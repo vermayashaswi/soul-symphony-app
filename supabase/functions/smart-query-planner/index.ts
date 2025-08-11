@@ -303,12 +303,15 @@ serve(async (req) => {
   }
 
   try {
-    const { message, conversationContext = [], userId } = await req.json();
+    const { message, conversationContext = [], userId, execute = false, timeRange = null, threadId = null, messageId = null } = await req.json();
     
     console.log('Smart Query Planner (Analyst Agent) called with:', { 
       message: message?.substring(0, 100),
       contextCount: conversationContext?.length || 0,
-      userId 
+      userId,
+      execute,
+      threadId,
+      messageId
     });
 
     // Get user's journal entry count for context
@@ -319,16 +322,108 @@ serve(async (req) => {
 
     // Generate comprehensive analysis plan
     const analysisPlan = await analyzeQueryWithSubQuestions(message, conversationContext, userEntryCount);
+
+    // Optionally execute the plan (Researcher Agent removed; direct execution)
+    let researchResults = null as any;
+    if (execute && analysisPlan?.subQuestions?.length) {
+      // Normalize time range
+      const normalizedTimeRange = (() => {
+        const tr = analysisPlan?.timeRange || analysisPlan?.dateRange || timeRange || null;
+        if (!tr) return null;
+        const start = tr.start ?? tr.startDate ?? null;
+        const end = tr.end ?? tr.endDate ?? null;
+        return (start || end) ? { start, end } : null;
+      })();
+
+      // Build pseudo-validated plans from Analyst sub-questions and execute
+      researchResults = await Promise.all(
+        analysisPlan.subQuestions.map(async (subQuestion: any, index: number) => {
+          try {
+            const executionSteps: any[] = [];
+            // Map analysisSteps to executionSteps
+            for (const step of (subQuestion.analysisSteps || [])) {
+              if (step.queryType?.includes('sql') && step.sqlQuery) {
+                // Ensure parameter placeholder and user filter
+                let sqlText = String(step.sqlQuery);
+                sqlText = sqlText.replace(/\$user_id/g, '$1');
+                if (!/WHERE\s+[^;]*user_id\s*=\s*\$1/i.test(sqlText)) {
+                  // Naively inject user filter if missing
+                  const whereMatch = sqlText.match(/\bWHERE\b/i);
+                  if (whereMatch) {
+                    sqlText = sqlText.replace(/\bWHERE\b/i, 'WHERE user_id = $1 AND ');
+                  } else {
+                    // Insert WHERE before ORDER/LIMIT/; if possible
+                    const insertIndex = sqlText.search(/\bORDER BY\b|\bLIMIT\b|;|$/i);
+                    sqlText = `${sqlText.slice(0, insertIndex)} WHERE user_id = $1 ${sqlText.slice(insertIndex)}`;
+                  }
+                }
+                executionSteps.push({
+                  stepId: executionSteps.length + 1,
+                  type: 'sql_query',
+                  description: step.description || 'SQL analysis',
+                  sql: {
+                    query: sqlText,
+                    parameters: ['$user_id'],
+                    purpose: step.description || 'analysis'
+                  },
+                  vector: null
+                });
+              } else if (step.queryType === 'vector_search' && step.vectorSearch) {
+                executionSteps.push({
+                  stepId: executionSteps.length + 1,
+                  type: 'vector_search',
+                  description: step.description || 'Vector search',
+                  sql: null,
+                  vector: {
+                    queryText: step.vectorSearch.query,
+                    threshold: step.vectorSearch.threshold ?? 0.3,
+                    limit: step.vectorSearch.limit ?? 10,
+                    dateFilter: Boolean(normalizedTimeRange)
+                  }
+                });
+              }
+            }
+
+            const validatedPlan = {
+              subQuestion: subQuestion.question,
+              searchStrategy: subQuestion.searchStrategy || 'hybrid',
+              executionSteps
+            };
+
+            const executionResults = await executeValidatedPlan(validatedPlan, userId, normalizedTimeRange, supabase);
+
+            return {
+              subQuestion,
+              researcherOutput: { validatedPlan, confidence: analysisPlan.confidence ?? 0.8, validationIssues: [], enhancements: [] },
+              executionResults,
+              index
+            };
+          } catch (err) {
+            console.error('[smart-query-planner] Execution error:', err);
+            return {
+              subQuestion,
+              researcherOutput: null,
+              executionResults: { error: err.message },
+              index
+            };
+          }
+        })
+      );
+    }
     
     return new Response(JSON.stringify({
       success: true,
       queryPlan: analysisPlan,
       userEntryCount,
+      researchResults: researchResults || undefined,
+      analysisResults: researchResults || undefined,
       metadata: {
-        plannerVersion: "analyst_agent_v1",
+        plannerVersion: "analyst_agent_v2",
         timestamp: new Date().toISOString(),
         hasSubQuestions: Boolean(analysisPlan.subQuestions?.length),
-        searchStrategies: analysisPlan.subQuestions?.map(sq => sq.searchStrategy) || []
+        searchStrategies: analysisPlan.subQuestions?.map((sq: any) => sq.searchStrategy) || [],
+        processedSubQuestions: researchResults?.length || 0,
+        hasErrors: Array.isArray(researchResults) ? researchResults.some((r: any) => r.executionResults?.error) : false
       }
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

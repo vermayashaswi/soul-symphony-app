@@ -169,6 +169,7 @@ serve(async (req) => {
               conversationContext,
               userProfile,
               timeRange: userProfile.timeRange || null,
+              execute: true,
               threadId,
               messageId
             }
@@ -192,36 +193,10 @@ serve(async (req) => {
       const shouldUseGptAnalysis = enhancedQueryPlan.subQuestions && enhancedQueryPlan.subQuestions.length >= 1;
       
       if (shouldUseGptAnalysis) {
-        console.log(`[chat-with-rag] Using GPT-driven analysis pipeline for ${enhancedQueryPlan.subQuestions.length} sub-questions`);
-        
-        // Normalize time range from plan (supports dateRange {startDate,endDate} or timeRange {start,end})
-        const normalizedTimeRange = (() => {
-          const tr = enhancedQueryPlan?.timeRange || enhancedQueryPlan?.dateRange || null;
-          if (!tr) return null;
-          const start = tr.start ?? tr.startDate ?? null;
-          const end = tr.end ?? tr.endDate ?? null;
-          return (start || end) ? { start, end } : null;
-        })();
-        
-        // Step 4: Call GPT Analysis Orchestrator for sub-question analysis
-        const { data: analysisResults, error: analysisError } = await supabaseClient.functions.invoke(
-          'gpt-analysis-orchestrator',
-          {
-            body: {
-              analysisPlan: enhancedQueryPlan,
-              // legacy for compatibility
-              subQuestions: enhancedQueryPlan.subQuestions,
-              userMessage: message,
-              userId: requestUserId,
-              timeRange: normalizedTimeRange,
-              threadId,
-              messageId
-            }
-          }
-        );
-
-        if (analysisError) {
-          throw new Error(`Analysis orchestrator failed: ${analysisError.message}`);
+        // Use researchResults returned by smart-query-planner (executed plan)
+        const researchResults = gptPlan.researchResults;
+        if (!researchResults || !Array.isArray(researchResults)) {
+          throw new Error('Analysis execution failed: missing researchResults');
         }
 
         // Step 5: Call GPT Response Consolidator to synthesize the results
@@ -230,7 +205,7 @@ serve(async (req) => {
           {
             body: {
               userMessage: message,
-              researchResults: analysisResults.researchResults ?? analysisResults.analysisResults,
+              researchResults,
               conversationContext,
               userProfile,
               streamingMode: false,
@@ -256,7 +231,7 @@ serve(async (req) => {
           analysis: {
             queryPlan: enhancedQueryPlan,
             gptDrivenAnalysis: true,
-            subQuestionAnalysis: analysisResults.summary,
+            subQuestionAnalysis: researchResults,
             consolidationMetadata: consolidationResult.analysisMetadata,
             classification
           }
@@ -477,6 +452,7 @@ async function processStreamingPipeline(
           conversationContext,
           userProfile,
           timeRange: userProfile.timeRange || null,
+          execute: true,
           threadId,
           messageId
         }
@@ -494,34 +470,12 @@ async function processStreamingPipeline(
         streamManager.sendUserMessage(gptPlan.userStatusMessage);
       }
       
-      // Step 3: Analysis orchestration with status updates
+      // Step 3: Analysis execution (already performed by smart-query-planner)
       streamManager.sendBackendTask("Searching your journal...", "Looking through journal entries");
-      
-      // Normalize time range for orchestrator
-      const normalizedTimeRange = (() => {
-        const tr = enhancedQueryPlan?.timeRange || enhancedQueryPlan?.dateRange || null;
-        if (!tr) return null;
-        const start = tr.start ?? tr.startDate ?? null;
-        const end = tr.end ?? tr.endDate ?? null;
-        return (start || end) ? { start, end } : null;
-      })();
-      
-      const { data: analysisResults, error: analysisError } = await supabaseClient.functions.invoke(
-        'gpt-analysis-orchestrator',
-        {
-          body: {
-            analysisPlan: enhancedQueryPlan,
-            subQuestions: enhancedQueryPlan.subQuestions,
-            userMessage: message,
-            userId: requestUserId,
-            timeRange: normalizedTimeRange,
-            threadId
-          }
-        }
-      );
 
-      if (analysisError) {
-        throw new Error(`Analysis orchestrator failed: ${analysisError.message}`);
+      const researchResults = gptPlan.researchResults;
+      if (!researchResults || !Array.isArray(researchResults)) {
+        throw new Error('Analysis execution failed: missing researchResults');
       }
 
       streamManager.sendBackendTask("Journal analysis complete", "Processing insights");
@@ -534,7 +488,7 @@ async function processStreamingPipeline(
         {
           body: {
             userMessage: message,
-            researchResults: analysisResults.researchResults ?? analysisResults.analysisResults,
+            researchResults,
             conversationContext,
             userProfile,
             streamingMode: false,
@@ -558,7 +512,7 @@ async function processStreamingPipeline(
         analysis: {
           queryPlan: enhancedQueryPlan,
           gptDrivenAnalysis: true,
-          subQuestionAnalysis: analysisResults.summary,
+          subQuestionAnalysis: researchResults,
           consolidationMetadata: consolidationResult.analysisMetadata,
           classification
         }
