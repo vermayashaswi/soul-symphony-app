@@ -234,10 +234,26 @@ export const useMobileKeyboardErrorRecovery = (
     window.addEventListener('keyboardOpen', handleKeyboardOpen);
     window.addEventListener('keyboardClose', handleKeyboardClose);
     
-    // Listen for swipe events
-    ['swipeLeft', 'swipeRight', 'swipeUp', 'swipeDown'].forEach(eventType => {
-      window.addEventListener(eventType, handleSwipeGesture as EventListener);
-    });
+    // Listen to coordinated detection state changes (from swipe/input coordinator)
+    const handleDetectionStateChange = (e: CustomEvent) => {
+      const detail: any = e.detail || {};
+      const hasActiveSwipe = !!detail.hasActiveSwipe;
+      const isComposing = !!detail.isComposing;
+      const inputActive = (() => {
+        const ae = document.activeElement as HTMLElement | null;
+        return !!ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable);
+      })();
+
+      if (hasActiveSwipe && (inputActive || isComposing)) {
+        if (enableDebugMode) {
+          console.log('[KeyboardErrorRecovery] Coordinated swipe conflict detected; applying silent recovery');
+        }
+        // Silent recovery without escalating to global error handler
+        recoverFromSwipeConflict();
+      }
+    };
+
+    window.addEventListener('coordinatedDetectionStateChange', handleDetectionStateChange as EventListener);
 
     // Manual error reporting
     (window as any).reportKeyboardError = (type: string, context?: string) => {
@@ -258,9 +274,7 @@ export const useMobileKeyboardErrorRecovery = (
       window.removeEventListener('keyboardOpen', handleKeyboardOpen);
       window.removeEventListener('keyboardClose', handleKeyboardClose);
       
-      ['swipeLeft', 'swipeRight', 'swipeUp', 'swipeDown'].forEach(eventType => {
-        window.removeEventListener(eventType, handleSwipeGesture as EventListener);
-      });
+      window.removeEventListener('coordinatedDetectionStateChange', handleDetectionStateChange as EventListener);
     };
   }, [isReady, handleError]);
 

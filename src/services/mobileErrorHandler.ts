@@ -19,7 +19,7 @@ const getPlatform = (): string => {
 };
 
 interface MobileError {
-  type: 'crash' | 'network' | 'permission' | 'storage' | 'audio' | 'android_webview' | 'capacitor' | 'unknown';
+  type: 'crash' | 'network' | 'permission' | 'storage' | 'audio' | 'android_webview' | 'capacitor' | 'swipe_conflict' | 'unknown';
   message: string;
   stack?: string;
   timestamp: number;
@@ -183,6 +183,11 @@ class MobileErrorHandler {
   private classifyError(message: string): MobileError['type'] {
     const msg = message.toLowerCase();
     
+    // Classify swipe conflicts early to suppress noisy toasts
+    if ((msg.includes('swipe') || msg.includes('gesture')) && (msg.includes('conflict') || msg.includes('keyboard'))) {
+      return 'swipe_conflict';
+    }
+    
     if (msg.includes('webview') || msg.includes('chromium')) {
       return 'android_webview';
     }
@@ -281,6 +286,17 @@ class MobileErrorHandler {
     const isStartup = now - this.appStartTime < this.suppressStartupMs;
     if (isStartup && (error.type === 'unknown' || error.type === 'capacitor')) {
       console.log('[MobileErrorHandler] Suppressing startup toast for minor error:', error.type);
+      return;
+    }
+
+    // Suppress benign keyboard swipe conflicts and minor errors while keyboard is visible
+    if (error.type === 'swipe_conflict') {
+      console.log('[MobileErrorHandler] Suppressing toast for swipe_conflict');
+      return;
+    }
+    const keyboardVisible = !!document?.body?.classList?.contains('keyboard-visible');
+    if (keyboardVisible && (error.type === 'unknown' || error.type === 'capacitor')) {
+      console.log('[MobileErrorHandler] Suppressing toast during keyboard-visible state for:', error.type);
       return;
     }
 
