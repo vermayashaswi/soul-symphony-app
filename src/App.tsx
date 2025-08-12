@@ -18,6 +18,7 @@ import { nativeAppInitService } from './services/nativeAppInitService';
 import { mobileErrorHandler } from './services/mobileErrorHandler';
 import { mobileOptimizationService } from './services/mobileOptimizationService';
 import { nativeIntegrationService } from './services/nativeIntegrationService';
+import PullToRefresh from './components/system/PullToRefresh';
 
 import { useAppInitialization } from './hooks/useAppInitialization';
 import { logger } from './utils/logger';
@@ -198,10 +199,12 @@ const App: React.FC = () => {
           <TutorialProvider>
             <TranslationLoadingOverlay />
             <JournalProcessingInitializer />
-            <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
-            <TutorialOverlay />
-            <Toaster />
-            <SonnerToaster position="top-right" />
+            <PullToRefresh>
+              <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
+              <TutorialOverlay />
+              <Toaster />
+              <SonnerToaster position="top-right" />
+            </PullToRefresh>
           </TutorialProvider>
         </SubscriptionProvider>
       </FeatureFlagsProvider>

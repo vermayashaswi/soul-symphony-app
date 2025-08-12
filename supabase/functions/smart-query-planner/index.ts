@@ -407,10 +407,18 @@ async function executeSqlIntent(sqlQuery: string, userId: string, timeRange: { s
 // Execute plan by directly running GPT-produced steps with staged parallelism
 async function executePlan(plan: any, userId: string, normalizedTimeRange: { start?: string | null; end?: string | null } | null, supabaseClient: any) {
   // Helper: run raw SQL via RPC after injecting user id
-  const executeRawSql = async (sqlQuery: string) => {
+  const executeRawSql = async (sqlQuery: string, timeRange?: { start?: string | null; end?: string | null } | null) => {
     if (!sqlQuery || !sqlQuery.trim()) return { ok: true, rows: [] };
-    // Replace $user_id placeholder with literal uuid cast
-    const finalSql = sqlQuery.replace(/\$user_id\b/g, `'${userId}'::uuid`);
+    // Replace placeholders
+    let finalSql = sqlQuery.replace(/\$user_id\b/g, `'${userId}'::uuid`);
+    const startVal = timeRange?.start || null;
+    const endVal = timeRange?.end || null;
+    if (/\$start_date\b/.test(finalSql)) {
+      finalSql = finalSql.replace(/\$start_date\b/g, startVal ? `'${startVal}'::timestamptz` : 'NULL');
+    }
+    if (/\$end_date\b/.test(finalSql)) {
+      finalSql = finalSql.replace(/\$end_date\b/g, endVal ? `'${endVal}'::timestamptz` : 'NULL');
+    }
     const { data, error } = await supabaseClient.rpc('execute_dynamic_query', { query_text: finalSql });
     if (error) return { ok: false, error: error.message };
     if (!data || data.success === false) return { ok: false, error: (data && data.error) || 'Unknown SQL execution error' };
@@ -471,7 +479,7 @@ async function executePlan(plan: any, userId: string, normalizedTimeRange: { sta
         }
 
         if (step.queryType === 'sql_analysis' || step.queryType === 'sql_calculation' || step.queryType === 'sql_count') {
-          const exec = await executeRawSql(step.sqlQuery || '');
+          const exec = await executeRawSql(step.sqlQuery || '', stepTimeRange);
           if (exec.ok) return { kind: 'sql', ok: true, rows: exec.rows || [], timeRange: stepTimeRange };
           return { kind: 'sql', ok: false, error: exec.error || 'SQL execution failed' };
         }
@@ -488,10 +496,22 @@ async function executePlan(plan: any, userId: string, normalizedTimeRange: { sta
     const vectorOk = resolved.filter(r => r.kind === 'vector' && r.ok && Array.isArray((r as any).entries)) as any[];
     const sqlResults = sqlRows.flatMap(r => r.rows);
     const vectorResults = vectorOk.flatMap(r => r.entries);
+    const stepTimeRanges = resolved.map((r: any) => ({ kind: r.kind, timeRange: r.timeRange || null }));
+
+    // Prefer SQL-derived metrics when available
+    let sqlPercentage: number | null = null;
+    let sqlCountValue: number | null = null;
+    for (const row of sqlResults) {
+      if (sqlPercentage === null && typeof row?.percentage === 'number') sqlPercentage = Number(row.percentage);
+      if (sqlCountValue === null && typeof row?.count === 'number') sqlCountValue = Number(row.count);
+    }
 
     const vectorIds = new Set<number>(vectorResults.map((e: any) => e.id));
     let totalCount = 0; try { totalCount = await getTotalCount(); } catch {}
-    const combinedPercentage = totalCount > 0 ? Math.round((vectorIds.size / totalCount) * 1000) / 10 : 0;
+    const vectorBasedPercentage = totalCount > 0 ? Math.round((vectorIds.size / totalCount) * 1000) / 10 : 0;
+
+    const finalPercentage = sqlPercentage ?? vectorBasedPercentage;
+    const finalCount = sqlCountValue ?? vectorIds.size;
 
     return {
       subQuestion: { question: subQuestion.question, purpose: subQuestion.purpose, executionStage: subQuestion.executionStage },
@@ -505,12 +525,13 @@ async function executePlan(plan: any, userId: string, normalizedTimeRange: { sta
       executionResults: {
         sqlResults,
         vectorResults,
+        stepTimeRanges,
         combinedMetrics: {
           sqlCount: sqlResults.length,
           vectorCount: vectorResults.length,
-          combinedCount: vectorIds.size,
+          combinedCount: finalCount,
           totalCount,
-          combinedPercentage
+          combinedPercentage: finalPercentage
         }
       }
     };
