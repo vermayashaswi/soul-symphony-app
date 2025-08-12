@@ -123,6 +123,12 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       }
       
       debugLog.addEvent("Streaming Response", `Final response received for ${originThreadId}: ${response.substring(0, 100)}...`, "success");
+
+      // Keep typing indicator visible while we finalize and render the message for the active thread
+      if (originThreadId === currentThreadId) {
+        setLocalLoading(true, "Finalizing response...");
+        updateProcessingStage("Finalizing response...");
+      }
       
       try {
         // Save the assistant response to database (always save to origin thread)
@@ -176,6 +182,11 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
           description: "Response displayed but couldn't be saved to your conversation history",
           variant: "default"
         });
+      } finally {
+        if (originThreadId === currentThreadId) {
+          setLocalLoading(false);
+          updateProcessingStage(null);
+        }
       }
     },
     onError: (error) => {

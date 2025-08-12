@@ -99,79 +99,88 @@ export default function MobileChatInterface({
     useThreeDotFallback,
     queryCategory,
     restoreStreamingState
-  } = useStreamingChat({
-     threadId: threadId,
-    onFinalResponse: async (response, analysis, originThreadId) => {
-      // Handle final streaming response scoped to its origin thread
-      if (!response || !originThreadId || !user?.id) {
-        debugLog.addEvent("Streaming Response", "[Mobile] Missing required data for final response", "error");
-        console.error("[Mobile] [Streaming] Missing response data:", { response: !!response, originThreadId: !!originThreadId, userId: !!user?.id });
-        return;
-      }
-      
-      debugLog.addEvent("Streaming Response", `[Mobile] Final response received for ${originThreadId}: ${response.substring(0, 100)}...`, "success");
-      
-      try {
-        // Always save to the origin thread
-        debugLog.addEvent("Database", "[Mobile] Saving streaming assistant response to database", "info");
-        const savedResponse = await saveMessage(
-          originThreadId,
-          response,
-          'assistant',
-          user.id,
-          analysis?.references || undefined,
-          analysis?.hasNumericResult || false
-        );
-        
-        if (savedResponse) {
-          debugLog.addEvent("Database", `[Mobile] Streaming assistant response saved with ID: ${savedResponse.id}`, "success");
-          
-          // Only append to UI if the origin thread is currently active
-          if (originThreadId === threadId) {
-            const finalMessage: UIChatMessage = {
-              role: 'assistant',
-              content: response,
-              references: analysis?.references,
-              analysis: analysis || undefined,
-              hasNumericResult: analysis?.hasNumericResult || false
-            };
-            setMessages(prev => [...prev, finalMessage]);
-          } else {
-            debugLog.addEvent("Streaming Response", `[Mobile] Response saved for background thread ${originThreadId}, not appending to current UI thread ${threadId}`, "info");
-          }
-        } else {
-          debugLog.addEvent("Database", "[Mobile] Failed to save streaming response - null response", "error");
-          throw new Error("Failed to save streaming response");
-        }
-      } catch (saveError) {
-        debugLog.addEvent("Database", `[Mobile] Error saving streaming response: ${saveError instanceof Error ? saveError.message : "Unknown error"}`, "error");
-        console.error("[Mobile] [Streaming] Failed to save response:", saveError);
-        
-        // Fallback: Only show in UI if still on the origin thread
-        if (originThreadId === threadId) {
-          const fallbackMessage: UIChatMessage = {
-            role: 'assistant',
-            content: response,
-            ...(analysis && { analysis })
-          };
-          setMessages(prev => [...prev, fallbackMessage]);
-        }
-        
-        toast({
-          title: "Warning",
-          description: "Response saved in memory but couldn't be persisted to history",
-          variant: "default"
-        });
-      }
-    },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: error,
-        variant: "destructive"
-      });
-    }
-  });
+   } = useStreamingChat({
+      threadId: threadId,
+     onFinalResponse: async (response, analysis, originThreadId) => {
+       // Handle final streaming response scoped to its origin thread
+       if (!response || !originThreadId || !user?.id) {
+         debugLog.addEvent("Streaming Response", "[Mobile] Missing required data for final response", "error");
+         console.error("[Mobile] [Streaming] Missing response data:", { response: !!response, originThreadId: !!originThreadId, userId: !!user?.id });
+         return;
+       }
+       
+       debugLog.addEvent("Streaming Response", `[Mobile] Final response received for ${originThreadId}: ${response.substring(0, 100)}...`, "success");
+
+       // Keep typing indicator visible on mobile while finalizing UI for the active thread
+       if (originThreadId === threadId) {
+         setLocalLoading(true, "Finalizing response...");
+       }
+       
+       try {
+         // Always save to the origin thread
+         debugLog.addEvent("Database", "[Mobile] Saving streaming assistant response to database", "info");
+         const savedResponse = await saveMessage(
+           originThreadId,
+           response,
+           'assistant',
+           user.id,
+           analysis?.references || undefined,
+           analysis?.hasNumericResult || false
+         );
+         
+         if (savedResponse) {
+           debugLog.addEvent("Database", `[Mobile] Streaming assistant response saved with ID: ${savedResponse.id}`, "success");
+           
+           // Only append to UI if the origin thread is currently active
+           if (originThreadId === threadId) {
+             const finalMessage: UIChatMessage = {
+               role: 'assistant',
+               content: response,
+               references: analysis?.references,
+               analysis: analysis || undefined,
+               hasNumericResult: analysis?.hasNumericResult || false
+             };
+             setMessages(prev => [...prev, finalMessage]);
+           } else {
+             debugLog.addEvent("Streaming Response", `[Mobile] Response saved for background thread ${originThreadId}, not appending to current UI thread ${threadId}`, "info");
+           }
+         } else {
+           debugLog.addEvent("Database", "[Mobile] Failed to save streaming response - null response", "error");
+           throw new Error("Failed to save streaming response");
+         }
+       } catch (saveError) {
+         debugLog.addEvent("Database", `[Mobile] Error saving streaming response: ${saveError instanceof Error ? saveError.message : "Unknown error"}`, "error");
+         console.error("[Mobile] [Streaming] Failed to save response:", saveError);
+         
+         // Fallback: Only show in UI if still on the origin thread
+         if (originThreadId === threadId) {
+           const fallbackMessage: UIChatMessage = {
+             role: 'assistant',
+             content: response,
+             ...(analysis && { analysis })
+           };
+           setMessages(prev => [...prev, fallbackMessage]);
+         }
+         
+         toast({
+           title: "Warning",
+           description: "Response saved in memory but couldn't be persisted to history",
+           variant: "default"
+         });
+       } finally {
+         if (originThreadId === threadId) {
+           setLocalLoading(false);
+         }
+       }
+     },
+     onError: (error) => {
+       toast({
+         title: "Error",
+         description: error,
+         variant: "destructive"
+       });
+     }
+   });
   
   const suggestionQuestions = [
     {
