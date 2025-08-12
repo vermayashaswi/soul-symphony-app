@@ -96,7 +96,7 @@ async function gptClassifyMessage(
     ? `\nConversation context: ${conversationContext.slice(-6).map(msg => `${(msg.role || msg.sender || 'user')}: ${msg.content}`).join('\n')}`
     : '';
 
-  const classificationPrompt = `You are the intent router for "Ruh by SOuLO". Use the conversation context to classify the latest user message and return ONE JSON object that exactly matches the schema. Be decisive and consistent.`
+  const classificationPrompt = `You are the intent router for "Ruh by SOuLO". Use the conversation context to classify the latest user message and return ONE JSON object that exactly matches the schema. Be decisive and consistent.
 
 Categories (choose exactly one):
 - JOURNAL_SPECIFIC: First-person, analyzable questions about the user's own patterns/feelings/behaviors. Examples: "How have I felt this month?", "Did meditation help me?", "What are my stress patterns lately?".
