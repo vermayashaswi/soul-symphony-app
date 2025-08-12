@@ -6,62 +6,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Simple scope validation
-function isWithinScope(message: string): boolean {
-  const lowerMessage = message.toLowerCase().trim();
-  
-  // Mental health and wellness keywords
-  const inScopeKeywords = [
-    'mental health', 'anxiety', 'depression', 'stress', 'mood', 'emotion', 'feeling',
-    'therapy', 'counseling', 'wellbeing', 'wellness', 'mindfulness', 'meditation',
-    'self-care', 'coping', 'cope', 'overwhelmed', 'worried', 'sad', 'happy',
-    'journal', 'journaling', 'reflection', 'sleep', 'exercise', 'habits'
-  ];
-  
-  // Clearly unrelated topics (removed sports/football for mental health context)
-  const outOfScopeIndicators = [
-    'president', 'politics', 'election', 'programming', 'coding', 'movie', 'film',
-    'recipe', 'cooking', 'weather', 'mathematics', 'physics', 'history'
-  ];
-  
-  // Quick exclusion check
-  if (outOfScopeIndicators.some(keyword => lowerMessage.includes(keyword))) {
-    return false;
-  }
-  
-  // Quick inclusion check
-  if (inScopeKeywords.some(keyword => lowerMessage.includes(keyword))) {
-    return true;
-  }
-  
-  // Allow general conversational patterns
-  const conversationalPatterns = [
-    /^(hi|hello|hey|good morning)/i,
-    /^(thank you|thanks)/i,
-    /^(how are you|how do you)/i,
-    /how (can|do) (i|you)/i,
-    /what (is|are) (some|good|best|effective) (ways?|methods?|techniques?)/i
-  ];
-  
-  if (conversationalPatterns.some(pattern => pattern.test(lowerMessage))) {
-    return true;
-  }
-  
-  // Reject specific factual questions
-  const factualPatterns = [
-    /^who is (the )?.*\?/i,
-    /^what is the (capital|population|president)/i,
-    /^when (was|did|is)/i,
-    /^where is/i
-  ];
-  
-  if (factualPatterns.some(pattern => pattern.test(lowerMessage))) {
-    return false;
-  }
-  
-  // Default to allowing (benefit of doubt for mental health context)
-  return true;
-}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -81,16 +25,6 @@ serve(async (req) => {
     console.log(`[General Mental Health] Processing: "${message}"`);
     // Follow-up flags removed from pipeline
 
-    // Scope checking
-    if (!isWithinScope(message)) {
-      console.log(`[General Mental Health] Out of scope: "${message}"`);
-      return new Response(
-        JSON.stringify({ 
-          response: "I'm Ruh by SOuLO, your journaling companion! I'm here to help you explore your emotions and deepen your self-awareness through thoughtful conversation. For other topics, try a general search engine. What feelings or experiences would you like to explore today?" 
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
 
     const openAiApiKey = Deno.env.get('OPENAI_API_KEY');
     if (!openAiApiKey) {

@@ -14,7 +14,9 @@ export interface StreamingMessage {
   analysis?: any;
   error?: string;
   timestamp: number;
+  requestId?: string; // correlate to activeRequestId to avoid bleed
 }
+
 
 interface UseStreamingChatProps {
   onFinalResponse?: (response: string, analysis: any | undefined, originThreadId: string | null) => void;
@@ -284,6 +286,13 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     console.log(`[useStreamingChat] Adding message to thread ${activeThreadId}:`, message.type);
     
     const threadState = getThreadState(activeThreadId);
+
+    // Correlate final/error messages to active request to avoid bleed from older requests
+    if ((message.type === 'final_response' || message.type === 'error') && message.requestId && threadState.activeRequestId && message.requestId !== threadState.activeRequestId) {
+      console.warn('[useStreamingChat] Ignoring message due to requestId mismatch', { incoming: message.requestId, active: threadState.activeRequestId });
+      return;
+    }
+
     const newMessages = [...threadState.streamingMessages, message];
     
     const updates: Partial<ThreadStreamingState> = {
@@ -691,7 +700,8 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
           type: 'final_response',
           response: text,
           analysis: data?.analysis,
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          requestId
         }, targetThreadId);
       } else {
         throw new Error('No response received from chat service');

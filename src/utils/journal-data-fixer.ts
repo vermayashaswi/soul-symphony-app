@@ -166,14 +166,14 @@ export const findProblematicEntries = async (userId?: string): Promise<{
       }
       
       // Check for missing sentiment
-      if (!entry.sentiment || entry.sentiment === '0' || entry.sentiment === '') {
+      if (entry.sentiment == null || Number(entry.sentiment) === 0) {
         missingSentiment.push(entry.id);
       }
       
       // Check for inconsistent data (has one type of analysis but missing others)
       const hasThemes = (entry.themes && entry.themes.length > 0) || 
                        (entry.master_themes && entry.master_themes.length > 0);
-      const hasSentiment = entry.sentiment && entry.sentiment !== '0';
+      const hasSentiment = entry.sentiment != null && Number(entry.sentiment) !== 0;
       const hasEmotions = entry.emotions && Object.keys(entry.emotions).length > 0;
       const hasEntities = entry.entities && Object.keys(entry.entities).length > 0;
       
