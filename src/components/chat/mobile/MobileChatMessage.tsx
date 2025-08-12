@@ -12,8 +12,9 @@ import { TranslatableText } from "@/components/translation/TranslatableText";
 import { TranslatableMarkdown } from "@/components/translation/TranslatableMarkdown";
 import TypingIndicator from "../TypingIndicator";
 import ParticleAvatar from "../ParticleAvatar";
-
-interface MobileChatMessageProps {
+import { getSanitizedFinalContent } from "@/utils/messageParser";
+ 
+ interface MobileChatMessageProps {
   message: {
     role: 'user' | 'assistant' | 'error';
     content: string;
@@ -41,6 +42,9 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({
   
   // Memoize formatted content - this hook must always be called
   const formattedContent = React.useMemo(() => {
+    if (message.role === 'assistant') {
+      return getSanitizedFinalContent(message.content);
+    }
     return message.content;
   }, [message]);
   
