@@ -185,10 +185,10 @@ export const JOURNAL_ENTRY_SCHEMA: JournalEntrySchema = {
       }
     },
     sentiment: {
-      type: "text",
-      description: "Overall sentiment score from Google NL API (-1.0 to 1.0 scale stored as text)",
+      type: "real",
+      description: "Overall sentiment score (-1.0 to 1.0) stored as a numeric real",
       nullable: true,
-      example: "0.75"
+      example: 0.75
     },
     entities: {
       type: "jsonb",
@@ -200,14 +200,39 @@ export const JOURNAL_ENTRY_SCHEMA: JournalEntrySchema = {
         "GPE": ["New York", "California"]
       }
     },
-    entityemotion: {
+    languages: {
       type: "jsonb",
-      description: "Entity-emotion relationships with strength scores. Structure: {entity_name: {emotion_name: strength_score}}",
+      description: "JSON array of ISO 639-1 language codes detected for the entry",
       nullable: true,
-      example: {
-        "Sarah": {"happy": 0.8, "grateful": 0.6},
-        "work": {"stressed": 0.9, "anxious": 0.7}
-      }
+      example: ["en", "hi"]
+    },
+    themes: {
+      type: "text[]",
+      description: "Additional themes/categories extracted from content (legacy/auxiliary)",
+      nullable: true,
+      example: ["work", "relationships"]
+    },
+    "foreign key": {
+      type: "text",
+      description: "Legacy reference or external system foreign key (if any)",
+      nullable: true
+    },
+    translation_status: {
+      type: "text",
+      description: "Translation processing status for the entry",
+      nullable: true,
+      example: "completed"
+    },
+    user_feedback: {
+      type: "text",
+      description: "Optional user-provided feedback on the AI processing",
+      nullable: true
+    },
+    Edit_Status: {
+      type: "integer",
+      description: "Editing status flag for the entry (0 by default)",
+      nullable: false,
+      example: 0
     },
     duration: {
       type: "numeric",
@@ -225,7 +250,7 @@ export const JOURNAL_ENTRY_SCHEMA: JournalEntrySchema = {
     "journal_embeddings table contains vector embeddings for semantic search",
     "User profile information available in profiles table",
     "Emotion analysis results are pre-calculated and stored in emotions column",
-    "Language detection results are stored in languages array for multi-language support"
+    "Language detection results are stored in languages jsonb array for multi-language support"
   ],
   searchCapabilities: [
     "Vector similarity search using embeddings",
@@ -235,7 +260,7 @@ export const JOURNAL_ENTRY_SCHEMA: JournalEntrySchema = {
     "Content text search in both transcription and refined text",
     "Entity-based search for people, places, organizations",
     "Sentiment-based filtering using Google NL API scores",
-    "Multi-language content filtering using detected languages array",
+    "Multi-language content filtering using detected languages jsonb array",
     "Language-specific content retrieval and analysis"
   ]
 };
@@ -243,6 +268,8 @@ export const JOURNAL_ENTRY_SCHEMA: JournalEntrySchema = {
 export async function generateDatabaseSchemaContext(supabaseClient?: any): Promise<string> {
   const { themes, emotions } = await fetchLiveMasterData(supabaseClient);
   return `
+Schema context version: 2025-08-12
+
 **JOURNAL ENTRY DATABASE SCHEMA:**
 
 Table: "${JOURNAL_ENTRY_SCHEMA.table}"
@@ -262,6 +289,8 @@ ${emotions.map(emotion => `• "${emotion.name}": ${emotion.description}`).join(
 - emotions column: Contains ONLY emotion names from the master emotions list above with scores 0.0-1.0
 - master_themes column: Contains ONLY theme names from the master themes list above as text array
 - themeemotion column: Combines themes and emotions {theme_name: {emotion_name: score}}
+- languages column: JSONB array of ISO 639-1 codes (e.g., ["en", "hi"]) 
+- sentiment column: real (numeric), typically in range -1.0..1.0
 - For theme-specific emotion queries (like "family emotions"), use: themeemotion->'theme_name' 
 - For general emotion queries, use: emotions column with jsonb operators
 - Always include WHERE user_id = $user_id for security
@@ -352,7 +381,7 @@ export function getSentimentAnalysisGuidelines(): string {
 1. **Google NL API Sentiment Scoring**
    - Sentiment scores are calculated using Google Natural Language API
    - Scores range from -1.0 (very negative) to 1.0 (very positive)
-   - Stored as text strings in the sentiment column
+   - Stored as real (numeric) in the sentiment column
 
 2. **Sentiment Categories**
    - Positive: >= 0.3
