@@ -114,8 +114,43 @@ serve(async (req) => {
     // Handle unrelated queries with polite denial
     if (cachedClassification.category === 'UNRELATED') {
       console.log('[chat-with-rag] EXECUTING: UNRELATED pipeline - polite denial');
+      const reply = "I appreciate your question, but I'm specifically designed to help you explore your journal entries, understand your emotional patterns, and support your mental health and well-being. I focus on analyzing your personal reflections and providing insights about your journey. Is there something about your thoughts, feelings, or experiences you'd like to discuss instead?";
+
+      // Persist assistant message idempotently for unrelated responses
+      if (threadId) {
+        try {
+          const enc = new TextEncoder();
+          const keySource = requestId || `${threadId}:${reply}`;
+          const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
+          const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+          const idempotencyKey = hex.slice(0, 32);
+
+          const { data: existing, error: existErr } = await supabaseClient
+            .from('chat_messages')
+            .select('id')
+            .eq('thread_id', threadId)
+            .eq('idempotency_key', idempotencyKey)
+            .maybeSingle();
+
+          if (!existErr && !existing) {
+            const { error: insertErr } = await supabaseClient
+              .from('chat_messages')
+              .insert({
+                thread_id: threadId,
+                content: reply,
+                sender: 'assistant',
+                role: 'assistant',
+                idempotency_key: idempotencyKey
+              });
+            if (insertErr) console.warn('[chat-with-rag] Unrelated persist error:', insertErr.message);
+          }
+        } catch (e) {
+          console.warn('[chat-with-rag] Unrelated persist exception:', (e as any)?.message || e);
+        }
+      }
+
       return new Response(JSON.stringify({
-        response: "I appreciate your question, but I'm specifically designed to help you explore your journal entries, understand your emotional patterns, and support your mental health and well-being. I focus on analyzing your personal reflections and providing insights about your journey. Is there something about your thoughts, feelings, or experiences you'd like to discuss instead?",
+        response: reply,
         userStatusMessage: null,
         analysis: {
           queryType: 'unrelated_denial',
@@ -501,15 +536,46 @@ async function processStreamingPipeline(
     if (classification.category === 'UNRELATED') {
       console.log('[chat-with-rag] STREAMING EXECUTING: UNRELATED pipeline');
       streamManager.sendUserMessage("Gently redirecting to wellness focus");
+      const reply = "I appreciate your question, but I'm specifically designed to help you explore your journal entries, understand your emotional patterns, and support your mental health and well-being. I focus on analyzing your personal reflections and providing insights about your journey. Is there something about your thoughts, feelings, or experiences you'd like to discuss instead?";
       
       streamManager.sendEvent('final_response', {
-        response: "I appreciate your question, but I'm specifically designed to help you explore your journal entries, understand your emotional patterns, and support your mental health and well-being. I focus on analyzing your personal reflections and providing insights about your journey. Is there something about your thoughts, feelings, or experiences you'd like to discuss instead?",
+        response: reply,
         analysis: {
           queryType: 'unrelated_denial',
           classification,
           timestamp: new Date().toISOString()
         }
       });
+
+      // Persist unrelated response in streaming mode
+      if (threadId) {
+        try {
+          const enc = new TextEncoder();
+          const keySource = requestId || `${threadId}:${reply}`;
+          const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
+          const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+          const idempotencyKey = hex.slice(0, 32);
+
+          const { data: existing } = await supabaseClient
+            .from('chat_messages')
+            .select('id')
+            .eq('thread_id', threadId)
+            .eq('idempotency_key', idempotencyKey)
+            .maybeSingle();
+
+          if (!existing) {
+            await supabaseClient.from('chat_messages').insert({
+              thread_id: threadId,
+              content: reply,
+              sender: 'assistant',
+              role: 'assistant',
+              idempotency_key: idempotencyKey
+            });
+          }
+        } catch (e) {
+          console.warn('[chat-with-rag] STREAM persist (unrelated) exception:', (e as any)?.message || e);
+        }
+      }
 
       streamManager.close();
       return;

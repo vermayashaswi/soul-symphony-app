@@ -126,7 +126,7 @@ const isInChatTutorialStep = isActive && isInStep(5);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey && !isLoading) {
+    if (e.key === 'Enter' && !e.shiftKey && !isLoading && !isSubmitting) {
       e.preventDefault();
       handleSendMessage();
     }
@@ -152,7 +152,7 @@ const isInChatTutorialStep = isActive && isInStep(5);
         chatDebug.addEvent("User Message", `Preparing to send: "${trimmedValue.substring(0, 30)}${trimmedValue.length > 30 ? '...' : ''}"`, "info");
         setIsSubmitting(true);
         
-        onSendMessage(trimmedValue);
+        await Promise.resolve(onSendMessage(trimmedValue));
         
         setInputValue("");
         
@@ -204,7 +204,7 @@ const isInChatTutorialStep = isActive && isInStep(5);
           onFocus={handleInputFocus}
           placeholder={placeholderText}
           className="w-full border border-muted shadow-sm bg-background text-foreground focus:outline-none focus:ring-0 focus:border-muted"
-          disabled={isSubmitting}
+          disabled={isSubmitting || isLoading}
           autoComplete="off"
           autoCorrect="on"
           autoCapitalize="sentences"
