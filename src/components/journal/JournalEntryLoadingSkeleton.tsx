@@ -34,16 +34,7 @@ const JournalEntryLoadingSkeleton: React.FC<JournalEntryLoadingSkeletonProps> = 
       if (event.detail?.tempId === tempId || event.detail?.tempId === 'all') {
         console.log(`[JournalEntryLoadingSkeleton] Force remove event received for ${tempId}`);
         setShouldRender(false);
-        
-        // IMMEDIATE DOM removal
-        if (componentRef.current) {
-          componentRef.current.style.display = 'none';
-          setTimeout(() => {
-            if (componentRef.current?.parentNode) {
-              componentRef.current.parentNode.removeChild(componentRef.current);
-            }
-          }, 0); // Remove immediately
-        }
+        // Removed immediate DOM manipulation; let React + AnimatePresence handle unmount smoothly
       }
     };
     
@@ -51,16 +42,7 @@ const JournalEntryLoadingSkeleton: React.FC<JournalEntryLoadingSkeletonProps> = 
       if (event.detail?.tempId === tempId) {
         console.log(`[JournalEntryLoadingSkeleton] Processing completed event received for ${tempId}`);
         setShouldRender(false);
-        
-        // IMMEDIATE DOM removal
-        if (componentRef.current) {
-          componentRef.current.style.display = 'none';
-          setTimeout(() => {
-            if (componentRef.current?.parentNode) {
-              componentRef.current.parentNode.removeChild(componentRef.current);
-            }
-          }, 0); // Remove immediately
-        }
+        // Removed immediate DOM manipulation; rely on React unmount
       }
     };
     

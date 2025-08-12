@@ -76,17 +76,7 @@ export const updateProcessingEntries = (tempId: string, action: 'add' | 'remove'
         detail: { tempId, action: 'remove', timestamp: now, immediate: true }
       }));
       
-      // IMMEDIATE DOM cleanup without any delays
-      try {
-        document.querySelectorAll('.journal-entry-card.processing-card').forEach(card => {
-          (card as HTMLElement).style.display = 'none';
-          if (card.parentNode) {
-            card.parentNode.removeChild(card);
-          }
-        });
-      } catch (e) {
-        console.error('[Audio.ProcessingState] Error in immediate DOM cleanup:', e);
-      }
+      // Removed immediate DOM cleanup; rely on React components to unmount on events
     }
     
     localStorage.setItem('processingEntries', JSON.stringify(entries));
@@ -154,17 +144,7 @@ export const getProcessingEntries = (): string[] => {
           detail: { tempId: id, timestamp: now, forceCleanup: true, wasStale: true, immediate: true }
         }));
         
-        // IMMEDIATE DOM cleanup for stale cards
-        try {
-          document.querySelectorAll('.journal-entry-card.processing-card').forEach(card => {
-            (card as HTMLElement).style.display = 'none';
-            if (card.parentNode) {
-              card.parentNode.removeChild(card);
-            }
-          });
-        } catch (e) {
-          console.error('[Audio.ProcessingState] Error in stale card DOM cleanup:', e);
-        }
+        // Removed immediate DOM cleanup for stale cards; components will unmount via state/events
         
         return false; // Remove this stale entry
       }
@@ -457,12 +437,12 @@ export function resetProcessingState(): void {
     detail: { entries: [], reset: true, lastUpdate: Date.now(), forceUpdate: true }
   }));
   
-  // Forcefully remove all processing cards
+  // Forcefully remove all processing cards via events; React will handle unmounts
   window.dispatchEvent(new CustomEvent('forceRemoveAllProcessingCards', {
     detail: { timestamp: Date.now() }
   }));
   
-  // Also forcefully remove any loading components
+  // Also notify that all loading components should be removed via events; React will handle unmounts
   window.dispatchEvent(new CustomEvent('forceRemoveAllLoadingContent', {
     detail: { timestamp: Date.now() }
   }));

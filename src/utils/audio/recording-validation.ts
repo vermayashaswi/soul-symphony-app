@@ -8,8 +8,7 @@ import {
   setProcessingLock, 
   setIsEntryBeingProcessed, 
   setProcessingTimeoutId,
-  getProcessingTimeoutId,
-  updateProcessingEntries
+  getProcessingTimeoutId
 } from './processing-state';
 import { validateAudioBlob } from './blob-utils';
 
@@ -79,18 +78,9 @@ export function setupProcessingTimeout(): void {
     setProcessingLock(false);
     setIsEntryBeingProcessed(false);
     
-    // Clean up any lingering entries after timeout
-    const entries = import('./processing-state').then(({ getProcessingEntries }) => {
-      return getProcessingEntries();
-    });
-    
-    entries.then(entries => {
-      if (entries.length > 0) {
-        entries.forEach(entry => {
-          updateProcessingEntries(entry, 'remove');
-        });
-      }
-    });
+    // Note: Do not auto-remove processing entries here to avoid premature UI hiding
+    // UI components will be unmounted by actual completion events
+
   }, 30000); // 30 second maximum lock time
   
   setProcessingTimeoutId(timeoutId);
