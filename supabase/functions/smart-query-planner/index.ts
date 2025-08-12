@@ -245,18 +245,19 @@ Return ONLY valid JSON with this exact structure:
   "hasExplicitTimeReference": boolean
 }
 
-- SQL INTENT RULES (no direct execution):
-- Your SQL is for intent only and will be translated to safe, parameterized Supabase query builder calls.
-- ALWAYS include a WHERE user_id = $user_id clause in your SQL (we will enforce it regardless).
-- Use exact column names: id, created_at, user_id, "refined text", "transcription text", master_themes, emotions, entities, sentiment.
-- For emotion analysis: Use emotions (jsonb) with jsonb_each/jsonb_object_keys in the SQL intent.
-- For theme analysis: Use master_themes array operators or unnest() in the SQL intent; we will map to overlaps() safely.
-- For percentages: Alias as percentage; for counts alias as count; for averages alias as avg_score.
-- For date filtering: Use created_at with timestamps; we also accept phrases like "since July" which will be normalized.
-- Do NOT reference tables outside of "Journal Entries" and journal_embeddings.
-- Do NOT invent columns; stick to the listed columns only.
-- Note: We will NEVER execute your SQL string verbatim; we only use it to infer the query.
-
+**SQL QUERY GENERATION RULES:**
+- ALWAYS include WHERE user_id = $user_id for security
+- Use proper column names with quotes for spaced names like "refined text"
+- For emotion analysis: Use emotions column with jsonb operators
+- For theme analysis: Use master_themes array with unnest() or array operators AND consider entity mentions and text content search for semantic expansion
+- For percentages: Always alias the result as percentage (e.g., SELECT ... AS percentage)
+- For counts: Alias as count (e.g., SELECT COUNT(*) AS count) or frequency for grouped counts
+- For averages/scores: Alias as avg_score (or score when singular)
+- For date filtering: Use created_at with timestamp comparisons
+- For theme-based queries like "family": AUTOMATICALLY expand to related terms (mom, dad, wife, husband, children, parents, siblings, mother, father, son, daughter, family) and search in master_themes, entities, AND text content
+- Use ONLY the $user_id placeholder for binding the user. Do not use {{user_id}} or :user_id.
+- Generate dynamic SQL - NO hardcoded RPC function calls
+- Always include semantic expansion for theme queries
 
 **SEARCH STRATEGY SELECTION:**
 - sql_primary: For statistical analysis, counts, percentages, structured data
@@ -314,19 +315,35 @@ Focus on creating comprehensive, executable analysis plans that will provide mea
   }
 }
 
-// Removed obsolete sanitizeAndBindUserSql validation step per updated architecture.
-// SQL text from the Analyst Agent is treated as intent only and never executed directly.
+// Helper: sanitize and bind user in SQL safely
+function sanitizeAndBindUserSql(sqlQuery: string, userId: string): { ok: true; sql: string } | { ok: false; error: string } {
+  try {
+    const q = (sqlQuery || '').trim();
+    const upper = q.toUpperCase();
+    if (!upper.startsWith('SELECT')) return { ok: false, error: 'Only SELECT statements are allowed' };
+    const semiCount = (q.match(/;/g) || []).length;
+    if (semiCount > 1 || (semiCount === 1 && !q.trim().endsWith(';'))) {
+      return { ok: false, error: 'Multiple statements are not allowed' };
+    }
+    if (!q.includes('$user_id')) {
+      return { ok: false, error: 'Missing required $user_id placeholder' };
+    }
+    const isValidUUID = (val: string) => /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(val);
+    if (!isValidUUID(userId)) return { ok: false, error: 'Invalid userId format' };
+    const bound = q.replace(/\$user_id\b/g, `'${userId}'`);
+    return { ok: true, sql: bound };
+  } catch (e) {
+    return { ok: false, error: 'SQL sanitation failed' };
+  }
+}
 
 // Execute a validated plan with proper SQL and vector search execution
 async function executeValidatedPlan(validatedPlan: any, userId: string, normalizedTimeRange: { start?: string | null; end?: string | null } | null, supabaseClient: any) {
   // Helpers
   const extractThemeKeywords = (text: string | null | undefined): string[] => {
     const src = (text || '').toLowerCase();
-    const themeKeywords = [
-      'family','mom','dad','mother','father','son','daughter','wife','husband','children','parents','siblings','sister','brother',
-      'work','career','relationships','relationship','health','wellness','exercise','fitness','sleep','finance','money','friends','social','travel'
-    ];
-    const found = themeKeywords.filter(k => src.includes(k));
+    const familySet = new Set<string>(['family','mom','dad','mother','father','son','daughter','wife','husband','children','parents','siblings','sister','brother']);
+    const found = Array.from(familySet).filter(k => src.includes(k));
     return found;
   };
 
@@ -339,7 +356,7 @@ async function executeValidatedPlan(validatedPlan: any, userId: string, normaliz
     return (total as number) || 0;
   };
 
-  const runThemeKeywordSql = async (keywords: string[]): Promise<{ ids: number[]; count: number }> => {
+  const runFamilyThemeSql = async (): Promise<{ ids: number[]; count: number }> => {
     let q = supabaseClient
       .from('Journal Entries')
       .select('id', { count: 'exact' })
@@ -348,37 +365,13 @@ async function executeValidatedPlan(validatedPlan: any, userId: string, normaliz
     if (normalizedTimeRange?.start) q = q.gte('created_at', normalizedTimeRange.start);
     if (normalizedTimeRange?.end) q = q.lte('created_at', normalizedTimeRange.end);
 
-    // Map lowercase keywords to canonical master_themes where possible
-    const themeMap: Record<string, string> = {
-      family: 'Family',
-      work: 'Work',
-      career: 'Work',
-      relationships: 'Relationships',
-      relationship: 'Relationships',
-      health: 'Health',
-      wellness: 'Health',
-      exercise: 'Exercise',
-      fitness: 'Exercise',
-      sleep: 'Sleep',
-      finance: 'Finance',
-      money: 'Finance',
-      friends: 'Friends',
-      social: 'Friends',
-      travel: 'Travel'
-    };
+    // Master theme match on 'Family'
+    q = q.contains('master_themes', ['Family'])
+      .limit(1000);
 
-    const mapped = Array.from(new Set(keywords
-      .map(k => themeMap[k.toLowerCase()] || k)
-      .filter(Boolean)));
-
-    if (mapped.length > 0) {
-      // Use overlaps to match any of the mapped themes
-      q = q.overlaps('master_themes', mapped);
-    }
-
-    const { data, count, error } = await q.limit(1000);
+    const { data, count, error } = await q;
     if (error) {
-      console.warn('[executeValidatedPlan] Safe theme keyword query failed:', error.message);
+      console.warn('[executeValidatedPlan] Safe SQL family query failed:', error.message);
       return { ids: [], count: 0 };
     }
     return { ids: (data || []).map((r: any) => r.id), count: count || 0 };
@@ -426,10 +419,10 @@ async function executeValidatedPlan(validatedPlan: any, userId: string, normaliz
           const textForKeywords = `${step.sqlQuery || ''} ${step.description || ''} ${(step.vectorSearch?.query) || ''}`;
           const kw = extractThemeKeywords(textForKeywords);
 
-          // Use theme keywords safely against master_themes
-          if (kw.length > 0) {
+          // Currently support family-oriented analysis safely
+          if (kw.some(k => k === 'family' || k === 'mom' || k === 'dad' || k === 'mother' || k === 'father' || k === 'wife' || k === 'husband' || k === 'children' || k === 'parents' || k === 'siblings' || k === 'sister' || k === 'brother')) {
             const [{ ids, count }, totalCount] = await Promise.all([
-              runThemeKeywordSql(kw),
+              runFamilyThemeSql(),
               getTotalCount(),
             ]);
             const percentage = totalCount > 0 ? Math.round((count / totalCount) * 1000) / 10 : 0; // 1 decimal
@@ -437,7 +430,7 @@ async function executeValidatedPlan(validatedPlan: any, userId: string, normaliz
           }
 
           // Fallback: do not execute arbitrary SQL
-          return { kind: 'sql', ok: false, error: 'Unsupported SQL step (dynamic SQL disabled).'};
+          return { kind: 'sql', ok: false, error: 'Unsafe or unsupported SQL step (dynamic SQL disabled).'};
         }
 
         return { kind: 'unknown', ok: false, error: 'Unknown or missing step configuration' };
@@ -471,9 +464,10 @@ async function executeValidatedPlan(validatedPlan: any, userId: string, normaliz
         purpose: subQuestion.purpose,
       },
       researcherOutput: {
-        analysisPlan: { searchStrategy: subQuestion.searchStrategy },
         validatedPlan: { searchStrategy: subQuestion.searchStrategy },
-        confidence: validatedPlan.confidence ?? null
+        confidence: validatedPlan.confidence ?? null,
+        validationIssues: [],
+        enhancements: []
       },
       executionResults: {
         sqlResults,
@@ -487,7 +481,6 @@ async function executeValidatedPlan(validatedPlan: any, userId: string, normaliz
         }
       }
     };
-
   });
 
   const perSubQuestionResults = await Promise.all(subQuestionPromises);
@@ -506,27 +499,6 @@ function getLastWeekRangeUTC() {
   start.setUTCDate(start.getUTCDate() - 7);
   const end = startOfThisWeek; // exclusive
   return { start, end };
-}
-
-
-function deriveTimeRangeFromMessage(msg: string): { start?: string | null, end?: string | null } | null {
-  if (!msg) return null;
-  const lower = msg.toLowerCase();
-  const monthNames = ['january','february','march','april','may','june','july','august','september','october','november','december'];
-  const sinceMatch = lower.match(/since\s+([a-z]+)/);
-  if (sinceMatch) {
-    const monthIdx = monthNames.indexOf(sinceMatch[1]);
-    if (monthIdx >= 0) {
-      const now = new Date();
-      const start = new Date(Date.UTC(now.getUTCFullYear(), monthIdx, 1));
-      return { start: start.toISOString(), end: new Date().toISOString() };
-    }
-  }
-  if (/last\s+week/.test(lower)) {
-    const { start, end } = getLastWeekRangeUTC();
-    return { start: start.toISOString(), end: end.toISOString() };
-  }
-  return null;
 }
 
 serve(async (req) => {
@@ -581,12 +553,6 @@ serve(async (req) => {
           end: timeRange.end || null
         };
       }
-    }
-
-    // If no explicit timeRange provided, infer basic ranges from the message (e.g., "since July", "last week")
-    if (!normalizedTimeRange) {
-      const inferred = deriveTimeRangeFromMessage(message || '');
-      if (inferred) normalizedTimeRange = inferred;
     }
 
     const executionResult = await executeValidatedPlan(analysisResult, userId, normalizedTimeRange, supabase);
