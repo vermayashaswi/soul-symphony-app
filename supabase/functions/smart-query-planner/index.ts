@@ -223,6 +223,7 @@ Return ONLY valid JSON with this exact structure:
       "question": "Specific focused sub-question",
       "purpose": "How this helps answer the main query",
       "searchStrategy": "sql_primary" | "vector_primary" | "hybrid",
+      "executionStage": 1,
       "analysisSteps": [
         {
           "step": 1,
@@ -245,6 +246,12 @@ Return ONLY valid JSON with this exact structure:
   "hasPersonalPronouns": boolean,
   "hasExplicitTimeReference": boolean
 }
+
+**EXECUTION ORDERING RULES:**
+- Assign an integer executionStage to EACH sub-question starting at 1
+- Sub-questions with the SAME executionStage run in parallel
+- Stages execute in ascending order: stage 1 first, then 2, then 3, etc.
+- Keep stages contiguous (1..N) without gaps
 
 **SQL QUERY GUIDELINES:**
 - ALWAYS include WHERE user_id = $user_id
@@ -397,7 +404,20 @@ async function executeSqlIntent(sqlQuery: string, userId: string, timeRange: { s
   return { ok: false, error: 'Unsupported SQL intent' };
 }
 // Execute plan by directly running GPT-produced steps (no hardcoded theme/emotion logic)
+// Execute plan by directly running GPT-produced steps with staged parallelism
 async function executePlan(plan: any, userId: string, normalizedTimeRange: { start?: string | null; end?: string | null } | null, supabaseClient: any) {
+  // Helper: run raw SQL via RPC after injecting user id
+  const executeRawSql = async (sqlQuery: string) => {
+    if (!sqlQuery || !sqlQuery.trim()) return { ok: true, rows: [] };
+    // Replace $user_id placeholder with literal uuid cast
+    const finalSql = sqlQuery.replace(/\$user_id\b/g, `'${userId}'::uuid`);
+    const { data, error } = await supabaseClient.rpc('execute_dynamic_query', { query_text: finalSql });
+    if (error) return { ok: false, error: error.message };
+    if (!data || data.success === false) return { ok: false, error: (data && data.error) || 'Unknown SQL execution error' };
+    const rows = Array.isArray(data.data) ? data.data : [];
+    return { ok: true, rows };
+  };
+
   const getTotalCount = async (): Promise<number> => {
     const { data: total } = await supabaseClient.rpc('get_journal_entry_count', {
       user_id_filter: userId,
@@ -407,17 +427,17 @@ async function executePlan(plan: any, userId: string, normalizedTimeRange: { sta
     return (total as number) || 0;
   };
 
-  // Determine steps to process
-  const stepsToProcess = plan.subQuestions || (plan.executionSteps ? [{ question: 'Analysis', purpose: 'Automated analysis', searchStrategy: 'hybrid', analysisSteps: plan.executionSteps }] : []);
-  console.log(`[executePlan] Processing ${stepsToProcess.length} sub-questions/steps`);
+  const subQuestions: any[] = plan.subQuestions || [];
+  // Default executionStage = 1 when missing
+  subQuestions.forEach(sq => { if (sq.executionStage == null) sq.executionStage = 1; });
+  const stages = [...new Set(subQuestions.map(sq => sq.executionStage))].sort((a, b) => a - b);
+  console.log(`[executePlan] Processing ${subQuestions.length} sub-questions across stages: ${stages.join(', ')}`);
 
-  const subQuestionPromises = stepsToProcess.map(async (subQuestion: any) => {
+  const processSubQuestion = async (subQuestion: any) => {
     console.log(`[executePlan] Processing sub-question: ${subQuestion.question}`);
-
     const stepPromises = (subQuestion.analysisSteps || []).map(async (step: any) => {
       try {
         console.log(`[executePlan] Executing step ${step.step}: ${step.description}`);
-
         // Determine per-step time range
         let stepTimeRange: { start?: string | null; end?: string | null } | null = normalizedTimeRange || null;
         const derived = deriveTimeRangeFromSql(step.sqlQuery || '');
@@ -442,21 +462,18 @@ async function executePlan(plan: any, userId: string, normalizedTimeRange: { sta
               rpcArgs.start_date = stepTimeRange?.start || null;
               rpcArgs.end_date = stepTimeRange?.end || null;
             }
-
             const { data: vectorData, error: vectorError } = await supabaseClient.rpc(rpcName, rpcArgs);
-            if (vectorError) {
-              return { kind: 'vector', ok: false, error: vectorError.message };
-            }
+            if (vectorError) return { kind: 'vector', ok: false, error: vectorError.message };
             return { kind: 'vector', ok: true, entries: vectorData || [], timeRange: stepTimeRange };
           } catch (e) {
             return { kind: 'vector', ok: false, error: (e as Error).message };
           }
         }
 
-        if ((step.queryType === 'sql_analysis' || step.queryType === 'sql_calculation' || step.queryType === 'sql_count')) {
-          const exec = await executeSqlIntent(step.sqlQuery || '', userId, stepTimeRange, supabaseClient);
+        if (step.queryType === 'sql_analysis' || step.queryType === 'sql_calculation' || step.queryType === 'sql_count') {
+          const exec = await executeRawSql(step.sqlQuery || '');
           if (exec.ok) return { kind: 'sql', ok: true, rows: exec.rows || [], timeRange: stepTimeRange };
-          return { kind: 'sql', ok: false, error: exec.error || 'SQL intent failed' };
+          return { kind: 'sql', ok: false, error: exec.error || 'SQL execution failed' };
         }
 
         return { kind: 'unknown', ok: false, error: 'Unknown or missing step configuration' };
@@ -469,20 +486,15 @@ async function executePlan(plan: any, userId: string, normalizedTimeRange: { sta
 
     const sqlRows = resolved.filter(r => r.kind === 'sql' && r.ok && Array.isArray((r as any).rows)) as any[];
     const vectorOk = resolved.filter(r => r.kind === 'vector' && r.ok && Array.isArray((r as any).entries)) as any[];
-
     const sqlResults = sqlRows.flatMap(r => r.rows);
     const vectorResults = vectorOk.flatMap(r => r.entries);
 
     const vectorIds = new Set<number>(vectorResults.map((e: any) => e.id));
-    let totalCount = 0;
-    try { totalCount = await getTotalCount(); } catch {}
+    let totalCount = 0; try { totalCount = await getTotalCount(); } catch {}
     const combinedPercentage = totalCount > 0 ? Math.round((vectorIds.size / totalCount) * 1000) / 10 : 0;
 
     return {
-      subQuestion: {
-        question: subQuestion.question,
-        purpose: subQuestion.purpose,
-      },
+      subQuestion: { question: subQuestion.question, purpose: subQuestion.purpose, executionStage: subQuestion.executionStage },
       researcherOutput: {
         plan: { searchStrategy: subQuestion.searchStrategy },
         validatedPlan: { searchStrategy: subQuestion.searchStrategy },
@@ -502,11 +514,18 @@ async function executePlan(plan: any, userId: string, normalizedTimeRange: { sta
         }
       }
     };
-  });
+  };
 
-  const perSubQuestionResults = await Promise.all(subQuestionPromises);
-  console.log(`[executePlan] Completed execution for ${perSubQuestionResults.length} sub-questions`);
-  return { researchResults: perSubQuestionResults };
+  const allResults: any[] = [];
+  for (const stage of stages) {
+    const inStage = subQuestions.filter(sq => sq.executionStage === stage);
+    console.log(`[executePlan] Executing stage ${stage} with ${inStage.length} sub-questions in parallel`);
+    const stageResults = await Promise.all(inStage.map(processSubQuestion));
+    allResults.push(...stageResults);
+  }
+
+  console.log(`[executePlan] Completed execution for ${allResults.length} sub-questions across ${stages.length} stages`);
+  return { researchResults: allResults };
 }
 
 
