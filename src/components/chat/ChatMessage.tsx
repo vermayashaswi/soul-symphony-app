@@ -8,7 +8,7 @@ import ParticleAvatar from './ParticleAvatar';
 import { TranslatableMarkdown } from '@/components/translation/TranslatableMarkdown';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import ChatErrorBoundary from './ChatErrorBoundary';
-import { getDisplayContent, isMalformedJSON, recoverFromMalformedJSON } from '@/utils/messageParser';
+import { getSanitizedFinalContent } from '@/utils/messageParser';
 
 interface ChatMessageProps {
   message: {
@@ -25,24 +25,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
   
   // Parse message content to handle JSON responses properly
   const displayContent = React.useMemo(() => {
-    if (isUser) {
-      return message.content; // User messages are always plain text
-    }
-    
-    // For assistant messages, try to parse and extract response
-    const parsedContent = getDisplayContent(message.content);
-    
-    // If content appears malformed, try to recover it
-    if (isMalformedJSON(message.content)) {
-      const recovered = recoverFromMalformedJSON(message.content);
-      console.warn('[ChatMessage] Recovered from malformed JSON:', {
-        original: message.content.substring(0, 100),
-        recovered: recovered.substring(0, 100)
-      });
-      return recovered;
-    }
-    
-    return parsedContent;
+    return isUser ? message.content : getSanitizedFinalContent(message.content);
   }, [message.content, isUser]);
 
   return (

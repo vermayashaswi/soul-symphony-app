@@ -95,12 +95,34 @@ TONE: Warm, grounded, spiritually aware but not preachy, genuinely caring, with 
     });
 
     const data = await response.json();
-    const clarificationResponse = data?.choices?.[0]?.message?.content || '';
-    const userStatusMessage = null;
+    const rawContent = data?.choices?.[0]?.message?.content || '';
+
+    let responseText = rawContent;
+    let userStatusMessage: string | null = null;
+
+    // Try to parse as JSON first
+    try {
+      const parsed = JSON.parse(rawContent);
+      if (parsed && typeof parsed === 'object') {
+        responseText = typeof parsed.response === 'string' && parsed.response.trim() ? parsed.response : rawContent;
+        userStatusMessage = typeof parsed.userStatusMessage === 'string' ? parsed.userStatusMessage : null;
+      }
+    } catch (_) {
+      // Fallback: regex extraction
+      const respMatch = rawContent.match(/\"response\"\s*:\s*\"([\s\S]*?)\"/m);
+      if (respMatch) {
+        responseText = respMatch[1].replace(/\\\"/g, '\"');
+      } else {
+        // Remove any userStatusMessage lines if present
+        responseText = rawContent.replace(/^\s*\"?userStatusMessage\"?\s*:\s*.*$/gmi, '').trim();
+      }
+      const statusMatch = rawContent.match(/\"userStatusMessage\"\s*:\s*\"([^\"]{0,100})\"/m);
+      if (statusMatch) userStatusMessage = statusMatch[1];
+    }
 
     return new Response(JSON.stringify({
       success: true,
-      response: clarificationResponse,
+      response: responseText,
       userStatusMessage,
       type: 'clarification'
     }), {
