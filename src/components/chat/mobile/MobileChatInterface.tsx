@@ -21,6 +21,7 @@ import { useChatRealtime } from "@/hooks/use-chat-realtime";
 import { updateThreadProcessingStatus, generateThreadTitle } from "@/utils/chat/threadUtils";
 import { useKeyboardDetection } from "@/hooks/use-keyboard-detection";
 import { useStreamingChat } from "@/hooks/useStreamingChat";
+import { threadSafetyManager } from "@/utils/threadSafetyManager";
 import ChatErrorBoundary from "../ChatErrorBoundary";
 import { useAutoScroll } from "@/hooks/use-auto-scroll";
 import {
@@ -65,6 +66,17 @@ export default function MobileChatInterface({
   const [sheetOpen, setSheetOpen] = useState(false);
   const debugLog = useDebugLog();
   
+  // Track active thread for safety manager
+  useEffect(() => {
+    threadSafetyManager.setActiveThread(threadId || null);
+  }, [threadId]);
+  
+  // Keep a ref of the latest active thread to guard async UI updates
+  const currentThreadIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    currentThreadIdRef.current = threadId;
+  }, [threadId]);
+  
   const {
     isLoading,
     isProcessing,
@@ -77,7 +89,7 @@ export default function MobileChatInterface({
   // Use streaming chat for enhanced UX
   const {
     isStreaming,
-    streamingThreadId,
+    // streamingThreadId - removed as part of thread isolation
     streamingMessages,
     currentUserMessage,
     showBackendAnimation,
@@ -88,6 +100,7 @@ export default function MobileChatInterface({
     queryCategory,
     restoreStreamingState
   } = useStreamingChat({
+     threadId: threadId,
     onFinalResponse: async (response, analysis, originThreadId) => {
       // Handle final streaming response scoped to its origin thread
       if (!response || !originThreadId || !user?.id) {
@@ -190,7 +203,7 @@ export default function MobileChatInterface({
   
   // Use unified auto-scroll hook
   const { scrollElementRef, scrollToBottom } = useAutoScroll({
-    dependencies: [messages, isLoading, isProcessing, isStreaming, streamingMessages],
+    dependencies: [messages, isLoading, isProcessing, isStreaming],
     delay: 50,
     scrollThreshold: 100
   });
@@ -431,13 +444,15 @@ export default function MobileChatInterface({
       const errorMessageContent = "I'm having trouble processing your request. Please try again later. " + 
                  (error?.message ? `Error: ${error.message}` : "");
       
-      setMessages(prev => [
-        ...prev, 
-        { 
-          role: 'assistant', 
-          content: errorMessageContent
-        }
-      ]);
+      if (currentThreadId === currentThreadIdRef.current) {
+        setMessages(prev => [
+          ...prev, 
+          { 
+            role: 'assistant', 
+            content: errorMessageContent
+          }
+        ]);
+      }
     } finally {
       setLocalLoading(false);
     }
@@ -786,7 +801,7 @@ export default function MobileChatInterface({
             ))}
             
             {/* Show streaming status or basic loading */}
-            {isStreaming && streamingThreadId === threadId ? (
+            {isStreaming ? (
               <ChatErrorBoundary>
                 <MobileChatMessage 
                   message={{ role: 'assistant', content: '' }}

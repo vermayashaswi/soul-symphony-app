@@ -87,12 +87,14 @@ const AppRoutes = () => {
       return <Navigate to={`/app/auth${window.location.search}${window.location.hash}`} replace />;
     }
 
+    const lastAppPath = (() => { try { return localStorage.getItem('lastAppPath'); } catch { return null; } })();
+
     if (!user && !validatedSession) {
       return <Navigate to="/app/onboarding" replace />;
     }
 
-    // If user is authenticated, go directly to home (ignore database onboarding flag)
-    return <Navigate to="/app/home" replace />;
+    // If user is authenticated, go to last in-app path when available
+    return <Navigate to={lastAppPath && lastAppPath.startsWith('/app/') ? lastAppPath : '/app/home'} replace />;
   };
 
   // Enhanced root redirect with session validation
@@ -121,8 +123,12 @@ const AppRoutes = () => {
       return <Navigate to="/app/home" replace />;
     }
 
-    // Web behavior - show marketing site only for web
-    console.log('[AppRoutes] Web environment, showing marketing site');
+    // Web behavior - if authenticated, go to last app path; else show marketing site
+    console.log('[AppRoutes] Web environment at root');
+    const lastAppPath = (() => { try { return localStorage.getItem('lastAppPath'); } catch { return null; } })();
+    if (user || validatedSession) {
+      return <Navigate to={lastAppPath && lastAppPath.startsWith('/app/') ? lastAppPath : '/app/home'} replace />;
+    }
     return <Index />;
   };
 

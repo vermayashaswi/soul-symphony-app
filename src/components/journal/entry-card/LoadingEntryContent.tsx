@@ -102,11 +102,6 @@ export function LoadingEntryContent({ error }: { error?: string }) {
     window.addEventListener('entryContentReady', handleHide);
     window.addEventListener('processingEntryCompleted', handleProcessingCompleted);
 
-    // Failsafe cleanup after extended time
-    const failsafeTimeout = setTimeout(() => {
-      console.log('[LoadingEntryContent] Failsafe cleanup triggered for:', componentId.current);
-      setIsVisible(false);
-    }, 30000);
     
     return () => {
       console.log('[LoadingEntryContent] Component cleanup:', componentId.current);
@@ -119,7 +114,7 @@ export function LoadingEntryContent({ error }: { error?: string }) {
         clearTimeout(longProcessingTimeoutRef.current);
       }
 
-      clearTimeout(failsafeTimeout);
+      
       
       window.removeEventListener('processingEntryHidden', handleHide);
       window.removeEventListener('entryContentReady', handleHide);

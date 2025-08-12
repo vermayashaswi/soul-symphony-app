@@ -157,7 +157,8 @@ serve(async (req) => {
       console.log('[chat-with-rag] EXECUTING: JOURNAL_SPECIFIC pipeline - full RAG processing');
       
       // Step 2: Use GPT-powered query planning via smart-query-planner
-      let enhancedQueryPlan;
+      let enhancedQueryPlan: any;
+      let plannerData: any = null;
       
       try {
         const { data: gptPlan, error: plannerError } = await supabaseClient.functions.invoke(
@@ -169,6 +170,7 @@ serve(async (req) => {
               conversationContext,
               userProfile,
               timeRange: userProfile.timeRange || null,
+              execute: true,
               threadId,
               messageId
             }
@@ -179,6 +181,7 @@ serve(async (req) => {
           throw new Error(`GPT planner error: ${plannerError.message}`);
         }
         
+        plannerData = gptPlan;
         enhancedQueryPlan = gptPlan.queryPlan;
         console.log('[chat-with-rag] Using GPT-generated query plan:', enhancedQueryPlan);
       } catch (error) {
@@ -192,34 +195,10 @@ serve(async (req) => {
       const shouldUseGptAnalysis = enhancedQueryPlan.subQuestions && enhancedQueryPlan.subQuestions.length >= 1;
       
       if (shouldUseGptAnalysis) {
-        console.log(`[chat-with-rag] Using GPT-driven analysis pipeline for ${enhancedQueryPlan.subQuestions.length} sub-questions`);
-        
-        // Normalize time range from plan (supports dateRange {startDate,endDate} or timeRange {start,end})
-        const normalizedTimeRange = (() => {
-          const tr = enhancedQueryPlan?.timeRange || enhancedQueryPlan?.dateRange || null;
-          if (!tr) return null;
-          const start = tr.start ?? tr.startDate ?? null;
-          const end = tr.end ?? tr.endDate ?? null;
-          return (start || end) ? { start, end } : null;
-        })();
-        
-        // Step 4: Call GPT Analysis Orchestrator for sub-question analysis
-        const { data: analysisResults, error: analysisError } = await supabaseClient.functions.invoke(
-          'gpt-analysis-orchestrator',
-          {
-            body: {
-              subQuestions: enhancedQueryPlan.subQuestions,
-              userMessage: message,
-              userId: requestUserId,
-              timeRange: normalizedTimeRange,
-              threadId,
-              messageId
-            }
-          }
-        );
-
-        if (analysisError) {
-          throw new Error(`Analysis orchestrator failed: ${analysisError.message}`);
+        // Use researchResults returned by smart-query-planner (executed plan)
+        const researchResults = plannerData?.researchResults;
+        if (!researchResults || !Array.isArray(researchResults)) {
+          throw new Error('Analysis execution failed: missing researchResults');
         }
 
         // Step 5: Call GPT Response Consolidator to synthesize the results
@@ -228,7 +207,7 @@ serve(async (req) => {
           {
             body: {
               userMessage: message,
-              analysisResults: analysisResults.analysisResults,
+              researchResults,
               conversationContext,
               userProfile,
               streamingMode: false,
@@ -248,13 +227,38 @@ serve(async (req) => {
           ? consolidationResult.response
           : "I couldn't synthesize a confident insight just now. Let's try again in a moment.";
 
+        // Persist assistant message so the client can see it even after navigation
+        if (threadId) {
+          try {
+            // Compute idempotency key based on thread + response content
+            const enc = new TextEncoder();
+            const digest = await crypto.subtle.digest('SHA-256', enc.encode(`${threadId}:${finalResponse}`));
+            const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+            const idempotencyKey = hex.slice(0, 32);
+
+            const { error: upsertErr } = await supabaseClient
+              .from('chat_messages')
+              .upsert({
+                thread_id: threadId,
+                content: finalResponse,
+                sender: 'assistant',
+                role: 'assistant',
+                idempotency_key: idempotencyKey
+              }, { onConflict: 'thread_id,idempotency_key' });
+
+            if (upsertErr) console.warn('[chat-with-rag] Failed to upsert assistant message:', upsertErr.message);
+          } catch (e) {
+            console.warn('[chat-with-rag] Exception persisting assistant message:', (e as any)?.message || e);
+          }
+        }
+
         return new Response(JSON.stringify({
           response: finalResponse,
           userStatusMessage: consolidationResult.userStatusMessage,
           analysis: {
             queryPlan: enhancedQueryPlan,
             gptDrivenAnalysis: true,
-            subQuestionAnalysis: analysisResults.summary,
+            subQuestionAnalysis: researchResults,
             consolidationMetadata: consolidationResult.analysisMetadata,
             classification
           }
@@ -475,6 +479,7 @@ async function processStreamingPipeline(
           conversationContext,
           userProfile,
           timeRange: userProfile.timeRange || null,
+          execute: true,
           threadId,
           messageId
         }
@@ -492,33 +497,12 @@ async function processStreamingPipeline(
         streamManager.sendUserMessage(gptPlan.userStatusMessage);
       }
       
-      // Step 3: Analysis orchestration with status updates
+      // Step 3: Analysis execution (already performed by smart-query-planner)
       streamManager.sendBackendTask("Searching your journal...", "Looking through journal entries");
-      
-      // Normalize time range for orchestrator
-      const normalizedTimeRange = (() => {
-        const tr = enhancedQueryPlan?.timeRange || enhancedQueryPlan?.dateRange || null;
-        if (!tr) return null;
-        const start = tr.start ?? tr.startDate ?? null;
-        const end = tr.end ?? tr.endDate ?? null;
-        return (start || end) ? { start, end } : null;
-      })();
-      
-      const { data: analysisResults, error: analysisError } = await supabaseClient.functions.invoke(
-        'gpt-analysis-orchestrator',
-        {
-          body: {
-            subQuestions: enhancedQueryPlan.subQuestions,
-            userMessage: message,
-            userId: requestUserId,
-            timeRange: normalizedTimeRange,
-            threadId
-          }
-        }
-      );
 
-      if (analysisError) {
-        throw new Error(`Analysis orchestrator failed: ${analysisError.message}`);
+      const researchResults = gptPlan.researchResults;
+      if (!researchResults || !Array.isArray(researchResults)) {
+        throw new Error('Analysis execution failed: missing researchResults');
       }
 
       streamManager.sendBackendTask("Journal analysis complete", "Processing insights");
@@ -531,7 +515,7 @@ async function processStreamingPipeline(
         {
           body: {
             userMessage: message,
-            analysisResults: analysisResults.analysisResults,
+            researchResults,
             conversationContext,
             userProfile,
             streamingMode: false,
@@ -555,7 +539,7 @@ async function processStreamingPipeline(
         analysis: {
           queryPlan: enhancedQueryPlan,
           gptDrivenAnalysis: true,
-          subQuestionAnalysis: analysisResults.summary,
+          subQuestionAnalysis: researchResults,
           consolidationMetadata: consolidationResult.analysisMetadata,
           classification
         }

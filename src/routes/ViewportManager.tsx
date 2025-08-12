@@ -54,6 +54,17 @@ const ViewportManager: React.FC = () => {
     tutorialCompleted
   });
   
+  // Persist last in-app path for post-refresh routing
+  useEffect(() => {
+    if (isAppRoute(location.pathname)) {
+      try {
+        localStorage.setItem('lastAppPath', location.pathname);
+      } catch (e) {
+        // ignore storage errors
+      }
+    }
+  }, [location.pathname]);
+  
   // Ensure proper scrolling behavior on route changes
   useEffect(() => {
     // Force enable scrolling on website routes and non-home app routes

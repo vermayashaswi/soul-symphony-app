@@ -9,10 +9,10 @@ export async function searchEntriesWithVector(
     console.log(`Searching entries with vector similarity for userId: ${userId}`);
     
     const { data, error } = await supabase.rpc(
-      'match_journal_entries_fixed',
+      'match_journal_entries',
       {
         query_embedding: queryEmbedding,
-        match_threshold: 0.5,
+        match_threshold: 0.3,
         match_count: 10,
         user_id_filter: userId
       }
@@ -74,7 +74,7 @@ export async function searchEntriesWithTimeRange(
     // Detailed logging of the actual parameters being sent to the database
     console.log("Database function parameters:", {
       query_embedding: `[array with ${queryEmbedding.length} elements]`,
-      match_threshold: 0.5,
+      match_threshold: 0.3,
       match_count: 10,
       user_id_filter: userId,
       start_date: startDate,
@@ -86,7 +86,7 @@ export async function searchEntriesWithTimeRange(
       'match_journal_entries_with_date',
       {
         query_embedding: queryEmbedding,
-        match_threshold: 0.5,
+        match_threshold: 0.3,
         match_count: 10,
         user_id_filter: userId,
         start_date: startDate,
@@ -113,7 +113,16 @@ export async function searchEntriesWithTimeRange(
       }));
       console.log("Time-filtered search - Entries found:", entryDates);
     } else {
-      console.log("No entries found within time range");
+      console.log("No entries found within time range; falling back to non-time-filtered vector search");
+      try {
+        const fallback = await searchEntriesWithVector(supabase, userId, queryEmbedding);
+        if (fallback && fallback.length > 0) {
+          console.log(`Fallback vector search found ${fallback.length} entries`);
+          return fallback;
+        }
+      } catch (fallbackErr) {
+        console.warn("Fallback vector search failed:", fallbackErr);
+      }
     }
     
     return data || [];

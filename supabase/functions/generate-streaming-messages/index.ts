@@ -28,9 +28,9 @@ serve(async (req) => {
     
     console.log(`[generate-streaming-messages] Processing message for category: ${category}`);
     
-    // Only generate dynamic messages for JOURNAL_SPECIFIC category
+    // Generate dynamic messages for JOURNAL_SPECIFIC category, fallback for others
     if (category !== 'JOURNAL_SPECIFIC') {
-      console.log(`[generate-streaming-messages] Category ${category} does not require dynamic messages`);
+      console.log(`[generate-streaming-messages] Category ${category} -> disabling dynamic messages, using three-dot UI`);
       return new Response(
         JSON.stringify({ 
           success: true, 
@@ -55,7 +55,7 @@ User's message: "${userMessage}"
 User profile: ${JSON.stringify(userProfile)}
 Recent conversation: ${JSON.stringify(conversationContext.slice(-3))}
 
-Generate exactly 3 different 5-word status messages that would be appropriate to show while processing this journal-specific query. These should be encouraging, relevant to journaling/mental health, and help the user understand what's happening.
+Generate exactly 5 different 5-word status messages that would be appropriate to show while processing this journal-specific query. These should be encouraging, relevant to journaling/mental health, and help the user understand what's happening.
 
 Examples of good 5-word messages:
 - "Analyzing your journal patterns..."
@@ -64,8 +64,8 @@ Examples of good 5-word messages:
 - "Reviewing your thought patterns..."
 - "Searching through journal entries..."
 
-Respond with ONLY a JSON array of 3 strings, nothing else:
-["message1", "message2", "message3"]
+Respond with ONLY a JSON array of 5 strings, nothing else:
+["message1", "message2", "message3", "message4", "message5"]
 `;
 
     console.log('[generate-streaming-messages] Calling OpenAI API');
@@ -109,16 +109,18 @@ Respond with ONLY a JSON array of 3 strings, nothing else:
       const arrayMatch = raw.match(/\[[\s\S]*\]/);
       const jsonText = arrayMatch ? arrayMatch[0] : raw;
       messages = JSON.parse(jsonText);
-      if (!Array.isArray(messages) || messages.length !== 3 || messages.some(m => typeof m !== 'string')) {
+      if (!Array.isArray(messages) || messages.length !== 5 || messages.some(m => typeof m !== 'string')) {
         throw new Error('Invalid response format');
       }
     } catch (parseError) {
       console.error('[generate-streaming-messages] Failed to parse GPT response:', parseError);
-      // Fallback messages
+      // Fallback messages (5 items)
       messages = [
         "Analyzing your journal patterns...",
         "Finding relevant emotional insights...",
-        "Processing your mental wellness..."
+        "Reviewing your thought patterns...",
+        "Comparing themes across entries...",
+        "Summarizing key emotional signals..."
       ];
     }
 
@@ -138,7 +140,9 @@ Respond with ONLY a JSON array of 3 strings, nothing else:
     const messages = [
       "Analyzing your journal patterns...",
       "Finding relevant emotional insights...",
-      "Processing your mental wellness..."
+      "Reviewing your thought patterns...",
+      "Comparing themes across entries...",
+      "Summarizing key emotional signals..."
     ];
     return new Response(
       JSON.stringify({ 

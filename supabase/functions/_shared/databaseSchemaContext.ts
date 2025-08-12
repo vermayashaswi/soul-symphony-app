@@ -18,6 +18,112 @@ export interface JournalEntrySchema {
   searchCapabilities: string[];
 }
 
+// Dynamic data fetching for real-time master tables
+let cachedThemes: any[] = [];
+let cachedEmotions: any[] = [];
+let cacheTimestamp = 0;
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+export async function fetchLiveMasterData(supabaseClient?: any) {
+  const now = Date.now();
+  if (cachedThemes.length > 0 && cachedEmotions.length > 0 && (now - cacheTimestamp) < CACHE_DURATION) {
+    return { themes: cachedThemes, emotions: cachedEmotions };
+  }
+
+  if (!supabaseClient) {
+    // Return hardcoded fallback if no client provided
+    return { 
+      themes: [
+        { name: "Self & Identity", description: "Personal growth, self-reflection, and identity exploration" },
+        { name: "Body & Health", description: "Physical health, fitness, body image, and medical concerns" },
+        { name: "Mental Health", description: "Emotional wellbeing, mental health challenges, and therapy" },
+        { name: "Romantic Relationships", description: "Dating, marriage, partnerships, and romantic connections" },
+        { name: "Family", description: "Family relationships, parenting, and family dynamics" },
+        { name: "Friendships & Social Circle", description: "Friendships, social connections, and community" },
+        { name: "Career & Workplace", description: "Work, career development, and professional relationships" },
+        { name: "Money & Finances", description: "Financial planning, money management, and economic concerns" },
+        { name: "Education & Learning", description: "Formal education, skill development, and learning experiences" },
+        { name: "Habits & Routines", description: "Daily habits, routines, and lifestyle patterns" },
+        { name: "Sleep & Rest", description: "Sleep quality, rest, and recovery" },
+        { name: "Creativity & Hobbies", description: "Creative pursuits, hobbies, and artistic expression" },
+        { name: "Spirituality & Beliefs", description: "Spiritual practices, religious beliefs, and philosophy" },
+        { name: "Technology & Social Media", description: "Digital life, social media, and technology use" },
+        { name: "Environment & Living Space", description: "Home, living environment, and physical spaces" },
+        { name: "Time & Productivity", description: "Time management, productivity, and organization" },
+        { name: "Travel & Movement", description: "Travel experiences, moving, and location changes" },
+        { name: "Loss & Grief", description: "Dealing with loss, grief, and major life transitions" },
+        { name: "Purpose & Fulfillment", description: "Life purpose, meaning, and personal fulfillment" },
+        { name: "Conflict & Trauma", description: "Conflict resolution, trauma processing, and difficult experiences" },
+        { name: "Celebration & Achievement", description: "Achievements, celebrations, and positive milestones" }
+      ],
+      emotions: [
+        { name: "amusement", description: "The state or experience of finding something funny" },
+        { name: "anger", description: "A strong feeling of annoyance, displeasure, or hostility" },
+        { name: "anticipation", description: "The action of anticipating something; expectation or prediction" },
+        { name: "anxiety", description: "A feeling of worry, nervousness, or unease, typically about an imminent event" },
+        { name: "awe", description: "A feeling of reverential respect mixed with fear or wonder" },
+        { name: "boredom", description: "The state of feeling weary because one is unoccupied or lacks interest" },
+        { name: "compassion", description: "Sympathetic pity and concern for the sufferings or misfortunes of others" },
+        { name: "concern", description: "Anxiety; worry; a matter of interest or importance to someone" },
+        { name: "confidence", description: "The feeling or belief that one can rely on someone or something; firm trust" },
+        { name: "confusion", description: "Lack of understanding; uncertainty" },
+        { name: "contentment", description: "A state of happiness and satisfaction" },
+        { name: "curiosity", description: "A strong desire to know or learn something" },
+        { name: "depression", description: "Feelings of severe despondency and dejection" },
+        { name: "disappointment", description: "Sadness or displeasure caused by the non-fulfillment of one's hopes or expectations" },
+        { name: "disgust", description: "A feeling of revulsion or strong disapproval" },
+        { name: "embarrassment", description: "A feeling of self-consciousness, shame, or awkwardness" },
+        { name: "empathy", description: "The ability to understand and share the feelings of another" },
+        { name: "enthusiasm", description: "Intense and eager enjoyment, interest, or approval" },
+        { name: "envy", description: "A feeling of discontented or resentful longing aroused by someone else's possessions, qualities, or luck" },
+        { name: "excitement", description: "A feeling of great enthusiasm and eagerness" },
+        { name: "fear", description: "An unpleasant emotion caused by the belief that someone or something is dangerous" },
+        { name: "frustration", description: "The feeling of being upset or annoyed, especially because of inability to change or achieve something" },
+        { name: "gratitude", description: "The quality of being thankful; readiness to show appreciation" },
+        { name: "guilt", description: "A feeling of having done wrong or failed in an obligation" },
+        { name: "hate", description: "Feel intense or passionate dislike for someone or something" },
+        { name: "hope", description: "A feeling of expectation and desire for a certain thing to happen" },
+        { name: "hurt", description: "Feeling emotional pain or distress" },
+        { name: "interest", description: "The feeling of wanting to know or learn about something" },
+        { name: "jealousy", description: "Feeling or showing envy of someone or their achievements and advantages" },
+        { name: "joy", description: "A feeling of great pleasure and happiness" },
+        { name: "loneliness", description: "Sadness because one has no friends or company" },
+        { name: "love", description: "An intense feeling of deep affection" },
+        { name: "nostalgia", description: "A sentimental longing or wistful affection for the past" },
+        { name: "optimism", description: "Hopefulness and confidence about the future or the successful outcome of something" },
+        { name: "overwhelm", description: "A feeling of being completely overcome or overpowered by emotion" },
+        { name: "pessimism", description: "A tendency to see the worst aspect of things or believe that the worst will happen" },
+        { name: "pride", description: "A feeling of deep pleasure or satisfaction derived from achievements" },
+        { name: "regret", description: "Feel sad, repentant, or disappointed over something that has happened" },
+        { name: "relief", description: "A feeling of reassurance and relaxation following release from anxiety or distress" },
+        { name: "remorse", description: "Deep regret or guilt for a wrong committed" },
+        { name: "sadness", description: "Feeling or showing sorrow; unhappy" },
+        { name: "satisfaction", description: "Fulfillment of one's wishes, expectations, or needs" },
+        { name: "serenity", description: "The state of being calm, peaceful, and untroubled" },
+        { name: "shame", description: "A painful feeling of humiliation or distress caused by consciousness of wrong or foolish behavior" },
+        { name: "surprise", description: "A feeling of mild astonishment or shock caused by something unexpected" },
+        { name: "trust", description: "Firm belief in the reliability, truth, ability, or strength of someone or something" }
+      ]
+    };
+  }
+
+  try {
+    const [themesResult, emotionsResult] = await Promise.all([
+      supabaseClient.from('themes').select('name, description').eq('is_active', true).order('display_order', { ascending: true }),
+      supabaseClient.from('emotions').select('name, description').order('name', { ascending: true })
+    ]);
+
+    cachedThemes = themesResult.data || [];
+    cachedEmotions = emotionsResult.data || [];
+    cacheTimestamp = now;
+
+    return { themes: cachedThemes, emotions: cachedEmotions };
+  } catch (error) {
+    console.error('Failed to fetch live master data:', error);
+    return { themes: [], emotions: [] };
+  }
+}
+
 export const JOURNAL_ENTRY_SCHEMA: JournalEntrySchema = {
   table: "Journal Entries",
   columns: {
@@ -29,44 +135,54 @@ export const JOURNAL_ENTRY_SCHEMA: JournalEntrySchema = {
     },
     user_id: {
       type: "uuid",
-      description: "ID of the user who created this entry",
+      description: "ID of the user who created this entry - MUST be included in all queries for user isolation",
       nullable: false,
       example: "550e8400-e29b-41d4-a716-446655440000"
     },
     created_at: {
       type: "timestamp with time zone",
-      description: "When the journal entry was created",
+      description: "When the journal entry was created - use for temporal analysis and date filtering",
       nullable: false,
       example: "2024-01-15T14:30:00Z"
     },
     "transcription text": {
       type: "text",
-      description: "Raw transcribed text from voice recording",
+      description: "Raw transcribed text from voice recording - original user input",
       nullable: true,
       example: "Today I felt really anxious about the meeting..."
     },
     "refined text": {
       type: "text",
-      description: "Cleaned and refined version of the transcription",
+      description: "Cleaned and refined version of the transcription - use as primary content source",
       nullable: true,
       example: "Today I experienced anxiety about an upcoming meeting..."
     },
     emotions: {
       type: "jsonb",
-      description: "AI-calculated emotion scores (0.0-1.0 scale). Each emotion has a numerical confidence score.",
+      description: "AI-calculated emotion scores (0.0-1.0 scale). Keys match emotions master table names. Use for emotion-based analysis.",
       nullable: true,
       example: {
-        "anxiety": 0.842,
-        "worry": 0.735,
-        "stress": 0.623,
-        "hope": 0.234
+        "anxious": 0.842,
+        "worried": 0.735,
+        "stressed": 0.623,
+        "hopeful": 0.234
       }
     },
     master_themes: {
       type: "text[]",
-      description: "Array of AI-extracted main themes and topics from the entry",
+      description: "Array of theme names from themes master table. Use for categorical analysis.",
       nullable: true,
-      example: ["work stress", "relationships", "health", "personal growth"]
+      example: ["work", "relationships", "health", "growth"]
+    },
+    themeemotion: {
+      type: "jsonb",
+      description: "CRITICAL FOR THEME-EMOTION ANALYSIS: Combination of themes and emotions with correlation scores. Structure: {theme_name: {emotion_name: score}}. Use this column to find emotions related to specific themes. For queries like 'emotions about family', use themeemotion->'Family' to get all emotions with scores for the Family theme.",
+      nullable: true,
+      example: {
+        "Family": {"anxiety": 0.8, "love": 0.6, "concern": 0.4},
+        "Career & Workplace": {"stress": 0.9, "satisfaction": 0.3},
+        "Body & Health": {"concern": 0.7, "hope": 0.5}
+      }
     },
     sentiment: {
       type: "text",
@@ -84,23 +200,14 @@ export const JOURNAL_ENTRY_SCHEMA: JournalEntrySchema = {
         "GPE": ["New York", "California"]
       }
     },
-    languages: {
+    entityemotion: {
       type: "jsonb",
-      description: "Array of detected language codes from comprehensive language detection (ISO 639-1 format)",
+      description: "Entity-emotion relationships with strength scores. Structure: {entity_name: {emotion_name: strength_score}}",
       nullable: true,
-      example: ["en", "hi", "es"]
-    },
-    original_language: {
-      type: "text",
-      description: "Primary detected language code before translation",
-      nullable: true,
-      example: "hi"
-    },
-    translation_text: {
-      type: "text",
-      description: "Translated version of the content when original language differs from target",
-      nullable: true,
-      example: "Today I felt anxious about the meeting..."
+      example: {
+        "Sarah": {"happy": 0.8, "grateful": 0.6},
+        "work": {"stressed": 0.9, "anxious": 0.7}
+      }
     },
     duration: {
       type: "numeric",
@@ -133,7 +240,8 @@ export const JOURNAL_ENTRY_SCHEMA: JournalEntrySchema = {
   ]
 };
 
-export function generateDatabaseSchemaContext(): string {
+export async function generateDatabaseSchemaContext(supabaseClient?: any): Promise<string> {
+  const { themes, emotions } = await fetchLiveMasterData(supabaseClient);
   return `
 **JOURNAL ENTRY DATABASE SCHEMA:**
 
@@ -144,47 +252,42 @@ ${Object.entries(JOURNAL_ENTRY_SCHEMA.columns).map(([column, info]) =>
   `• ${column} (${info.type}): ${info.description}${info.example ? `\n  Example: ${JSON.stringify(info.example)}` : ''}`
 ).join('\n')}
 
-**LANGUAGE DETECTION SYSTEM:**
-- Languages are detected during transcription using multiple detection methods
-- Stored as JSON array of ISO 639-1 language codes (e.g., ["en", "hi", "es"])
-- Primary language is stored in original_language field
-- Supports multi-language content analysis and filtering
-- Translation results are stored in translation_text field
+**MASTER THEMES (COMPLETE LIST FOR SQL QUERIES):**
+${themes.map(theme => `• "${theme.name}": ${theme.description}`).join('\n')}
 
-**EMOTION SCORING SYSTEM:**
-- Emotions are PRE-CALCULATED using advanced AI analysis
-- Scores range from 0.0 (not present) to 1.0 (strongly present)
-- Typical threshold for significance: 0.3+
-- DO NOT attempt to infer emotions from text - use the provided scores
+**MASTER EMOTIONS (COMPLETE LIST FOR SQL QUERIES):**
+${emotions.map(emotion => `• "${emotion.name}": ${emotion.description}`).join('\n')}
 
-**SENTIMENT ANALYSIS:**
-- Sentiment scores are calculated using Google Natural Language API
-- Scores range from -1.0 (very negative) to 1.0 (very positive)
-- Stored as text in the sentiment column
-- Scores >= 0.3 are considered positive
-- Scores >= -0.1 and < 0.3 are considered neutral
-- Scores < -0.1 are considered negative
+**CRITICAL DATABASE INSIGHTS:**
+- emotions column: Contains ONLY emotion names from the master emotions list above with scores 0.0-1.0
+- master_themes column: Contains ONLY theme names from the master themes list above as text array
+- themeemotion column: Combines themes and emotions {theme_name: {emotion_name: score}}
+- For theme-specific emotion queries (like "family emotions"), use: themeemotion->'theme_name' 
+- For general emotion queries, use: emotions column with jsonb operators
+- Always include WHERE user_id = $user_id for security
 
-**MASTER THEMES:**
-- AI-extracted main topics and themes from journal entries
-- Useful for categorical analysis and pattern recognition
-- Examples: "work stress", "family relationships", "health concerns"
+**SQL QUERY PATTERNS FOR THEME-EMOTION ANALYSIS:**
+1. Top emotions for a specific theme:
+   SELECT json_object_keys(themeemotion->'Family') AS emotion, 
+          AVG((themeemotion->'Family'->>json_object_keys(themeemotion->'Family'))::float) AS avg_score
+   FROM "Journal Entries" 
+   WHERE user_id = $user_id AND themeemotion ? 'Family'
+   GROUP BY emotion ORDER BY avg_score DESC LIMIT 3
+
+2. Entries with theme-emotion combinations:
+   SELECT id, created_at, themeemotion->'Family' as family_emotions
+   FROM "Journal Entries"
+   WHERE user_id = $user_id AND themeemotion ? 'Family'
 
 **SEARCH CAPABILITIES:**
 ${JOURNAL_ENTRY_SCHEMA.searchCapabilities.map(cap => `• ${cap}`).join('\n')}
 
-**RELATIONSHIPS:**
-${JOURNAL_ENTRY_SCHEMA.relationships.map(rel => `• ${rel}`).join('\n')}
-
 **IMPORTANT ANALYSIS NOTES:**
 - All emotion data is pre-calculated and stored as numerical scores
 - Use "refined text" as primary content source when available
-- Master themes provide categorical context for grouping and analysis
+- themeemotion column is KEY for theme-specific emotion analysis
 - Vector embeddings enable semantic similarity search
 - Date filtering supports temporal pattern analysis
-- Sentiment analysis uses Google NL API for accurate sentiment scoring
-- Language detection supports multi-language journaling and content analysis
-- Translation capabilities preserve original language context while enabling cross-language analysis
 `;
 }
 

@@ -34,6 +34,7 @@ import { useDebugLog } from "@/utils/debug/DebugContext";
 import { TranslatableText } from "@/components/translation/TranslatableText";
 import { useChatMessageClassification, QueryCategory } from "@/hooks/use-chat-message-classification";
 import { useStreamingChat } from "@/hooks/useStreamingChat";
+import { threadSafetyManager } from "@/utils/threadSafetyManager";
 import { useAutoScroll } from "@/hooks/use-auto-scroll";
 import {
   AlertDialog,
@@ -78,10 +79,24 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
   const loadedThreadRef = useRef<string | null>(null);
   const debugLog = useDebugLog();
   
-  // Use props for thread ID if available, otherwise manage locally
+  // Local thread state and current id
   const [localThreadId, setLocalThreadId] = useState<string | null>(null);
+  
+  // Track latest active thread id for guarding async UI updates
+  const currentThreadIdRef = useRef<string | null>(null);
+  
+  // Use props for thread ID if available, otherwise manage locally
   const currentThreadId = propsThreadId ?? localThreadId;
   const effectiveUserId = propsUserId ?? user?.id;
+  
+  useEffect(() => {
+    currentThreadIdRef.current = currentThreadId || null;
+  }, [currentThreadId]);
+  
+  // Track active thread for safety manager
+  useEffect(() => {
+    threadSafetyManager.setActiveThread(currentThreadId || null);
+  }, [currentThreadId]);
   
   // Use the GPT-based message classification hook
   const { classifyMessage, classification } = useChatMessageClassification();
@@ -89,14 +104,16 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
   // Use streaming chat for enhanced UX
   const {
     isStreaming,
-    streamingThreadId,
+    // streamingThreadId - removed as part of thread isolation
     streamingMessages,
     currentUserMessage,
     showBackendAnimation,
     startStreamingChat,
     queryCategory,
-    restoreStreamingState
+    restoreStreamingState,
+    stopStreaming
   } = useStreamingChat({
+      threadId: currentThreadId,
     onFinalResponse: async (response, analysis, originThreadId) => {
       // Handle final streaming response scoped to its origin thread
       if (!response || !originThreadId || !effectiveUserId) {
@@ -162,6 +179,9 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       }
     },
     onError: (error) => {
+      // Ensure UI never gets stuck on loader after errors
+      setLocalLoading(false);
+      updateProcessingStage(null);
       toast({
         title: "Error",
         description: error,
@@ -497,6 +517,10 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
           }
         );
         
+        // Streaming owns the lifecycle; ensure local loader is cleared immediately
+        setLocalLoading(false);
+        updateProcessingStage(null);
+        
         // Skip the rest since streaming handles the response
         return;
         
@@ -613,7 +637,9 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
               isInteractive: true,
               interactiveOptions: response.interactiveOptions
             };
-            setChatHistory(prev => [...prev, typedSavedResponse]);
+            if (threadId === currentThreadIdRef.current) {
+              setChatHistory(prev => [...prev, typedSavedResponse]);
+            }
           } else {
             throw new Error("Failed to save interactive message");
           }
@@ -631,7 +657,9 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
             interactiveOptions: response.interactiveOptions
           };
           
-          setChatHistory(prev => [...prev, interactiveMessage]);
+          if (threadId === currentThreadIdRef.current) {
+            setChatHistory(prev => [...prev, interactiveMessage]);
+          }
         }
       } else {
         const responseInfo = {
@@ -665,7 +693,9 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
               sender: savedResponse.sender as 'user' | 'assistant' | 'error',
               role: savedResponse.role as 'user' | 'assistant' | 'error'
             };
-            setChatHistory(prev => [...prev, typedSavedResponse]);
+            if (threadId === currentThreadIdRef.current) {
+              setChatHistory(prev => [...prev, typedSavedResponse]);
+            }
           } else {
             throw new Error("Failed to save assistant response");
           }
@@ -683,8 +713,10 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
             has_numeric_result: response.hasNumericResult
           };
           
-          debugLog.addEvent("UI Update", "Adding fallback temporary assistant response to chat history", "warning");
-          setChatHistory(prev => [...prev, assistantMessage]);
+          if (threadId === currentThreadIdRef.current) {
+            debugLog.addEvent("UI Update", "Adding fallback temporary assistant response to chat history", "warning");
+            setChatHistory(prev => [...prev, assistantMessage]);
+          }
           
           toast({
             title: "Warning",
@@ -720,7 +752,9 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
             sender: 'assistant',
             role: 'assistant'
           };
-          setChatHistory(prev => [...prev, typedErrorMessage]);
+          if (threadId === currentThreadIdRef.current) {
+            setChatHistory(prev => [...prev, typedErrorMessage]);
+          }
         } else {
           const errorMessage: ChatMessage = {
             id: `error-${Date.now()}`,
@@ -732,7 +766,9 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
           };
           
           debugLog.addEvent("UI Update", "Adding fallback error message to chat history", "warning");
-          setChatHistory(prev => [...prev, errorMessage]);
+          if (threadId === currentThreadIdRef.current) {
+            setChatHistory(prev => [...prev, errorMessage]);
+          }
         }
         
         debugLog.addEvent("Error Handling", "Error message saved to database", "success");
@@ -749,12 +785,16 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
         };
         
         debugLog.addEvent("UI Update", "Adding last-resort error message to chat history", "warning");
-        setChatHistory(prev => [...prev, errorMessage]);
+        if (threadId === currentThreadIdRef.current) {
+          setChatHistory(prev => [...prev, errorMessage]);
+        }
       }
     } finally {
-      // Clear local loading state - the realtime hook will handle the final state
-      setLocalLoading(false);
-      updateProcessingStage(null);
+      // Clear local loading state - only if still on originating thread
+      if (threadId === currentThreadIdRef.current) {
+        setLocalLoading(false);
+        updateProcessingStage(null);
+      }
     }
   };
 
@@ -908,10 +948,8 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
   // Check if deletion should be disabled - use realtime processing state
   const isDeletionDisabled = isProcessing || processingStatus === 'processing' || isLoading;
 
-  // Thread-scoped loading indicator: during streaming, only show for the originating thread
-  const showLoadingForThisThread = streamingThreadId
-    ? (isStreaming && streamingThreadId === currentThreadId)
-    : (isLoading || isProcessing);
+  // Thread-scoped loading indicator: during streaming, only show for current thread
+  const showLoadingForThisThread = isLoading || isProcessing || isStreaming;
 
   return (
     <div className="chat-interface flex flex-col h-full">
@@ -919,6 +957,20 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
         <h2 className="text-xl font-semibold"><TranslatableText text="Rūḥ" /></h2>
         
         <div className="flex items-center gap-2">
+          {showLoadingForThisThread && currentThreadId && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                stopStreaming(currentThreadId);
+                setLocalLoading(false);
+                updateProcessingStage(null);
+              }}
+              aria-label="Cancel processing"
+            >
+              <TranslatableText text="Cancel" />
+            </Button>
+          )}
           {currentThreadId && (
             <TooltipProvider>
               <Tooltip>
