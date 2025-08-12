@@ -65,8 +65,12 @@ function sanitizeConsolidatorOutput(raw: string): { responseText: string; status
       } catch {
         const jsonStr = extractFirstJsonObjectString(s);
         if (jsonStr) {
-          parsed = JSON.parse(jsonStr);
-          meta.parsedExtracted = true;
+          try {
+            parsed = JSON.parse(jsonStr);
+            meta.parsedExtracted = true;
+          } catch {
+            // silently fall back to raw text if JSON parsing fails
+          }
         }
       }
     }
@@ -104,98 +108,65 @@ serve(async (req) => {
       messageId
     });
 
-    // Process Researcher Agent results into consolidated insights
+    // Permissive pass-through of Researcher results (no restrictive parsing)
+    const MAX_SQL_ROWS = 200;
+    const MAX_VECTOR_ITEMS = 20;
+
     const analysisSummary = researchResults.map((research: any, index: number) => {
-      const summary = {
-        subQuestion: research.subQuestion.question,
-        purpose: research.subQuestion.purpose,
-        searchStrategy: research.researcherOutput?.validatedPlan?.searchStrategy,
-        researcherValidation: {
-          confidence: research.researcherOutput?.confidence,
-          validationIssues: research.researcherOutput?.validationIssues || [],
-          enhancements: research.researcherOutput?.enhancements || []
+      const originalSql = Array.isArray(research?.executionResults?.sqlResults)
+        ? research.executionResults.sqlResults
+        : null;
+      const originalVector = Array.isArray(research?.executionResults?.vectorResults)
+        ? research.executionResults.vectorResults
+        : null;
+
+      const sqlTrimmed = !!(originalSql && originalSql.length > MAX_SQL_ROWS);
+      const vectorTrimmed = !!(originalVector && originalVector.length > MAX_VECTOR_ITEMS);
+
+      if (sqlTrimmed || vectorTrimmed) {
+        console.log('Consolidator trimming payload sizes', {
+          index,
+          sqlRows: originalSql?.length || 0,
+          sqlTrimmedTo: sqlTrimmed ? MAX_SQL_ROWS : (originalSql?.length || 0),
+          vectorItems: originalVector?.length || 0,
+          vectorTrimmedTo: vectorTrimmed ? MAX_VECTOR_ITEMS : (originalVector?.length || 0),
+        });
+      }
+
+      return {
+        subQuestion: research?.subQuestion ?? null,
+        researcherOutput: research?.researcherOutput ?? null,
+        executionResults: {
+          ...(research?.executionResults ?? {}),
+          sqlResults: originalSql ? originalSql.slice(0, MAX_SQL_ROWS) : originalSql,
+          sqlRowCount: originalSql?.length ?? 0,
+          sqlRowCappedTo: sqlTrimmed ? MAX_SQL_ROWS : (originalSql?.length ?? 0),
+          vectorResults: originalVector ? originalVector.slice(0, MAX_VECTOR_ITEMS) : originalVector,
+          vectorItemCount: originalVector?.length ?? 0,
+          vectorItemCappedTo: vectorTrimmed ? MAX_VECTOR_ITEMS : (originalVector?.length ?? 0),
         },
-        quantitativeFindings: {},
-        qualitativeFindings: {},
-        error: research.executionResults?.error
+        error: research?.executionResults?.error ?? research?.error ?? null,
+        notes: sqlTrimmed || vectorTrimmed
+          ? {
+              truncated: true,
+              reason: 'Soft cap applied to prevent token overflow',
+              caps: { MAX_SQL_ROWS, MAX_VECTOR_ITEMS },
+            }
+          : undefined,
       };
+    });
 
-      // Process SQL results from execution
-      if (research.executionResults?.sqlResults && Array.isArray(research.executionResults.sqlResults)) {
-        const sqlData = research.executionResults.sqlResults;
-        
-        if (sqlData.length > 0) {
-          const firstRow = sqlData[0];
-          
-          // Handle percentage calculations
-          if ('percentage' in firstRow) {
-            summary.quantitativeFindings = {
-              type: 'percentage_analysis',
-              percentage: firstRow.percentage,
-              count: firstRow.count || sqlData.length,
-              interpretation: firstRow.percentage >= 50 ? 'majority_presence' : 'minority_presence',
-              significance: firstRow.percentage > 75 ? 'very_high' : 
-                          firstRow.percentage > 50 ? 'high' :
-                          firstRow.percentage > 25 ? 'moderate' : 'low'
-            };
-          }
-          // Handle count data
-          else if ('count' in firstRow || 'frequency' in firstRow) {
-            const countValue = firstRow.count || firstRow.frequency || sqlData.length;
-            summary.quantitativeFindings = {
-              type: 'count_analysis',
-              count: countValue,
-              data: sqlData.slice(0, 5), // Top 5 results
-              magnitude: countValue > 50 ? 'extensive' :
-                        countValue > 20 ? 'substantial' :
-                        countValue > 10 ? 'moderate' : 'limited'
-            };
-          }
-          // Handle average/score data
-          else if ('avg_score' in firstRow || 'score' in firstRow) {
-            summary.quantitativeFindings = {
-              type: 'score_analysis',
-              topResults: sqlData.slice(0, 5),
-              avgScore: firstRow.avg_score || firstRow.score,
-              dataPoints: sqlData.length
-            };
-          }
-        }
-      }
-
-      // Process vector search results
-      if (research.executionResults?.vectorResults && research.executionResults.vectorResults.length > 0) {
-        const vectorData = research.executionResults.vectorResults;
-        summary.qualitativeFindings = {
-          type: 'semantic_insights',
-          entryCount: vectorData.length,
-          sampleEntries: vectorData.slice(0, 2).map((entry: any) => ({
-            date: entry.created_at,
-            contentPreview: entry.content?.substring(0, 150),
-            similarity: Math.round((entry.similarity || 0) * 100),
-            themes: entry.themes || [],
-            topEmotions: entry.emotions ? Object.entries(entry.emotions)
-              .sort(([,a], [,b]) => (b as number) - (a as number))
-              .slice(0, 3)
-              .map(([emotion, score]) => `${emotion}: ${(score as number * 100).toFixed(0)}%`)
-              : []
-          })),
-          avgSimilarity: Math.round(vectorData.reduce((sum: number, entry: any) => sum + (entry.similarity || 0), 0) / vectorData.length * 100)
-        };
-      }
-
-      return summary;
-    }).filter(s => s.quantitativeFindings.type || s.qualitativeFindings.type || s.error);
-
-    // Build comprehensive context for GPT
+    // Build lightweight context snapshot (kept minimal, consolidationPrompt remains unchanged)
     const contextData = {
       userProfile: {
         timezone: userProfile?.timezone || 'UTC',
         journalEntryCount: userProfile?.journalEntryCount || 'unknown',
-        premiumUser: userProfile?.is_premium || false
+        premiumUser: userProfile?.is_premium || false,
       },
-      conversationHistory: conversationContext?.slice(-6) || [], // Last 6 messages for context
-      analysis: analysisSummary
+      conversationHistory: conversationContext?.slice(-6) || [],
+      meta: {
+        totalResearchItems: analysisSummary.length,
+      },
     };
 
     const consolidationPrompt = `
@@ -310,7 +281,7 @@ serve(async (req) => {
       userStatusMessage,
       analysisMetadata: {
         totalSubQuestions: researchResults.length,
-        strategiesUsed: researchResults.map((r: any) => r.researcherOutput?.validatedPlan?.searchStrategy),
+        strategiesUsed: researchResults.map((r: any) => r.researcherOutput?.validatedPlan?.searchStrategy ?? r.researcherOutput?.plan?.searchStrategy ?? r.subQuestion?.searchStrategy),
         dataSourcesUsed: {
           vectorSearch: researchResults.some((r: any) => r.executionResults?.vectorResults),
           sqlQueries: researchResults.some((r: any) => r.executionResults?.sqlResults),
