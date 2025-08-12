@@ -181,10 +181,35 @@ export default function MobileChatInterface({
           const m: any = payload.new;
           if (m.sender === 'assistant') {
             setMessages(prev => {
-              // Avoid duplicates
-              // Mobile UI doesn't track IDs, so we check last message content as heuristic
-              const exists = false; // rely on stream -> backend single write
-              if (exists) return prev;
+              // Avoid duplicates by simple heuristic
+              const last = prev[prev.length - 1];
+              if (last && last.role === 'assistant' && last.content === m.content) return prev;
+              const uiMsg: UIChatMessage = {
+                role: 'assistant',
+                content: m.content,
+                references: m.reference_entries || undefined,
+                analysis: m.analysis_data || undefined,
+                hasNumericResult: m.has_numeric_result || false
+              };
+              return [...prev, uiMsg];
+            });
+          }
+        }
+      )
+      .on('postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'chat_messages',
+          filter: `thread_id=eq.${threadId}`
+        },
+        (payload) => {
+          const m: any = payload.new;
+          if (m.sender === 'assistant') {
+            setMessages(prev => {
+              // If last assistant message already matches, skip; else append updated
+              const last = prev[prev.length - 1];
+              if (last && last.role === 'assistant' && last.content === m.content) return prev;
               const uiMsg: UIChatMessage = {
                 role: 'assistant',
                 content: m.content,

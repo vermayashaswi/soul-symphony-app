@@ -198,6 +198,39 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
           }
         }
       )
+      .on('postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'chat_messages',
+          filter: `thread_id=eq.${currentThreadId}`
+        },
+        (payload) => {
+          const m: any = payload.new;
+          if (m.sender === 'assistant') {
+            setChatHistory(prev => {
+              const updatedMsg: ChatMessage = {
+                id: m.id,
+                thread_id: m.thread_id,
+                content: m.content,
+                sender: 'assistant',
+                role: 'assistant',
+                created_at: m.created_at,
+                reference_entries: m.reference_entries,
+                analysis_data: m.analysis_data,
+                has_numeric_result: m.has_numeric_result
+              } as any;
+              const idx = prev.findIndex(msg => msg.id === m.id);
+              if (idx === -1) {
+                return [...prev, updatedMsg];
+              }
+              const copy = [...prev];
+              copy[idx] = { ...copy[idx], ...updatedMsg } as any;
+              return copy;
+            });
+          }
+        }
+      )
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
