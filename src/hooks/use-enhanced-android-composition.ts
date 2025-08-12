@@ -156,7 +156,7 @@ export const useEnhancedAndroidComposition = (
     if (!enableSwypeOptimization || keyboardType !== 'swype') return;
 
     // Swype needs special gesture handling
-    element.style.touchAction = 'none';
+    element.style.touchAction = 'manipulation';
     element.style.userSelect = 'text';
     element.style.webkitUserSelect = 'text';
     

@@ -141,7 +141,6 @@ serve(async (req) => {
 
       return new Response(JSON.stringify({
         response: clarificationResult.response,
-        userStatusMessage: clarificationResult.userStatusMessage,
         analysis: {
           queryType: 'clarification',
           classification,
@@ -254,7 +253,6 @@ serve(async (req) => {
 
         return new Response(JSON.stringify({
           response: finalResponse,
-          userStatusMessage: consolidationResult.userStatusMessage,
           analysis: {
             queryPlan: enhancedQueryPlan,
             gptDrivenAnalysis: true,

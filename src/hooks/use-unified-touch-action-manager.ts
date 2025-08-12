@@ -161,9 +161,9 @@ export const useUnifiedTouchActionManager = (options: TouchActionManagerOptions 
 
   // Composition event optimizations
   const optimizeForComposition = useCallback((element: HTMLElement) => {
-    const touchAction = platform === 'android' ? 'none' : 'manipulation';
+    const touchAction = 'manipulation';
     return setTouchAction(element, 'composition', touchAction, 'composition-opt');
-  }, [platform, setTouchAction]);
+  }, [setTouchAction]);
 
   // Event listeners for automatic management
   useEffect(() => {

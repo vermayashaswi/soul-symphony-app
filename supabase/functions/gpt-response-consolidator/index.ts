@@ -180,6 +180,13 @@ serve(async (req) => {
     **CONVERSATION CONTEXT:**
     ${conversationContext ? conversationContext.slice(-6).map((msg: any) => `${(msg.role || msg.sender || 'user')}: ${msg.content}`).join('\n') : 'No prior context'}
     
+    **STRICT FOCUS AND TOPIC GUARDRAILS (IMPORTANT):**
+    - Use ONLY the data in COMPREHENSIVE ANALYSIS RESULTS as factual basis.
+    - Do NOT carry over numbers or topics from CONVERSATION CONTEXT unless the SAME facts are present in the analysis results.
+    - Answer the exact intent of the USER QUESTION. If results are about a different topic (e.g., happiness) and the question asks about time-of-day, ignore the other topic.
+    - If analysis results do not cover the question, ask ONE concise clarifying question instead of guessing.
+    - Conversation context is for tone and continuity only, NOT for facts.
+    
     **ANALYSIS SYNTHESIS GUIDELINES:**
     
     **For Quantitative Findings (percentages, counts, calculations):**

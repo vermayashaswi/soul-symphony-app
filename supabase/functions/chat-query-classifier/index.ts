@@ -76,6 +76,22 @@ async function gptClassifyMessage(
   timeScopeHint?: 'all' | 'recent' | 'last_week' | 'this_month' | 'last_month' | null;
 }> {
   
+  // Short-circuit acknowledgements to avoid unnecessary analysis
+  const trimmed = (message || '').trim();
+  const ackRegex = /^(ok(?:ay)?|k|kk|thanks|thank you|thx|cool|got it|sounds good|roger|understood|yep|yup|sure|👌|👍)[.!]?$/i;
+  if (ackRegex.test(trimmed)) {
+    return {
+      category: 'GENERAL_MENTAL_HEALTH',
+      confidence: 0.99,
+      reasoning: 'Acknowledgment/closure detected; no analysis requested.',
+      useAllEntries: false,
+      recommendedPipeline: 'general',
+      clarifyingQuestion: null,
+      journalHintStrength: 'low',
+      timeScopeHint: null
+    };
+  }
+
   const contextString = conversationContext.length > 0 
     ? `\nConversation context: ${conversationContext.slice(-6).map(msg => `${(msg.role || msg.sender || 'user')}: ${msg.content}`).join('\n')}`
     : '';
