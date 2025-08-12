@@ -128,8 +128,8 @@ export const useCapacitorAndroidWebViewOptimization = (
       await Keyboard.setAccessoryBarVisible({ isVisible: false });
       await Keyboard.setScroll({ isDisabled: false });
       await Keyboard.setStyle({ style: 'DARK' });
-      await Keyboard.setResizeMode({ mode: 'ionic' });
-      keyboardInfo.current.resizeMode = 'ionic';
+      await Keyboard.setResizeMode({ mode: 'native' });
+      keyboardInfo.current.resizeMode = 'native';
 
       // Keyboard show handler
       await Keyboard.addListener('keyboardWillShow', (info) => {
@@ -156,6 +156,10 @@ export const useCapacitorAndroidWebViewOptimization = (
         window.dispatchEvent(new CustomEvent('capacitorKeyboardShow', {
           detail: { height: info.keyboardHeight, keyboardInfo: keyboardInfo.current }
         }));
+        // Compatibility event for other modules
+        window.dispatchEvent(new CustomEvent('keyboardOpen', {
+          detail: { height: info.keyboardHeight }
+        }));
       });
 
       // Keyboard hide handler
@@ -179,6 +183,8 @@ export const useCapacitorAndroidWebViewOptimization = (
         window.dispatchEvent(new CustomEvent('capacitorKeyboardHide', {
           detail: { keyboardInfo: keyboardInfo.current }
         }));
+        // Compatibility event for other modules
+        window.dispatchEvent(new CustomEvent('keyboardClose'));
       });
 
       if (debugMode) {

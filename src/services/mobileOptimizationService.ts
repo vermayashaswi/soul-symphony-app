@@ -202,11 +202,9 @@ class MobileOptimizationService {
         return;
       }
       
-      // Prevent rubber band scrolling at document level only when safe
-      if (e.target === document.body && !keyboardVisible) {
-        e.preventDefault();
-      }
-    }, { passive: false });
+      // Avoid preventing default to not block native gestures; rely on CSS overscroll-behavior
+      // If you need to prevent rubber banding, do it on specific containers, not document.body
+    }, { passive: true });
 
     // Enhanced visual feedback for touch interactions
     document.addEventListener('touchstart', (e) => {

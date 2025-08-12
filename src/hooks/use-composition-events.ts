@@ -48,8 +48,8 @@ export const useCompositionEvents = (
     
     // Android-specific optimizations
     if (androidOptimized && isAndroidSwipeKeyboard) {
-      // Prevent touch events from interfering
-      inputRef.current.style.touchAction = 'none';
+      // Prevent touch events from interfering while allowing swipe typing
+      inputRef.current.style.touchAction = 'manipulation';
       
       // Ensure composition text is visible
       if ((inputRef.current.style as any).imeMode !== 'active') {
@@ -78,13 +78,8 @@ export const useCompositionEvents = (
     
     // Android swipe keyboard optimization
     if (androidOptimized && isAndroidSwipeKeyboard) {
-      // Some Android keyboards need a slight delay to process composition
-      setTimeout(() => {
-        if (inputRef.current && compositionState.current.isComposing) {
-          // Trigger visual update without interfering with composition
-          inputRef.current.dispatchEvent(new Event('input', { bubbles: false }));
-        }
-      }, 10);
+      // Avoid synthetic input events during composition to not disrupt swipe-to-type
+      // Keep state only; final input will trigger on compositionend
     }
   }, [inputRef, enableDebugMode, androidOptimized, isAndroidSwipeKeyboard]);
 
