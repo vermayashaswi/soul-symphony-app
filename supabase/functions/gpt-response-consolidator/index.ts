@@ -109,7 +109,9 @@ serve(async (req) => {
       const summary = {
         subQuestion: research.subQuestion.question,
         purpose: research.subQuestion.purpose,
-        searchStrategy: research.researcherOutput?.validatedPlan?.searchStrategy,
+        searchStrategy: research.researcherOutput?.validatedPlan?.searchStrategy ??
+          research.researcherOutput?.plan?.searchStrategy ??
+          research.subQuestion?.searchStrategy,
         researcherValidation: {
           confidence: research.researcherOutput?.confidence,
           validationIssues: research.researcherOutput?.validationIssues || [],
@@ -310,7 +312,7 @@ serve(async (req) => {
       userStatusMessage,
       analysisMetadata: {
         totalSubQuestions: researchResults.length,
-        strategiesUsed: researchResults.map((r: any) => r.researcherOutput?.validatedPlan?.searchStrategy),
+        strategiesUsed: researchResults.map((r: any) => r.researcherOutput?.validatedPlan?.searchStrategy ?? r.researcherOutput?.plan?.searchStrategy ?? r.subQuestion?.searchStrategy),
         dataSourcesUsed: {
           vectorSearch: researchResults.some((r: any) => r.executionResults?.vectorResults),
           sqlQueries: researchResults.some((r: any) => r.executionResults?.sqlResults),
