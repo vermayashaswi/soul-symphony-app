@@ -164,7 +164,7 @@ export type Database = {
           languages: Json | null
           master_themes: string[] | null
           "refined text": string | null
-          sentiment: string | null
+          sentiment: number | null
           themeemotion: Json | null
           themes: string[] | null
           "transcription text": string | null
@@ -184,7 +184,7 @@ export type Database = {
           languages?: Json | null
           master_themes?: string[] | null
           "refined text"?: string | null
-          sentiment?: string | null
+          sentiment?: number | null
           themeemotion?: Json | null
           themes?: string[] | null
           "transcription text"?: string | null
@@ -204,7 +204,7 @@ export type Database = {
           languages?: Json | null
           master_themes?: string[] | null
           "refined text"?: string | null
-          sentiment?: string | null
+          sentiment?: number | null
           themeemotion?: Json | null
           themes?: string[] | null
           "transcription text"?: string | null

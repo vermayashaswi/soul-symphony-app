@@ -9,6 +9,8 @@ import { useTranslation } from "@/contexts/TranslationContext";
 import { cn } from "@/lib/utils";
 import { useKeyboardDetection } from "@/hooks/use-keyboard-detection";
 import { useNativeKeyboard } from "@/hooks/use-native-keyboard";
+import { useCompositionEvents } from "@/hooks/use-composition-events";
+import { useMobileKeyboardErrorRecovery } from "@/hooks/use-mobile-keyboard-error-recovery";
 
 interface MobileChatInputProps {
   onSendMessage: (message: string, isAudio?: boolean) => void;
@@ -32,6 +34,8 @@ export default function MobileChatInput({
   
   const { isKeyboardVisible, keyboardHeight, platform, isNative, isReady } = useKeyboardDetection();
   const { isOptimized } = useNativeKeyboard();
+  const { isComposing, keyboardType } = useCompositionEvents(inputRef, { preventConflicts: false, androidOptimized: true });
+  const { recoverFromSwipeConflict } = useMobileKeyboardErrorRecovery({ enableDebugMode: false, autoRecovery: true, recoveryDelay: 0 });
   
   const isInChatTutorialStep = isActive && isInStep(5);
 
