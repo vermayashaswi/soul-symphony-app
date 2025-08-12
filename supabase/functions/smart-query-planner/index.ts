@@ -315,28 +315,97 @@ Focus on creating comprehensive, executable analysis plans that will provide mea
   }
 }
 
-// Helper: sanitize and bind user in SQL safely
-function sanitizeAndBindUserSql(sqlQuery: string, userId: string): { ok: true; sql: string } | { ok: false; error: string } {
-  try {
-    const q = (sqlQuery || '').trim();
-    const upper = q.toUpperCase();
-    if (!upper.startsWith('SELECT')) return { ok: false, error: 'Only SELECT statements are allowed' };
-    const semiCount = (q.match(/;/g) || []).length;
-    if (semiCount > 1 || (semiCount === 1 && !q.trim().endsWith(';'))) {
-      return { ok: false, error: 'Multiple statements are not allowed' };
-    }
-    if (!q.includes('$user_id')) {
-      return { ok: false, error: 'Missing required $user_id placeholder' };
-    }
-    const isValidUUID = (val: string) => /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(val);
-    if (!isValidUUID(userId)) return { ok: false, error: 'Invalid userId format' };
-    const bound = q.replace(/\$user_id\b/g, `'${userId}'`);
-    return { ok: true, sql: bound };
-  } catch (e) {
-    return { ok: false, error: 'SQL sanitation failed' };
+// Helper: derive time range hints from SQL WHERE clauses
+function deriveTimeRangeFromSql(sqlQuery: string): { start?: string | null; end?: string | null } {
+  const res: { start?: string | null; end?: string | null } = {};
+  if (!sqlQuery) return res;
+  const q = sqlQuery.replace(/\s+/g, ' ');
+  const between = q.match(/created_at\s+BETWEEN\s*(?:TIMESTAMP\s*)?'([^']+)'\s+AND\s*(?:TIMESTAMP\s*)?'([^']+)'/i);
+  if (between) {
+    const start = new Date(between[1]);
+    const end = new Date(between[2]);
+    if (!isNaN(start.getTime())) res.start = start.toISOString();
+    if (!isNaN(end.getTime())) res.end = end.toISOString();
   }
+  const gte = q.match(/created_at\s*>=\s*(?:TIMESTAMP\s*)?'([^']+)'/i);
+  if (gte) {
+    const d = new Date(gte[1]);
+    if (!isNaN(d.getTime())) res.start = d.toISOString();
+  }
+  const lte = q.match(/created_at\s*<=\s*(?:TIMESTAMP\s*)?'([^']+)'/i);
+  if (lte) {
+    const d = new Date(lte[1]);
+    if (!isNaN(d.getTime())) res.end = d.toISOString();
+  }
+  return res;
 }
 
+// Helper: extract LIMIT from SQL
+function deriveLimitFromSql(sqlQuery: string, fallback: number = 10): number {
+  const m = (sqlQuery || '').match(/LIMIT\s+(\d+)/i);
+  if (m) {
+    const n = parseInt(m[1], 10);
+    if (!isNaN(n) && n > 0) return n;
+  }
+  return fallback;
+}
+
+// Execute SQL intent by mapping to safe RPCs/query builder
+async function executeSqlIntent(sqlQuery: string, userId: string, timeRange: { start?: string | null; end?: string | null } | null, supabaseClient: any) {
+  const limit = deriveLimitFromSql(sqlQuery, 5);
+  const start_date = timeRange?.start || null;
+  const end_date = timeRange?.end || null;
+
+  // Emotions analysis
+  if (/jsonb_each\(emotions\)|\bemotions\b/i.test(sqlQuery)) {
+    const { data, error } = await supabaseClient.rpc('get_top_emotions_with_entries', {
+      user_id_param: userId,
+      start_date,
+      end_date,
+      limit_count: limit
+    });
+    if (error) return { ok: false, error: error.message };
+    return { ok: true, rows: data || [] };
+  }
+
+  // Theme statistics
+  if (/unnest\(master_themes\)|\bmaster_themes\b/i.test(sqlQuery)) {
+    const { data, error } = await supabaseClient.rpc('get_theme_statistics', {
+      user_id_filter: userId,
+      start_date,
+      end_date,
+      limit_count: Math.max(limit, 10)
+    });
+    if (error) return { ok: false, error: error.message };
+    return { ok: true, rows: data || [] };
+  }
+
+  // Entity statistics
+  if (/jsonb_each\(entities\)|\bentities\b/i.test(sqlQuery)) {
+    const { data, error } = await supabaseClient.rpc('get_entity_statistics', {
+      user_id_filter: userId,
+      start_date,
+      end_date,
+      limit_count: Math.max(limit, 10)
+    });
+    if (error) return { ok: false, error: error.message };
+    return { ok: true, rows: data || [] };
+  }
+
+  // Entity-Emotion relationships
+  if (/entityemotion/i.test(sqlQuery)) {
+    const { data, error } = await supabaseClient.rpc('get_entity_emotion_statistics', {
+      user_id_filter: userId,
+      start_date,
+      end_date,
+      limit_count: Math.max(limit, 10)
+    });
+    if (error) return { ok: false, error: error.message };
+    return { ok: true, rows: data || [] };
+  }
+
+  return { ok: false, error: 'Unsupported SQL intent' };
+}
 // Execute a validated plan with proper SQL and vector search execution
 async function executeValidatedPlan(validatedPlan: any, userId: string, normalizedTimeRange: { start?: string | null; end?: string | null } | null, supabaseClient: any) {
   // Helpers
