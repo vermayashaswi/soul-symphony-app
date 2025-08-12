@@ -544,7 +544,8 @@ async function processStreamingPipeline(
           queryType: 'unrelated_denial',
           classification,
           timestamp: new Date().toISOString()
-        }
+        },
+        requestId
       });
 
       // Persist unrelated response in streaming mode
@@ -614,7 +615,8 @@ async function processStreamingPipeline(
           queryType: 'clarification',
           classification,
           timestamp: new Date().toISOString()
-        }
+        },
+        requestId
       });
 
       // Persist clarification response in streaming mode
@@ -733,7 +735,8 @@ async function processStreamingPipeline(
           subQuestionAnalysis: researchResults,
           consolidationMetadata: consolidationResult.analysisMetadata,
           classification
-        }
+        },
+        requestId
       });
       // Persist journal-specific response in streaming mode
       if (threadId) {
@@ -787,24 +790,26 @@ async function processStreamingPipeline(
           throw new Error(`General mental health chat failed: ${generalError.message}`);
         }
 
-        streamManager.sendEvent('final_response', {
-          response: generalResponse.response,
-          analysis: {
-            queryType: 'general_mental_health',
-            classification,
-            timestamp: new Date().toISOString()
-          }
-        });
+      streamManager.sendEvent('final_response', {
+        response: generalResponse.response,
+        analysis: {
+          queryType: 'general_mental_health',
+          classification,
+          timestamp: new Date().toISOString()
+        },
+        requestId
+      });
       } catch (error) {
         // Fallback response
-        streamManager.sendEvent('final_response', {
-          response: "I understand you're reaching out. For questions about your personal journal insights, I'm here to help analyze your entries. For general wellness information, feel free to ask specific questions!",
-          analysis: {
-            queryType: 'general_fallback',
-            classification,
-            timestamp: new Date().toISOString()
-          }
-        });
+      streamManager.sendEvent('final_response', {
+        response: "I understand you're reaching out. For questions about your personal journal insights, I'm here to help analyze your entries. For general wellness information, feel free to ask specific questions!",
+        analysis: {
+          queryType: 'general_fallback',
+          classification,
+          timestamp: new Date().toISOString()
+        },
+        requestId
+      });
       }
 
       streamManager.close();
@@ -816,7 +821,8 @@ async function processStreamingPipeline(
           queryType: 'unknown_category',
           classification,
           timestamp: new Date().toISOString()
-        }
+        },
+        requestId
       });
 
       streamManager.close();

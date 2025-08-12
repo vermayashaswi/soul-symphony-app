@@ -101,7 +101,7 @@ export default function MobileChatInterface({
     restoreStreamingState
    } = useStreamingChat({
       threadId: threadId,
-     onFinalResponse: async (response, analysis, originThreadId) => {
+     onFinalResponse: async (response, analysis, originThreadId, requestId) => {
        // Handle final streaming response scoped to its origin thread
        if (!response || !originThreadId || !user?.id) {
          debugLog.addEvent("Streaming Response", "[Mobile] Missing required data for final response", "error");
@@ -141,7 +141,8 @@ export default function MobileChatInterface({
                // Persist safely with an idempotency_key derived from threadId + response
                try {
                  const enc = new TextEncoder();
-                 const digest = await crypto.subtle.digest('SHA-256', enc.encode(`${originThreadId}:${response}`));
+                 const keySource = requestId || `${originThreadId}:${response}`;
+                 const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
                  const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
                  const idempotencyKey = hex.slice(0, 32);
 
