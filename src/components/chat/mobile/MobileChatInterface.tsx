@@ -13,7 +13,7 @@ import { useTranslation } from "@/contexts/TranslationContext";
 import { TranslatableText } from "@/components/translation/TranslatableText";
 import { v4 as uuidv4 } from "uuid";
 import { useDebugLog } from "@/utils/debug/DebugContext";
-import { getThreadMessages } from "@/services/chat";
+import { getThreadMessages, saveMessage } from "@/services/chat";
 import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
 import { processChatMessage } from "@/services/chatService";
 import { MentalHealthInsights } from "@/hooks/use-mental-health-insights";
