@@ -752,7 +752,7 @@ export default function MobileChatInterface({
       </div>
       
       {/* Chat Content */}
-      <div ref={scrollElementRef} className="mobile-chat-content">
+      <div className="mobile-chat-content">
         {initialLoading ? (
           <div className="flex items-center justify-center py-10">
             <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></div>
@@ -799,7 +799,7 @@ export default function MobileChatInterface({
             </div>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div ref={scrollElementRef} className="space-y-3 h-full overflow-y-auto">
             {messages.map((message, index) => (
               <ChatErrorBoundary key={index}>
                 <MobileChatMessage 
