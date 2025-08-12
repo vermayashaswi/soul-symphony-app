@@ -76,11 +76,27 @@ async function gptClassifyMessage(
   timeScopeHint?: 'all' | 'recent' | 'last_week' | 'this_month' | 'last_month' | null;
 }> {
   
+  // Short-circuit acknowledgements to avoid unnecessary analysis
+  const trimmed = (message || '').trim();
+  const ackRegex = /^(ok(?:ay)?|k|kk|thanks|thank you|thx|cool|got it|sounds good|roger|understood|yep|yup|sure|👌|👍)[.!]?$/i;
+  if (ackRegex.test(trimmed)) {
+    return {
+      category: 'GENERAL_MENTAL_HEALTH',
+      confidence: 0.99,
+      reasoning: 'Acknowledgment/closure detected; no analysis requested.',
+      useAllEntries: false,
+      recommendedPipeline: 'general',
+      clarifyingQuestion: null,
+      journalHintStrength: 'low',
+      timeScopeHint: null
+    };
+  }
+
   const contextString = conversationContext.length > 0 
     ? `\nConversation context: ${conversationContext.slice(-6).map(msg => `${(msg.role || msg.sender || 'user')}: ${msg.content}`).join('\n')}`
     : '';
 
-  const classificationPrompt = `You are the intent router for "Ruh by SOuLO". Use the conversation context to classify the latest user message and return ONE JSON object that exactly matches the schema. Be decisive and consistent.
+  const classificationPrompt = `You are the intent router for "Ruh by SOuLO". Use the conversation context to classify the latest user message and return ONE JSON object that exactly matches the schema. Be decisive and consistent.`
 
 Categories (choose exactly one):
 - JOURNAL_SPECIFIC: First-person, analyzable questions about the user's own patterns/feelings/behaviors. Examples: "How have I felt this month?", "Did meditation help me?", "What are my stress patterns lately?".
