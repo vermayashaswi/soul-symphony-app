@@ -11,7 +11,7 @@ import { useKeyboardDetection } from "@/hooks/use-keyboard-detection";
 import { useNativeKeyboard } from "@/hooks/use-native-keyboard";
 import { useCompositionEvents } from "@/hooks/use-composition-events";
 import { useMobileKeyboardErrorRecovery } from "@/hooks/use-mobile-keyboard-error-recovery";
-
+import { Keyboard } from "@capacitor/keyboard";
 interface MobileChatInputProps {
   onSendMessage: (message: string, isAudio?: boolean) => void;
   isLoading: boolean;
@@ -156,12 +156,25 @@ const isInChatTutorialStep = isActive && isInStep(5);
         
         setInputValue("");
         
-        // Keep focus on input after sending
-        if (inputRef.current) {
-          inputRef.current.focus();
+        // Blur input and hide the mobile keyboard after sending
+        try {
+          inputRef.current?.blur();
+          if (document.activeElement && (document.activeElement as HTMLElement).blur) {
+            (document.activeElement as HTMLElement).blur();
+          }
+        } catch {}
+
+        try {
+          await Keyboard.hide();
+          // Some Android WebViews need a second hide call after a short delay
+          setTimeout(() => {
+            Keyboard.hide().catch(() => {});
+          }, 50);
+        } catch {
+          // no-op on web or if plugin unavailable
         }
         
-        chatDebug.addEvent("User Input", "Reset input field after sending", "success");
+        chatDebug.addEvent("User Input", "Reset input field and hid keyboard after sending", "success");
       } catch (error) {
         console.error("Error sending message:", error);
         chatDebug.addEvent("Send Error", error instanceof Error ? error.message : "Unknown error sending message", "error");
