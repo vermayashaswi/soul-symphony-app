@@ -17,14 +17,12 @@ serve(async (req) => {
     const { 
       userMessage, 
       conversationContext,
-      userProfile,
-      messageId 
+      userProfile
     } = await req.json();
     
     console.log('GPT Clarification Generator called with:', { 
       userMessage: userMessage?.substring(0, 100),
-      contextCount: conversationContext?.length || 0,
-      messageId
+      contextCount: conversationContext?.length || 0
     });
 
     const clarificationPrompt = `
@@ -92,29 +90,13 @@ TONE: Warm, grounded, spiritually aware but not preachy, genuinely caring, with 
             { role: 'system', content: 'You are Ruh, the soul-centered wellness companion by SOuLO. You combine ancient wisdom with modern psychology to help people connect with their deepest truth and inner knowing.' },
             { role: 'user', content: clarificationPrompt }
           ],
-          response_format: { type: 'json_object' },
           max_tokens: 800
         }),
     });
 
     const data = await response.json();
-    const rawResponse = data?.choices?.[0]?.message?.content || '';
-
-    
-    // Try to parse JSON response with status message
-    let clarificationResponse = rawResponse;
-    let userStatusMessage = null;
-    
-    try {
-      const parsedResponse = JSON.parse(rawResponse);
-      if (parsedResponse.userStatusMessage && parsedResponse.response) {
-        userStatusMessage = parsedResponse.userStatusMessage;
-        clarificationResponse = parsedResponse.response;
-      }
-    } catch (parseError) {
-      // If JSON parsing fails, use the raw response as is
-      console.log('Could not parse JSON response, using raw content');
-    }
+    const clarificationResponse = data?.choices?.[0]?.message?.content || '';
+    const userStatusMessage = null;
 
     return new Response(JSON.stringify({
       success: true,
