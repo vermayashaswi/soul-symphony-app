@@ -238,16 +238,23 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
         }
 
         try {
-          const timeoutMs = 20000 + i * 5000;
-          const timeoutPromise = new Promise((_, rej) =>
-            setTimeout(() => rej(new Error('Request timed out')), timeoutMs)
-          );
+          const category = (body as any)?.category || threadState.queryCategory;
+          let result: { data: any; error: any };
 
-          const result = (await Promise.race([
-            supabase.functions.invoke('chat-with-rag', { body }),
-            timeoutPromise,
-          ])) as { data: any; error: any };
+          if (category === 'JOURNAL_SPECIFIC') {
+            // Disable client-side timeout for long-running analysis
+            result = (await supabase.functions.invoke('chat-with-rag', { body })) as { data: any; error: any };
+          } else {
+            const timeoutMs = 20000 + i * 5000;
+            const timeoutPromise = new Promise((_, rej) =>
+              setTimeout(() => rej(new Error('Request timed out')), timeoutMs)
+            );
 
+            result = (await Promise.race([
+              supabase.functions.invoke('chat-with-rag', { body }),
+              timeoutPromise,
+            ])) as { data: any; error: any };
+          }
           if ((result as any)?.error) {
             lastErr = (result as any).error;
             if (isEdgeFunctionError(lastErr) || isNetworkError(lastErr)) {
@@ -657,9 +664,9 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
         conversationContext,
         userProfile,
         streamingMode: false,
-        requestId // Include request ID for deduplication
+        requestId, // Include request ID for deduplication
+        category: messageCategory,
       }, { attempts: 3, baseDelay: 900 }, targetThreadId);
-
       // Check if request is still active (not superseded by another request)
       const currentThreadState = getThreadState(targetThreadId);
       if (currentThreadState.activeRequestId !== requestId) {

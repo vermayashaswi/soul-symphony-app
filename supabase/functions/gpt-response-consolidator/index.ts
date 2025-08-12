@@ -65,8 +65,12 @@ function sanitizeConsolidatorOutput(raw: string): { responseText: string; status
       } catch {
         const jsonStr = extractFirstJsonObjectString(s);
         if (jsonStr) {
-          parsed = JSON.parse(jsonStr);
-          meta.parsedExtracted = true;
+          try {
+            parsed = JSON.parse(jsonStr);
+            meta.parsedExtracted = true;
+          } catch {
+            // silently fall back to raw text if JSON parsing fails
+          }
         }
       }
     }
