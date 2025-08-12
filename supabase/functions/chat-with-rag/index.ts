@@ -38,7 +38,9 @@ serve(async (req) => {
       conversationContext = [], 
       userProfile = {},
       threadId,
-      messageId
+      messageId,
+      requestId,
+      category
     } = requestBody;
 
     console.log(`[chat-with-rag] Processing query: "${message}" for user: ${requestUserId} (threadId: ${threadId || 'none'}, messageId: ${messageId || 'none'})`);
@@ -84,6 +86,12 @@ serve(async (req) => {
     }
 
     console.log(`[chat-with-rag] Query classified as: ${classification.category} (confidence: ${classification.confidence})`);
+    
+    // Apply client-provided category hint to keep client/server in sync
+    if (category && ['JOURNAL_SPECIFIC','GENERAL_MENTAL_HEALTH','JOURNAL_SPECIFIC_NEEDS_CLARIFICATION','UNRELATED'].includes(category)) {
+      console.warn(`[chat-with-rag] CLIENT HINT: Overriding classification to ${category}`);
+      classification.category = category;
+    }
     
     // Heuristic override for obvious journal-specific queries with protection for bare emotions
     const lowerMsg = (message || '').toLowerCase();
@@ -139,8 +147,45 @@ serve(async (req) => {
         throw new Error(`Clarification generation failed: ${clarificationError.message}`);
       }
 
+      const reply = (typeof clarificationResult?.response === 'string' && clarificationResult.response.trim())
+        ? clarificationResult.response.trim()
+        : 'Could you clarify what you mean so I can look into your entries properly?';
+
+      // Persist assistant message idempotently
+      if (threadId) {
+        try {
+          const enc = new TextEncoder();
+          const keySource = requestId || `${threadId}:${reply}`;
+          const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
+          const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+          const idempotencyKey = hex.slice(0, 32);
+
+          const { data: existing, error: existErr } = await supabaseClient
+            .from('chat_messages')
+            .select('id')
+            .eq('thread_id', threadId)
+            .eq('idempotency_key', idempotencyKey)
+            .maybeSingle();
+
+          if (!existErr && !existing) {
+            const { error: insertErr } = await supabaseClient
+              .from('chat_messages')
+              .insert({
+                thread_id: threadId,
+                content: reply,
+                sender: 'assistant',
+                role: 'assistant',
+                idempotency_key: idempotencyKey
+              });
+            if (insertErr) console.warn('[chat-with-rag] Clarification persist error:', insertErr.message);
+          }
+        } catch (e) {
+          console.warn('[chat-with-rag] Clarification persist exception:', (e as any)?.message || e);
+        }
+      }
+
       return new Response(JSON.stringify({
-        response: clarificationResult.response,
+        response: reply,
         analysis: {
           queryType: 'clarification',
           classification,
@@ -229,23 +274,31 @@ serve(async (req) => {
         // Persist assistant message so the client can see it even after navigation
         if (threadId) {
           try {
-            // Compute idempotency key based on thread + response content
             const enc = new TextEncoder();
-            const digest = await crypto.subtle.digest('SHA-256', enc.encode(`${threadId}:${finalResponse}`));
+            const keySource = requestId || `${threadId}:${finalResponse}`;
+            const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
             const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
             const idempotencyKey = hex.slice(0, 32);
 
-            const { error: upsertErr } = await supabaseClient
+            const { data: existing, error: existErr } = await supabaseClient
               .from('chat_messages')
-              .upsert({
-                thread_id: threadId,
-                content: finalResponse,
-                sender: 'assistant',
-                role: 'assistant',
-                idempotency_key: idempotencyKey
-              }, { onConflict: 'thread_id,idempotency_key' });
+              .select('id')
+              .eq('thread_id', threadId)
+              .eq('idempotency_key', idempotencyKey)
+              .maybeSingle();
 
-            if (upsertErr) console.warn('[chat-with-rag] Failed to upsert assistant message:', upsertErr.message);
+            if (!existErr && !existing) {
+              const { error: insertErr } = await supabaseClient
+                .from('chat_messages')
+                .insert({
+                  thread_id: threadId,
+                  content: finalResponse,
+                  sender: 'assistant',
+                  role: 'assistant',
+                  idempotency_key: idempotencyKey
+                });
+              if (insertErr) console.warn('[chat-with-rag] Failed to persist assistant message:', insertErr.message);
+            }
           } catch (e) {
             console.warn('[chat-with-rag] Exception persisting assistant message:', (e as any)?.message || e);
           }
@@ -285,8 +338,41 @@ serve(async (req) => {
         }
 
         const reply = (typeof generalResponse?.response === 'string' && generalResponse.response.trim())
-          ? generalResponse.response
+          ? generalResponse.response.trim()
           : "I’m here to support your mental health journey. Could you share a bit more so I can respond meaningfully?";
+
+        // Persist assistant message idempotently for general responses
+        if (threadId) {
+          try {
+            const enc = new TextEncoder();
+            const keySource = requestId || `${threadId}:${reply}`;
+            const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
+            const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+            const idempotencyKey = hex.slice(0, 32);
+
+            const { data: existing, error: existErr } = await supabaseClient
+              .from('chat_messages')
+              .select('id')
+              .eq('thread_id', threadId)
+              .eq('idempotency_key', idempotencyKey)
+              .maybeSingle();
+
+            if (!existErr && !existing) {
+              const { error: insertErr } = await supabaseClient
+                .from('chat_messages')
+                .insert({
+                  thread_id: threadId,
+                  content: reply,
+                  sender: 'assistant',
+                  role: 'assistant',
+                  idempotency_key: idempotencyKey
+                });
+              if (insertErr) console.warn('[chat-with-rag] General persist error:', insertErr.message);
+            }
+          } catch (e) {
+            console.warn('[chat-with-rag] General persist exception:', (e as any)?.message || e);
+          }
+        }
 
         return new Response(JSON.stringify({
           response: reply,
@@ -360,7 +446,9 @@ async function processStreamingPipeline(
       conversationContext = [], 
       userProfile = {},
       threadId,
-      messageId
+      messageId,
+      requestId,
+      category
     } = requestBody;
 
     // Step 1: Query classification with status updates (streaming mode)
@@ -384,6 +472,12 @@ async function processStreamingPipeline(
     }
 
     console.log(`[chat-with-rag] STREAMING: Query classified as: ${classification.category} (confidence: ${classification.confidence})`);
+
+    // Apply client-provided hint in streaming as well
+    if (category && ['JOURNAL_SPECIFIC','GENERAL_MENTAL_HEALTH','JOURNAL_SPECIFIC_NEEDS_CLARIFICATION','UNRELATED'].includes(category)) {
+      console.warn(`[chat-with-rag] STREAMING CLIENT HINT: Overriding classification to ${category}`);
+      classification.category = category;
+    }
 
     // Heuristic override for obvious journal-specific queries (streaming)
     {
@@ -456,6 +550,39 @@ async function processStreamingPipeline(
           timestamp: new Date().toISOString()
         }
       });
+
+      // Persist clarification response in streaming mode
+      if (threadId) {
+        try {
+          const reply = (typeof clarificationResult?.response === 'string' && clarificationResult.response.trim()) ? clarificationResult.response.trim() : '';
+          if (reply) {
+            const enc = new TextEncoder();
+            const keySource = requestId || `${threadId}:${reply}`;
+            const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
+            const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+            const idempotencyKey = hex.slice(0, 32);
+
+            const { data: existing } = await supabaseClient
+              .from('chat_messages')
+              .select('id')
+              .eq('thread_id', threadId)
+              .eq('idempotency_key', idempotencyKey)
+              .maybeSingle();
+
+            if (!existing) {
+              await supabaseClient.from('chat_messages').insert({
+                thread_id: threadId,
+                content: reply,
+                sender: 'assistant',
+                role: 'assistant',
+                idempotency_key: idempotencyKey
+              });
+            }
+          }
+        } catch (e) {
+          console.warn('[chat-with-rag] STREAM persist (clarification) exception:', (e as any)?.message || e);
+        }
+      }
 
       streamManager.close();
       return;
@@ -542,6 +669,38 @@ async function processStreamingPipeline(
           classification
         }
       });
+      // Persist journal-specific response in streaming mode
+      if (threadId) {
+        try {
+          const reply = (typeof consolidationResult?.response === 'string' && consolidationResult.response.trim()) ? consolidationResult.response.trim() : '';
+          if (reply) {
+            const enc = new TextEncoder();
+            const keySource = requestId || `${threadId}:${reply}`;
+            const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
+            const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+            const idempotencyKey = hex.slice(0, 32);
+
+            const { data: existing } = await supabaseClient
+              .from('chat_messages')
+              .select('id')
+              .eq('thread_id', threadId)
+              .eq('idempotency_key', idempotencyKey)
+              .maybeSingle();
+
+            if (!existing) {
+              await supabaseClient.from('chat_messages').insert({
+                thread_id: threadId,
+                content: reply,
+                sender: 'assistant',
+                role: 'assistant',
+                idempotency_key: idempotencyKey
+              });
+            }
+          }
+        } catch (e) {
+          console.warn('[chat-with-rag] STREAM persist (journal) exception:', (e as any)?.message || e);
+        }
+      }
 
       streamManager.close();
     } else if (classification.category === 'GENERAL_MENTAL_HEALTH') {

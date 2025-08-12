@@ -132,8 +132,53 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       
       // Backend persists assistant message; UI will append via realtime
       if (originThreadId === currentThreadId) {
-        setLocalLoading(false);
-        updateProcessingStage(null);
+        // Watchdog: if realtime insert doesn't arrive, persist client-side after a short delay
+        try {
+          setTimeout(async () => {
+            // Double-check still on same thread
+            if (!currentThreadIdRef.current || currentThreadIdRef.current !== originThreadId) return;
+
+            // Has an assistant message with same content arrived?
+            const { data: recent, error: recentErr } = await supabase
+              .from('chat_messages')
+              .select('id, content, sender, created_at')
+              .eq('thread_id', originThreadId)
+              .order('created_at', { ascending: false })
+              .limit(5);
+
+            if (recentErr) {
+              console.warn('[Streaming Watchdog] Failed to fetch recent messages:', recentErr.message);
+            }
+
+            const alreadyExists = (recent || []).some(m => (m as any).sender === 'assistant' && (m as any).content?.trim() === response.trim());
+            if (!alreadyExists) {
+              // Persist safely with an idempotency_key derived from threadId + response
+              try {
+                const enc = new TextEncoder();
+                const digest = await crypto.subtle.digest('SHA-256', enc.encode(`${originThreadId}:${response}`));
+                const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+                const idempotencyKey = hex.slice(0, 32);
+
+                await supabase.from('chat_messages').upsert({
+                  thread_id: originThreadId,
+                  content: response,
+                  sender: 'assistant',
+                  role: 'assistant',
+                  idempotency_key: idempotencyKey
+                }, { onConflict: 'thread_id,idempotency_key' });
+              } catch (e) {
+                console.warn('[Streaming Watchdog] Persist fallback failed:', (e as any)?.message || e);
+              }
+            }
+
+            setLocalLoading(false);
+            updateProcessingStage(null);
+          }, 1200);
+        } catch (e) {
+          console.warn('[Streaming Watchdog] Exception scheduling fallback:', (e as any)?.message || e);
+          setLocalLoading(false);
+          updateProcessingStage(null);
+        }
       }
     },
     onError: (error) => {
