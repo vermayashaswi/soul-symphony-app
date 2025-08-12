@@ -143,7 +143,7 @@ export const useInsightsData = (
       const aggregatedEmotionData = processEmotionData(processedEntries, timeRange);
 
       const processedAllEntries = allEntries?.map(entry => {
-        if ((!entry.sentiment || entry.sentiment === '0') && entry.emotions) {
+        if ((entry.sentiment == null || Number(entry.sentiment) === 0) && entry.emotions) {
           try {
             const emotions = typeof entry.emotions === 'string' 
               ? JSON.parse(entry.emotions) 
@@ -188,7 +188,7 @@ export const useInsightsData = (
                 if (avgSentiment > 1.0) avgSentiment = 1.0;
                 if (avgSentiment < -1.0) avgSentiment = -1.0;
                 
-                entry.sentiment = avgSentiment.toString();
+                entry.sentiment = avgSentiment;
                 console.log(`Calculated sentiment for entry ${entry.id}: ${entry.sentiment}`);
               }
             }

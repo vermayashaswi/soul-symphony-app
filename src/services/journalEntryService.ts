@@ -9,7 +9,13 @@ export const createJournalEntry = async (entryData: Partial<JournalEntry>, userI
       ...entryData,
       user_id: userId, // Set for RLS validation
       created_at: new Date().toISOString(),
-    };
+    } as any;
+
+    // Ensure sentiment is a number for DB insert
+    if (insertData.sentiment !== undefined && insertData.sentiment !== null) {
+      const s = Number(insertData.sentiment);
+      if (!isNaN(s)) insertData.sentiment = s; else delete insertData.sentiment;
+    }
 
     console.log('[JournalEntryService] Creating entry for authenticated user:', userId);
 

@@ -122,7 +122,7 @@ const JournalSummaryCard: React.FC = () => {
             
             journalEntries.forEach(entry => {
               if (entry.themes && Array.isArray(entry.themes)) {
-                const sentimentScore = entry.sentiment ? parseFloat(entry.sentiment) : 0;
+                const sentimentScore = entry.sentiment != null ? Number(entry.sentiment) : 0;
                 
                 entry.themes.forEach(theme => {
                   if (theme && typeof theme === 'string') {

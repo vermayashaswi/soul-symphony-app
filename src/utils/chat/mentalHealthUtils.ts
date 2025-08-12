@@ -34,7 +34,7 @@ export async function analyzeMentalHealthEntries(userId: string, timeRange?: { s
     entries.forEach(entry => {
       // Process sentiment
       if (entry.sentiment) {
-        const sentimentValue = parseFloat(entry.sentiment);
+        const sentimentValue = Number(entry.sentiment);
         if (!isNaN(sentimentValue)) {
           overallSentiment += sentimentValue;
           sentimentCount++;
