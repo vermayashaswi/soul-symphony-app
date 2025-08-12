@@ -206,11 +206,11 @@ ${databaseSchemaContext}
 - User has ${userEntryCount} journal entries${contextString}
 
 **YOUR RESPONSIBILITIES AS ANALYST AGENT:**
-1. **Smart Hypothesis Formation**: Create a smart hypothesis for what the query means and what the user truly wants to know, then logically deduce sub-questions to answer it comprehensively
-2. **Sub-Question Generation**: Break down the query into 1-3 focused sub-questions that capture both explicit themes AND related semantic concepts (e.g., "family" should automatically expand to include "mom", "dad", "wife", "husband", "children", "parents", "siblings", "mother", "father", "son", "daughter")
-3. **Intelligent Search Strategy**: For theme-based queries, ALWAYS create both SQL queries that search for expanded terms AND vector searches for semantic similarity
-4. **Dynamic Query Generation**: Generate SQL queries and vector searches dynamically based on the user's specific query - NO hardcoded functions
-5. **Hybrid Analysis**: Combine SQL statistical analysis with vector semantic search for comprehensive insights
+1. Smart Hypothesis Formation: infer what the user truly wants to know, then deduce focused sub-questions to answer it comprehensively
+2. Sub-Question Generation: break down the query into 1-3 precise sub-questions (no hardcoded keyword lists)
+3. Search Strategy: pick sql_primary, vector_primary, or hybrid based on the sub-question
+4. Dynamic Query Generation: produce executable SQL for our schema and/or vector queries
+5. Hybrid Analysis: combine SQL stats with semantic vector results when helpful
 
 **MANDATORY OUTPUT STRUCTURE:**
 Return ONLY valid JSON with this exact structure:
@@ -228,12 +228,13 @@ Return ONLY valid JSON with this exact structure:
           "step": 1,
           "description": "Clear description of what this step accomplishes",
           "queryType": "sql_analysis" | "vector_search" | "sql_count" | "sql_calculation",
-          "sqlQuery": "SELECT ... FROM \\"Journal Entries\\" WHERE user_id = $user_id AND ..." | null,
+          "sqlQuery": "SELECT ... FROM \"Journal Entries\" WHERE user_id = $user_id AND ..." | null,
           "vectorSearch": {
             "query": "optimized search query",
             "threshold": 0.3,
             "limit": 10
-          } | null
+          } | null,
+          "timeRange": { "start": "ISO string or null", "end": "ISO string or null" } | null
         }
       ]
     }
@@ -245,32 +246,21 @@ Return ONLY valid JSON with this exact structure:
   "hasExplicitTimeReference": boolean
 }
 
-**SQL QUERY GENERATION RULES:**
-- ALWAYS include WHERE user_id = $user_id for security
+**SQL QUERY GUIDELINES:**
+- ALWAYS include WHERE user_id = $user_id
 - Use proper column names with quotes for spaced names like "refined text"
-- For emotion analysis: Use emotions column with jsonb operators
-- For theme analysis: Use master_themes array with unnest() or array operators AND consider entity mentions and text content search for semantic expansion
-- For percentages: Always alias the result as percentage (e.g., SELECT ... AS percentage)
-- For counts: Alias as count (e.g., SELECT COUNT(*) AS count) or frequency for grouped counts
-- For averages/scores: Alias as avg_score (or score when singular)
-- For date filtering: Use created_at with timestamp comparisons
-- For theme-based queries like "family": AUTOMATICALLY expand to related terms (mom, dad, wife, husband, children, parents, siblings, mother, father, son, daughter, family) and search in master_themes, entities, AND text content
-- Use ONLY the $user_id placeholder for binding the user. Do not use {{user_id}} or :user_id.
-- Generate dynamic SQL - NO hardcoded RPC function calls
-- Always include semantic expansion for theme queries
+- For emotion analysis: use emotions JSONB
+- For theme analysis: use master_themes array and/or entities/text where appropriate (no hardcoded expansions)
+- For percentages: alias as percentage
+- For counts: alias as count (or frequency for grouped counts)
+- For averages/scores: alias as avg_score (or score)
+- For date filtering: apply created_at comparisons when time is implied or stated
+- Do NOT call RPCs; generate plain SQL only
 
 **SEARCH STRATEGY SELECTION:**
-- sql_primary: For statistical analysis, counts, percentages, structured data
-- vector_primary: For semantic content analysis, finding similar entries
-- hybrid: For comprehensive analysis requiring both approaches (PREFERRED for theme queries)
-
-**CRITICAL FOR THEME QUERIES:** Always include both SQL analysis AND vector search steps for theme-based queries like "family", "work", "relationships" to ensure comprehensive coverage.
-
-**ANALYSIS STEP TYPES:**
-- sql_count: Simple counting queries
-- sql_calculation: Complex calculations, percentages, aggregations
-- sql_analysis: General SQL-based analysis
-- vector_search: Semantic similarity search
+- sql_primary: statistical analysis, counts, percentages
+- vector_primary: semantic content analysis, similar entries
+- hybrid: combine both when needed
 
 Focus on creating comprehensive, executable analysis plans that will provide meaningful insights.`;
 
@@ -406,16 +396,8 @@ async function executeSqlIntent(sqlQuery: string, userId: string, timeRange: { s
 
   return { ok: false, error: 'Unsupported SQL intent' };
 }
-// Execute a validated plan with proper SQL and vector search execution
-async function executeValidatedPlan(validatedPlan: any, userId: string, normalizedTimeRange: { start?: string | null; end?: string | null } | null, supabaseClient: any) {
-  // Helpers
-  const extractThemeKeywords = (text: string | null | undefined): string[] => {
-    const src = (text || '').toLowerCase();
-    const familySet = new Set<string>(['family','mom','dad','mother','father','son','daughter','wife','husband','children','parents','siblings','sister','brother']);
-    const found = Array.from(familySet).filter(k => src.includes(k));
-    return found;
-  };
-
+// Execute plan by directly running GPT-produced steps (no hardcoded theme/emotion logic)
+async function executePlan(plan: any, userId: string, normalizedTimeRange: { start?: string | null; end?: string | null } | null, supabaseClient: any) {
   const getTotalCount = async (): Promise<number> => {
     const { data: total } = await supabaseClient.rpc('get_journal_entry_count', {
       user_id_filter: userId,
@@ -425,42 +407,30 @@ async function executeValidatedPlan(validatedPlan: any, userId: string, normaliz
     return (total as number) || 0;
   };
 
-  const runFamilyThemeSql = async (): Promise<{ ids: number[]; count: number }> => {
-    let q = supabaseClient
-      .from('Journal Entries')
-      .select('id', { count: 'exact' })
-      .eq('user_id', userId);
-
-    if (normalizedTimeRange?.start) q = q.gte('created_at', normalizedTimeRange.start);
-    if (normalizedTimeRange?.end) q = q.lte('created_at', normalizedTimeRange.end);
-
-    // Master theme match on 'Family'
-    q = q.contains('master_themes', ['Family'])
-      .limit(1000);
-
-    const { data, count, error } = await q;
-    if (error) {
-      console.warn('[executeValidatedPlan] Safe SQL family query failed:', error.message);
-      return { ids: [], count: 0 };
-    }
-    return { ids: (data || []).map((r: any) => r.id), count: count || 0 };
-  };
-
   // Determine steps to process
-  const stepsToProcess = validatedPlan.subQuestions || (validatedPlan.executionSteps ? [{ question: 'Analysis', purpose: 'Automated analysis', searchStrategy: 'hybrid', analysisSteps: validatedPlan.executionSteps }] : []);
-  console.log(`[executeValidatedPlan] Processing ${stepsToProcess.length} sub-questions/steps`);
+  const stepsToProcess = plan.subQuestions || (plan.executionSteps ? [{ question: 'Analysis', purpose: 'Automated analysis', searchStrategy: 'hybrid', analysisSteps: plan.executionSteps }] : []);
+  console.log(`[executePlan] Processing ${stepsToProcess.length} sub-questions/steps`);
 
   const subQuestionPromises = stepsToProcess.map(async (subQuestion: any) => {
-    console.log(`[executeValidatedPlan] Processing sub-question: ${subQuestion.question}`);
+    console.log(`[executePlan] Processing sub-question: ${subQuestion.question}`);
 
     const stepPromises = (subQuestion.analysisSteps || []).map(async (step: any) => {
       try {
-        console.log(`[executeValidatedPlan] Executing step ${step.step}: ${step.description}`);
+        console.log(`[executePlan] Executing step ${step.step}: ${step.description}`);
+
+        // Determine per-step time range
+        let stepTimeRange: { start?: string | null; end?: string | null } | null = normalizedTimeRange || null;
+        const derived = deriveTimeRangeFromSql(step.sqlQuery || '');
+        if (step?.timeRange && (step.timeRange.start || step.timeRange.end)) {
+          stepTimeRange = { start: step.timeRange.start || null, end: step.timeRange.end || null };
+        } else if (derived.start || derived.end) {
+          stepTimeRange = { start: derived.start || null, end: derived.end || null };
+        }
 
         if (step.queryType === 'vector_search' && step.vectorSearch) {
           try {
             const queryEmbedding = await generateEmbedding(step.vectorSearch.query);
-            const useDated = !!(normalizedTimeRange && (normalizedTimeRange.start || normalizedTimeRange.end));
+            const useDated = !!(stepTimeRange && (stepTimeRange.start || stepTimeRange.end));
             const rpcName = useDated ? 'match_journal_entries_with_date' : 'match_journal_entries';
             const rpcArgs: Record<string, any> = {
               query_embedding: queryEmbedding,
@@ -469,37 +439,24 @@ async function executeValidatedPlan(validatedPlan: any, userId: string, normaliz
               user_id_filter: userId,
             };
             if (useDated) {
-              rpcArgs.start_date = normalizedTimeRange?.start || null;
-              rpcArgs.end_date = normalizedTimeRange?.end || null;
+              rpcArgs.start_date = stepTimeRange?.start || null;
+              rpcArgs.end_date = stepTimeRange?.end || null;
             }
 
             const { data: vectorData, error: vectorError } = await supabaseClient.rpc(rpcName, rpcArgs);
             if (vectorError) {
               return { kind: 'vector', ok: false, error: vectorError.message };
             }
-            return { kind: 'vector', ok: true, entries: vectorData || [] };
+            return { kind: 'vector', ok: true, entries: vectorData || [], timeRange: stepTimeRange };
           } catch (e) {
             return { kind: 'vector', ok: false, error: (e as Error).message };
           }
         }
 
         if ((step.queryType === 'sql_analysis' || step.queryType === 'sql_calculation' || step.queryType === 'sql_count')) {
-          // SAFE path: derive intent and execute known-safe SQL via query builder (no dynamic SQL)
-          const textForKeywords = `${step.sqlQuery || ''} ${step.description || ''} ${(step.vectorSearch?.query) || ''}`;
-          const kw = extractThemeKeywords(textForKeywords);
-
-          // Currently support family-oriented analysis safely
-          if (kw.some(k => k === 'family' || k === 'mom' || k === 'dad' || k === 'mother' || k === 'father' || k === 'wife' || k === 'husband' || k === 'children' || k === 'parents' || k === 'siblings' || k === 'sister' || k === 'brother')) {
-            const [{ ids, count }, totalCount] = await Promise.all([
-              runFamilyThemeSql(),
-              getTotalCount(),
-            ]);
-            const percentage = totalCount > 0 ? Math.round((count / totalCount) * 1000) / 10 : 0; // 1 decimal
-            return { kind: 'sql', ok: true, rows: [{ count, total_count: totalCount, percentage }], meta: { ids } };
-          }
-
-          // Fallback: do not execute arbitrary SQL
-          return { kind: 'sql', ok: false, error: 'Unsafe or unsupported SQL step (dynamic SQL disabled).'};
+          const exec = await executeSqlIntent(step.sqlQuery || '', userId, stepTimeRange, supabaseClient);
+          if (exec.ok) return { kind: 'sql', ok: true, rows: exec.rows || [], timeRange: stepTimeRange };
+          return { kind: 'sql', ok: false, error: exec.error || 'SQL intent failed' };
         }
 
         return { kind: 'unknown', ok: false, error: 'Unknown or missing step configuration' };
@@ -510,22 +467,16 @@ async function executeValidatedPlan(validatedPlan: any, userId: string, normaliz
 
     const resolved = await Promise.all(stepPromises);
 
-    // Aggregate results per sub-question
     const sqlRows = resolved.filter(r => r.kind === 'sql' && r.ok && Array.isArray((r as any).rows)) as any[];
     const vectorOk = resolved.filter(r => r.kind === 'vector' && r.ok && Array.isArray((r as any).entries)) as any[];
 
     const sqlResults = sqlRows.flatMap(r => r.rows);
     const vectorResults = vectorOk.flatMap(r => r.entries);
 
-    // Combined metrics (dedup by id when available)
-    const sqlIds = new Set<number>();
-    sqlRows.forEach(r => (r.meta?.ids || []).forEach((id: number) => sqlIds.add(id)));
     const vectorIds = new Set<number>(vectorResults.map((e: any) => e.id));
-    const combinedIds = new Set<number>([...sqlIds, ...vectorIds]);
-
     let totalCount = 0;
     try { totalCount = await getTotalCount(); } catch {}
-    const combinedPercentage = totalCount > 0 ? Math.round((combinedIds.size / totalCount) * 1000) / 10 : 0;
+    const combinedPercentage = totalCount > 0 ? Math.round((vectorIds.size / totalCount) * 1000) / 10 : 0;
 
     return {
       subQuestion: {
@@ -533,8 +484,9 @@ async function executeValidatedPlan(validatedPlan: any, userId: string, normaliz
         purpose: subQuestion.purpose,
       },
       researcherOutput: {
+        plan: { searchStrategy: subQuestion.searchStrategy },
         validatedPlan: { searchStrategy: subQuestion.searchStrategy },
-        confidence: validatedPlan.confidence ?? null,
+        confidence: plan.confidence ?? null,
         validationIssues: [],
         enhancements: []
       },
@@ -542,9 +494,9 @@ async function executeValidatedPlan(validatedPlan: any, userId: string, normaliz
         sqlResults,
         vectorResults,
         combinedMetrics: {
-          sqlCount: sqlIds.size,
-          vectorCount: vectorIds.size,
-          combinedCount: combinedIds.size,
+          sqlCount: sqlResults.length,
+          vectorCount: vectorResults.length,
+          combinedCount: vectorIds.size,
           totalCount,
           combinedPercentage
         }
@@ -553,7 +505,7 @@ async function executeValidatedPlan(validatedPlan: any, userId: string, normaliz
   });
 
   const perSubQuestionResults = await Promise.all(subQuestionPromises);
-  console.log(`[executeValidatedPlan] Completed execution for ${perSubQuestionResults.length} sub-questions`);
+  console.log(`[executePlan] Completed execution for ${perSubQuestionResults.length} sub-questions`);
   return { researchResults: perSubQuestionResults };
 }
 
@@ -624,7 +576,7 @@ serve(async (req) => {
       }
     }
 
-    const executionResult = await executeValidatedPlan(analysisResult, userId, normalizedTimeRange, supabase);
+    const executionResult = await executePlan(analysisResult, userId, normalizedTimeRange, supabase);
 
     return new Response(JSON.stringify({
       success: true,
