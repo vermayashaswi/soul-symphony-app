@@ -57,16 +57,30 @@ export async function processChatMessage(
       .order('created_at', { ascending: false })
       .limit(10); // Increased limit for better context
 
-    const conversationContext = previousMessages ? 
-      [...previousMessages].reverse().map(msg => ({
-        role: msg.sender === 'user' ? 'user' : 'assistant',
-        content: msg.content,
-        timestamp: msg.created_at
-      })) : [];
+    // Build trimmed & capped conversational context
+    const MAX_CONTEXT_CHARS = 1600;
+    const MAX_MSG_CHARS = 500;
+    const baseContext = previousMessages ?
+      [...previousMessages]
+        .reverse()
+        .map(msg => ({
+          role: msg.sender === 'user' ? 'user' : 'assistant',
+          content: (msg.content || '').replace(/\s+/g, ' ').slice(0, MAX_MSG_CHARS).trim(),
+          timestamp: msg.created_at
+        })) : [];
+
+    // Keep up to last 10 messages but cap total characters
+    let conversationContext = baseContext.slice(-10);
+    const totalChars = () => conversationContext.reduce((s, m) => s + (m.content?.length || 0), 0);
+    while (conversationContext.length > 0 && totalChars() > MAX_CONTEXT_CHARS) {
+      conversationContext.shift(); // drop oldest until within cap
+    }
+
+    const contextPreview = conversationContext.slice(-2).map(m => `${m.role}: ${m.content?.slice(0, 60)}`).join(' | ');
 
     console.log('[ChatService] Conversation context loaded:', {
       messagesCount: conversationContext.length,
-      lastMessage: conversationContext[conversationContext.length - 1]?.content?.slice(0, 50),
+      preview: contextPreview,
       isResumedSession: conversationContext.length > 0
     });
 
@@ -77,8 +91,10 @@ export async function processChatMessage(
       .find(msg => msg.role === 'assistant');
     
     const isFollowUpMessage = conversationContext.length > 0 && 
-      lastAssistantMessage && 
-      /\b(sport|football|activity|exercise|physical)\b/i.test(lastAssistantMessage.content);
+      !!lastAssistantMessage && 
+      (/(?:\bthat\b|\bthose\b|\bit\b|\bthis\b|\bthem\b)/i.test(message) ||
+       /^(also|and|btw|anyway)/i.test(message.trim()) ||
+       /\b(sport|football|activity|exercise|physical)\b/i.test(lastAssistantMessage.content));
 
     console.log('[ChatService] Follow-up detection:', {
       isFollowUp: isFollowUpMessage,
@@ -168,6 +184,7 @@ export async function processChatMessage(
         message,
         userId,
         conversationContext,
+        isFollowUp: isFollowUpMessage,
         preserveTopicContext: true,
         threadMetadata: {},
         requireDualSearch: true,

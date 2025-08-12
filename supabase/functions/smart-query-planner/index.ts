@@ -181,16 +181,28 @@ async function retryOpenAICall(promptFunction: () => Promise<Response>, maxRetri
 /**
  * Enhanced Analyst Agent - generates comprehensive analysis plans
  */
-async function analyzeQueryWithSubQuestions(message: string, conversationContext: any[], userEntryCount: number) {
+async function analyzeQueryWithSubQuestions(message: string, conversationContext: any[], userEntryCount: number, isFollowUp: boolean = false) {
   try {
-    const contextString = conversationContext.length > 0 
-      ? `\nConversation context: ${conversationContext.slice(-2).map(msg => `${msg.role}: ${msg.content}`).join('\n')}`
+    const last = Array.isArray(conversationContext) ? conversationContext.slice(-5) : [];
+    // Serialize last 5 messages with length safeguards
+    let serialized = last
+      .map((msg: any) => `${msg.role}: ${(msg.content || '').toString().replace(/\s+/g, ' ').slice(0, 200)}`)
+      .join('\n');
+    if (serialized.length > 1000) {
+      serialized = last
+        .map((msg: any) => `${msg.role}: ${(msg.content || '').toString().slice(0, 120)}`)
+        .join('\n');
+    }
+    const contextString = last.length > 0 
+      ? `\nConversation context (last ${last.length}): ${serialized}`
       : '';
+
+    console.log(`[Analyst Agent] Context preview: ${last.map((m: any) => `${m.role}:${(m.content || '').slice(0, 40)}`).join(' | ')}`);
 
     const hasPersonalPronouns = /\b(i|me|my|mine|myself)\b/i.test(message.toLowerCase());
     const hasExplicitTimeReference = /\b(last week|yesterday|this week|last month|today|recently|lately|since|started|began)\b/i.test(message.toLowerCase());
     
-    console.log(`[Analyst Agent] Personal pronouns: ${hasPersonalPronouns}, Time reference: ${hasExplicitTimeReference}`);
+    console.log(`[Analyst Agent] Personal pronouns: ${hasPersonalPronouns}, Time reference: ${hasExplicitTimeReference}, Follow-up: ${isFollowUp}`);
 
     // Get live database schema with real themes and emotions
     const databaseSchemaContext = await generateDatabaseSchemaContext(supabase);
@@ -502,7 +514,7 @@ serve(async (req) => {
   }
 
   try {
-    const { message, conversationContext = [], userId, execute = false, timeRange = null, threadId = null, messageId = null } = await req.json();
+    const { message, conversationContext = [], userId, execute = false, timeRange = null, threadId = null, messageId = null, isFollowUp = false } = await req.json();
     
     console.log('Smart Query Planner (Analyst Agent) called with:', { 
       message: message?.substring(0, 100),
@@ -510,7 +522,8 @@ serve(async (req) => {
       userId,
       execute,
       threadId,
-      messageId
+      messageId,
+      isFollowUp
     });
 
     // Get user's journal entry count for context
@@ -520,7 +533,7 @@ serve(async (req) => {
     const userEntryCount = countData || 0;
 
     // Generate comprehensive analysis plan
-    const analysisResult = await analyzeQueryWithSubQuestions(message, conversationContext, userEntryCount);
+    const analysisResult = await analyzeQueryWithSubQuestions(message, conversationContext, userEntryCount, isFollowUp);
     
     if (!execute) {
       // Return just the plan without execution
