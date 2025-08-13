@@ -564,14 +564,21 @@ async function processStreamingPipeline(
             .eq('idempotency_key', idempotencyKey)
             .maybeSingle();
 
-          if (!existing) {
-            await supabaseClient.from('chat_messages').insert({
+          if (existing) {
+            console.log('[chat-with-rag] STREAM persist (unrelated): existing message found for idempotency_key', idempotencyKey);
+          } else {
+            const { error: insertErr } = await supabaseClient.from('chat_messages').insert({
               thread_id: threadId,
               content: reply,
               sender: 'assistant',
               role: 'assistant',
               idempotency_key: idempotencyKey
             });
+            if (insertErr) {
+              console.warn('[chat-with-rag] STREAM persist (unrelated) insert error:', insertErr.message);
+            } else {
+              console.log('[chat-with-rag] STREAM persist (unrelated): inserted assistant message with idempotency_key', idempotencyKey);
+            }
           }
         } catch (e) {
           console.warn('[chat-with-rag] STREAM persist (unrelated) exception:', (e as any)?.message || e);
@@ -637,14 +644,21 @@ async function processStreamingPipeline(
               .eq('idempotency_key', idempotencyKey)
               .maybeSingle();
 
-            if (!existing) {
-              await supabaseClient.from('chat_messages').insert({
+            if (existing) {
+              console.log('[chat-with-rag] STREAM persist (clarification): existing message found for idempotency_key', idempotencyKey);
+            } else {
+              const { error: insertErr } = await supabaseClient.from('chat_messages').insert({
                 thread_id: threadId,
                 content: reply,
                 sender: 'assistant',
                 role: 'assistant',
                 idempotency_key: idempotencyKey
               });
+              if (insertErr) {
+                console.warn('[chat-with-rag] STREAM persist (clarification) insert error:', insertErr.message);
+              } else {
+                console.log('[chat-with-rag] STREAM persist (clarification): inserted assistant message with idempotency_key', idempotencyKey);
+              }
             }
           }
         } catch (e) {
@@ -756,14 +770,21 @@ async function processStreamingPipeline(
               .eq('idempotency_key', idempotencyKey)
               .maybeSingle();
 
-            if (!existing) {
-              await supabaseClient.from('chat_messages').insert({
+            if (existing) {
+              console.log('[chat-with-rag] STREAM persist (journal): existing message found for idempotency_key', idempotencyKey);
+            } else {
+              const { error: insertErr } = await supabaseClient.from('chat_messages').insert({
                 thread_id: threadId,
                 content: reply,
                 sender: 'assistant',
                 role: 'assistant',
                 idempotency_key: idempotencyKey
               });
+              if (insertErr) {
+                console.warn('[chat-with-rag] STREAM persist (journal) insert error:', insertErr.message);
+              } else {
+                console.log('[chat-with-rag] STREAM persist (journal): inserted assistant message with idempotency_key', idempotencyKey);
+              }
             }
           }
         } catch (e) {
@@ -782,7 +803,7 @@ async function processStreamingPipeline(
         const { data: generalResponse, error: generalError } = await supabaseClient.functions.invoke(
           'general-mental-health-chat',
           {
-            body: { message, conversationContext }
+            body: { message, conversationContext, threadId }
           }
         );
 
@@ -790,26 +811,101 @@ async function processStreamingPipeline(
           throw new Error(`General mental health chat failed: ${generalError.message}`);
         }
 
-      streamManager.sendEvent('final_response', {
-        response: generalResponse.response,
-        analysis: {
-          queryType: 'general_mental_health',
-          classification,
-          timestamp: new Date().toISOString()
-        },
-        requestId
-      });
+        const reply = (typeof generalResponse?.response === 'string' && generalResponse.response.trim())
+          ? generalResponse.response.trim()
+          : "I’m here to support your mental health journey. Could you share a bit more so I can respond meaningfully?";
+
+        // Persist assistant message idempotently (streaming general)
+        if (threadId) {
+          try {
+            const enc = new TextEncoder();
+            const keySource = requestId || `${threadId}:${reply}`;
+            const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
+            const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+            const idempotencyKey = hex.slice(0, 32);
+
+            const { data: existing } = await supabaseClient
+              .from('chat_messages')
+              .select('id')
+              .eq('thread_id', threadId)
+              .eq('idempotency_key', idempotencyKey)
+              .maybeSingle();
+
+            if (existing) {
+              console.log('[chat-with-rag] STREAM persist (general): existing message found for idempotency_key', idempotencyKey);
+            } else {
+              const { error: insertErr } = await supabaseClient
+                .from('chat_messages')
+                .insert({
+                  thread_id: threadId,
+                  content: reply,
+                  sender: 'assistant',
+                  role: 'assistant',
+                  idempotency_key: idempotencyKey
+                });
+              if (insertErr) {
+                console.warn('[chat-with-rag] STREAM persist (general) insert error:', insertErr.message);
+              } else {
+                console.log('[chat-with-rag] STREAM persist (general): inserted assistant message with idempotency_key', idempotencyKey);
+              }
+            }
+          } catch (e) {
+            console.warn('[chat-with-rag] STREAM persist (general) exception:', (e as any)?.message || e);
+          }
+        }
+
+        streamManager.sendEvent('final_response', {
+          response: reply,
+          analysis: {
+            queryType: 'general_mental_health',
+            classification,
+            timestamp: new Date().toISOString()
+          },
+          requestId
+        });
       } catch (error) {
         // Fallback response
-      streamManager.sendEvent('final_response', {
-        response: "I understand you're reaching out. For questions about your personal journal insights, I'm here to help analyze your entries. For general wellness information, feel free to ask specific questions!",
-        analysis: {
-          queryType: 'general_fallback',
-          classification,
-          timestamp: new Date().toISOString()
-        },
-        requestId
-      });
+        const reply = "I understand you're reaching out. For questions about your personal journal insights, I'm here to help analyze your entries. For general wellness information, feel free to ask specific questions!";
+        // Attempt to persist fallback as well
+        if (threadId) {
+          try {
+            const enc = new TextEncoder();
+            const keySource = requestId || `${threadId}:${reply}`;
+            const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
+            const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+            const idempotencyKey = hex.slice(0, 32);
+
+            const { data: existing } = await supabaseClient
+              .from('chat_messages')
+              .select('id')
+              .eq('thread_id', threadId)
+              .eq('idempotency_key', idempotencyKey)
+              .maybeSingle();
+
+            if (!existing) {
+              await supabaseClient.from('chat_messages').insert({
+                thread_id: threadId,
+                content: reply,
+                sender: 'assistant',
+                role: 'assistant',
+                idempotency_key: idempotencyKey
+              });
+              console.log('[chat-with-rag] STREAM persist (general fallback): inserted message');
+            }
+          } catch (e) {
+            console.warn('[chat-with-rag] STREAM persist (general fallback) exception:', (e as any)?.message || e);
+          }
+        }
+
+        streamManager.sendEvent('final_response', {
+          response: reply,
+          analysis: {
+            queryType: 'general_fallback',
+            classification,
+            timestamp: new Date().toISOString()
+          },
+          requestId
+        });
       }
 
       streamManager.close();
