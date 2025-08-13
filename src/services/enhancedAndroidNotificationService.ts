@@ -204,8 +204,8 @@ class EnhancedAndroidNotificationService {
       const now = new Date();
 
       for (const time of times) {
-        const scheduleTime = this.getNextReminderTime(time);
         const notificationId = this.getNotificationId(time);
+        const timeMap = this.getTimeMapping(time);
 
         const notification: ScheduleOptions = {
           notifications: [{
@@ -213,9 +213,12 @@ class EnhancedAndroidNotificationService {
             title: 'Time for Your Journal',
             body: this.getNotificationBody(time),
             schedule: {
-              at: scheduleTime,
-              repeats: true,
-              every: 'day'
+              on: {
+                hour: timeMap.hour,
+                minute: timeMap.minute
+              },
+              every: 'day',
+              allowWhileIdle: true
             },
             channelId: 'journal-reminders-high',
             sound: 'default.wav',
@@ -232,8 +235,10 @@ class EnhancedAndroidNotificationService {
         
         this.log(`Scheduled ${time} reminder`, {
           id: notificationId,
-          time: scheduleTime,
-          channelId: 'journal-reminders-high'
+          hour: timeMap.hour,
+          minute: timeMap.minute,
+          channelId: 'journal-reminders-high',
+          pattern: 'on-time-recurring'
         });
       }
 
@@ -299,18 +304,21 @@ class EnhancedAndroidNotificationService {
     }
   }
 
-  private getNextReminderTime(time: JournalReminderTime): Date {
-    const now = new Date();
-    const next = new Date();
-    
+  private getTimeMapping(time: JournalReminderTime): { hour: number; minute: number } {
     const timeMap = {
       morning: { hour: 8, minute: 0 },
       afternoon: { hour: 14, minute: 0 },
       evening: { hour: 19, minute: 0 },
       night: { hour: 22, minute: 0 }
     };
+    return timeMap[time];
+  }
 
-    const targetTime = timeMap[time];
+  private getNextReminderTime(time: JournalReminderTime): Date {
+    const now = new Date();
+    const next = new Date();
+    const targetTime = this.getTimeMapping(time);
+
     next.setHours(targetTime.hour, targetTime.minute, 0, 0);
 
     // If the time has passed today, schedule for tomorrow
@@ -440,6 +448,13 @@ class EnhancedAndroidNotificationService {
 
       await LocalNotifications.schedule(testNotification);
       this.log('Test notification scheduled successfully');
+      
+      // Verify it was scheduled
+      setTimeout(async () => {
+        const pending = await LocalNotifications.getPending();
+        this.log(`Verification: ${pending.notifications.length} notifications pending after test`);
+      }, 1000);
+      
       return true;
 
     } catch (error) {
