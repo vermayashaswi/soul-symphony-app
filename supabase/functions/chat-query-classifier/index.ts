@@ -98,11 +98,20 @@ async function gptClassifyMessage(
 
   const classificationPrompt = `You are the intent router for "Ruh by SOuLO". Use the conversation context to classify the latest user message and return ONE JSON object that exactly matches the schema. Be decisive and consistent.
 
+**CONTEXT OVERRIDE RULES (CHECK FIRST):**
+- If the user is answering previous clarifying questions or providing requested details, immediately classify as "JOURNAL_SPECIFIC" with "rag_full" pipeline
+- If user says "check", "look at", "analyze", "what does my", "in my entries", "from my data" - classify as "JOURNAL_SPECIFIC" with "rag_full" pipeline
+- If previous message was asking for clarification and current message provides more info, upgrade to "JOURNAL_SPECIFIC"
+
 Categories (choose exactly one):
-- JOURNAL_SPECIFIC: First-person, analyzable questions about the user's own patterns/feelings/behaviors. Examples: "How have I felt this month?", "Did meditation help me?", "What are my stress patterns lately?".
+- JOURNAL_SPECIFIC: First-person, analyzable questions about the user's own patterns/feelings/behaviors. Examples: "How have I felt this month?", "Did meditation help me?", "What are my stress patterns lately?", "Check my entries for anxiety", "Look at my data from last week".
 - JOURNAL_SPECIFIC_NEEDS_CLARIFICATION: Personal but too vague to analyze. Examples: "I'm sad", "Help", "How am I?". A single short follow-up question would unlock analysis.
 - GENERAL_MENTAL_HEALTH: General advice/skills/resources not about their own data. Examples: "How to manage anxiety?", "Tips for sleep".
 - UNRELATED: Small talk or off-topic. Examples: "Thanks", "Tell me more", "How are you?".
+
+**DIRECT ANALYSIS TRIGGERS (HIGH PRIORITY):**
+- Messages containing: "check my", "look at my", "analyze my", "what does my", "in my entries", "from my data", "patterns in my"
+- These should bypass clarification and go straight to JOURNAL_SPECIFIC with rag_full pipeline
 
 Decisions:
 - useAllEntries: true if holistic with no explicit timeframe words ("overall", "in general", "what do my entries say about me?"); otherwise false when any timeframe appears or is implied ("today", "yesterday", "last week", "this month", "last month", "recently", "lately").
