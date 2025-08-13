@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { useTutorial } from "@/contexts/TutorialContext";
 import { useTranslation } from "@/contexts/TranslationContext";
 import { cn } from "@/lib/utils";
-import { useSimplifiedKeyboard } from "@/hooks/use-simplified-keyboard";
+import { useReliableKeyboard } from "@/hooks/use-reliable-keyboard";
 import { Keyboard } from "@capacitor/keyboard";
 interface MobileChatInputProps {
   onSendMessage: (message: string, isAudio?: boolean) => void;
@@ -29,7 +29,7 @@ export default function MobileChatInput({
   const { isActive, isInStep } = useTutorial();
   const { translate, currentLanguage } = useTranslation();
   
-  const { isKeyboardVisible, keyboardHeight, platform, isNative } = useSimplifiedKeyboard();
+  const { isKeyboardVisible, keyboardHeight, platform, isNative } = useReliableKeyboard();
 
   const isInChatTutorialStep = isActive && isInStep(5);
 
