@@ -127,7 +127,8 @@
 /* =============================================== */
 
 /* Hide navigation completely when keyboard is visible */
-.mobile-navigation.keyboard-visible {
+.mobile-navigation.keyboard-visible,
+.mobile-navigation.capacitor-keyboard-visible {
   transform: translateY(100%);
   transition: transform 0.15s ease-in-out;
   pointer-events: none;
@@ -147,22 +148,26 @@
 }
 
 /* Reposition input to bottom when keyboard is visible */
-.mobile-chat-input-container.keyboard-visible {
+.mobile-chat-input-container.keyboard-visible,
+.mobile-chat-input-container.capacitor-keyboard-visible {
   bottom: 0px;
   transition: none;
 }
 
 /* Platform-specific keyboard adjustments for input */
-.mobile-chat-input-container.keyboard-visible.platform-ios {
+.mobile-chat-input-container.keyboard-visible.platform-ios,
+.mobile-chat-input-container.capacitor-keyboard-visible.platform-ios {
   bottom: var(--calculated-safe-area-bottom, env(safe-area-inset-bottom, 0px));
 }
 
-.mobile-chat-input-container.keyboard-visible.platform-android {
+.mobile-chat-input-container.keyboard-visible.platform-android,
+.mobile-chat-input-container.capacitor-keyboard-visible.platform-android {
   bottom: 0px;
 }
 
 /* Content adjustments when keyboard is visible */
-.mobile-chat-content.keyboard-visible {
+.mobile-chat-content.keyboard-visible,
+.mobile-chat-content.capacitor-keyboard-visible {
   padding-bottom: calc(var(--chat-input-height) + 0.5rem);
   transition: padding-bottom 0.2s ease-in-out;
 }

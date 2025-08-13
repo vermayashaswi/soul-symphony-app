@@ -810,7 +810,10 @@ export default function MobileChatInterface({
       </div>
       
       {/* Chat Content */}
-      <div className="mobile-chat-content" ref={scrollElementRef}>
+      <div 
+        className={`mobile-chat-content ${isKeyboardVisible ? 'keyboard-visible' : ''}`} 
+        ref={scrollElementRef}
+      >
         {initialLoading ? (
           <div className="flex items-center justify-center py-10">
             <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></div>

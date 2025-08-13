@@ -38,8 +38,11 @@ export function useSwipeGesture(
       // Block if disabled
       if (options.disabled) return true;
 
-      // Block if keyboard is visible (simple check)
-      if (options.keyboardAware && document.body.classList.contains('capacitor-keyboard-visible')) {
+      // Block if keyboard is visible - check both legacy and new class names
+      const isKeyboardVisible = document.body.classList.contains('keyboard-visible') || 
+                                document.body.classList.contains('capacitor-keyboard-visible');
+      
+      if (options.keyboardAware && isKeyboardVisible) {
         if (options.debugMode) {
           console.log('[SwipeGesture] Blocked - keyboard visible');
         }
