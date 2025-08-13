@@ -120,7 +120,7 @@ serve(async (req) => {
       if (threadId) {
         try {
           const enc = new TextEncoder();
-          const keySource = requestId || `${threadId}:${reply}`;
+          const keySource = requestId || `${threadId}:${message}:${Date.now()}:${reply}`;
           const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
           const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
           const idempotencyKey = hex.slice(0, 32);
@@ -190,7 +190,7 @@ serve(async (req) => {
       if (threadId) {
         try {
           const enc = new TextEncoder();
-          const keySource = requestId || `${threadId}:${reply}`;
+          const keySource = requestId || `${threadId}:${message}:${Date.now()}:${reply}`;
           const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
           const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
           const idempotencyKey = hex.slice(0, 32);
@@ -310,7 +310,7 @@ serve(async (req) => {
         if (threadId) {
           try {
             const enc = new TextEncoder();
-            const keySource = requestId || `${threadId}:${finalResponse}`;
+            const keySource = requestId || `${threadId}:${message}:${Date.now()}:${finalResponse}`;
             const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
             const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
             const idempotencyKey = hex.slice(0, 32);
@@ -380,7 +380,7 @@ serve(async (req) => {
         if (threadId) {
           try {
             const enc = new TextEncoder();
-            const keySource = requestId || `${threadId}:${reply}`;
+            const keySource = requestId || `${threadId}:${message}:${Date.now()}:${reply}`;
             const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
             const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
             const idempotencyKey = hex.slice(0, 32);
@@ -552,7 +552,7 @@ async function processStreamingPipeline(
       if (threadId) {
         try {
           const enc = new TextEncoder();
-          const keySource = requestId || `${threadId}:${reply}`;
+          const keySource = requestId || `${threadId}:${message}:${Date.now()}:${reply}`;
           const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
           const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
           const idempotencyKey = hex.slice(0, 32);
@@ -632,7 +632,7 @@ async function processStreamingPipeline(
           const reply = (typeof clarificationResult?.response === 'string' && clarificationResult.response.trim()) ? clarificationResult.response.trim() : '';
           if (reply) {
             const enc = new TextEncoder();
-            const keySource = requestId || `${threadId}:${reply}`;
+            const keySource = requestId || `${threadId}:${message}:${Date.now()}:${reply}`;
             const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
             const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
             const idempotencyKey = hex.slice(0, 32);
@@ -758,7 +758,7 @@ async function processStreamingPipeline(
           const reply = (typeof consolidationResult?.response === 'string' && consolidationResult.response.trim()) ? consolidationResult.response.trim() : '';
           if (reply) {
             const enc = new TextEncoder();
-            const keySource = requestId || `${threadId}:${reply}`;
+            const keySource = requestId || `${threadId}:${message}:${Date.now()}:${reply}`;
             const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
             const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
             const idempotencyKey = hex.slice(0, 32);
@@ -819,7 +819,7 @@ async function processStreamingPipeline(
         if (threadId) {
           try {
             const enc = new TextEncoder();
-            const keySource = requestId || `${threadId}:${reply}`;
+            const keySource = requestId || `${threadId}:${message}:${Date.now()}:${reply}`;
             const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
             const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
             const idempotencyKey = hex.slice(0, 32);
@@ -870,7 +870,7 @@ async function processStreamingPipeline(
         if (threadId) {
           try {
             const enc = new TextEncoder();
-            const keySource = requestId || `${threadId}:${reply}`;
+            const keySource = requestId || `${threadId}:${message}:${Date.now()}:${reply}`;
             const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
             const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
             const idempotencyKey = hex.slice(0, 32);

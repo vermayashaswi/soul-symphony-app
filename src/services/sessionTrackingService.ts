@@ -24,8 +24,23 @@ export interface PageInteraction {
   action?: string;
 }
 
+// In-memory session data for anonymous users
+interface AnonymousSessionData {
+  sessionId: string;
+  device_type?: string;
+  start_page?: string;
+  most_interacted_page?: string;
+  total_page_views: number;
+  pages_visited: string[];
+  page_interactions: Record<string, number>;
+  session_start: number;
+  last_activity: number;
+  isAnonymous: true;
+}
+
 class SessionTrackingService {
   private currentSessionId: string | null = null;
+  private anonymousSession: AnonymousSessionData | null = null;
   private pageInteractions: Record<string, number> = {};
   private pagesVisited: Set<string> = new Set();
   private currentPage: string = '';
@@ -47,7 +62,7 @@ class SessionTrackingService {
   async initializeSession(userId?: string): Promise<string | null> {
     if (this.isInitializing) {
       console.log('[SessionTracking] Session initialization already in progress');
-      return this.currentSessionId;
+      return this.currentSessionId || this.anonymousSession?.sessionId || null;
     }
 
     this.isInitializing = true;
@@ -55,19 +70,20 @@ class SessionTrackingService {
     try {
       console.log('[SessionTracking] Initializing session for user:', userId);
       
-      // First, try to resume an existing session if available
-      if (userId) {
-        const resumedSessionId = await this.attemptSessionResumption(userId);
-        if (resumedSessionId) {
-          this.isInitializing = false;
-          return resumedSessionId;
-        }
-      }
+      // Clear any existing session data
+      this.cleanup();
 
-      // Create new session if no resumable session found
-      const sessionId = await this.createNewSession(userId);
-      this.isInitializing = false;
-      return sessionId;
+      if (userId) {
+        // For authenticated users, use database
+        const sessionId = await this.createAuthenticatedSession(userId);
+        this.isInitializing = false;
+        return sessionId;
+      } else {
+        // For anonymous users, create in-memory session only
+        const sessionId = await this.createAnonymousSession();
+        this.isInitializing = false;
+        return sessionId;
+      }
 
     } catch (error) {
       console.error('[SessionTracking] Failed to initialize session:', error);
@@ -76,9 +92,9 @@ class SessionTrackingService {
     }
   }
 
-  private async attemptSessionResumption(userId: string): Promise<string | null> {
+  private async createAuthenticatedSession(userId: string): Promise<string | null> {
     try {
-      // Use the database function to resume or create session
+      // First, try to resume an existing session
       const { data, error } = await supabase.rpc('resume_or_create_session', {
         p_user_id: userId,
         p_device_type: this.getDeviceInfo().type,
@@ -95,74 +111,65 @@ class SessionTrackingService {
         this.currentPage = this.getCurrentPagePath();
         this.pagesVisited.add(this.currentPage);
         this.pageInteractions[this.currentPage] = 1;
+        this.sessionStartTime = Date.now();
+        this.lastActivityTime = Date.now();
         
-        console.log('[SessionTracking] Session resumed:', this.currentSessionId);
+        console.log('[SessionTracking] Authenticated session created/resumed:', this.currentSessionId);
         this.startActivityTracking();
         return this.currentSessionId;
       }
 
       return null;
     } catch (error) {
-      console.error('[SessionTracking] Error resuming session:', error);
+      console.error('[SessionTracking] Error creating authenticated session:', error);
       return null;
     }
   }
 
-  private async createNewSession(userId?: string): Promise<string | null> {
+  private async createAnonymousSession(): Promise<string | null> {
     try {
-      // Get device and location info
-      const deviceInfo = this.getDeviceInfo();
-      const locationInfo = await this.getLocationInfo();
+      const sessionId = this.generateSessionId();
       const startPage = this.getCurrentPagePath();
       
-      // Get current language from localStorage or default to 'en'
-      const appLanguage = localStorage.getItem('i18nextLng') || 'en';
-
-      const sessionData: Partial<SessionData> = {
-        user_id: userId || undefined,
-        device_type: deviceInfo.type,
-        ip_address: locationInfo.ip,
-        country: locationInfo.country,
-        app_language: appLanguage,
+      // Create in-memory session for anonymous users
+      this.anonymousSession = {
+        sessionId,
+        isAnonymous: true,
+        device_type: this.getDeviceInfo().type,
         start_page: startPage,
         total_page_views: 1,
         pages_visited: [startPage],
         page_interactions: { [startPage]: 1 },
-        is_active: true,
+        session_start: Date.now(),
+        last_activity: Date.now(),
       };
 
-      const { data, error } = await supabase
-        .from('user_sessions')
-        .insert(sessionData)
-        .select('id')
-        .single();
-
-      if (error) {
-        console.error('[SessionTracking] Error creating session:', error);
-        return null;
-      }
-
-      this.currentSessionId = data.id;
+      // Initialize local tracking variables
       this.currentPage = startPage;
       this.pagesVisited.add(startPage);
       this.pageInteractions[startPage] = 1;
       this.sessionStartTime = Date.now();
       this.lastActivityTime = Date.now();
+
+      // Store basic info in localStorage for session persistence
+      localStorage.setItem('anonymous_session_id', sessionId);
+      localStorage.setItem('anonymous_session_start', Date.now().toString());
       
-      console.log('[SessionTracking] New session created:', this.currentSessionId);
+      console.log('[SessionTracking] Anonymous session created (in-memory only):', sessionId);
       
-      // Start activity tracking
-      this.startActivityTracking();
+      // Start basic activity tracking (no database updates)
+      this.startAnonymousActivityTracking();
       
-      return this.currentSessionId;
+      return sessionId;
     } catch (error) {
-      console.error('[SessionTracking] Failed to create new session:', error);
+      console.error('[SessionTracking] Failed to create anonymous session:', error);
       return null;
     }
   }
 
   async trackPageView(page: string): Promise<void> {
-    if (!this.currentSessionId) return;
+    const session = this.getCurrentSession();
+    if (!session) return;
 
     try {
       this.currentPage = page;
@@ -170,8 +177,18 @@ class SessionTrackingService {
       this.pageInteractions[page] = (this.pageInteractions[page] || 0) + 1;
       this.updateLastActivity();
 
-      // Debounced save to avoid too many database calls
-      this.debounceSave();
+      // Update session data
+      if (this.anonymousSession) {
+        this.anonymousSession.pages_visited.push(page);
+        this.anonymousSession.total_page_views++;
+        this.anonymousSession.last_activity = Date.now();
+        this.anonymousSession.page_interactions[page] = this.pageInteractions[page];
+      }
+
+      // Save to database only for authenticated users
+      if (this.currentSessionId) {
+        this.debounceSave();
+      }
       
       console.log('[SessionTracking] Page view tracked:', page);
     } catch (error) {
@@ -180,7 +197,8 @@ class SessionTrackingService {
   }
 
   async trackInteraction(page: string, action?: string): Promise<void> {
-    if (!this.currentSessionId) return;
+    const session = this.getCurrentSession();
+    if (!session) return;
 
     try {
       this.pageInteractions[page] = (this.pageInteractions[page] || 0) + 1;
@@ -192,7 +210,20 @@ class SessionTrackingService {
         this.pagesVisited.add(page);
       }
 
-      this.debounceSave();
+      // Update session data
+      if (this.anonymousSession) {
+        if (!this.anonymousSession.pages_visited.includes(page)) {
+          this.anonymousSession.pages_visited.push(page);
+        }
+        this.anonymousSession.page_interactions[page] = this.pageInteractions[page];
+        this.anonymousSession.last_activity = Date.now();
+        this.anonymousSession.most_interacted_page = this.getMostInteractedPage();
+      }
+
+      // Save to database only for authenticated users
+      if (this.currentSessionId) {
+        this.debounceSave();
+      }
       
       console.log('[SessionTracking] Interaction tracked:', { page, action });
     } catch (error) {
@@ -206,10 +237,10 @@ class SessionTrackingService {
   }
 
   async extendSessionActivity(): Promise<void> {
+    // Only extend activity for authenticated users in database
     if (!this.currentSessionId) return;
 
     try {
-      // Use database function to extend session activity
       const { data, error } = await supabase.rpc('extend_session_activity', {
         p_session_id: this.currentSessionId,
         p_user_id: await this.getCurrentUserId()
@@ -227,26 +258,30 @@ class SessionTrackingService {
   }
 
   async endSession(reason: 'user_action' | 'idle_timeout' | 'app_close' = 'user_action'): Promise<void> {
-    if (!this.currentSessionId) return;
+    const session = this.getCurrentSession();
+    if (!session) return;
 
     try {
       const sessionDuration = Date.now() - this.sessionStartTime;
       const mostInteractedPage = this.getMostInteractedPage();
 
-      await supabase
-        .from('user_sessions')
-        .update({
-          session_end: new Date().toISOString(),
-          session_duration: `${Math.floor(sessionDuration / 1000)} seconds`,
-          most_interacted_page: mostInteractedPage,
-          total_page_views: this.pagesVisited.size,
-          pages_visited: Array.from(this.pagesVisited),
-          page_interactions: this.pageInteractions,
-          is_active: false,
-        })
-        .eq('id', this.currentSessionId);
+      // Only update database for authenticated users
+      if (this.currentSessionId) {
+        await supabase
+          .from('user_sessions')
+          .update({
+            session_end: new Date().toISOString(),
+            session_duration: `${Math.floor(sessionDuration / 1000)} seconds`,
+            most_interacted_page: mostInteractedPage,
+            total_page_views: this.pagesVisited.size,
+            pages_visited: Array.from(this.pagesVisited),
+            page_interactions: this.pageInteractions,
+            is_active: false,
+          })
+          .eq('id', this.currentSessionId);
+      }
 
-      console.log(`[SessionTracking] Session ended (${reason}):`, this.currentSessionId);
+      console.log(`[SessionTracking] Session ended (${reason}):`, session.sessionId || this.currentSessionId);
       
       // Clean up
       this.cleanup();
@@ -256,37 +291,44 @@ class SessionTrackingService {
   }
 
   async handleIdleDetection(isIdle: boolean): Promise<void> {
-    if (!this.currentSessionId) return;
+    const session = this.getCurrentSession();
+    if (!session) return;
 
     if (isIdle && !this.hasBeenIdle) {
       this.hasBeenIdle = true;
       console.log('[SessionTracking] User has gone idle, but keeping session active');
       
-      // Don't end session immediately on idle - just note it
-      // Session will only end after IDLE_TIMEOUT_MS of actual inactivity
-      
     } else if (!isIdle && this.hasBeenIdle) {
       this.hasBeenIdle = false;
       console.log('[SessionTracking] User is active again');
       this.updateLastActivity();
-      await this.extendSessionActivity();
+      
+      // Only extend database session for authenticated users
+      if (this.currentSessionId) {
+        await this.extendSessionActivity();
+      }
     }
   }
 
   async handleAppStateChange(state: 'background' | 'foreground' | 'terminated'): Promise<void> {
-    if (!this.currentSessionId) return;
+    const session = this.getCurrentSession();
+    if (!session) return;
 
     switch (state) {
       case 'background':
         console.log('[SessionTracking] App backgrounded - continuing session');
-        // Don't end session on background, just save current state
-        await this.saveCurrentState();
+        // Only save to database for authenticated users
+        if (this.currentSessionId) {
+          await this.saveCurrentState();
+        }
         break;
         
       case 'foreground':
         console.log('[SessionTracking] App foregrounded - resuming session');
         this.updateLastActivity();
-        await this.extendSessionActivity();
+        if (this.currentSessionId) {
+          await this.extendSessionActivity();
+        }
         break;
         
       case 'terminated':
@@ -294,6 +336,16 @@ class SessionTrackingService {
         await this.endSession('app_close');
         break;
     }
+  }
+
+  private getCurrentSession(): { sessionId: string } | null {
+    if (this.currentSessionId) {
+      return { sessionId: this.currentSessionId };
+    }
+    if (this.anonymousSession) {
+      return { sessionId: this.anonymousSession.sessionId };
+    }
+    return null;
   }
 
   private async getCurrentUserId(): Promise<string | null> {
@@ -323,32 +375,6 @@ class SessionTrackingService {
     return { type: deviceType };
   }
 
-  private async getLocationInfo(): Promise<{ ip?: string; country?: string }> {
-    try {
-      // Try to get IP and country from a free service with timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-      
-      const response = await fetch('https://ipapi.co/json/', {
-        signal: controller.signal,
-      });
-      
-      clearTimeout(timeoutId);
-      
-      if (response.ok) {
-        const data = await response.json();
-        return {
-          ip: data.ip,
-          country: data.country_name || data.country,
-        };
-      }
-    } catch (error) {
-      console.warn('[SessionTracking] Could not fetch location info:', error);
-    }
-    
-    return {};
-  }
-
   private getCurrentPagePath(): string {
     if (typeof window !== 'undefined') {
       return window.location.pathname + window.location.search;
@@ -370,8 +396,12 @@ class SessionTrackingService {
     return mostInteractedPage || this.currentPage;
   }
 
+  private generateSessionId(): string {
+    return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+  }
+
   private startActivityTracking(): void {
-    // Update activity every 30 seconds
+    // Update activity every 30 seconds for authenticated users
     this.activityTimer = setInterval(() => {
       this.extendSessionActivity();
     }, this.ACTIVITY_UPDATE_INTERVAL);
@@ -381,29 +411,48 @@ class SessionTrackingService {
       this.checkForIdleTimeout();
     }, this.CLEANUP_INTERVAL_MS);
 
+    this.setupEventListeners();
+  }
+
+  private startAnonymousActivityTracking(): void {
+    // For anonymous users, only check for idle timeout, no database updates
+    this.idleCheckTimer = setInterval(() => {
+      this.checkForIdleTimeout();
+    }, this.CLEANUP_INTERVAL_MS);
+
+    this.setupEventListeners();
+  }
+
+  private setupEventListeners(): void {
     // Listen for page visibility changes
     if (typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', () => {
         if (document.hidden) {
-          // App is hidden/backgrounded - save state but don't end session
-          this.debounceSave();
+          // App is hidden/backgrounded - save state for authenticated users
+          if (this.currentSessionId) {
+            this.debounceSave();
+          }
         } else {
           // App is visible again - update activity
           this.updateLastActivity();
-          this.extendSessionActivity();
+          if (this.currentSessionId) {
+            this.extendSessionActivity();
+          }
         }
       });
 
-      // Listen for beforeunload to save session data (but don't end session)
+      // Listen for beforeunload to save session data for authenticated users
       window.addEventListener('beforeunload', () => {
-        // Use sendBeacon for reliable data sending during page unload
-        this.saveCurrentStateSync();
+        if (this.currentSessionId) {
+          this.saveCurrentStateSync();
+        }
       });
     }
   }
 
   private checkForIdleTimeout(): void {
-    if (!this.currentSessionId) return;
+    const session = this.getCurrentSession();
+    if (!session) return;
 
     const idleTime = Date.now() - this.lastActivityTime;
     
@@ -414,6 +463,8 @@ class SessionTrackingService {
   }
 
   private debounceSave(): void {
+    if (!this.currentSessionId) return; // Only save authenticated sessions to database
+    
     if (this.saveTimer) {
       clearTimeout(this.saveTimer);
     }
@@ -424,7 +475,7 @@ class SessionTrackingService {
   }
 
   private async saveCurrentState(): Promise<void> {
-    if (!this.currentSessionId) return;
+    if (!this.currentSessionId) return; // Only save authenticated sessions
 
     try {
       const mostInteractedPage = this.getMostInteractedPage();
@@ -493,11 +544,16 @@ class SessionTrackingService {
     }
     
     this.currentSessionId = null;
+    this.anonymousSession = null;
     this.pageInteractions = {};
     this.pagesVisited.clear();
     this.currentPage = '';
     this.hasBeenIdle = false;
     this.isInitializing = false;
+
+    // Clear anonymous session from localStorage
+    localStorage.removeItem('anonymous_session_id');
+    localStorage.removeItem('anonymous_session_start');
   }
 
   // Static cleanup method for expired sessions
@@ -520,16 +576,20 @@ class SessionTrackingService {
 
   // Public getters for debugging and analytics
   getCurrentSessionId(): string | null {
-    return this.currentSessionId;
+    return this.currentSessionId || this.anonymousSession?.sessionId || null;
   }
 
   getSessionStats() {
+    const session = this.getCurrentSession();
+    
     return {
       currentPage: this.currentPage,
       pagesVisited: Array.from(this.pagesVisited),
       pageInteractions: { ...this.pageInteractions },
       sessionDuration: Date.now() - this.sessionStartTime,
-      isActive: !!this.currentSessionId,
+      isActive: !!session,
+      isAnonymous: !!this.anonymousSession,
+      isAuthenticated: !!this.currentSessionId,
       lastActivityTime: this.lastActivityTime,
       isIdle: this.hasBeenIdle,
       timeSinceLastActivity: Date.now() - this.lastActivityTime,
@@ -537,7 +597,7 @@ class SessionTrackingService {
   }
 
   isSessionActive(): boolean {
-    return !!this.currentSessionId;
+    return !!(this.currentSessionId || this.anonymousSession);
   }
 }
 

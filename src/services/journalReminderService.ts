@@ -211,6 +211,12 @@ class JournalReminderService {
       
       this.log(`Scheduled ${notifications.length} recurring native reminders`);
       
+      // Verify scheduling worked
+      setTimeout(async () => {
+        const pending = await LocalNotifications.getPending();
+        this.log(`Verification: ${pending.notifications.length} notifications pending after native scheduling`);
+      }, 1000);
+      
     } catch (error) {
       this.error('Error setting up native reminders:', error);
       throw error;
