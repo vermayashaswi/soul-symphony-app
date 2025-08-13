@@ -78,8 +78,18 @@ export const useCompositionEvents = (
     
     // Android swipe keyboard optimization
     if (androidOptimized && isAndroidSwipeKeyboard) {
-      // Avoid synthetic input events during composition to not disrupt swipe-to-type
-      // Keep state only; final input will trigger on compositionend
+      // Immediately reflect composition text in the input for swipe keyboards
+      const base = inputValueBeforeComposition.current || '';
+      const composed = base + (e.data || '');
+      if (inputRef.current.value !== composed) {
+        inputRef.current.value = composed;
+        try {
+          const end = composed.length;
+          (inputRef.current as HTMLInputElement).setSelectionRange?.(end, end);
+        } catch {}
+        // Dispatch synthetic input so React controlled state updates promptly
+        inputRef.current.dispatchEvent(new Event('input', { bubbles: true }));
+      }
     }
   }, [inputRef, enableDebugMode, androidOptimized, isAndroidSwipeKeyboard]);
 

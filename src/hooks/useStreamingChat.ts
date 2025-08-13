@@ -146,7 +146,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [threadId, getThreadState, restoreStreamingState]);
+  }, [threadId, getThreadState]);
 
   // Capacitor app lifecycle handling
   useEffect(() => {
@@ -168,11 +168,29 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
                 pausedDueToBackground: true,
               });
             }
-          } else if (state.isActive && threadId) {
-             // App foregrounded
-             console.log(`[useStreamingChat] Capacitor app foregrounded for thread: ${threadId}`);
-             try { restoreStreamingState(threadId); } catch {}
-           }
+           } else if (state.isActive && threadId) {
+              // App foregrounded
+              console.log(`[useStreamingChat] Capacitor app foregrounded for thread: ${threadId}`);
+              try {
+                const savedState: any = getChatStreamingState(threadId);
+                if (savedState && (savedState.isStreaming || savedState.pausedDueToBackground)) {
+                  updateThreadState(threadId, {
+                    isStreaming: true,
+                    streamingMessages: savedState.streamingMessages || [],
+                    currentUserMessage: savedState.currentUserMessage || '',
+                    showBackendAnimation: !!savedState.showBackendAnimation,
+                    dynamicMessages: savedState.dynamicMessages || [],
+                    currentMessageIndex: savedState.currentMessageIndex || 0,
+                    useThreeDotFallback: !!savedState.useThreeDotFallback,
+                    queryCategory: savedState.queryCategory || '',
+                    expectedProcessingTime: savedState.expectedProcessingTime || null,
+                    processingStartTime: savedState.processingStartTime || Date.now(),
+                    abortController: new AbortController(),
+                    activeRequestId: savedState.activeRequestId || null,
+                  });
+                }
+              } catch {}
+            }
         };
 
         App.addListener('appStateChange', handleAppStateChange);
@@ -188,7 +206,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
         console.warn('[useStreamingChat] Error setting up Capacitor app lifecycle handlers:', error);
       }
     }
-  }, [threadId, getThreadState, restoreStreamingState]);
+  }, [threadId, getThreadState]);
 
   // Thread switch handler - abort current operations and switch state
   useEffect(() => {
