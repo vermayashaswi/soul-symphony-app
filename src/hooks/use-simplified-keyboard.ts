@@ -28,8 +28,26 @@ export const useSimplifiedKeyboard = () => {
         height: info.keyboardHeight || 0
       });
       
-      // Add CSS class for styling
-      document.body.classList.add('capacitor-keyboard-visible');
+      // Add keyboard-visible class to specific elements that need repositioning
+      const elements = [
+        '.mobile-navigation',
+        '.mobile-chat-input-container', 
+        '.mobile-chat-content'
+      ];
+      
+      elements.forEach(selector => {
+        const element = document.querySelector(selector);
+        if (element) {
+          element.classList.add('keyboard-visible');
+          // Add platform class for platform-specific styles
+          if (platform === 'android') element.classList.add('platform-android');
+          if (platform === 'ios') element.classList.add('platform-ios');
+        }
+      });
+      
+      // Also add to body for legacy compatibility
+      document.body.classList.add('keyboard-visible');
+      console.log('[SimplifiedKeyboard] Added keyboard-visible classes to elements');
     };
 
     const handleKeyboardHide = () => {
@@ -39,8 +57,25 @@ export const useSimplifiedKeyboard = () => {
         height: 0
       });
       
-      // Remove CSS class
-      document.body.classList.remove('capacitor-keyboard-visible');
+      // Remove keyboard-visible class from specific elements
+      const elements = [
+        '.mobile-navigation',
+        '.mobile-chat-input-container',
+        '.mobile-chat-content'
+      ];
+      
+      elements.forEach(selector => {
+        const element = document.querySelector(selector);
+        if (element) {
+          element.classList.remove('keyboard-visible');
+          element.classList.remove('platform-android');
+          element.classList.remove('platform-ios');
+        }
+      });
+      
+      // Also remove from body for legacy compatibility
+      document.body.classList.remove('keyboard-visible');
+      console.log('[SimplifiedKeyboard] Removed keyboard-visible classes from elements');
     };
 
     // Use Capacitor's native keyboard events
@@ -57,7 +92,24 @@ export const useSimplifiedKeyboard = () => {
     return () => {
       if (showListener) showListener.remove();
       if (hideListener) hideListener.remove();
-      document.body.classList.remove('capacitor-keyboard-visible');
+      
+      // Clean up all classes on unmount
+      const elements = [
+        '.mobile-navigation',
+        '.mobile-chat-input-container',
+        '.mobile-chat-content'
+      ];
+      
+      elements.forEach(selector => {
+        const element = document.querySelector(selector);
+        if (element) {
+          element.classList.remove('keyboard-visible');
+          element.classList.remove('platform-android');
+          element.classList.remove('platform-ios');
+        }
+      });
+      
+      document.body.classList.remove('keyboard-visible');
     };
   }, [isNative]);
 

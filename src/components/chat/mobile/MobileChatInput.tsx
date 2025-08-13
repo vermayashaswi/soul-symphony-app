@@ -54,16 +54,24 @@ export default function MobileChatInput({
 
   // Handle keyboard state changes and ensure proper scrolling
   useEffect(() => {
+    console.log('[MobileChatInput] Keyboard state changed:', { 
+      isKeyboardVisible, 
+      keyboardHeight, 
+      platform, 
+      isNative 
+    });
+    
     if (isKeyboardVisible) {
       // Scroll chat to bottom when keyboard opens
       setTimeout(() => {
         const chatContent = document.querySelector('.mobile-chat-content');
         if (chatContent) {
           chatContent.scrollTop = chatContent.scrollHeight;
+          console.log('[MobileChatInput] Scrolled chat content to bottom');
         }
       }, 100);
     }
-  }, [isKeyboardVisible]);
+  }, [isKeyboardVisible, keyboardHeight, platform, isNative]);
 
 
   if (isInChatTutorialStep) {
@@ -136,7 +144,12 @@ export default function MobileChatInput({
   return (
     <div 
       ref={inputContainerRef}
-      className="mobile-chat-input-container flex items-center gap-3 p-3"
+      className={cn(
+        "mobile-chat-input-container flex items-center gap-3 p-3",
+        isKeyboardVisible && "keyboard-visible",
+        platform === 'android' && "platform-android",
+        platform === 'ios' && "platform-ios"
+      )}
     >
       <div className="flex-1">
         <Input
