@@ -30,7 +30,7 @@
 			"splashScreenDelay": 2000
 		},
 		"Keyboard": {
-			"resize": "body",
+			"resize": "ionic",
 			"style": "dark",
 			"resizeOnFullScreen": true
 		},
