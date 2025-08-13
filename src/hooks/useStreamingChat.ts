@@ -120,9 +120,27 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
           });
         }
       } else if (visible && threadId) {
-        // Page foregrounded - resume streaming state
+        // Page foregrounded - restore UI state if we had an active stream
         console.log(`[useStreamingChat] Page foregrounded for thread: ${threadId}`);
-        // Don't trigger new requests automatically - just restore UI state
+        try {
+          const savedState: any = getChatStreamingState(threadId);
+          if (savedState && (savedState.isStreaming || savedState.pausedDueToBackground)) {
+            updateThreadState(threadId, {
+              isStreaming: true,
+              streamingMessages: savedState.streamingMessages || [],
+              currentUserMessage: savedState.currentUserMessage || '',
+              showBackendAnimation: !!savedState.showBackendAnimation,
+              dynamicMessages: savedState.dynamicMessages || [],
+              currentMessageIndex: savedState.currentMessageIndex || 0,
+              useThreeDotFallback: !!savedState.useThreeDotFallback,
+              queryCategory: savedState.queryCategory || '',
+              expectedProcessingTime: savedState.expectedProcessingTime || null,
+              processingStartTime: savedState.processingStartTime || Date.now(),
+              abortController: new AbortController(),
+              activeRequestId: savedState.activeRequestId || null,
+            });
+          }
+        } catch {}
       }
     };
 
@@ -150,11 +168,29 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
                 pausedDueToBackground: true,
               });
             }
-          } else if (state.isActive && threadId) {
-            // App foregrounded
-            console.log(`[useStreamingChat] Capacitor app foregrounded for thread: ${threadId}`);
-            // Don't trigger new requests automatically
-          }
+           } else if (state.isActive && threadId) {
+              // App foregrounded
+              console.log(`[useStreamingChat] Capacitor app foregrounded for thread: ${threadId}`);
+              try {
+                const savedState: any = getChatStreamingState(threadId);
+                if (savedState && (savedState.isStreaming || savedState.pausedDueToBackground)) {
+                  updateThreadState(threadId, {
+                    isStreaming: true,
+                    streamingMessages: savedState.streamingMessages || [],
+                    currentUserMessage: savedState.currentUserMessage || '',
+                    showBackendAnimation: !!savedState.showBackendAnimation,
+                    dynamicMessages: savedState.dynamicMessages || [],
+                    currentMessageIndex: savedState.currentMessageIndex || 0,
+                    useThreeDotFallback: !!savedState.useThreeDotFallback,
+                    queryCategory: savedState.queryCategory || '',
+                    expectedProcessingTime: savedState.expectedProcessingTime || null,
+                    processingStartTime: savedState.processingStartTime || Date.now(),
+                    abortController: new AbortController(),
+                    activeRequestId: savedState.activeRequestId || null,
+                  });
+                }
+              } catch {}
+            }
         };
 
         App.addListener('appStateChange', handleAppStateChange);
@@ -768,16 +804,24 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     if (targetThreadId !== threadId) return false;
 
     try {
-      const savedState = getChatStreamingState(targetThreadId);
-      if (savedState && savedState.isStreaming && !savedState.pausedDueToBackground) {
+      const savedState: any = getChatStreamingState(targetThreadId);
+      if (savedState && (savedState.isStreaming || savedState.pausedDueToBackground)) {
         console.log(`[useStreamingChat] Restoring streaming state for thread: ${targetThreadId}`);
-        
-        updateThreadState(targetThreadId, {
-          ...savedState,
-          abortController: new AbortController(), // Create new abort controller
+        const updates = {
+          isStreaming: true,
+          streamingMessages: savedState.streamingMessages || [],
+          currentUserMessage: savedState.currentUserMessage || '',
+          showBackendAnimation: !!savedState.showBackendAnimation,
+          dynamicMessages: savedState.dynamicMessages || [],
+          currentMessageIndex: savedState.currentMessageIndex || 0,
+          useThreeDotFallback: !!savedState.useThreeDotFallback,
+          queryCategory: savedState.queryCategory || '',
+          expectedProcessingTime: savedState.expectedProcessingTime || null,
+          processingStartTime: savedState.processingStartTime || Date.now(),
+          abortController: new AbortController(),
           activeRequestId: savedState.activeRequestId || null,
-        });
-        
+        } as Partial<ThreadStreamingState>;
+        updateThreadState(targetThreadId, updates);
         return true;
       }
     } catch (error) {

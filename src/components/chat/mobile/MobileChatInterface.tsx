@@ -111,13 +111,15 @@ export default function MobileChatInterface({
        
        debugLog.addEvent("Streaming Response", `[Mobile] Final response received for ${originThreadId}: ${response.substring(0, 100)}...`, "success");
 
-       // Keep typing indicator visible on mobile while finalizing UI for the active thread
-       if (originThreadId === threadId) {
-         setLocalLoading(true, "Finalizing response...");
-       }
-       
-       // Let backend persist assistant message; UI will append via realtime
-       if (originThreadId === threadId) {
+        // Optimistic UI: append assistant message immediately so UI doesn't appear blank
+        if (originThreadId === threadId) {
+          setMessages(prev => [...prev, { role: 'assistant', content: response, analysis }]);
+          setShowSuggestions(false);
+          setLocalLoading(false);
+        }
+        
+        // Let backend persist assistant message; UI will also update via realtime when it arrives
+        if (originThreadId === threadId) {
          // Watchdog fallback: if realtime insert doesn't arrive, persist client-side after a short delay
          try {
            setTimeout(async () => {

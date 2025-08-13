@@ -78,8 +78,18 @@ export const useCompositionEvents = (
     
     // Android swipe keyboard optimization
     if (androidOptimized && isAndroidSwipeKeyboard) {
-      // Avoid synthetic input events during composition to not disrupt swipe-to-type
-      // Keep state only; final input will trigger on compositionend
+      // Immediately reflect composition text in the input for swipe keyboards
+      const base = inputValueBeforeComposition.current || '';
+      const composed = base + (e.data || '');
+      if (inputRef.current.value !== composed) {
+        inputRef.current.value = composed;
+        try {
+          const end = composed.length;
+          (inputRef.current as HTMLInputElement).setSelectionRange?.(end, end);
+        } catch {}
+        // Dispatch synthetic input so React controlled state updates promptly
+        inputRef.current.dispatchEvent(new Event('input', { bubbles: true }));
+      }
     }
   }, [inputRef, enableDebugMode, androidOptimized, isAndroidSwipeKeyboard]);
 
@@ -103,7 +113,7 @@ export const useCompositionEvents = (
     // Android-specific cleanup
     if (androidOptimized && isAndroidSwipeKeyboard) {
       // Restore normal touch behavior
-      inputRef.current.style.touchAction = 'manipulation';
+      inputRef.current.style.touchAction = 'auto';
       (inputRef.current.style as any).imeMode = 'auto';
       
       // Ensure final input event is fired for Android
@@ -139,8 +149,11 @@ export const useCompositionEvents = (
     // Conflict prevention
     if (preventConflicts) {
       const preventInputDuringComposition = (e: Event) => {
-        if (compositionState.current.isComposing && 
-            compositionState.current.lastCompositionEvent !== 'end') {
+        if (
+          compositionState.current.isComposing &&
+          compositionState.current.lastCompositionEvent !== 'end' &&
+          !(androidOptimized && isAndroidSwipeKeyboard)
+        ) {
           e.stopImmediatePropagation();
           if (enableDebugMode) {
             console.log('[CompositionEvents] Input event blocked during composition');
@@ -170,7 +183,9 @@ export const useCompositionEvents = (
     handleCompositionUpdate,
     handleCompositionEnd,
     preventConflicts,
-    enableDebugMode
+    enableDebugMode,
+    androidOptimized,
+    isAndroidSwipeKeyboard
   ]);
 
   return {

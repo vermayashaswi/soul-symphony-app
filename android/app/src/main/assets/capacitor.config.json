@@ -32,7 +32,7 @@
 			"iosLaunchStoryboard": "LaunchScreen"
 		},
 		"Keyboard": {
-			"resize": "body",
+			"resize": "ionic",
 			"style": "dark",
 			"resizeOnFullScreen": true
 		},
