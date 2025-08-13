@@ -11,7 +11,7 @@ import { useKeyboardDetection } from "@/hooks/use-keyboard-detection";
 import { useNativeKeyboard } from "@/hooks/use-native-keyboard";
 import { useCompositionEvents } from "@/hooks/use-composition-events";
 import { useMobileKeyboardErrorRecovery } from "@/hooks/use-mobile-keyboard-error-recovery";
-
+import { Keyboard } from "@capacitor/keyboard";
 interface MobileChatInputProps {
   onSendMessage: (message: string, isAudio?: boolean) => void;
   isLoading: boolean;
@@ -35,9 +35,11 @@ export default function MobileChatInput({
   const { isKeyboardVisible, keyboardHeight, platform, isNative, isReady } = useKeyboardDetection();
   const { isOptimized } = useNativeKeyboard();
   const { isComposing, keyboardType } = useCompositionEvents(inputRef, { preventConflicts: false, androidOptimized: true });
-  const { recoverFromSwipeConflict } = useMobileKeyboardErrorRecovery({ enableDebugMode: false, autoRecovery: true, recoveryDelay: 0 });
-  
-  const isInChatTutorialStep = isActive && isInStep(5);
+const { recoverFromSwipeConflict } = useMobileKeyboardErrorRecovery({ enableDebugMode: false, autoRecovery: false, recoveryDelay: 200 });
+// Track previous visibility to avoid focus flapping
+const prevKeyboardVisibleRef = useRef(false);
+
+const isInChatTutorialStep = isActive && isInStep(5);
 
   // Translate placeholder
   useEffect(() => {
@@ -61,6 +63,8 @@ export default function MobileChatInput({
   // Handle keyboard state changes and ensure proper scrolling
   useEffect(() => {
     if (!isReady) return;
+
+    const prevVisible = prevKeyboardVisibleRef.current;
     
     console.log('[MobileChatInput] Keyboard state:', { 
       isVisible: isKeyboardVisible, 
@@ -69,20 +73,23 @@ export default function MobileChatInput({
       isNative 
     });
     
-    // Ensure proper scrolling when keyboard opens
-    if (isKeyboardVisible && inputRef.current) {
+    // Only act when the keyboard transitions from closed -> open
+    if (!prevVisible && isKeyboardVisible && inputRef.current) {
       setTimeout(() => {
         const chatContent = document.querySelector('.mobile-chat-content');
         if (chatContent) {
           chatContent.scrollTop = chatContent.scrollHeight;
         }
         
-        // Ensure input stays focused
-        if (inputRef.current && document.activeElement !== inputRef.current) {
-          inputRef.current.focus();
+        // Avoid forcing a blur/refocus loop
+        if (document.activeElement !== inputRef.current) {
+          inputRef.current?.focus();
         }
       }, 100);
     }
+
+    // Update previous visibility state
+    prevKeyboardVisibleRef.current = isKeyboardVisible;
   }, [isKeyboardVisible, keyboardHeight, platform, isNative, isReady]);
 
   // IMPROVED: Apply container classes with better coordination
@@ -119,7 +126,7 @@ export default function MobileChatInput({
   };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey && !isLoading) {
+    if (e.key === 'Enter' && !e.shiftKey && !isLoading && !isSubmitting) {
       e.preventDefault();
       handleSendMessage();
     }
@@ -145,16 +152,29 @@ export default function MobileChatInput({
         chatDebug.addEvent("User Message", `Preparing to send: "${trimmedValue.substring(0, 30)}${trimmedValue.length > 30 ? '...' : ''}"`, "info");
         setIsSubmitting(true);
         
-        onSendMessage(trimmedValue);
+        await Promise.resolve(onSendMessage(trimmedValue));
         
         setInputValue("");
         
-        // Keep focus on input after sending
-        if (inputRef.current) {
-          inputRef.current.focus();
+        // Blur input and hide the mobile keyboard after sending
+        try {
+          inputRef.current?.blur();
+          if (document.activeElement && (document.activeElement as HTMLElement).blur) {
+            (document.activeElement as HTMLElement).blur();
+          }
+        } catch {}
+
+        try {
+          await Keyboard.hide();
+          // Some Android WebViews need a second hide call after a short delay
+          setTimeout(() => {
+            Keyboard.hide().catch(() => {});
+          }, 50);
+        } catch {
+          // no-op on web or if plugin unavailable
         }
         
-        chatDebug.addEvent("User Input", "Reset input field after sending", "success");
+        chatDebug.addEvent("User Input", "Reset input field and hid keyboard after sending", "success");
       } catch (error) {
         console.error("Error sending message:", error);
         chatDebug.addEvent("Send Error", error instanceof Error ? error.message : "Unknown error sending message", "error");
@@ -184,7 +204,7 @@ export default function MobileChatInput({
           onFocus={handleInputFocus}
           placeholder={placeholderText}
           className="w-full border border-muted shadow-sm bg-background text-foreground focus:outline-none focus:ring-0 focus:border-muted"
-          disabled={isLoading || isSubmitting}
+          disabled={isSubmitting || isLoading}
           autoComplete="off"
           autoCorrect="on"
           autoCapitalize="sentences"

@@ -99,79 +99,81 @@ export default function MobileChatInterface({
     useThreeDotFallback,
     queryCategory,
     restoreStreamingState
-  } = useStreamingChat({
-     threadId: threadId,
-    onFinalResponse: async (response, analysis, originThreadId) => {
-      // Handle final streaming response scoped to its origin thread
-      if (!response || !originThreadId || !user?.id) {
-        debugLog.addEvent("Streaming Response", "[Mobile] Missing required data for final response", "error");
-        console.error("[Mobile] [Streaming] Missing response data:", { response: !!response, originThreadId: !!originThreadId, userId: !!user?.id });
-        return;
-      }
-      
-      debugLog.addEvent("Streaming Response", `[Mobile] Final response received for ${originThreadId}: ${response.substring(0, 100)}...`, "success");
-      
-      try {
-        // Always save to the origin thread
-        debugLog.addEvent("Database", "[Mobile] Saving streaming assistant response to database", "info");
-        const savedResponse = await saveMessage(
-          originThreadId,
-          response,
-          'assistant',
-          user.id,
-          analysis?.references || undefined,
-          analysis?.hasNumericResult || false
-        );
-        
-        if (savedResponse) {
-          debugLog.addEvent("Database", `[Mobile] Streaming assistant response saved with ID: ${savedResponse.id}`, "success");
-          
-          // Only append to UI if the origin thread is currently active
-          if (originThreadId === threadId) {
-            const finalMessage: UIChatMessage = {
-              role: 'assistant',
-              content: response,
-              references: analysis?.references,
-              analysis: analysis || undefined,
-              hasNumericResult: analysis?.hasNumericResult || false
-            };
-            setMessages(prev => [...prev, finalMessage]);
-          } else {
-            debugLog.addEvent("Streaming Response", `[Mobile] Response saved for background thread ${originThreadId}, not appending to current UI thread ${threadId}`, "info");
-          }
-        } else {
-          debugLog.addEvent("Database", "[Mobile] Failed to save streaming response - null response", "error");
-          throw new Error("Failed to save streaming response");
-        }
-      } catch (saveError) {
-        debugLog.addEvent("Database", `[Mobile] Error saving streaming response: ${saveError instanceof Error ? saveError.message : "Unknown error"}`, "error");
-        console.error("[Mobile] [Streaming] Failed to save response:", saveError);
-        
-        // Fallback: Only show in UI if still on the origin thread
-        if (originThreadId === threadId) {
-          const fallbackMessage: UIChatMessage = {
-            role: 'assistant',
-            content: response,
-            ...(analysis && { analysis })
-          };
-          setMessages(prev => [...prev, fallbackMessage]);
-        }
-        
-        toast({
-          title: "Warning",
-          description: "Response saved in memory but couldn't be persisted to history",
-          variant: "default"
-        });
-      }
+   } = useStreamingChat({
+      threadId: threadId,
+     onFinalResponse: async (response, analysis, originThreadId, requestId) => {
+       // Handle final streaming response scoped to its origin thread
+       if (!response || !originThreadId || !user?.id) {
+         debugLog.addEvent("Streaming Response", "[Mobile] Missing required data for final response", "error");
+         console.error("[Mobile] [Streaming] Missing response data:", { response: !!response, originThreadId: !!originThreadId, userId: !!user?.id });
+         return;
+       }
+       
+       debugLog.addEvent("Streaming Response", `[Mobile] Final response received for ${originThreadId}: ${response.substring(0, 100)}...`, "success");
+
+       // Keep typing indicator visible on mobile while finalizing UI for the active thread
+       if (originThreadId === threadId) {
+         setLocalLoading(true, "Finalizing response...");
+       }
+       
+       // Let backend persist assistant message; UI will append via realtime
+       if (originThreadId === threadId) {
+         // Watchdog fallback: if realtime insert doesn't arrive, persist client-side after a short delay
+         try {
+           setTimeout(async () => {
+             // Double-check still on same thread
+             if (!currentThreadIdRef.current || currentThreadIdRef.current !== originThreadId) return;
+
+             // Has an assistant message with same content arrived?
+             const { data: recent, error: recentErr } = await supabase
+               .from('chat_messages')
+               .select('id, content, sender, created_at')
+               .eq('thread_id', originThreadId)
+               .order('created_at', { ascending: false })
+               .limit(5);
+
+             if (recentErr) {
+               console.warn('[Mobile Streaming Watchdog] Failed to fetch recent messages:', recentErr.message);
+             }
+
+             const alreadyExists = (recent || []).some(m => (m as any).sender === 'assistant' && (m as any).content?.trim() === response.trim());
+             if (!alreadyExists) {
+               // Persist safely with an idempotency_key derived from threadId + response
+               try {
+                 const enc = new TextEncoder();
+                 const keySource = requestId || `${originThreadId}:${response}`;
+                 const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
+                 const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+                 const idempotencyKey = hex.slice(0, 32);
+
+                 await supabase.from('chat_messages').upsert({
+                   thread_id: originThreadId,
+                   content: response,
+                   sender: 'assistant',
+                   role: 'assistant',
+                   idempotency_key: idempotencyKey
+                 }, { onConflict: 'thread_id,idempotency_key' });
+               } catch (e) {
+                 console.warn('[Mobile Streaming Watchdog] Persist fallback failed:', (e as any)?.message || e);
+               }
+             }
+
+             setLocalLoading(false);
+           }, 1200);
+         } catch (e) {
+           console.warn('[Mobile Streaming Watchdog] Exception scheduling fallback:', (e as any)?.message || e);
+           setLocalLoading(false);
+         }
+       }
     },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: error,
-        variant: "destructive"
-      });
-    }
-  });
+     onError: (error) => {
+       toast({
+         title: "Error",
+         description: error,
+         variant: "destructive"
+       });
+     }
+   });
   
   const suggestionQuestions = [
     {
@@ -207,6 +209,69 @@ export default function MobileChatInterface({
     delay: 50,
     scrollThreshold: 100
   });
+
+  // Realtime: append assistant messages saved by backend
+  useEffect(() => {
+    if (!threadId) return;
+    const channel = supabase
+      .channel(`mobile-thread-assistant-append-${threadId}`)
+      .on('postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'chat_messages',
+          filter: `thread_id=eq.${threadId}`
+        },
+        (payload) => {
+          const m: any = payload.new;
+          if (m.sender === 'assistant') {
+            setMessages(prev => {
+              // Avoid duplicates by simple heuristic
+              const last = prev[prev.length - 1];
+              if (last && last.role === 'assistant' && last.content === m.content) return prev;
+              const uiMsg: UIChatMessage = {
+                role: 'assistant',
+                content: m.content,
+                references: m.reference_entries || undefined,
+                analysis: m.analysis_data || undefined,
+                hasNumericResult: m.has_numeric_result || false
+              };
+              return [...prev, uiMsg];
+            });
+          }
+        }
+      )
+      .on('postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'chat_messages',
+          filter: `thread_id=eq.${threadId}`
+        },
+        (payload) => {
+          const m: any = payload.new;
+          if (m.sender === 'assistant') {
+            setMessages(prev => {
+              // If last assistant message already matches, skip; else append updated
+              const last = prev[prev.length - 1];
+              if (last && last.role === 'assistant' && last.content === m.content) return prev;
+              const uiMsg: UIChatMessage = {
+                role: 'assistant',
+                content: m.content,
+                references: m.reference_entries || undefined,
+                analysis: m.analysis_data || undefined,
+                hasNumericResult: m.has_numeric_result || false
+              };
+              return [...prev, uiMsg];
+            });
+          }
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [threadId]);
 
   useEffect(() => {
     if (threadId) {
@@ -743,7 +808,7 @@ export default function MobileChatInterface({
       </div>
       
       {/* Chat Content */}
-      <div className="mobile-chat-content">
+      <div className="mobile-chat-content" ref={scrollElementRef}>
         {initialLoading ? (
           <div className="flex items-center justify-center py-10">
             <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></div>
@@ -790,7 +855,7 @@ export default function MobileChatInterface({
             </div>
           </div>
         ) : (
-          <div ref={scrollElementRef} className="space-y-3 h-full overflow-y-auto">
+          <div className="space-y-3">
             {messages.map((message, index) => (
               <ChatErrorBoundary key={index}>
                 <MobileChatMessage 

@@ -38,7 +38,9 @@ serve(async (req) => {
       conversationContext = [], 
       userProfile = {},
       threadId,
-      messageId
+      messageId,
+      requestId,
+      category
     } = requestBody;
 
     console.log(`[chat-with-rag] Processing query: "${message}" for user: ${requestUserId} (threadId: ${threadId || 'none'}, messageId: ${messageId || 'none'})`);
@@ -85,6 +87,12 @@ serve(async (req) => {
 
     console.log(`[chat-with-rag] Query classified as: ${classification.category} (confidence: ${classification.confidence})`);
     
+    // Apply client-provided category hint to keep client/server in sync
+    if (category && ['JOURNAL_SPECIFIC','GENERAL_MENTAL_HEALTH','JOURNAL_SPECIFIC_NEEDS_CLARIFICATION','UNRELATED'].includes(category)) {
+      console.warn(`[chat-with-rag] CLIENT HINT: Overriding classification to ${category}`);
+      classification.category = category;
+    }
+    
     // Heuristic override for obvious journal-specific queries with protection for bare emotions
     const lowerMsg = (message || '').toLowerCase();
     const personalLikely = /\b(i|me|my|mine|myself)\b/i.test(lowerMsg);
@@ -106,8 +114,43 @@ serve(async (req) => {
     // Handle unrelated queries with polite denial
     if (cachedClassification.category === 'UNRELATED') {
       console.log('[chat-with-rag] EXECUTING: UNRELATED pipeline - polite denial');
+      const reply = "I appreciate your question, but I'm specifically designed to help you explore your journal entries, understand your emotional patterns, and support your mental health and well-being. I focus on analyzing your personal reflections and providing insights about your journey. Is there something about your thoughts, feelings, or experiences you'd like to discuss instead?";
+
+      // Persist assistant message idempotently for unrelated responses
+      if (threadId) {
+        try {
+          const enc = new TextEncoder();
+          const keySource = requestId || `${threadId}:${reply}`;
+          const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
+          const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+          const idempotencyKey = hex.slice(0, 32);
+
+          const { data: existing, error: existErr } = await supabaseClient
+            .from('chat_messages')
+            .select('id')
+            .eq('thread_id', threadId)
+            .eq('idempotency_key', idempotencyKey)
+            .maybeSingle();
+
+          if (!existErr && !existing) {
+            const { error: insertErr } = await supabaseClient
+              .from('chat_messages')
+              .insert({
+                thread_id: threadId,
+                content: reply,
+                sender: 'assistant',
+                role: 'assistant',
+                idempotency_key: idempotencyKey
+              });
+            if (insertErr) console.warn('[chat-with-rag] Unrelated persist error:', insertErr.message);
+          }
+        } catch (e) {
+          console.warn('[chat-with-rag] Unrelated persist exception:', (e as any)?.message || e);
+        }
+      }
+
       return new Response(JSON.stringify({
-        response: "I appreciate your question, but I'm specifically designed to help you explore your journal entries, understand your emotional patterns, and support your mental health and well-being. I focus on analyzing your personal reflections and providing insights about your journey. Is there something about your thoughts, feelings, or experiences you'd like to discuss instead?",
+        response: reply,
         userStatusMessage: null,
         analysis: {
           queryType: 'unrelated_denial',
@@ -139,8 +182,45 @@ serve(async (req) => {
         throw new Error(`Clarification generation failed: ${clarificationError.message}`);
       }
 
+      const reply = (typeof clarificationResult?.response === 'string' && clarificationResult.response.trim())
+        ? clarificationResult.response.trim()
+        : 'Could you clarify what you mean so I can look into your entries properly?';
+
+      // Persist assistant message idempotently
+      if (threadId) {
+        try {
+          const enc = new TextEncoder();
+          const keySource = requestId || `${threadId}:${reply}`;
+          const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
+          const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+          const idempotencyKey = hex.slice(0, 32);
+
+          const { data: existing, error: existErr } = await supabaseClient
+            .from('chat_messages')
+            .select('id')
+            .eq('thread_id', threadId)
+            .eq('idempotency_key', idempotencyKey)
+            .maybeSingle();
+
+          if (!existErr && !existing) {
+            const { error: insertErr } = await supabaseClient
+              .from('chat_messages')
+              .insert({
+                thread_id: threadId,
+                content: reply,
+                sender: 'assistant',
+                role: 'assistant',
+                idempotency_key: idempotencyKey
+              });
+            if (insertErr) console.warn('[chat-with-rag] Clarification persist error:', insertErr.message);
+          }
+        } catch (e) {
+          console.warn('[chat-with-rag] Clarification persist exception:', (e as any)?.message || e);
+        }
+      }
+
       return new Response(JSON.stringify({
-        response: clarificationResult.response,
+        response: reply,
         analysis: {
           queryType: 'clarification',
           classification,
@@ -229,23 +309,31 @@ serve(async (req) => {
         // Persist assistant message so the client can see it even after navigation
         if (threadId) {
           try {
-            // Compute idempotency key based on thread + response content
             const enc = new TextEncoder();
-            const digest = await crypto.subtle.digest('SHA-256', enc.encode(`${threadId}:${finalResponse}`));
+            const keySource = requestId || `${threadId}:${finalResponse}`;
+            const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
             const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
             const idempotencyKey = hex.slice(0, 32);
 
-            const { error: upsertErr } = await supabaseClient
+            const { data: existing, error: existErr } = await supabaseClient
               .from('chat_messages')
-              .upsert({
-                thread_id: threadId,
-                content: finalResponse,
-                sender: 'assistant',
-                role: 'assistant',
-                idempotency_key: idempotencyKey
-              }, { onConflict: 'thread_id,idempotency_key' });
+              .select('id')
+              .eq('thread_id', threadId)
+              .eq('idempotency_key', idempotencyKey)
+              .maybeSingle();
 
-            if (upsertErr) console.warn('[chat-with-rag] Failed to upsert assistant message:', upsertErr.message);
+            if (!existErr && !existing) {
+              const { error: insertErr } = await supabaseClient
+                .from('chat_messages')
+                .insert({
+                  thread_id: threadId,
+                  content: finalResponse,
+                  sender: 'assistant',
+                  role: 'assistant',
+                  idempotency_key: idempotencyKey
+                });
+              if (insertErr) console.warn('[chat-with-rag] Failed to persist assistant message:', insertErr.message);
+            }
           } catch (e) {
             console.warn('[chat-with-rag] Exception persisting assistant message:', (e as any)?.message || e);
           }
@@ -285,8 +373,41 @@ serve(async (req) => {
         }
 
         const reply = (typeof generalResponse?.response === 'string' && generalResponse.response.trim())
-          ? generalResponse.response
+          ? generalResponse.response.trim()
           : "I’m here to support your mental health journey. Could you share a bit more so I can respond meaningfully?";
+
+        // Persist assistant message idempotently for general responses
+        if (threadId) {
+          try {
+            const enc = new TextEncoder();
+            const keySource = requestId || `${threadId}:${reply}`;
+            const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
+            const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+            const idempotencyKey = hex.slice(0, 32);
+
+            const { data: existing, error: existErr } = await supabaseClient
+              .from('chat_messages')
+              .select('id')
+              .eq('thread_id', threadId)
+              .eq('idempotency_key', idempotencyKey)
+              .maybeSingle();
+
+            if (!existErr && !existing) {
+              const { error: insertErr } = await supabaseClient
+                .from('chat_messages')
+                .insert({
+                  thread_id: threadId,
+                  content: reply,
+                  sender: 'assistant',
+                  role: 'assistant',
+                  idempotency_key: idempotencyKey
+                });
+              if (insertErr) console.warn('[chat-with-rag] General persist error:', insertErr.message);
+            }
+          } catch (e) {
+            console.warn('[chat-with-rag] General persist exception:', (e as any)?.message || e);
+          }
+        }
 
         return new Response(JSON.stringify({
           response: reply,
@@ -360,7 +481,9 @@ async function processStreamingPipeline(
       conversationContext = [], 
       userProfile = {},
       threadId,
-      messageId
+      messageId,
+      requestId,
+      category
     } = requestBody;
 
     // Step 1: Query classification with status updates (streaming mode)
@@ -385,6 +508,12 @@ async function processStreamingPipeline(
 
     console.log(`[chat-with-rag] STREAMING: Query classified as: ${classification.category} (confidence: ${classification.confidence})`);
 
+    // Apply client-provided hint in streaming as well
+    if (category && ['JOURNAL_SPECIFIC','GENERAL_MENTAL_HEALTH','JOURNAL_SPECIFIC_NEEDS_CLARIFICATION','UNRELATED'].includes(category)) {
+      console.warn(`[chat-with-rag] STREAMING CLIENT HINT: Overriding classification to ${category}`);
+      classification.category = category;
+    }
+
     // Heuristic override for obvious journal-specific queries (streaming)
     {
       const lowerMsg = (message || '').toLowerCase();
@@ -407,15 +536,54 @@ async function processStreamingPipeline(
     if (classification.category === 'UNRELATED') {
       console.log('[chat-with-rag] STREAMING EXECUTING: UNRELATED pipeline');
       streamManager.sendUserMessage("Gently redirecting to wellness focus");
+      const reply = "I appreciate your question, but I'm specifically designed to help you explore your journal entries, understand your emotional patterns, and support your mental health and well-being. I focus on analyzing your personal reflections and providing insights about your journey. Is there something about your thoughts, feelings, or experiences you'd like to discuss instead?";
       
       streamManager.sendEvent('final_response', {
-        response: "I appreciate your question, but I'm specifically designed to help you explore your journal entries, understand your emotional patterns, and support your mental health and well-being. I focus on analyzing your personal reflections and providing insights about your journey. Is there something about your thoughts, feelings, or experiences you'd like to discuss instead?",
+        response: reply,
         analysis: {
           queryType: 'unrelated_denial',
           classification,
           timestamp: new Date().toISOString()
-        }
+        },
+        requestId
       });
+
+      // Persist unrelated response in streaming mode
+      if (threadId) {
+        try {
+          const enc = new TextEncoder();
+          const keySource = requestId || `${threadId}:${reply}`;
+          const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
+          const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+          const idempotencyKey = hex.slice(0, 32);
+
+          const { data: existing } = await supabaseClient
+            .from('chat_messages')
+            .select('id')
+            .eq('thread_id', threadId)
+            .eq('idempotency_key', idempotencyKey)
+            .maybeSingle();
+
+          if (existing) {
+            console.log('[chat-with-rag] STREAM persist (unrelated): existing message found for idempotency_key', idempotencyKey);
+          } else {
+            const { error: insertErr } = await supabaseClient.from('chat_messages').insert({
+              thread_id: threadId,
+              content: reply,
+              sender: 'assistant',
+              role: 'assistant',
+              idempotency_key: idempotencyKey
+            });
+            if (insertErr) {
+              console.warn('[chat-with-rag] STREAM persist (unrelated) insert error:', insertErr.message);
+            } else {
+              console.log('[chat-with-rag] STREAM persist (unrelated): inserted assistant message with idempotency_key', idempotencyKey);
+            }
+          }
+        } catch (e) {
+          console.warn('[chat-with-rag] STREAM persist (unrelated) exception:', (e as any)?.message || e);
+        }
+      }
 
       streamManager.close();
       return;
@@ -454,8 +622,49 @@ async function processStreamingPipeline(
           queryType: 'clarification',
           classification,
           timestamp: new Date().toISOString()
-        }
+        },
+        requestId
       });
+
+      // Persist clarification response in streaming mode
+      if (threadId) {
+        try {
+          const reply = (typeof clarificationResult?.response === 'string' && clarificationResult.response.trim()) ? clarificationResult.response.trim() : '';
+          if (reply) {
+            const enc = new TextEncoder();
+            const keySource = requestId || `${threadId}:${reply}`;
+            const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
+            const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+            const idempotencyKey = hex.slice(0, 32);
+
+            const { data: existing } = await supabaseClient
+              .from('chat_messages')
+              .select('id')
+              .eq('thread_id', threadId)
+              .eq('idempotency_key', idempotencyKey)
+              .maybeSingle();
+
+            if (existing) {
+              console.log('[chat-with-rag] STREAM persist (clarification): existing message found for idempotency_key', idempotencyKey);
+            } else {
+              const { error: insertErr } = await supabaseClient.from('chat_messages').insert({
+                thread_id: threadId,
+                content: reply,
+                sender: 'assistant',
+                role: 'assistant',
+                idempotency_key: idempotencyKey
+              });
+              if (insertErr) {
+                console.warn('[chat-with-rag] STREAM persist (clarification) insert error:', insertErr.message);
+              } else {
+                console.log('[chat-with-rag] STREAM persist (clarification): inserted assistant message with idempotency_key', idempotencyKey);
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('[chat-with-rag] STREAM persist (clarification) exception:', (e as any)?.message || e);
+        }
+      }
 
       streamManager.close();
       return;
@@ -540,8 +749,48 @@ async function processStreamingPipeline(
           subQuestionAnalysis: researchResults,
           consolidationMetadata: consolidationResult.analysisMetadata,
           classification
-        }
+        },
+        requestId
       });
+      // Persist journal-specific response in streaming mode
+      if (threadId) {
+        try {
+          const reply = (typeof consolidationResult?.response === 'string' && consolidationResult.response.trim()) ? consolidationResult.response.trim() : '';
+          if (reply) {
+            const enc = new TextEncoder();
+            const keySource = requestId || `${threadId}:${reply}`;
+            const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
+            const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+            const idempotencyKey = hex.slice(0, 32);
+
+            const { data: existing } = await supabaseClient
+              .from('chat_messages')
+              .select('id')
+              .eq('thread_id', threadId)
+              .eq('idempotency_key', idempotencyKey)
+              .maybeSingle();
+
+            if (existing) {
+              console.log('[chat-with-rag] STREAM persist (journal): existing message found for idempotency_key', idempotencyKey);
+            } else {
+              const { error: insertErr } = await supabaseClient.from('chat_messages').insert({
+                thread_id: threadId,
+                content: reply,
+                sender: 'assistant',
+                role: 'assistant',
+                idempotency_key: idempotencyKey
+              });
+              if (insertErr) {
+                console.warn('[chat-with-rag] STREAM persist (journal) insert error:', insertErr.message);
+              } else {
+                console.log('[chat-with-rag] STREAM persist (journal): inserted assistant message with idempotency_key', idempotencyKey);
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('[chat-with-rag] STREAM persist (journal) exception:', (e as any)?.message || e);
+        }
+      }
 
       streamManager.close();
     } else if (classification.category === 'GENERAL_MENTAL_HEALTH') {
@@ -554,7 +803,7 @@ async function processStreamingPipeline(
         const { data: generalResponse, error: generalError } = await supabaseClient.functions.invoke(
           'general-mental-health-chat',
           {
-            body: { message, conversationContext }
+            body: { message, conversationContext, threadId }
           }
         );
 
@@ -562,23 +811,100 @@ async function processStreamingPipeline(
           throw new Error(`General mental health chat failed: ${generalError.message}`);
         }
 
+        const reply = (typeof generalResponse?.response === 'string' && generalResponse.response.trim())
+          ? generalResponse.response.trim()
+          : "I’m here to support your mental health journey. Could you share a bit more so I can respond meaningfully?";
+
+        // Persist assistant message idempotently (streaming general)
+        if (threadId) {
+          try {
+            const enc = new TextEncoder();
+            const keySource = requestId || `${threadId}:${reply}`;
+            const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
+            const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+            const idempotencyKey = hex.slice(0, 32);
+
+            const { data: existing } = await supabaseClient
+              .from('chat_messages')
+              .select('id')
+              .eq('thread_id', threadId)
+              .eq('idempotency_key', idempotencyKey)
+              .maybeSingle();
+
+            if (existing) {
+              console.log('[chat-with-rag] STREAM persist (general): existing message found for idempotency_key', idempotencyKey);
+            } else {
+              const { error: insertErr } = await supabaseClient
+                .from('chat_messages')
+                .insert({
+                  thread_id: threadId,
+                  content: reply,
+                  sender: 'assistant',
+                  role: 'assistant',
+                  idempotency_key: idempotencyKey
+                });
+              if (insertErr) {
+                console.warn('[chat-with-rag] STREAM persist (general) insert error:', insertErr.message);
+              } else {
+                console.log('[chat-with-rag] STREAM persist (general): inserted assistant message with idempotency_key', idempotencyKey);
+              }
+            }
+          } catch (e) {
+            console.warn('[chat-with-rag] STREAM persist (general) exception:', (e as any)?.message || e);
+          }
+        }
+
         streamManager.sendEvent('final_response', {
-          response: generalResponse.response,
+          response: reply,
           analysis: {
             queryType: 'general_mental_health',
             classification,
             timestamp: new Date().toISOString()
-          }
+          },
+          requestId
         });
       } catch (error) {
         // Fallback response
+        const reply = "I understand you're reaching out. For questions about your personal journal insights, I'm here to help analyze your entries. For general wellness information, feel free to ask specific questions!";
+        // Attempt to persist fallback as well
+        if (threadId) {
+          try {
+            const enc = new TextEncoder();
+            const keySource = requestId || `${threadId}:${reply}`;
+            const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
+            const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+            const idempotencyKey = hex.slice(0, 32);
+
+            const { data: existing } = await supabaseClient
+              .from('chat_messages')
+              .select('id')
+              .eq('thread_id', threadId)
+              .eq('idempotency_key', idempotencyKey)
+              .maybeSingle();
+
+            if (!existing) {
+              await supabaseClient.from('chat_messages').insert({
+                thread_id: threadId,
+                content: reply,
+                sender: 'assistant',
+                role: 'assistant',
+                idempotency_key: idempotencyKey
+              });
+              console.log('[chat-with-rag] STREAM persist (general fallback): inserted message');
+            }
+          } catch (e) {
+            console.warn('[chat-with-rag] STREAM persist (general fallback) exception:', (e as any)?.message || e);
+          }
+        }
+
         streamManager.sendEvent('final_response', {
-          response: "I understand you're reaching out. For questions about your personal journal insights, I'm here to help analyze your entries. For general wellness information, feel free to ask specific questions!",
+          response: reply,
           analysis: {
             queryType: 'general_fallback',
             classification,
             timestamp: new Date().toISOString()
-          }
+          },
+          requestId
         });
       }
 
@@ -591,7 +917,8 @@ async function processStreamingPipeline(
           queryType: 'unknown_category',
           classification,
           timestamp: new Date().toISOString()
-        }
+        },
+        requestId
       });
 
       streamManager.close();

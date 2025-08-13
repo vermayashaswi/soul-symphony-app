@@ -114,7 +114,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     stopStreaming
   } = useStreamingChat({
       threadId: currentThreadId,
-    onFinalResponse: async (response, analysis, originThreadId) => {
+    onFinalResponse: async (response, analysis, originThreadId, requestId) => {
       // Handle final streaming response scoped to its origin thread
       if (!response || !originThreadId || !effectiveUserId) {
         debugLog.addEvent("Streaming Response", "Missing required data for final response", "error");
@@ -123,59 +123,63 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       }
       
       debugLog.addEvent("Streaming Response", `Final response received for ${originThreadId}: ${response.substring(0, 100)}...`, "success");
+
+      // Keep typing indicator visible while we finalize and render the message for the active thread
+      if (originThreadId === currentThreadId) {
+        setLocalLoading(true, "Finalizing response...");
+        updateProcessingStage("Finalizing response...");
+      }
       
-      try {
-        // Save the assistant response to database (always save to origin thread)
-        debugLog.addEvent("Database", "Saving streaming assistant response to database", "info");
-        const savedResponse = await saveMessage(
-          originThreadId,
-          response,
-          'assistant',
-          effectiveUserId,
-          analysis?.references || undefined,
-          analysis?.hasNumericResult || false
-        );
-        
-        if (savedResponse) {
-          debugLog.addEvent("Database", `Streaming assistant response saved with ID: ${savedResponse.id}`, "success");
-          
-          // Only append to UI if the origin thread is currently active
-          if (originThreadId === currentThreadId) {
-            const typedSavedResponse: ChatMessage = {
-              ...savedResponse,
-              sender: savedResponse.sender as 'user' | 'assistant' | 'error',
-              role: savedResponse.role as 'user' | 'assistant' | 'error'
-            };
-            setChatHistory(prev => [...prev, typedSavedResponse]);
-          } else {
-            debugLog.addEvent("Streaming Response", `Response saved for background thread ${originThreadId}, not appending to current UI thread ${currentThreadId}`, "info");
-          }
-        } else {
-          debugLog.addEvent("Database", "Failed to save streaming response - null response", "error");
-          throw new Error("Failed to save streaming response");
+      // Backend persists assistant message; UI will append via realtime
+      if (originThreadId === currentThreadId) {
+        // Watchdog: if realtime insert doesn't arrive, persist client-side after a short delay
+        try {
+          setTimeout(async () => {
+            // Double-check still on same thread
+            if (!currentThreadIdRef.current || currentThreadIdRef.current !== originThreadId) return;
+
+            // Has an assistant message with same content arrived?
+            const { data: recent, error: recentErr } = await supabase
+              .from('chat_messages')
+              .select('id, content, sender, created_at')
+              .eq('thread_id', originThreadId)
+              .order('created_at', { ascending: false })
+              .limit(5);
+
+            if (recentErr) {
+              console.warn('[Streaming Watchdog] Failed to fetch recent messages:', recentErr.message);
+            }
+
+            const alreadyExists = (recent || []).some(m => (m as any).sender === 'assistant' && (m as any).content?.trim() === response.trim());
+            if (!alreadyExists) {
+              // Persist safely with an idempotency_key derived from threadId + response
+              try {
+                const enc = new TextEncoder();
+                const keySource = requestId || `${originThreadId}:${response}`;
+                const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
+                const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+                const idempotencyKey = hex.slice(0, 32);
+
+                await supabase.from('chat_messages').upsert({
+                  thread_id: originThreadId,
+                  content: response,
+                  sender: 'assistant',
+                  role: 'assistant',
+                  idempotency_key: idempotencyKey
+                }, { onConflict: 'thread_id,idempotency_key' });
+              } catch (e) {
+                console.warn('[Streaming Watchdog] Persist fallback failed:', (e as any)?.message || e);
+              }
+            }
+
+            setLocalLoading(false);
+            updateProcessingStage(null);
+          }, 1200);
+        } catch (e) {
+          console.warn('[Streaming Watchdog] Exception scheduling fallback:', (e as any)?.message || e);
+          setLocalLoading(false);
+          updateProcessingStage(null);
         }
-      } catch (saveError) {
-        debugLog.addEvent("Database", `Error saving streaming response: ${saveError instanceof Error ? saveError.message : "Unknown error"}`, "error");
-        console.error("[Streaming] Failed to save response:", saveError);
-        
-        // Fallback: Add temporary message to UI only if still on origin thread
-        if (originThreadId === currentThreadId) {
-          const fallbackMessage: ChatMessage = {
-            id: `temp-streaming-${Date.now()}`,
-            thread_id: originThreadId,
-            content: response,
-            sender: 'assistant',
-            role: 'assistant',
-            created_at: new Date().toISOString()
-          };
-          setChatHistory(prev => [...prev, fallbackMessage]);
-        }
-        
-        toast({
-          title: "Warning",
-          description: "Response displayed but couldn't be saved to your conversation history",
-          variant: "default"
-        });
       }
     },
     onError: (error) => {
@@ -206,6 +210,78 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     delay: 50,
     scrollThreshold: 100
   });
+
+  // Realtime: append assistant messages saved by backend
+  useEffect(() => {
+    if (!currentThreadId) return;
+    const channel = supabase
+      .channel(`thread-assistant-append-${currentThreadId}`)
+      .on('postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'chat_messages',
+          filter: `thread_id=eq.${currentThreadId}`
+        },
+        (payload) => {
+          const m: any = payload.new;
+          if (m.sender === 'assistant') {
+            setChatHistory(prev => {
+              if (prev.some(msg => msg.id === m.id)) return prev;
+              const newMsg: ChatMessage = {
+                id: m.id,
+                thread_id: m.thread_id,
+                content: m.content,
+                sender: 'assistant',
+                role: 'assistant',
+                created_at: m.created_at,
+                reference_entries: m.reference_entries,
+                analysis_data: m.analysis_data,
+                has_numeric_result: m.has_numeric_result
+              } as any;
+              return [...prev, newMsg];
+            });
+          }
+        }
+      )
+      .on('postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'chat_messages',
+          filter: `thread_id=eq.${currentThreadId}`
+        },
+        (payload) => {
+          const m: any = payload.new;
+          if (m.sender === 'assistant') {
+            setChatHistory(prev => {
+              const updatedMsg: ChatMessage = {
+                id: m.id,
+                thread_id: m.thread_id,
+                content: m.content,
+                sender: 'assistant',
+                role: 'assistant',
+                created_at: m.created_at,
+                reference_entries: m.reference_entries,
+                analysis_data: m.analysis_data,
+                has_numeric_result: m.has_numeric_result
+              } as any;
+              const idx = prev.findIndex(msg => msg.id === m.id);
+              if (idx === -1) {
+                return [...prev, updatedMsg];
+              }
+              const copy = [...prev];
+              copy[idx] = { ...copy[idx], ...updatedMsg } as any;
+              return copy;
+            });
+          }
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentThreadId]);
 
   // Sync with props thread ID and update local storage
   useEffect(() => {

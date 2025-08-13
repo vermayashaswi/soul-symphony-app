@@ -19,7 +19,7 @@ export interface StreamingMessage {
 
 
 interface UseStreamingChatProps {
-  onFinalResponse?: (response: string, analysis: any | undefined, originThreadId: string | null) => void;
+  onFinalResponse?: (response: string, analysis: any | undefined, originThreadId: string | null, requestId?: string | null) => void;
   onError?: (error: string) => void;
   threadId?: string | null; // Thread-specific hook instance
 }
@@ -322,7 +322,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
           threadState.abortController = null;
         }
         
-        onFinalResponse?.(message.response || '', message.analysis, activeThreadId);
+        onFinalResponse?.(message.response || '', message.analysis, activeThreadId, message.requestId || null);
         break;
       case 'error':
         updates.isStreaming = false;

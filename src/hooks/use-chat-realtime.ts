@@ -133,6 +133,29 @@ export function useChatRealtime(threadId: string | null) {
             }
           }
         )
+        .on('postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'chat_messages',
+            filter: `thread_id=eq.${threadId}`
+          },
+          (payload) => {
+            const messageData = payload.new as any;
+            console.log(`[useChatRealtime] Updated message in thread ${threadId}:`, messageData.sender);
+            
+            if (threadId && threadRealtimeStates.has(threadId)) {
+              if (messageData.sender === 'assistant' && !messageData.is_processing) {
+                updateThreadRealtimeState(threadId, {
+                  isLoading: false,
+                  isProcessing: false,
+                  processingStatus: 'idle',
+                  processingStage: null
+                });
+              }
+            }
+          }
+        )
         .subscribe();
 
       // Store subscription in thread state
