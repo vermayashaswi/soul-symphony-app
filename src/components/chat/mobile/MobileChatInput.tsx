@@ -7,10 +7,7 @@ import { Input } from "@/components/ui/input";
 import { useTutorial } from "@/contexts/TutorialContext";
 import { useTranslation } from "@/contexts/TranslationContext";
 import { cn } from "@/lib/utils";
-import { useKeyboardDetection } from "@/hooks/use-keyboard-detection";
-import { useNativeKeyboard } from "@/hooks/use-native-keyboard";
-import { useCompositionEvents } from "@/hooks/use-composition-events";
-import { useMobileKeyboardErrorRecovery } from "@/hooks/use-mobile-keyboard-error-recovery";
+import { useSimplifiedKeyboard } from "@/hooks/use-simplified-keyboard";
 import { Keyboard } from "@capacitor/keyboard";
 interface MobileChatInputProps {
   onSendMessage: (message: string, isAudio?: boolean) => void;
@@ -32,14 +29,9 @@ export default function MobileChatInput({
   const { isActive, isInStep } = useTutorial();
   const { translate, currentLanguage } = useTranslation();
   
-  const { isKeyboardVisible, keyboardHeight, platform, isNative, isReady } = useKeyboardDetection();
-  const { isOptimized } = useNativeKeyboard();
-  const { isComposing, keyboardType } = useCompositionEvents(inputRef, { preventConflicts: false, androidOptimized: true });
-const { recoverFromSwipeConflict } = useMobileKeyboardErrorRecovery({ enableDebugMode: false, autoRecovery: false, recoveryDelay: 200 });
-// Track previous visibility to avoid focus flapping
-const prevKeyboardVisibleRef = useRef(false);
+  const { isKeyboardVisible, keyboardHeight, platform, isNative } = useSimplifiedKeyboard();
 
-const isInChatTutorialStep = isActive && isInStep(5);
+  const isInChatTutorialStep = isActive && isInStep(5);
 
   // Translate placeholder
   useEffect(() => {
@@ -62,60 +54,17 @@ const isInChatTutorialStep = isActive && isInStep(5);
 
   // Handle keyboard state changes and ensure proper scrolling
   useEffect(() => {
-    if (!isReady) return;
-
-    const prevVisible = prevKeyboardVisibleRef.current;
-    
-    console.log('[MobileChatInput] Keyboard state:', { 
-      isVisible: isKeyboardVisible, 
-      height: keyboardHeight, 
-      platform, 
-      isNative 
-    });
-    
-    // Only act when the keyboard transitions from closed -> open
-    if (!prevVisible && isKeyboardVisible && inputRef.current) {
+    if (isKeyboardVisible) {
+      // Scroll chat to bottom when keyboard opens
       setTimeout(() => {
         const chatContent = document.querySelector('.mobile-chat-content');
         if (chatContent) {
           chatContent.scrollTop = chatContent.scrollHeight;
         }
-        
-        // Avoid forcing a blur/refocus loop
-        if (document.activeElement !== inputRef.current) {
-          inputRef.current?.focus();
-        }
       }, 100);
     }
+  }, [isKeyboardVisible]);
 
-    // Update previous visibility state
-    prevKeyboardVisibleRef.current = isKeyboardVisible;
-  }, [isKeyboardVisible, keyboardHeight, platform, isNative, isReady]);
-
-  // IMPROVED: Apply container classes with better coordination
-  useEffect(() => {
-    if (!inputContainerRef.current || !isReady) return;
-    
-    const container = inputContainerRef.current;
-    
-    // Apply keyboard state and platform classes (let the hook manage these)
-    // These classes are managed by useKeyboardState hook, but we ensure they're present
-    container.classList.toggle('keyboard-visible', isKeyboardVisible);
-    container.classList.toggle(`platform-${platform}`, true);
-    
-    // Debug attributes - DISABLED for production
-    // container.setAttribute('data-debug', 'true');
-    container.setAttribute('data-keyboard-visible', isKeyboardVisible.toString());
-    container.setAttribute('data-platform', platform);
-    container.setAttribute('data-keyboard-height', keyboardHeight.toString());
-    
-    console.log('[MobileChatInput] Updated container classes:', {
-      keyboardVisible: isKeyboardVisible,
-      platform,
-      height: keyboardHeight,
-      classes: container.className
-    });
-  }, [isKeyboardVisible, platform, keyboardHeight, isReady]);
 
   if (isInChatTutorialStep) {
     return null;
@@ -187,12 +136,7 @@ const isInChatTutorialStep = isActive && isInStep(5);
   return (
     <div 
       ref={inputContainerRef}
-      className={cn(
-        "mobile-chat-input-container",
-        "flex items-center gap-3 p-3",
-        // Note: keyboard-visible and platform classes are managed by useKeyboardState hook
-        !isReady && 'opacity-0'
-      )}
+      className="mobile-chat-input-container flex items-center gap-3 p-3"
     >
       <div className="flex-1">
         <Input
