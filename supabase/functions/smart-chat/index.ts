@@ -244,6 +244,11 @@ async function processSubQuery(subQuery, supabase, userId, timeRange) {
   }
 
   const embeddingData = await embeddingResponse.json();
+  if (!embeddingData.data || embeddingData.data.length === 0) {
+    console.error('Invalid embedding data received for sub-query:', embeddingData);
+    throw new Error('Could not generate embedding for the sub-query');
+  }
+
   const queryEmbedding = embeddingData.data[0].embedding;
   
   // Search for relevant entries
