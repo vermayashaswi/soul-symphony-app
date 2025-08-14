@@ -156,16 +156,23 @@ serve(async (req) => {
       };
     });
 
-    // Build lightweight context snapshot (kept minimal, consolidationPrompt remains unchanged)
+    // Build lightweight context snapshot with filtered conversation (user messages only)
+    const filteredContext = conversationContext ? conversationContext.filter((msg: any) => {
+      const role = msg.role || msg.sender || 'user';
+      return role === 'user';
+    }).slice(-3) : [];
+    
     const contextData = {
       userProfile: {
         timezone: userProfile?.timezone || 'UTC',
         journalEntryCount: userProfile?.journalEntryCount || 'unknown',
         premiumUser: userProfile?.is_premium || false,
       },
-      conversationHistory: conversationContext?.slice(-6) || [],
+      conversationHistory: filteredContext,
       meta: {
         totalResearchItems: analysisSummary.length,
+        contextFiltered: true,
+        assistantResponsesRemoved: conversationContext ? conversationContext.length - filteredContext.length : 0
       },
     };
 
@@ -177,15 +184,16 @@ serve(async (req) => {
     **COMPREHENSIVE ANALYSIS RESULTS:**
     ${JSON.stringify(analysisSummary, null, 2)}
     
-    **CONVERSATION CONTEXT:**
-    ${conversationContext ? conversationContext.slice(-6).map((msg: any) => `${(msg.role || msg.sender || 'user')}: ${msg.content}`).join('\n') : 'No prior context'}
+    **CONVERSATION CONTEXT (USER MESSAGES ONLY):**
+    ${conversationContext ? conversationContext.filter((msg: any) => (msg.role || msg.sender || 'user') === 'user').slice(-3).map((msg: any) => `user: ${msg.content}`).join('\n') : 'No prior user context'}
     
-    **STRICT FOCUS AND TOPIC GUARDRAILS (IMPORTANT):**
-    - Use ONLY the data in COMPREHENSIVE ANALYSIS RESULTS as factual basis.
-    - Do NOT carry over numbers or topics from CONVERSATION CONTEXT unless the SAME facts are present in the analysis results.
-    - Answer the exact intent of the USER QUESTION. If results are about a different topic (e.g., happiness) and the question asks about time-of-day, ignore the other topic.
-    - If analysis results do not cover the question, ask ONE concise clarifying question instead of guessing.
-    - Conversation context is for tone and continuity only, NOT for facts.
+    **CRITICAL CONTEXT ISOLATION RULES:**
+    - IGNORE ALL previous assistant responses and analysis results from conversation context
+    - Use ONLY the fresh COMPREHENSIVE ANALYSIS RESULTS as your factual basis
+    - Do NOT reference, mention, or carry over ANY data, numbers, percentages, or topics from previous responses
+    - If the current analysis results are about a completely different topic than the user's question, acknowledge this mismatch
+    - Answer ONLY what the current analysis results support - do not fill gaps with conversation context
+    - Previous conversation is for understanding user intent only, NOT for factual information
     
     **ANALYSIS SYNTHESIS GUIDELINES:**
     
@@ -241,9 +249,9 @@ serve(async (req) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-4.1-mini-2025-04-14',
+          model: 'gpt-4o-mini',
           messages: [
-            { role: 'system', content: 'You are Ruh by SOuLO, a warm and insightful wellness coach. Provide thoughtful, data-driven responses based on journal analysis.' },
+            { role: 'system', content: 'You are Ruh by SOuLO, a warm and insightful wellness coach. You analyze ONLY the current research results provided to you. Never reference or use data from previous conversations or responses.' },
             { role: 'user', content: consolidationPrompt }
           ],
           max_tokens: 1500

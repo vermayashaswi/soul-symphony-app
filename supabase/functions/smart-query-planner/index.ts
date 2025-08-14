@@ -491,8 +491,19 @@ async function executePlan(plan: any, userId: string, normalizedTimeRange: { sta
     allResults.push(...stageResults);
   }
 
-  console.log(`[executePlan] Completed execution for ${allResults.length} sub-questions across ${stages.length} stages`);
-  return { researchResults: allResults };
+    console.log(`[executePlan] Completed execution for ${allResults.length} sub-questions across ${stages.length} stages`);
+    
+    // Log summary of results for debugging
+    allResults.forEach((result, idx) => {
+      const sqlCount = result.executionResults?.sqlResults?.length || 0;
+      const vectorCount = result.executionResults?.vectorResults?.length || 0;
+      console.log(`[executePlan] Result ${idx + 1}: ${sqlCount} SQL rows, ${vectorCount} vector results`);
+      if (sqlCount > 0) {
+        console.log(`[executePlan] Sample SQL data:`, JSON.stringify(result.executionResults.sqlResults.slice(0, 2), null, 2));
+      }
+    });
+    
+    return { researchResults: allResults };
 }
 
 
