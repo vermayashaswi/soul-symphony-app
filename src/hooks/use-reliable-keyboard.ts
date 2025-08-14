@@ -55,50 +55,118 @@ export const useReliableKeyboard = () => {
 
   useEffect(() => {
     if (!isNative) {
-      // For web, use simpler focus-based detection
+      // For web, use Visual Viewport API when available, otherwise use focus detection
+      let keyboardHeight = 0;
+      
+      const handleVisualViewportChange = () => {
+        if (window.visualViewport) {
+          const heightDifference = window.innerHeight - window.visualViewport.height;
+          const isKeyboardVisible = heightDifference > 150; // Threshold for keyboard
+          keyboardHeight = isKeyboardVisible ? heightDifference : 0;
+          
+          console.log('[ReliableKeyboard] Visual viewport change:', { 
+            innerHeight: window.innerHeight, 
+            viewportHeight: window.visualViewport.height, 
+            heightDifference, 
+            isKeyboardVisible 
+          });
+          
+          const newState = { isVisible: isKeyboardVisible, height: keyboardHeight };
+          setKeyboardState(newState);
+          applyKeyboardClasses(isKeyboardVisible, keyboardHeight);
+        }
+      };
+
       const handleFocusIn = (e: FocusEvent) => {
         const target = e.target as HTMLElement;
         if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) {
           console.log('[ReliableKeyboard] Input focused on web');
-          const newState = { isVisible: true, height: 280 }; // Estimated keyboard height
-          setKeyboardState(newState);
-          applyKeyboardClasses(true, 280);
+          // Use visual viewport if available, otherwise estimate
+          setTimeout(() => {
+            if (window.visualViewport) {
+              handleVisualViewportChange();
+            } else {
+              const estimatedHeight = 280;
+              const newState = { isVisible: true, height: estimatedHeight };
+              setKeyboardState(newState);
+              applyKeyboardClasses(true, estimatedHeight);
+            }
+          }, 100);
         }
       };
 
       const handleFocusOut = () => {
         console.log('[ReliableKeyboard] Input blurred on web');
-        const newState = { isVisible: false, height: 0 };
-        setKeyboardState(newState);
-        applyKeyboardClasses(false, 0);
+        setTimeout(() => {
+          if (window.visualViewport) {
+            handleVisualViewportChange();
+          } else {
+            const newState = { isVisible: false, height: 0 };
+            setKeyboardState(newState);
+            applyKeyboardClasses(false, 0);
+          }
+        }, 100);
       };
+
+      // Set up Visual Viewport API listener if available
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', handleVisualViewportChange);
+      }
 
       document.addEventListener('focusin', handleFocusIn);
       document.addEventListener('focusout', handleFocusOut);
 
       return () => {
+        if (window.visualViewport) {
+          window.visualViewport.removeEventListener('resize', handleVisualViewportChange);
+        }
         document.removeEventListener('focusin', handleFocusIn);
         document.removeEventListener('focusout', handleFocusOut);
         applyKeyboardClasses(false, 0);
       };
     }
 
-    // For native apps, use Capacitor keyboard events
+    // For native apps, use enhanced Capacitor keyboard events
     let showListener: any;
     let hideListener: any;
+    let didShowListener: any;
+    let didHideListener: any;
 
     const setupListeners = async () => {
       try {
+        // Use both willShow and didShow for more reliable detection
         showListener = await Keyboard.addListener('keyboardWillShow', (info: any) => {
-          console.log('[ReliableKeyboard] Native keyboard shown:', info);
+          console.log('[ReliableKeyboard] Native keyboard will show:', info);
           const height = info.keyboardHeight || 280;
           const newState = { isVisible: true, height };
           setKeyboardState(newState);
           applyKeyboardClasses(true, height);
         });
 
+        didShowListener = await Keyboard.addListener('keyboardDidShow', (info: any) => {
+          console.log('[ReliableKeyboard] Native keyboard did show:', info);
+          const height = info.keyboardHeight || 280;
+          // Only update if height is different or state is not visible
+          setKeyboardState(prev => {
+            if (!prev.isVisible || prev.height !== height) {
+              const newState = { isVisible: true, height };
+              applyKeyboardClasses(true, height);
+              return newState;
+            }
+            return prev;
+          });
+        });
+
         hideListener = await Keyboard.addListener('keyboardWillHide', () => {
-          console.log('[ReliableKeyboard] Native keyboard hidden');
+          console.log('[ReliableKeyboard] Native keyboard will hide');
+          const newState = { isVisible: false, height: 0 };
+          setKeyboardState(newState);
+          applyKeyboardClasses(false, 0);
+        });
+
+        didHideListener = await Keyboard.addListener('keyboardDidHide', () => {
+          console.log('[ReliableKeyboard] Native keyboard did hide');
+          // Ensure cleanup
           const newState = { isVisible: false, height: 0 };
           setKeyboardState(newState);
           applyKeyboardClasses(false, 0);
@@ -113,6 +181,8 @@ export const useReliableKeyboard = () => {
     return () => {
       if (showListener) showListener.remove();
       if (hideListener) hideListener.remove();
+      if (didShowListener) didShowListener.remove();
+      if (didHideListener) didHideListener.remove();
       applyKeyboardClasses(false, 0);
     };
   }, [isNative, applyKeyboardClasses]);

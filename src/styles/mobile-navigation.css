@@ -147,46 +147,55 @@
   pointer-events: auto;
 }
 
-/* Chat input positioning when keyboard is visible - CRITICAL FIX */
+/* Chat input positioning when keyboard is visible - CRITICAL FIX for Capacitor */
 .mobile-chat-input-container.keyboard-visible {
-  bottom: 0px !important;
+  bottom: var(--keyboard-height, 0px) !important;
   position: fixed !important;
   left: 0 !important;
   right: 0 !important;
   z-index: 1002 !important;
   background: hsl(var(--background)) !important;
   border-top: 1px solid hsl(var(--border)) !important;
-  transition: none !important;
+  transition: bottom 0.2s ease-out !important;
+  transform: translateY(0) !important;
 }
 
 /* Platform-specific keyboard adjustments for input */
 .mobile-chat-input-container.keyboard-visible.platform-ios {
-  bottom: env(safe-area-inset-bottom, 0px) !important;
+  bottom: calc(var(--keyboard-height, 0px) + env(safe-area-inset-bottom, 0px)) !important;
 }
 
 .mobile-chat-input-container.keyboard-visible.platform-android {
-  bottom: 0px !important;
+  bottom: var(--keyboard-height, 0px) !important;
+}
+
+/* Native app specific adjustments */
+.platform-native .mobile-chat-input-container.keyboard-visible {
+  bottom: var(--keyboard-height, 0px) !important;
+  padding-bottom: 0.5rem !important;
 }
 
 /* Content adjustments when keyboard is visible */
 .mobile-chat-content.keyboard-visible {
-  padding-bottom: calc(var(--chat-input-height) + 20px) !important;
+  padding-bottom: calc(var(--keyboard-height, 0px) + var(--chat-input-height) + 20px) !important;
   transition: padding-bottom 0.3s ease-out;
+  margin-bottom: 0 !important;
 }
 
 /* Legacy support for old class names */
 .mobile-chat-input-container.capacitor-keyboard-visible {
-  bottom: 0px !important;
+  bottom: var(--keyboard-height, 0px) !important;
   position: fixed !important;
   left: 0 !important;
   right: 0 !important;
   z-index: 1002 !important;
   background: hsl(var(--background)) !important;
   border-top: 1px solid hsl(var(--border)) !important;
+  transform: translateY(0) !important;
 }
 
 .mobile-chat-content.capacitor-keyboard-visible {
-  padding-bottom: calc(var(--chat-input-height) + 20px) !important;
+  padding-bottom: calc(var(--keyboard-height, 0px) + var(--chat-input-height) + 20px) !important;
 }
 
 /* Enhanced scrolling */
