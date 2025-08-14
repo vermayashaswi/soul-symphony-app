@@ -52,24 +52,35 @@ export default function MobileChatInput({
     translatePlaceholder();
   }, [currentLanguage, translate]);
 
-  // Handle keyboard state changes and ensure proper scrolling
+  // Handle keyboard state changes and ensure proper scrolling with enhanced logging
   useEffect(() => {
-    console.log('[MobileChatInput] Keyboard state changed:', { 
+    console.log('[MobileChatInput] Enhanced keyboard state changed:', { 
       isKeyboardVisible, 
       keyboardHeight, 
       platform, 
-      isNative 
+      isNative,
+      userAgent: navigator.userAgent
     });
     
     if (isKeyboardVisible) {
-      // Scroll chat to bottom when keyboard opens
+      // Enhanced scroll logic with mobile browser detection
+      const isMobileBrowser = !isNative && /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent);
+      const scrollDelay = isMobileBrowser ? 300 : 100; // Longer delay for mobile browsers
+      
       setTimeout(() => {
         const chatContent = document.querySelector('.mobile-chat-content');
         if (chatContent) {
           chatContent.scrollTop = chatContent.scrollHeight;
-          console.log('[MobileChatInput] Scrolled chat content to bottom');
+          console.log('[MobileChatInput] Scrolled chat content to bottom (mobile browser mode:', isMobileBrowser, ')');
+          
+          // Additional scroll attempt for stubborn mobile browsers
+          if (isMobileBrowser) {
+            setTimeout(() => {
+              chatContent.scrollTop = chatContent.scrollHeight;
+            }, 100);
+          }
         }
-      }, 100);
+      }, scrollDelay);
     }
   }, [isKeyboardVisible, keyboardHeight, platform, isNative]);
 

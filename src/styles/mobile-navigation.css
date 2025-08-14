@@ -211,6 +211,32 @@
     will-change: transform !important;
     contain: layout style paint !important;
   }
+  
+  /* Enhanced mobile viewport handling */
+  .mobile-chat-input-container.keyboard-visible.mobile-browser {
+    /* Use viewport units for more reliable positioning */
+    bottom: env(keyboard-inset-height, 0px) !important;
+  }
+}
+
+/* Native app specific adjustments - enhanced */
+.platform-native .mobile-chat-input-container.keyboard-visible {
+  bottom: var(--keyboard-height, 0px) !important;
+  padding-bottom: 0.5rem !important;
+}
+
+/* Enhanced content adjustments when keyboard is visible */
+.mobile-chat-content.keyboard-visible {
+  /* Use transform for smooth transitions */
+  transform: translateY(0);
+  transition: transform 0.2s ease-out, padding-bottom 0.2s ease-out;
+  
+  /* Ensure content doesn't get cut off */
+  max-height: calc(100vh - var(--keyboard-height, 0px) - var(--chat-input-height) - var(--status-bar-height, 0px));
+  overflow-y: auto;
+}
+    contain: layout style paint !important;
+  }
 }
 
 /* Native app specific adjustments */
