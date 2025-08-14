@@ -235,22 +235,8 @@
   max-height: calc(100vh - var(--keyboard-height, 0px) - var(--chat-input-height) - var(--status-bar-height, 0px));
   overflow-y: auto;
 }
-    contain: layout style paint !important;
-  }
-}
 
-/* Native app specific adjustments */
-.platform-native .mobile-chat-input-container.keyboard-visible {
-  bottom: var(--keyboard-height, 0px) !important;
-  padding-bottom: 0.5rem !important;
-}
 
-/* Content adjustments when keyboard is visible */
-.mobile-chat-content.keyboard-visible {
-  padding-bottom: calc(var(--keyboard-height, 0px) + var(--chat-input-height) + 20px) !important;
-  transition: padding-bottom 0.3s ease-out;
-  margin-bottom: 0 !important;
-}
 
 /* Legacy support for old class names */
 .mobile-chat-input-container.capacitor-keyboard-visible {
