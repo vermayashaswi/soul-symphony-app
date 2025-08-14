@@ -95,7 +95,7 @@ export default function MobileChatInput({
       }
       
       // Enhanced scroll logic with swipe-aware timing
-      const shouldRespectSwipeState = coordinator.isMasterCoordinator && coordinator.hasActiveSwipe;
+      const shouldRespectSwipeState = coordinator.isMasterCoordinator && (coordinator.hasActiveSwipe || false);
       const scrollDelay = shouldRespectSwipeState ? 500 : 200; // Longer delay if swipe is active
       
       setTimeout(() => {

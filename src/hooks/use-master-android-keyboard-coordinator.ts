@@ -191,6 +191,11 @@ export const useMasterAndroidKeyboardCoordinator = (
     return {
       isMasterCoordinator: false,
       platform,
+      isNative: false,
+      hasActiveSwipe: false,
+      isComposing: false,
+      keyboardHeight: 0,
+      isKeyboardVisible: false,
       optimizeForKeyboardInput: () => {},
       handleCompositionConflict: () => {},
       generateSystemReport: () => null
