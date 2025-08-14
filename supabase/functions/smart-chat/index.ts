@@ -244,6 +244,10 @@ async function processSubQuery(subQuery, supabase, userId, timeRange) {
   }
 
   const embeddingData = await embeddingResponse.json();
+  if (!embeddingData.data || embeddingData.data.length === 0) {
+    console.error('Empty embedding data received from OpenAI for sub-query:', subQuery);
+    throw new Error('Empty embedding data received from OpenAI');
+  }
   const queryEmbedding = embeddingData.data[0].embedding;
   
   // Search for relevant entries
