@@ -100,13 +100,45 @@ serve(async (req) => {
     const messageId = raw.messageId;
     const threadId = raw.threadId;
     
-    console.log('GPT Response Consolidator called with:', { 
+    // Generate unique consolidation ID for tracking
+    const consolidationId = `cons_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    console.log(`[CONSOLIDATION START] ${consolidationId}:`, { 
       userMessage: userMessage?.substring(0, 100),
       researchResultsCount: researchResults?.length || 0,
       contextCount: conversationContext?.length || 0,
       streamingMode,
-      messageId
+      messageId,
+      timestamp: new Date().toISOString()
     });
+
+    // Data integrity validation - check for stale research results
+    if (researchResults && researchResults.length > 0) {
+      console.log(`[RESEARCH DATA VALIDATION] ${consolidationId}:`, {
+        totalResults: researchResults.length,
+        resultTypes: researchResults.map((r: any, i: number) => ({
+          index: i,
+          question: r?.subQuestion?.question?.substring(0, 50) || 'unknown',
+          sqlRowCount: r?.executionResults?.sqlResults?.length || 0,
+          vectorResultCount: r?.executionResults?.vectorResults?.length || 0,
+          hasError: !!r?.executionResults?.error,
+          sampleSqlData: r?.executionResults?.sqlResults?.slice(0, 1) || null
+        }))
+      });
+      
+      // Check for potential data contamination indicators
+      const totalSqlRows = researchResults.reduce((sum: number, r: any) => 
+        sum + (r?.executionResults?.sqlResults?.length || 0), 0);
+      const totalVectorResults = researchResults.reduce((sum: number, r: any) => 
+        sum + (r?.executionResults?.vectorResults?.length || 0), 0);
+        
+      console.log(`[DATA SUMMARY] ${consolidationId}:`, {
+        totalSqlRows,
+        totalVectorResults,
+        userQuestion: userMessage,
+        potentialStaleDataRisk: totalSqlRows > 0 ? 'check_sql_dates' : 'no_sql_data'
+      });
+    }
 
     // Permissive pass-through of Researcher results (no restrictive parsing)
     const MAX_SQL_ROWS = 200;
@@ -156,14 +188,13 @@ serve(async (req) => {
       };
     });
 
-    // Build lightweight context snapshot (kept minimal, consolidationPrompt remains unchanged)
+    // Build lightweight context snapshot (conversation context removed entirely)
     const contextData = {
       userProfile: {
         timezone: userProfile?.timezone || 'UTC',
         journalEntryCount: userProfile?.journalEntryCount || 'unknown',
         premiumUser: userProfile?.is_premium || false,
       },
-      conversationHistory: conversationContext?.slice(-6) || [],
       meta: {
         totalResearchItems: analysisSummary.length,
       },
@@ -177,15 +208,12 @@ serve(async (req) => {
     **COMPREHENSIVE ANALYSIS RESULTS:**
     ${JSON.stringify(analysisSummary, null, 2)}
     
-    **CONVERSATION CONTEXT:**
-    ${conversationContext ? conversationContext.slice(-6).map((msg: any) => `${(msg.role || msg.sender || 'user')}: ${msg.content}`).join('\n') : 'No prior context'}
-    
-    **STRICT FOCUS AND TOPIC GUARDRAILS (IMPORTANT):**
-    - Use ONLY the data in COMPREHENSIVE ANALYSIS RESULTS as factual basis.
-    - Do NOT carry over numbers or topics from CONVERSATION CONTEXT unless the SAME facts are present in the analysis results.
-    - Answer the exact intent of the USER QUESTION. If results are about a different topic (e.g., happiness) and the question asks about time-of-day, ignore the other topic.
-    - If analysis results do not cover the question, ask ONE concise clarifying question instead of guessing.
-    - Conversation context is for tone and continuity only, NOT for facts.
+    **FOCUS GUARDRAILS:**
+    - Use ONLY the COMPREHENSIVE ANALYSIS RESULTS above as your factual basis
+    - Answer the exact USER QUESTION based solely on the fresh analysis data
+    - If analysis results don't match the question, acknowledge this clearly
+    - CRITICAL: Verify that the data you're analyzing actually corresponds to the user's question timeframe
+    - If you detect data inconsistencies or mismatches, flag this immediately
     
     **ANALYSIS SYNTHESIS GUIDELINES:**
     
@@ -241,9 +269,9 @@ serve(async (req) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-4.1-mini-2025-04-14',
+          model: 'gpt-4o-mini',
           messages: [
-            { role: 'system', content: 'You are Ruh by SOuLO, a warm and insightful wellness coach. Provide thoughtful, data-driven responses based on journal analysis.' },
+            { role: 'system', content: 'You are Ruh by SOuLO, a warm and insightful wellness coach. You analyze ONLY the current research results provided to you. Never reference or use data from previous conversations or responses.' },
             { role: 'user', content: consolidationPrompt }
           ],
           max_tokens: 1500
@@ -277,7 +305,12 @@ serve(async (req) => {
     const rawResponse = data?.choices?.[0]?.message?.content || '';
     // Sanitize and extract consolidated response
     const sanitized = sanitizeConsolidatorOutput(rawResponse);
-    console.log('Consolidator sanitization meta:', sanitized.meta);
+    console.log(`[CONSOLIDATION SUCCESS] ${consolidationId}:`, {
+      sanitizationMeta: sanitized.meta,
+      responseLength: sanitized.responseText?.length || 0,
+      hasStatusMessage: !!sanitized.statusMsg,
+      responsePreview: sanitized.responseText?.substring(0, 150) || 'empty'
+    });
 
     const consolidatedResponse = sanitized.responseText;
     const userStatusMessage = sanitized.statusMsg ?? null;

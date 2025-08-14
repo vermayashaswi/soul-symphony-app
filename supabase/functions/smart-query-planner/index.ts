@@ -352,9 +352,27 @@ function deriveTimeRangeFromSql(sqlQuery: string): { start?: string | null; end?
 // Execute plan by directly running GPT-produced steps (no hardcoded theme/emotion logic)
 // Execute plan by directly running GPT-produced steps with staged parallelism
 async function executePlan(plan: any, userId: string, normalizedTimeRange: { start?: string | null; end?: string | null } | null, supabaseClient: any) {
+  // Clear any potential variable persistence to prevent stale data contamination
+  let executionMetadata = {
+    requestId: `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    timestamp: new Date().toISOString(),
+    userId: userId,
+    timeRange: normalizedTimeRange,
+    planQuestion: plan?.subQuestions?.[0]?.question || 'unknown'
+  };
+  
+  console.log(`[EXECUTION START] ${executionMetadata.requestId}:`, {
+    userId,
+    timeRange: normalizedTimeRange,
+    planType: plan?.queryType,
+    subQuestionCount: plan?.subQuestions?.length || 0,
+    firstQuestion: executionMetadata.planQuestion
+  });
+
   // Helper: run raw SQL via RPC after injecting user id
   const executeRawSql = async (sqlQuery: string, timeRange?: { start?: string | null; end?: string | null } | null) => {
     if (!sqlQuery || !sqlQuery.trim()) return { ok: true, rows: [] };
+    
     // Replace placeholders
     let finalSql = sqlQuery.replace(/\$user_id\b/g, `'${userId}'::uuid`);
     const startVal = timeRange?.start || null;
@@ -365,10 +383,82 @@ async function executePlan(plan: any, userId: string, normalizedTimeRange: { sta
     if (/\$end_date\b/.test(finalSql)) {
       finalSql = finalSql.replace(/\$end_date\b/g, endVal ? `'${endVal}'::timestamptz` : 'NULL');
     }
+    
+    // Log SQL execution with full details
+    console.log(`[SQL EXECUTION] ${executionMetadata.requestId}:`, {
+      originalQuery: sqlQuery,
+      finalSql: finalSql,
+      timeRange: timeRange,
+      userId: userId
+    });
+    
     const { data, error } = await supabaseClient.rpc('execute_dynamic_query', { query_text: finalSql });
-    if (error) return { ok: false, error: error.message };
-    if (!data || data.success === false) return { ok: false, error: (data && data.error) || 'Unknown SQL execution error' };
+    
+    // Log SQL results with data freshness validation
+    if (error) {
+      console.error(`[SQL ERROR] ${executionMetadata.requestId}:`, error);
+      return { ok: false, error: error.message };
+    }
+    if (!data || data.success === false) {
+      console.error(`[SQL FAILED] ${executionMetadata.requestId}:`, data);
+      return { ok: false, error: (data && data.error) || 'Unknown SQL execution error' };
+    }
+    
     const rows = Array.isArray(data.data) ? data.data : [];
+    
+    // Data freshness validation - check if returned data matches query parameters
+    if (rows.length > 0 && timeRange) {
+      const sampleRow = rows[0];
+      const dateFields = ['created_at', 'date', 'timestamp'];
+      let foundDateField = null;
+      let sampleDate = null;
+      
+      for (const field of dateFields) {
+        if (sampleRow[field]) {
+          foundDateField = field;
+          sampleDate = new Date(sampleRow[field]);
+          break;
+        }
+      }
+      
+      if (foundDateField && sampleDate) {
+        const queryStart = timeRange.start ? new Date(timeRange.start) : null;
+        const queryEnd = timeRange.end ? new Date(timeRange.end) : null;
+        
+        let dataFreshness = 'unknown';
+        if (queryStart && queryEnd) {
+          dataFreshness = (sampleDate >= queryStart && sampleDate <= queryEnd) ? 'fresh' : 'stale';
+        } else if (queryStart) {
+          dataFreshness = (sampleDate >= queryStart) ? 'fresh' : 'stale';
+        } else if (queryEnd) {
+          dataFreshness = (sampleDate <= queryEnd) ? 'fresh' : 'stale';
+        }
+        
+        console.log(`[DATA FRESHNESS] ${executionMetadata.requestId}:`, {
+          status: dataFreshness,
+          sampleDate: sampleDate.toISOString(),
+          queryStart: queryStart?.toISOString() || null,
+          queryEnd: queryEnd?.toISOString() || null,
+          foundDateField,
+          rowCount: rows.length
+        });
+        
+        // Alert if stale data detected
+        if (dataFreshness === 'stale') {
+          console.error(`[STALE DATA ALERT] ${executionMetadata.requestId}: Returned data outside query time range!`, {
+            sampleDate: sampleDate.toISOString(),
+            expectedRange: { start: queryStart?.toISOString(), end: queryEnd?.toISOString() },
+            sqlQuery: finalSql
+          });
+        }
+      }
+    }
+    
+    console.log(`[SQL SUCCESS] ${executionMetadata.requestId}:`, {
+      rowCount: rows.length,
+      sampleData: rows.slice(0, 2) // Log first 2 rows for inspection
+    });
+    
     return { ok: true, rows };
   };
 
@@ -491,8 +581,31 @@ async function executePlan(plan: any, userId: string, normalizedTimeRange: { sta
     allResults.push(...stageResults);
   }
 
-  console.log(`[executePlan] Completed execution for ${allResults.length} sub-questions across ${stages.length} stages`);
-  return { researchResults: allResults };
+    console.log(`[EXECUTION COMPLETE] ${executionMetadata.requestId}:`, {
+      totalSubQuestions: allResults.length,
+      stages: stages.length,
+      successfulQuestions: allResults.filter(r => r.executionResults?.sqlResults || r.executionResults?.vectorResults).length,
+      timeRange: normalizedTimeRange,
+      resultsSummary: allResults.map((r, idx) => ({
+        index: idx,
+        question: r.subQuestion?.question?.substring(0, 50),
+        sqlRowCount: r.executionResults?.sqlResults?.length || 0,
+        vectorResultCount: r.executionResults?.vectorResults?.length || 0,
+        hasError: !!r.executionResults?.error
+      }))
+    });
+    
+    // Final data integrity check
+    allResults.forEach((result, idx) => {
+      const sqlCount = result.executionResults?.sqlResults?.length || 0;
+      const vectorCount = result.executionResults?.vectorResults?.length || 0;
+      console.log(`[RESULT SUMMARY] ${executionMetadata.requestId} #${idx + 1}: ${sqlCount} SQL rows, ${vectorCount} vector results`);
+      if (sqlCount > 0) {
+        console.log(`[SAMPLE DATA] ${executionMetadata.requestId} #${idx + 1}:`, JSON.stringify(result.executionResults.sqlResults.slice(0, 2), null, 2));
+      }
+    });
+    
+    return { researchResults: allResults };
 }
 
 
@@ -514,17 +627,32 @@ serve(async (req) => {
   }
 
   try {
+    // Generate unique request ID for tracking data flow
+    const requestId = `planner_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
     const { message, conversationContext = [], userId, execute = false, timeRange = null, threadId = null, messageId = null, isFollowUp = false } = await req.json();
     
-    console.log('Smart Query Planner (Analyst Agent) called with:', { 
+    console.log(`[REQUEST START] ${requestId}:`, {
       message: message?.substring(0, 100),
-      contextCount: conversationContext?.length || 0,
-      userId,
+      userId: userId?.substring(0, 8),
       execute,
-      threadId,
-      messageId,
+      timestamp: new Date().toISOString(),
+      contextLength: conversationContext?.length || 0,
+      timeRange,
+      threadId: threadId?.substring(0, 8),
+      messageId: messageId?.substring(0, 8),
       isFollowUp
     });
+
+    if (!message || !userId) {
+      console.error(`[REQUEST ERROR] ${requestId}: Missing required fields`);
+      return new Response(JSON.stringify({ 
+        error: 'Message and userId are required' 
+      }), { 
+        status: 400, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
+    }
 
     // Get user's journal entry count for context
     const { data: countData } = await supabase
