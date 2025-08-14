@@ -121,7 +121,7 @@ export const useMasterAndroidKeyboardCoordinator = (
     }
 
     // Apply coordinated resolution
-    if (coordinatedDetection.detectionState.isComposing) {
+    if (coordinatedDetection?.detectionState?.isComposing) {
       // Prioritize composition
       window.dispatchEvent(new CustomEvent('blockSwipeGestures', {
         detail: { source: 'master-coordinator', reason: 'composition-active' }
@@ -155,7 +155,7 @@ export const useMasterAndroidKeyboardCoordinator = (
             isComposing: androidComposition.isComposing
           } : null,
           coordinatedDetection: {
-            detectionState: coordinatedDetection.detectionState
+            detectionState: coordinatedDetection?.detectionState || {}
           },
           capacitorOptimization: capacitorOptimization.isCapacitorAndroid ? {
             webViewInfo: capacitorOptimization.webViewInfo,
@@ -220,9 +220,9 @@ export const useMasterAndroidKeyboardCoordinator = (
     generateSystemReport,
     
     // Quick access to key states
-    isComposing: androidComposition.isComposing,
-    hasActiveSwipe: coordinatedDetection.detectionState.hasActiveSwipe,
-    keyboardHeight: capacitorOptimization.keyboardInfo?.height || 0,
-    isKeyboardVisible: capacitorOptimization.keyboardInfo?.isVisible || false
+    isComposing: androidComposition?.isComposing || false,
+    hasActiveSwipe: coordinatedDetection?.detectionState?.hasActiveSwipe || false,
+    keyboardHeight: capacitorOptimization?.keyboardInfo?.height || 0,
+    isKeyboardVisible: capacitorOptimization?.keyboardInfo?.isVisible || false
   };
 };
