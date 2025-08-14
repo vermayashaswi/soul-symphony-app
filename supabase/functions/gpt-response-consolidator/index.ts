@@ -156,23 +156,15 @@ serve(async (req) => {
       };
     });
 
-    // Build lightweight context snapshot with filtered conversation (user messages only)
-    const filteredContext = conversationContext ? conversationContext.filter((msg: any) => {
-      const role = msg.role || msg.sender || 'user';
-      return role === 'user';
-    }).slice(-3) : [];
-    
+    // Build lightweight context snapshot (conversation context removed entirely)
     const contextData = {
       userProfile: {
         timezone: userProfile?.timezone || 'UTC',
         journalEntryCount: userProfile?.journalEntryCount || 'unknown',
         premiumUser: userProfile?.is_premium || false,
       },
-      conversationHistory: filteredContext,
       meta: {
         totalResearchItems: analysisSummary.length,
-        contextFiltered: true,
-        assistantResponsesRemoved: conversationContext ? conversationContext.length - filteredContext.length : 0
       },
     };
 
@@ -184,16 +176,10 @@ serve(async (req) => {
     **COMPREHENSIVE ANALYSIS RESULTS:**
     ${JSON.stringify(analysisSummary, null, 2)}
     
-    **CONVERSATION CONTEXT (USER MESSAGES ONLY):**
-    ${conversationContext ? conversationContext.filter((msg: any) => (msg.role || msg.sender || 'user') === 'user').slice(-3).map((msg: any) => `user: ${msg.content}`).join('\n') : 'No prior user context'}
-    
-    **CRITICAL CONTEXT ISOLATION RULES:**
-    - IGNORE ALL previous assistant responses and analysis results from conversation context
-    - Use ONLY the fresh COMPREHENSIVE ANALYSIS RESULTS as your factual basis
-    - Do NOT reference, mention, or carry over ANY data, numbers, percentages, or topics from previous responses
-    - If the current analysis results are about a completely different topic than the user's question, acknowledge this mismatch
-    - Answer ONLY what the current analysis results support - do not fill gaps with conversation context
-    - Previous conversation is for understanding user intent only, NOT for factual information
+    **FOCUS GUARDRAILS:**
+    - Use ONLY the COMPREHENSIVE ANALYSIS RESULTS above as your factual basis
+    - Answer the exact USER QUESTION based solely on the fresh analysis data
+    - If analysis results don't match the question, acknowledge this clearly
     
     **ANALYSIS SYNTHESIS GUIDELINES:**
     
