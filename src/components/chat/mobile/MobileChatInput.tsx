@@ -30,11 +30,8 @@ export default function MobileChatInput({
   const { isActive, isInStep } = useTutorial();
   const { translate, currentLanguage } = useTranslation();
   
-  // Get platform info to conditionally use Android coordinator
-  const { platform, isNative } = usePlatformDetection();
-  
-  // Only use Android keyboard coordinator on Android platforms
-  const androidCoordinator = platform === 'android' ? useMasterAndroidKeyboardCoordinator(
+  // Always call the hook unconditionally (required by Rules of Hooks)
+  const coordinator = useMasterAndroidKeyboardCoordinator(
     inputContainerRef,
     inputRef,
     {}, // No swipe callbacks needed for input
@@ -44,22 +41,9 @@ export default function MobileChatInput({
       enableCompositionOptimization: true,
       debugMode: false
     }
-  ) : null;
+  );
 
-  // Create a unified coordinator interface for all platforms
-  const coordinator = androidCoordinator || {
-    isMasterCoordinator: false,
-    platform,
-    isNative,
-    isKeyboardVisible: false,
-    keyboardHeight: 0,
-    hasActiveSwipe: false,
-    isComposing: false,
-    optimizeForKeyboardInput: () => {},
-    handleCompositionConflict: () => {}
-  };
-
-  const { isKeyboardVisible, keyboardHeight } = coordinator;
+  const { isKeyboardVisible, keyboardHeight, platform, isNative } = coordinator;
 
   const isInChatTutorialStep = isActive && isInStep(5);
 
