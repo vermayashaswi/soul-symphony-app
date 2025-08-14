@@ -109,9 +109,10 @@ export default function MobileChatInput({
         chatDebug.addEvent("User Message", `Preparing to send: "${trimmedValue.substring(0, 30)}${trimmedValue.length > 30 ? '...' : ''}"`, "info");
         setIsSubmitting(true);
         
-        await Promise.resolve(onSendMessage(trimmedValue));
-        
+        // Clear input immediately for better UX
         setInputValue("");
+        
+        await Promise.resolve(onSendMessage(trimmedValue));
         
         // Blur input and hide the mobile keyboard after sending
         try {
@@ -161,7 +162,7 @@ export default function MobileChatInput({
           onFocus={handleInputFocus}
           placeholder={placeholderText}
           className="w-full border border-muted shadow-sm bg-background text-foreground focus:outline-none focus:ring-0 focus:border-muted"
-          disabled={isSubmitting || isLoading}
+          disabled={isSubmitting}
           autoComplete="off"
           autoCorrect="on"
           autoCapitalize="sentences"
