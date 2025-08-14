@@ -147,42 +147,69 @@
   pointer-events: auto;
 }
 
-/* Chat input positioning when keyboard is visible - CRITICAL FIX for mobile browsers */
+/* Chat input positioning when keyboard is visible - ENHANCED for mobile browsers */
 .mobile-chat-input-container.keyboard-visible {
-  bottom: var(--keyboard-height, 0px) !important;
   position: fixed !important;
   left: 0 !important;
   right: 0 !important;
   z-index: 1002 !important;
   background: hsl(var(--background)) !important;
   border-top: 1px solid hsl(var(--border)) !important;
-  transition: bottom 0.15s ease-out !important;
-  transform: translateY(0) !important;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.15) !important;
   
-  /* Force immediate positioning to prevent gaps */
-  will-change: bottom;
+  /* Enhanced hardware acceleration for smooth transitions */
+  will-change: transform, bottom;
   -webkit-transform: translateZ(0);
   transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
-/* Platform-specific keyboard adjustments for input */
-.mobile-chat-input-container.keyboard-visible.platform-ios {
+/* Default positioning for keyboard visible state */
+.mobile-chat-input-container.keyboard-visible:not(.mobile-browser) {
+  bottom: var(--keyboard-height, 0px) !important;
+}
+
+/* Enhanced mobile browser positioning using transform */
+.mobile-chat-input-container.keyboard-visible.mobile-browser {
+  bottom: 0px !important;
+  /* Transform is applied via JavaScript for more reliable positioning */
+}
+
+/* Platform-specific keyboard adjustments for input - enhanced */
+.mobile-chat-input-container.keyboard-visible.platform-ios:not(.mobile-browser) {
   bottom: calc(var(--keyboard-height, 0px) + env(safe-area-inset-bottom, 0px)) !important;
 }
 
-.mobile-chat-input-container.keyboard-visible.platform-android {
+.mobile-chat-input-container.keyboard-visible.platform-android:not(.mobile-browser) {
   bottom: var(--keyboard-height, 0px) !important;
-  /* Android browsers often need additional positioning assistance */
   margin-bottom: 0 !important;
   padding-bottom: 0 !important;
 }
 
-/* Mobile browser specific adjustments */
+/* Enhanced mobile browser adjustments */
+.mobile-chat-input-container.keyboard-visible.mobile-browser.platform-ios {
+  /* iOS mobile browsers: account for safe area in transform */
+  padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+}
+
+.mobile-chat-input-container.keyboard-visible.mobile-browser.platform-android {
+  /* Android mobile browsers: ensure no extra padding */
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* Enhanced mobile browser specific adjustments */
 @media screen and (max-width: 768px) {
   .mobile-chat-input-container.keyboard-visible {
-    /* Ensure no gap on mobile browsers */
-    bottom: var(--keyboard-height, 0px) !important;
     min-height: var(--chat-input-height) !important;
+  }
+  
+  /* Force GPU acceleration on mobile */
+  .mobile-chat-input-container.keyboard-visible.mobile-browser {
+    transform: translateZ(0) !important;
+    will-change: transform !important;
+    contain: layout style paint !important;
   }
 }
 
