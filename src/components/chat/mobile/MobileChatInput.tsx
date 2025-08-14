@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { useTutorial } from "@/contexts/TutorialContext";
 import { useTranslation } from "@/contexts/TranslationContext";
 import { cn } from "@/lib/utils";
-import { useReliableKeyboard } from "@/hooks/use-reliable-keyboard";
+import { useMasterAndroidKeyboardCoordinator } from "@/hooks/use-master-android-keyboard-coordinator";
 import { Keyboard } from "@capacitor/keyboard";
 interface MobileChatInputProps {
   onSendMessage: (message: string, isAudio?: boolean) => void;
@@ -29,7 +29,27 @@ export default function MobileChatInput({
   const { isActive, isInStep } = useTutorial();
   const { translate, currentLanguage } = useTranslation();
   
-  const { isKeyboardVisible, keyboardHeight, platform, isNative } = useReliableKeyboard();
+  // Use master coordinator for unified keyboard and swipe handling
+  const coordinator = useMasterAndroidKeyboardCoordinator(
+    inputContainerRef,
+    inputRef,
+    {}, // No swipe callbacks needed for input
+    {
+      enableCapacitorOptimization: true,
+      enableSwipeCoordination: true,
+      enableCompositionOptimization: true,
+      debugMode: false
+    }
+  );
+
+  const { isKeyboardVisible, keyboardHeight, platform, isNative } = coordinator.isMasterCoordinator 
+    ? { 
+        isKeyboardVisible: coordinator.isKeyboardVisible, 
+        keyboardHeight: coordinator.keyboardHeight,
+        platform: coordinator.platform,
+        isNative: coordinator.isNative 
+      }
+    : { isKeyboardVisible: false, keyboardHeight: 0, platform: 'web', isNative: false };
 
   const isInChatTutorialStep = isActive && isInStep(5);
 
@@ -52,37 +72,41 @@ export default function MobileChatInput({
     translatePlaceholder();
   }, [currentLanguage, translate]);
 
-  // Handle keyboard state changes and ensure proper scrolling with enhanced logging
+  // Update CSS variables for precise keyboard positioning
   useEffect(() => {
-    console.log('[MobileChatInput] Enhanced keyboard state changed:', { 
+    console.log('[MobileChatInput] Keyboard state changed:', { 
       isKeyboardVisible, 
       keyboardHeight, 
       platform, 
       isNative,
-      userAgent: navigator.userAgent
+      coordinatorActive: coordinator.isMasterCoordinator
     });
     
+    // Set CSS variables for keyboard height
+    if (typeof document !== 'undefined') {
+      document.documentElement.style.setProperty('--keyboard-height', `${keyboardHeight}px`);
+      document.documentElement.style.setProperty('--capacitor-keyboard-height', `${keyboardHeight}px`);
+    }
+    
     if (isKeyboardVisible) {
-      // Enhanced scroll logic with mobile browser detection
-      const isMobileBrowser = !isNative && /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent);
-      const scrollDelay = isMobileBrowser ? 300 : 100; // Longer delay for mobile browsers
+      // Optimize input for keyboard interaction if using coordinator
+      if (coordinator.isMasterCoordinator) {
+        coordinator.optimizeForKeyboardInput();
+      }
+      
+      // Enhanced scroll logic with swipe-aware timing
+      const shouldRespectSwipeState = coordinator.isMasterCoordinator && coordinator.hasActiveSwipe;
+      const scrollDelay = shouldRespectSwipeState ? 500 : 200; // Longer delay if swipe is active
       
       setTimeout(() => {
         const chatContent = document.querySelector('.mobile-chat-content');
         if (chatContent) {
           chatContent.scrollTop = chatContent.scrollHeight;
-          console.log('[MobileChatInput] Scrolled chat content to bottom (mobile browser mode:', isMobileBrowser, ')');
-          
-          // Additional scroll attempt for stubborn mobile browsers
-          if (isMobileBrowser) {
-            setTimeout(() => {
-              chatContent.scrollTop = chatContent.scrollHeight;
-            }, 100);
-          }
+          console.log('[MobileChatInput] Scrolled chat content to bottom');
         }
       }, scrollDelay);
     }
-  }, [isKeyboardVisible, keyboardHeight, platform, isNative]);
+  }, [isKeyboardVisible, keyboardHeight, platform, isNative, coordinator]);
 
 
   if (isInChatTutorialStep) {
@@ -102,6 +126,17 @@ export default function MobileChatInput({
 
   const handleInputFocus = () => {
     console.log('[MobileChatInput] Input focused');
+    
+    // Optimize for keyboard input if using coordinator
+    if (coordinator.isMasterCoordinator) {
+      coordinator.optimizeForKeyboardInput();
+    }
+    
+    // Check for composition conflicts
+    if (coordinator.isMasterCoordinator && coordinator.isComposing) {
+      coordinator.handleCompositionConflict('input-focus-during-composition');
+    }
+    
     // Slight delay to ensure keyboard detection fires first
     setTimeout(() => {
       const chatContent = document.querySelector('.mobile-chat-content');
@@ -160,7 +195,9 @@ export default function MobileChatInput({
         "mobile-chat-input-container flex items-center gap-3 p-3",
         isKeyboardVisible && "keyboard-visible",
         platform === 'android' && "platform-android",
-        platform === 'ios' && "platform-ios"
+        platform === 'ios' && "platform-ios",
+        isNative && "platform-native",
+        coordinator.isMasterCoordinator && "coordinator-active"
       )}
     >
       <div className="flex-1">

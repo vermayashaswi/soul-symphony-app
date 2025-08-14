@@ -1,6 +1,7 @@
 /* CSS Variables */
 :root {
   --keyboard-height: 0px;
+  --capacitor-keyboard-height: 0px;
   --nav-bar-height: 4rem;
   --chat-input-height: 4rem;
 }
@@ -109,15 +110,16 @@
 
 /* Input positioning when keyboard is visible - ZERO GAP FIX */
 .mobile-chat-input-container.keyboard-visible {
-  bottom: var(--keyboard-height, 0px) !important;
+  bottom: var(--capacitor-keyboard-height, var(--keyboard-height, 0px)) !important;
   transition: bottom 0.15s ease-in-out;
+  transform: translateZ(0);
 }
 
 /* Content adjustments when keyboard is visible */
 .mobile-chat-content.keyboard-visible {
-  padding-bottom: calc(var(--keyboard-height, 0px) + var(--chat-input-height) + 1rem);
+  padding-bottom: calc(var(--capacitor-keyboard-height, var(--keyboard-height, 0px)) + var(--chat-input-height) + 1rem);
   transition: padding-bottom 0.15s ease-in-out;
-  max-height: calc(100vh - var(--keyboard-height, 0px) - var(--chat-input-height));
+  max-height: calc(100vh - var(--capacitor-keyboard-height, var(--keyboard-height, 0px)) - var(--chat-input-height));
   overflow-y: auto;
 }
 
@@ -131,17 +133,24 @@
 }
 
 .platform-ios .mobile-chat-input-container.keyboard-visible {
-  bottom: calc(var(--keyboard-height, 0px) + env(safe-area-inset-bottom, 0px)) !important;
+  bottom: calc(var(--capacitor-keyboard-height, var(--keyboard-height, 0px)) + env(safe-area-inset-bottom, 0px)) !important;
 }
 
 /* Android specific adjustments */
 .platform-android .mobile-chat-input-container.keyboard-visible {
-  bottom: var(--keyboard-height, 0px) !important;
+  bottom: var(--capacitor-keyboard-height, var(--keyboard-height, 0px)) !important;
 }
 
-/* Native app adjustments */
+/* Native app adjustments - Use Capacitor data first */
 .platform-native .mobile-chat-input-container.keyboard-visible {
-  bottom: var(--keyboard-height, 0px) !important;
+  bottom: var(--capacitor-keyboard-height, var(--keyboard-height, 0px)) !important;
+}
+
+/* Master coordinator active - Enhanced positioning */
+.mobile-chat-input-container.coordinator-active.keyboard-visible {
+  bottom: var(--capacitor-keyboard-height, var(--keyboard-height, 0px)) !important;
+  transition: bottom 0.1s ease-out;
+  transform: translateZ(0);
 }
 
 /* =============================================== */
@@ -185,7 +194,7 @@
 /* =============================================== */
 
 .mobile-chat-input-container.capacitor-keyboard-visible {
-  bottom: var(--keyboard-height, 0px) !important;
+  bottom: var(--capacitor-keyboard-height, var(--keyboard-height, 0px)) !important;
 }
 
 .mobile-navigation.capacitor-keyboard-visible {
