@@ -100,13 +100,45 @@ serve(async (req) => {
     const messageId = raw.messageId;
     const threadId = raw.threadId;
     
-    console.log('GPT Response Consolidator called with:', { 
+    // Generate unique consolidation ID for tracking
+    const consolidationId = `cons_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    console.log(`[CONSOLIDATION START] ${consolidationId}:`, { 
       userMessage: userMessage?.substring(0, 100),
       researchResultsCount: researchResults?.length || 0,
       contextCount: conversationContext?.length || 0,
       streamingMode,
-      messageId
+      messageId,
+      timestamp: new Date().toISOString()
     });
+
+    // Data integrity validation - check for stale research results
+    if (researchResults && researchResults.length > 0) {
+      console.log(`[RESEARCH DATA VALIDATION] ${consolidationId}:`, {
+        totalResults: researchResults.length,
+        resultTypes: researchResults.map((r: any, i: number) => ({
+          index: i,
+          question: r?.subQuestion?.question?.substring(0, 50) || 'unknown',
+          sqlRowCount: r?.executionResults?.sqlResults?.length || 0,
+          vectorResultCount: r?.executionResults?.vectorResults?.length || 0,
+          hasError: !!r?.executionResults?.error,
+          sampleSqlData: r?.executionResults?.sqlResults?.slice(0, 1) || null
+        }))
+      });
+      
+      // Check for potential data contamination indicators
+      const totalSqlRows = researchResults.reduce((sum: number, r: any) => 
+        sum + (r?.executionResults?.sqlResults?.length || 0), 0);
+      const totalVectorResults = researchResults.reduce((sum: number, r: any) => 
+        sum + (r?.executionResults?.vectorResults?.length || 0), 0);
+        
+      console.log(`[DATA SUMMARY] ${consolidationId}:`, {
+        totalSqlRows,
+        totalVectorResults,
+        userQuestion: userMessage,
+        potentialStaleDataRisk: totalSqlRows > 0 ? 'check_sql_dates' : 'no_sql_data'
+      });
+    }
 
     // Permissive pass-through of Researcher results (no restrictive parsing)
     const MAX_SQL_ROWS = 200;
@@ -180,6 +212,8 @@ serve(async (req) => {
     - Use ONLY the COMPREHENSIVE ANALYSIS RESULTS above as your factual basis
     - Answer the exact USER QUESTION based solely on the fresh analysis data
     - If analysis results don't match the question, acknowledge this clearly
+    - CRITICAL: Verify that the data you're analyzing actually corresponds to the user's question timeframe
+    - If you detect data inconsistencies or mismatches, flag this immediately
     
     **ANALYSIS SYNTHESIS GUIDELINES:**
     
@@ -271,7 +305,12 @@ serve(async (req) => {
     const rawResponse = data?.choices?.[0]?.message?.content || '';
     // Sanitize and extract consolidated response
     const sanitized = sanitizeConsolidatorOutput(rawResponse);
-    console.log('Consolidator sanitization meta:', sanitized.meta);
+    console.log(`[CONSOLIDATION SUCCESS] ${consolidationId}:`, {
+      sanitizationMeta: sanitized.meta,
+      responseLength: sanitized.responseText?.length || 0,
+      hasStatusMessage: !!sanitized.statusMsg,
+      responsePreview: sanitized.responseText?.substring(0, 150) || 'empty'
+    });
 
     const consolidatedResponse = sanitized.responseText;
     const userStatusMessage = sanitized.statusMsg ?? null;
