@@ -8,6 +8,7 @@ import { useTutorial } from "@/contexts/TutorialContext";
 import { useTranslation } from "@/contexts/TranslationContext";
 import { cn } from "@/lib/utils";
 import { useMasterAndroidKeyboardCoordinator } from "@/hooks/use-master-android-keyboard-coordinator";
+import { usePlatformDetection } from "@/hooks/use-platform-detection";
 import { Keyboard } from "@capacitor/keyboard";
 interface MobileChatInputProps {
   onSendMessage: (message: string, isAudio?: boolean) => void;
@@ -29,8 +30,11 @@ export default function MobileChatInput({
   const { isActive, isInStep } = useTutorial();
   const { translate, currentLanguage } = useTranslation();
   
-  // Use master coordinator for unified keyboard and swipe handling
-  const coordinator = useMasterAndroidKeyboardCoordinator(
+  // Get platform info to conditionally use Android coordinator
+  const { platform, isNative } = usePlatformDetection();
+  
+  // Only use Android keyboard coordinator on Android platforms
+  const androidCoordinator = platform === 'android' ? useMasterAndroidKeyboardCoordinator(
     inputContainerRef,
     inputRef,
     {}, // No swipe callbacks needed for input
@@ -40,16 +44,22 @@ export default function MobileChatInput({
       enableCompositionOptimization: true,
       debugMode: false
     }
-  );
+  ) : null;
 
-  const { isKeyboardVisible, keyboardHeight, platform, isNative } = coordinator.isMasterCoordinator 
-    ? { 
-        isKeyboardVisible: coordinator.isKeyboardVisible, 
-        keyboardHeight: coordinator.keyboardHeight,
-        platform: coordinator.platform,
-        isNative: coordinator.isNative 
-      }
-    : { isKeyboardVisible: false, keyboardHeight: 0, platform: 'web', isNative: false };
+  // Create a unified coordinator interface for all platforms
+  const coordinator = androidCoordinator || {
+    isMasterCoordinator: false,
+    platform,
+    isNative,
+    isKeyboardVisible: false,
+    keyboardHeight: 0,
+    hasActiveSwipe: false,
+    isComposing: false,
+    optimizeForKeyboardInput: () => {},
+    handleCompositionConflict: () => {}
+  };
+
+  const { isKeyboardVisible, keyboardHeight } = coordinator;
 
   const isInChatTutorialStep = isActive && isInStep(5);
 
