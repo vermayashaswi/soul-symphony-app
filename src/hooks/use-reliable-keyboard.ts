@@ -61,14 +61,16 @@ export const useReliableKeyboard = () => {
       const handleVisualViewportChange = () => {
         if (window.visualViewport) {
           const heightDifference = window.innerHeight - window.visualViewport.height;
-          const isKeyboardVisible = heightDifference > 150; // Threshold for keyboard
+          // Lowered threshold from 150px to 100px for better mobile browser sensitivity
+          const isKeyboardVisible = heightDifference > 100;
           keyboardHeight = isKeyboardVisible ? heightDifference : 0;
           
           console.log('[ReliableKeyboard] Visual viewport change:', { 
             innerHeight: window.innerHeight, 
             viewportHeight: window.visualViewport.height, 
             heightDifference, 
-            isKeyboardVisible 
+            isKeyboardVisible,
+            userAgent: navigator.userAgent.includes('Mobile') ? 'mobile' : 'desktop'
           });
           
           const newState = { isVisible: isKeyboardVisible, height: keyboardHeight };
@@ -81,22 +83,29 @@ export const useReliableKeyboard = () => {
         const target = e.target as HTMLElement;
         if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) {
           console.log('[ReliableKeyboard] Input focused on web');
-          // Use visual viewport if available, otherwise estimate
-          setTimeout(() => {
-            if (window.visualViewport) {
-              handleVisualViewportChange();
-            } else {
-              const estimatedHeight = 280;
-              const newState = { isVisible: true, height: estimatedHeight };
-              setKeyboardState(newState);
-              applyKeyboardClasses(true, estimatedHeight);
-            }
-          }, 100);
+          
+          // Immediate class application for better responsiveness
+          const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+          const estimatedHeight = isMobile ? 320 : 280; // Higher estimate for mobile browsers
+          
+          // Apply classes immediately without delay for better UX
+          if (window.visualViewport) {
+            // Check immediately and also set up for resize events
+            handleVisualViewportChange();
+            setTimeout(handleVisualViewportChange, 50); // Backup check
+          } else {
+            console.log('[ReliableKeyboard] Using fallback height estimation:', estimatedHeight);
+            const newState = { isVisible: true, height: estimatedHeight };
+            setKeyboardState(newState);
+            applyKeyboardClasses(true, estimatedHeight);
+          }
         }
       };
 
       const handleFocusOut = () => {
         console.log('[ReliableKeyboard] Input blurred on web');
+        
+        // Reduced delay for faster response, with backup check
         setTimeout(() => {
           if (window.visualViewport) {
             handleVisualViewportChange();
@@ -105,7 +114,19 @@ export const useReliableKeyboard = () => {
             setKeyboardState(newState);
             applyKeyboardClasses(false, 0);
           }
-        }, 100);
+        }, 50); // Reduced from 100ms to 50ms
+        
+        // Additional backup check with longer delay for tricky scenarios
+        setTimeout(() => {
+          if (window.visualViewport) {
+            const heightDifference = window.innerHeight - window.visualViewport.height;
+            if (heightDifference <= 100) {
+              const newState = { isVisible: false, height: 0 };
+              setKeyboardState(newState);
+              applyKeyboardClasses(false, 0);
+            }
+          }
+        }, 200);
       };
 
       // Set up Visual Viewport API listener if available
