@@ -19,7 +19,8 @@ import { processChatMessage } from "@/services/chatService";
 import { MentalHealthInsights } from "@/hooks/use-mental-health-insights";
 import { useChatRealtime } from "@/hooks/use-chat-realtime";
 import { updateThreadProcessingStatus, generateThreadTitle } from "@/utils/chat/threadUtils";
-import { useKeyboardDetection } from "@/hooks/use-keyboard-detection";
+import { useReliableKeyboard } from "@/hooks/use-reliable-keyboard";
+import { useChatSwipeGestures } from "@/hooks/use-chat-swipe-gestures";
 import { useStreamingChat } from "@/hooks/useStreamingChat";
 import { threadSafetyManager } from "@/utils/threadSafetyManager";
 import ChatErrorBoundary from "../ChatErrorBoundary";
@@ -84,7 +85,32 @@ export default function MobileChatInterface({
     setLocalLoading
   } = useChatRealtime(threadId);
   
-  const { isKeyboardVisible } = useKeyboardDetection();
+  const { isKeyboardVisible } = useReliableKeyboard();
+  
+  // Add swipe gesture support for navigation and quick actions
+  const chatContainerRef = useChatSwipeGestures({
+    onSwipeLeft: () => {
+      console.log('[MobileChatInterface] Swipe left - could open thread list');
+      // Future: implement thread list navigation
+    },
+    onSwipeRight: () => {
+      console.log('[MobileChatInterface] Swipe right - could close current thread');
+      // Future: implement quick navigation
+    },
+    onSwipeUp: () => {
+      console.log('[MobileChatInterface] Swipe up - scroll to top');
+      const content = document.querySelector('.mobile-chat-content');
+      if (content) {
+        content.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    },
+    onSwipeDown: () => {
+      console.log('[MobileChatInterface] Swipe down - refresh or pull to refresh');
+      // Future: implement pull to refresh
+    },
+    minDistance: 75,
+    disabled: false
+  });
   
   // Use streaming chat for enhanced UX
   const {
