@@ -129,20 +129,20 @@ export const useReliableKeyboard = () => {
         if (isNative) element.classList.add('platform-native');
         if (isMobileBrowser && !isNative) element.classList.add('mobile-browser');
         
-        // Apply direct transform for more reliable positioning on mobile browsers
+        // Use bottom positioning instead of transform for zero gap
         if (isMobileBrowser && !isNative) {
-          element.style.setProperty('transform', `translateY(-${height}px)`);
-          element.style.setProperty('bottom', '0px');
+          element.style.setProperty('bottom', `${height}px`);
+          element.style.setProperty('transform', 'none');
           element.style.setProperty('position', 'fixed');
-          element.style.setProperty('will-change', 'transform');
+          element.style.setProperty('will-change', 'bottom');
         }
       } else {
         element.classList.remove('keyboard-visible', 'platform-ios', 'platform-android', 'platform-native', 'mobile-browser');
         
-        // Reset transform and positioning
+        // Reset positioning to default
         if (isMobileBrowser && !isNative) {
-          element.style.removeProperty('transform');
           element.style.setProperty('bottom', 'var(--nav-bar-height)');
+          element.style.setProperty('transform', 'translateZ(0)');
         }
       }
     });
