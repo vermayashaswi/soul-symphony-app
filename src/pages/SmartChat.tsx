@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { v4 as uuidv4 } from 'uuid';
 import { PremiumFeatureGuard } from '@/components/subscription/PremiumFeatureGuard';
+import { setupGlobalMessageDeletionListener } from '@/hooks/use-message-deletion';
 
 const SmartChat = () => {
   const { user } = useAuth();
@@ -61,6 +62,19 @@ const SmartChat = () => {
     };
     
     loadLastThread();
+  }, [user?.id]);
+
+  // Setup global message deletion listener
+  useEffect(() => {
+    if (!user?.id) return;
+    
+    const subscription = setupGlobalMessageDeletionListener(user.id);
+    
+    return () => {
+      if (subscription) {
+        supabase.removeChannel(subscription);
+      }
+    };
   }, [user?.id]);
 
   const handleSelectThread = (threadId: string) => {

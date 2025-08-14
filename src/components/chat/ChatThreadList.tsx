@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { TranslatableText } from "@/components/translation/TranslatableText";
 import { getChatThreads, updateChatThread } from "@/services/chat/threadService";
 import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
+import { recoverLostThreads, validateThreadExistence } from "@/utils/chat/threadRecovery";
 
 interface ChatThreadListProps {
   activeThreadId: string | null;
@@ -75,8 +77,32 @@ export const ChatThreadList: React.FC<ChatThreadListProps> = ({
       }
     };
     
+    // Listen for thread recovery events
+    const handleThreadRecovered = (event: any) => {
+      const { threadId, title, messageCount, lastUpdated } = event.detail;
+      console.log(`[ChatThreadList] Thread recovered: ${threadId} with ${messageCount} messages`);
+      
+      // Check if thread is already in the list
+      setThreads(prevThreads => {
+        const exists = prevThreads.some(thread => thread.id === threadId);
+        if (!exists) {
+          // Add the recovered thread to the list
+          const recoveredThread = {
+            id: threadId,
+            title: title || 'Recovered Conversation',
+            created_at: lastUpdated,
+            updated_at: lastUpdated,
+            user_id: user?.id || ''
+          };
+          return [recoveredThread, ...prevThreads];
+        }
+        return prevThreads;
+      });
+    };
+    
     window.addEventListener('threadSelected', handleThreadSelected);
     window.addEventListener('threadTitleUpdated', handleThreadTitleUpdated);
+    window.addEventListener('threadRecovered', handleThreadRecovered);
     
     // Set up real-time subscription for thread updates if user exists
     let subscription: any;
@@ -84,19 +110,60 @@ export const ChatThreadList: React.FC<ChatThreadListProps> = ({
       subscription = supabase
         .channel(`threads_for_${user.id}`)
         .on('postgres_changes', {
-          event: '*',
+          event: 'INSERT',
           schema: 'public',
           table: 'chat_threads',
           filter: `user_id=eq.${user.id}`
         }, () => {
           loadThreads();
         })
+        .on('postgres_changes', {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'chat_threads',
+          filter: `user_id=eq.${user.id}`
+        }, () => {
+          loadThreads();
+        })
+        .on('postgres_changes', {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'chat_threads',
+          filter: `user_id=eq.${user.id}`
+        }, (payload) => {
+          const deletedThread = payload.old as any;
+          console.log(`[ChatThreadList] Thread deleted: ${deletedThread.id}`);
+          
+          // Remove deleted thread from local state
+          setThreads(prev => prev.filter(thread => thread.id !== deletedThread.id));
+          
+          // If the deleted thread was active, select another thread
+          if (deletedThread.id === activeThreadId && threads.length > 1) {
+            const remainingThreads = threads.filter(t => t.id !== deletedThread.id);
+            if (remainingThreads.length > 0) {
+              onSelectThread(remainingThreads[0].id);
+            }
+          }
+        })
         .subscribe();
     }
+    
+    // Recovery mechanism: attempt to recover lost threads after initial load
+    const attemptRecovery = async () => {
+      if (user?.id && threads.length === 0) {
+        console.log('[ChatThreadList] No threads found, attempting recovery...');
+        await recoverLostThreads(user.id);
+      }
+    };
+    
+    // Delay recovery attempt to allow initial load
+    const recoveryTimeout = setTimeout(attemptRecovery, 2000);
     
     return () => {
       window.removeEventListener('threadSelected', handleThreadSelected);
       window.removeEventListener('threadTitleUpdated', handleThreadTitleUpdated);
+      window.removeEventListener('threadRecovered', handleThreadRecovered);
+      clearTimeout(recoveryTimeout);
       if (subscription) {
         supabase.removeChannel(subscription);
       }
