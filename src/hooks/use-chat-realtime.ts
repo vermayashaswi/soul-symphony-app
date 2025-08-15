@@ -156,6 +156,24 @@ export function useChatRealtime(threadId: string | null) {
             }
           }
         )
+        .on('postgres_changes',
+          {
+            event: 'DELETE',
+            schema: 'public',
+            table: 'chat_messages',
+            filter: `thread_id=eq.${threadId}`
+          },
+          (payload) => {
+            const deletedMessage = payload.old as any;
+            console.log(`[useChatRealtime] Deleted message in thread ${threadId}:`, deletedMessage.id);
+            
+            // Emit custom event for message deletion handling
+            const deleteEvent = new CustomEvent('chatMessageDeleted', {
+              detail: { messageId: deletedMessage.id, threadId }
+            });
+            window.dispatchEvent(deleteEvent);
+          }
+        )
         .subscribe();
 
       // Store subscription in thread state

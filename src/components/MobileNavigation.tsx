@@ -12,7 +12,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { useSafeArea } from '@/hooks/use-safe-area';
-import { useKeyboardDetection } from '@/hooks/use-keyboard-detection';
+import { useUnifiedKeyboard } from '@/hooks/use-unified-keyboard';
 import { logger } from '@/utils/logger';
 
 interface MobileNavigationProps {
@@ -29,7 +29,19 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   const { hasActiveSubscription, isTrialActive, isLoading: subscriptionLoading, hasInitialLoadCompleted } = useSubscription();
   const { safeArea, isNative, isAndroid, applySafeAreaStyles } = useSafeArea();
   
-  const { isKeyboardVisible, keyboardHeight, platform } = useKeyboardDetection();
+  const { 
+    isKeyboardVisible, 
+    keyboardHeight, 
+    platform,
+    isMobileBrowser,
+    isCapacitorWebView 
+  } = useUnifiedKeyboard();
+  
+  // Conservative keyboard hiding logic - only hide if keyboard is substantial and input is focused
+  const shouldHideForKeyboard = isKeyboardVisible && 
+                               keyboardHeight > 200 && // Higher threshold 
+                               document.activeElement && 
+                               (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA');
   
   const navRef = useRef<HTMLDivElement>(null);
   const [renderKey, setRenderKey] = useState(0);
@@ -55,31 +67,30 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     }
   }, [safeArea, applySafeAreaStyles]);
   
-  // IMPROVED: Handle keyboard visibility with better coordination
+  // Handle keyboard visibility with better coordination
   useEffect(() => {
     if (!navRef.current) return;
     
     const nav = navRef.current;
     
-    // Prevent race conditions by ensuring only this component manages these classes
-    nav.classList.toggle('keyboard-visible', isKeyboardVisible);
+    // Use conservative keyboard hiding logic
+    nav.classList.toggle('keyboard-hidden', shouldHideForKeyboard);
+    nav.classList.toggle('mobile-browser-keyboard-visible', isMobileBrowser && isKeyboardVisible);
+    nav.classList.toggle('capacitor-keyboard-visible', isCapacitorWebView && isKeyboardVisible);
     nav.classList.toggle(`platform-${platform}`, true);
     
-    // Debug attributes - DISABLED for production
-    // nav.setAttribute('data-debug', 'true');
-    nav.setAttribute('data-keyboard-visible', isKeyboardVisible.toString());
-    nav.setAttribute('data-platform', platform);
-    
-    componentLogger.debug('Keyboard state applied', { 
+    componentLogger.debug('Keyboard state applied to navigation', { 
       isVisible: isKeyboardVisible, 
       height: keyboardHeight, 
       platform,
-      navHidden: isKeyboardVisible,
-      elementClasses: nav.className
+      shouldHideForKeyboard,
+      navHidden: shouldHideForKeyboard,
+      isMobileBrowser,
+      isCapacitorWebView
     });
-  }, [isKeyboardVisible, keyboardHeight, platform]);
+  }, [isKeyboardVisible, keyboardHeight, platform, shouldHideForKeyboard, isMobileBrowser, isCapacitorWebView]);
   
-  // Enhanced visibility logic - aligned with ViewportManager
+  // Enhanced visibility logic
   useEffect(() => {
     const navigationHiddenPaths = [
       '/app/onboarding',
@@ -89,7 +100,6 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     ];
     
     const shouldHideNavigation = navigationHiddenPaths.includes(location.pathname);
-    const isTransitionalRoute = location.pathname === '/app' || location.pathname === '/';
     const isInAppContext = isAppRoute(location.pathname);
     
     // Show navigation if:
@@ -108,19 +118,17 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
       isInAppContext,
       isKeyboardVisible,
       shouldHideNavigation,
-      isTransitionalRoute,
       hasUser: !!user,
       onboardingComplete,
       tutorialCompleted,
       safeArea,
-      isTutorialActive,
-      note: 'Navigation now shows on all screen sizes within /app routes'
+      isTutorialActive
     });
     
     setIsVisible(shouldShowNav);
   }, [location.pathname, isMobile.isMobile, user, onboardingComplete, tutorialCompleted, currentLanguage, renderKey, safeArea]);
   
-  // Gate rendering until subscription data is ready to avoid premium-lock flicker
+  // Gate rendering until subscription data is ready
   if (!isVisible || subscriptionLoading || !hasInitialLoadCompleted) {
     return null;
   }
@@ -135,7 +143,6 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   ];
 
   const getActiveStatus = (path: string) => {
-    // FIX: Use exact path matching to prevent multiple items appearing active
     return location.pathname === path;
   };
   
@@ -149,11 +156,11 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
         "mobile-navigation",
         isTutorialActive ? "tutorial-dimmed" : "",
         isAndroid && "platform-android",
-        platform === 'ios' && "platform-ios"
-        // Note: keyboard-visible class is managed by useKeyboardDetection hook
+        platform === 'ios' && "platform-ios",
+        shouldHideForKeyboard && "keyboard-hidden"
       )}
       initial={{ y: 100 }}
-      animate={{ y: isVisible ? 0 : 100 }}
+      animate={{ y: isVisible && !shouldHideForKeyboard ? 0 : 100 }}
       transition={{ duration: 0.3 }}
     >
       <div className="mobile-navigation-content">

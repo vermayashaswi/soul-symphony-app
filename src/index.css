@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -41,6 +42,12 @@
     --edit-btn-text: 217 91.2% 40%;
     --delete-btn-bg: 0 84.2% 95%;
     --delete-btn-text: 0 84.2% 40%;
+    
+    /* Keyboard and mobile positioning variables */
+    --keyboard-height: 0px;
+    --mobile-browser-keyboard-height: 0px;
+    --nav-bar-height: 4rem;
+    --mobile-input-height: 70px;
   }
  
   .dark {
@@ -293,6 +300,91 @@ body {
 /* Hide "Select Language" text */
 .goog-te-gadget-simple {
   display: none !important;
+}
+
+/* CONSOLIDATED MOBILE KEYBOARD AND NAVIGATION STYLES */
+
+/* Base Mobile Chat Input Container */
+.mobile-chat-input-container {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: hsl(var(--background));
+  border-top: 1px solid hsl(var(--border));
+  transform: translateZ(0);
+  will-change: bottom;
+  z-index: 1000;
+  min-height: var(--mobile-input-height);
+  transition: bottom 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+/* Mobile Browser Keyboard Positioning */
+.mobile-browser-keyboard-visible .mobile-chat-input-container {
+  bottom: var(--mobile-browser-keyboard-height) !important;
+}
+
+/* Capacitor Keyboard Positioning */
+.capacitor-keyboard-visible .mobile-chat-input-container {
+  bottom: 0px !important;
+  transform: none !important;
+}
+
+/* Chat Content Adjustments */
+.mobile-chat-content {
+  padding-bottom: calc(var(--mobile-input-height) + 1rem);  
+  min-height: calc(100vh - var(--mobile-input-height) - var(--nav-bar-height));
+  overflow-y: auto;
+  transition: padding-bottom 0.25s ease-out;
+}
+
+.mobile-browser-keyboard-visible .mobile-chat-content {
+  padding-bottom: calc(var(--mobile-browser-keyboard-height) + var(--mobile-input-height) + 1rem);
+}
+
+/* Mobile Navigation Styles */
+.mobile-navigation {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: var(--nav-bar-height);
+  background: hsl(var(--background));
+  border-top: 1px solid hsl(var(--border));
+  z-index: 50;
+  transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.mobile-navigation-content {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  height: 100%;
+  padding: 0 1rem;
+}
+
+/* Navigation Keyboard Hide States */
+.mobile-navigation.keyboard-hidden {
+  transform: translateY(100%);
+}
+
+.mobile-browser-keyboard-visible .mobile-navigation {
+  transform: translateY(100%);
+}
+
+.capacitor-keyboard-visible .mobile-navigation {
+  transform: translateY(100%);  
+}
+
+/* Platform Specific Optimizations */
+.platform-android .mobile-chat-input-container {
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+.platform-ios .mobile-chat-input-container {
+  -webkit-transform: translate3d(0, 0, 0);
+  -webkit-backface-visibility: hidden;
 }
 
 /* Enhanced Select component styles for dark backgrounds */

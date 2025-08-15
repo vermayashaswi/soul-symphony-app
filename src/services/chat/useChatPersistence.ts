@@ -10,6 +10,7 @@ import {
 import { v4 as uuidv4 } from "uuid";
 import { useToast } from "@/hooks/use-toast";
 import { ChatMessage } from "@/types/chat";
+import { useMessageDeletion } from "@/hooks/use-message-deletion";
 
 export interface ChatThread {
   id: string;
@@ -44,6 +45,15 @@ export const useChatPersistence = (userId: string | undefined) => {
   const [messages, setMessages] = useState<ChatMessagePersistence[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+
+  // Handle message deletions
+  useMessageDeletion(
+    (messageId: string, threadId: string) => {
+      console.log(`[useChatPersistence] Handling deletion of message ${messageId} in thread ${threadId}`);
+      setMessages(prev => prev.filter(msg => msg.id !== messageId));
+    },
+    activeThread
+  );
 
   // Load threads
   useEffect(() => {
@@ -129,10 +139,33 @@ export const useChatPersistence = (userId: string | undefined) => {
         };
         setMessages(prev => [...prev, persistenceMessage]);
       })
+      .on('postgres_changes', { 
+        event: 'DELETE', 
+        schema: 'public', 
+        table: 'chat_messages',
+        filter: `thread_id=eq.${activeThread}` 
+      }, (payload) => {
+        const deletedMessage = payload.old as any;
+        console.log(`[useChatPersistence] Message deleted in thread ${activeThread}:`, deletedMessage.id);
+        
+        // Remove deleted message from local state
+        setMessages(prev => prev.filter(msg => msg.id !== deletedMessage.id));
+      })
       .subscribe();
+
+    // Listen for custom deletion events from other components
+    const handleMessageDeletion = (event: CustomEvent) => {
+      const { messageId, threadId } = event.detail;
+      if (threadId === activeThread) {
+        setMessages(prev => prev.filter(msg => msg.id !== messageId));
+      }
+    };
+
+    window.addEventListener('chatMessageDeleted', handleMessageDeletion as EventListener);
       
     return () => {
       supabase.removeChannel(subscription);
+      window.removeEventListener('chatMessageDeleted', handleMessageDeletion as EventListener);
     };
   }, [activeThread]);
 
