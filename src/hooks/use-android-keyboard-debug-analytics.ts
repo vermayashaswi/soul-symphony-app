@@ -5,7 +5,7 @@
 
 import { useEffect, useRef, useCallback } from 'react';
 import { useEnhancedPlatformDetection } from './use-enhanced-platform-detection';
-// Removed circular dependency - will access data through props if needed
+import { useCapacitorAndroidWebViewOptimization } from './use-capacitor-android-webview-optimization';
 
 interface DebugAnalyticsOptions {
   enableConflictDetection?: boolean;
@@ -72,14 +72,9 @@ export const useAndroidKeyboardDebugAnalytics = (
     webViewVersion 
   } = useEnhancedPlatformDetection();
 
-  // Capacitor optimization data will be passed from master coordinator to avoid circular dependency
-  const capacitorOptimization = {
-    isOptimized: false,
-    webViewInfo: { brand: 'unknown', version: 'unknown', hasProblem: false },
-    keyboardInfo: { isVisible: false, height: 0 },
-    performanceMetrics: { inputLatency: 0, memoryUsage: 0 },
-    optimizationStatus: { keyboard: false, statusBar: false, webView: false, performance: false, memory: false }
-  };
+  const capacitorOptimization = useCapacitorAndroidWebViewOptimization(inputRef, {
+    debugMode: options.debugMode
+  });
 
   const {
     enableConflictDetection = true,

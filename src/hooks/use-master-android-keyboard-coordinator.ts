@@ -44,27 +44,19 @@ export const useMasterAndroidKeyboardCoordinator = (
     debugMode = false
   } = options;
 
-  // Skip Android-specific optimizations for non-Android platforms
-  const isAndroidPlatform = platform === 'android';
-  const enableAndroidFeatures = isAndroidPlatform && enableTouchActionManagement;
-  const enableAndroidComposition = isAndroidPlatform && enableCompositionOptimization;
-  const enableAndroidSwipe = isAndroidPlatform && enableSwipeCoordination;
-  const enableAndroidCapacitor = isAndroidPlatform && enableCapacitorOptimization;
-  const enableAndroidAnalytics = isAndroidPlatform && enableDebugAnalytics;
-
   // Phase 1: Unified Touch Action Management
   const touchActionManager = useUnifiedTouchActionManager({
     debugMode,
-    respectCapacitorNative: isNative && enableAndroidCapacitor
+    respectCapacitorNative: isNative && enableCapacitorOptimization
   });
 
   // Phase 2: Enhanced Android Composition Handling
   const androidComposition = useEnhancedAndroidComposition(inputRef, {
-    enableGboardOptimization: enableAndroidComposition,
-    enableSamsungOptimization: enableAndroidComposition,
-    enableSwypeOptimization: enableAndroidComposition,
-    enableCapacitorIntegration: enableAndroidCapacitor && isNative,
-    debugMode: debugMode && isAndroidPlatform
+    enableGboardOptimization: true,
+    enableSamsungOptimization: true,
+    enableSwypeOptimization: true,
+    enableCapacitorIntegration: enableCapacitorOptimization && isNative,
+    debugMode
   });
 
   // Phase 3: Coordinated Swipe and Input Detection
@@ -73,29 +65,29 @@ export const useMasterAndroidKeyboardCoordinator = (
     swipeCallbacks,
     {
       inputRef,
-      enableSwipeDetection: enableAndroidSwipe,
-      enableInputPriority: enableAndroidSwipe,
-      debugMode: debugMode && isAndroidPlatform
+      enableSwipeDetection: enableSwipeCoordination,
+      enableInputPriority: true,
+      debugMode
     }
   );
 
   // Phase 4: Capacitor Android WebView Optimization
   const capacitorOptimization = useCapacitorAndroidWebViewOptimization(inputRef, {
-    enableKeyboardPlugin: enableAndroidCapacitor && isNative,
-    enableStatusBarAdjustment: enableAndroidCapacitor && isNative,
-    enableWebViewWorkarounds: enableAndroidCapacitor,
-    enablePerformanceOptimization: enableAndroidCapacitor,
-    enableMemoryManagement: enableAndroidCapacitor,
-    debugMode: debugMode && isAndroidPlatform
+    enableKeyboardPlugin: enableCapacitorOptimization && isNative,
+    enableStatusBarAdjustment: enableCapacitorOptimization && isNative,
+    enableWebViewWorkarounds: enableCapacitorOptimization,
+    enablePerformanceOptimization: true,
+    enableMemoryManagement: true,
+    debugMode
   });
 
   // Phase 5: Debug and Analytics Integration
   const debugAnalytics = useAndroidKeyboardDebugAnalytics(inputRef, {
-    enableConflictDetection: enableAndroidAnalytics,
-    enablePerformanceTracking: enableAndroidAnalytics,
-    enableErrorReporting: enableAndroidAnalytics,
-    enableUsageAnalytics: enableAndroidAnalytics,
-    debugMode: debugMode && isAndroidPlatform
+    enableConflictDetection: enableDebugAnalytics,
+    enablePerformanceTracking: enableDebugAnalytics,
+    enableErrorReporting: enableDebugAnalytics,
+    enableUsageAnalytics: enableDebugAnalytics,
+    debugMode
   });
 
   // Master coordination functions
@@ -129,7 +121,7 @@ export const useMasterAndroidKeyboardCoordinator = (
     }
 
     // Apply coordinated resolution
-    if (coordinatedDetection?.isComposing) {
+    if (coordinatedDetection.detectionState.isComposing) {
       // Prioritize composition
       window.dispatchEvent(new CustomEvent('blockSwipeGestures', {
         detail: { source: 'master-coordinator', reason: 'composition-active' }
@@ -140,9 +132,9 @@ export const useMasterAndroidKeyboardCoordinator = (
   const generateSystemReport = useCallback(() => {
     if (!enableDebugAnalytics) return null;
 
-    const report = debugAnalytics?.generateReport?.() || { message: 'Debug analytics not available' };
+    const report = debugAnalytics.generateReport();
     
-    // Add master coordinator context with safe property access
+    // Add master coordinator context
     const enhancedReport = {
       ...report,
       masterCoordinator: {
@@ -156,24 +148,18 @@ export const useMasterAndroidKeyboardCoordinator = (
           debugAnalytics: enableDebugAnalytics
         },
         phases: {
-          touchActionManager: touchActionManager?.platform || platform,
-          androidComposition: androidComposition?.isAndroid ? {
-            keyboardBrand: androidComposition?.keyboardBrand || 'unknown',
-            hasSwipeGesture: androidComposition?.hasSwipeGesture || false,
-            isComposing: androidComposition?.isComposing || false
+          touchActionManager: touchActionManager.platform,
+          androidComposition: androidComposition.isAndroid ? {
+            keyboardBrand: androidComposition.keyboardBrand,
+            hasSwipeGesture: androidComposition.hasSwipeGesture,
+            isComposing: androidComposition.isComposing
           } : null,
           coordinatedDetection: {
-            isInputActive: coordinatedDetection?.isInputActive || false,
-            isComposing: coordinatedDetection?.isComposing || false,
-            hasActiveSwipe: coordinatedDetection?.hasActiveSwipe || false,
-            swipeBlocked: coordinatedDetection?.swipeBlocked || false,
-            inputBlocked: coordinatedDetection?.inputBlocked || false,
-            lastInteractionType: coordinatedDetection?.lastInteractionType || null
+            detectionState: coordinatedDetection.detectionState
           },
-          capacitorOptimization: capacitorOptimization?.isCapacitorAndroid ? {
-            webViewInfo: capacitorOptimization?.webViewInfo || {},
-            keyboardInfo: capacitorOptimization?.keyboardInfo || {},
-            workaroundsApplied: capacitorOptimization?.webViewInfo?.workaroundsApplied?.length || 0
+          capacitorOptimization: capacitorOptimization.isCapacitorAndroid ? {
+            webViewInfo: capacitorOptimization.webViewInfo,
+            keyboardInfo: capacitorOptimization.keyboardInfo
           } : null
         }
       }
@@ -205,11 +191,6 @@ export const useMasterAndroidKeyboardCoordinator = (
     return {
       isMasterCoordinator: false,
       platform,
-      isNative: false,
-      hasActiveSwipe: false,
-      isComposing: false,
-      keyboardHeight: 0,
-      isKeyboardVisible: false,
       optimizeForKeyboardInput: () => {},
       handleCompositionConflict: () => {},
       generateSystemReport: () => null
@@ -234,9 +215,9 @@ export const useMasterAndroidKeyboardCoordinator = (
     generateSystemReport,
     
     // Quick access to key states
-    isComposing: androidComposition?.isComposing || false,
-    hasActiveSwipe: coordinatedDetection?.hasActiveSwipe || false,
-    keyboardHeight: capacitorOptimization?.keyboardInfo?.height || 0,
-    isKeyboardVisible: capacitorOptimization?.keyboardInfo?.isVisible || false
+    isComposing: androidComposition.isComposing,
+    hasActiveSwipe: coordinatedDetection.detectionState.hasActiveSwipe,
+    keyboardHeight: capacitorOptimization.keyboardInfo?.height || 0,
+    isKeyboardVisible: capacitorOptimization.keyboardInfo?.isVisible || false
   };
 };

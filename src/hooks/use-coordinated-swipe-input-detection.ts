@@ -6,7 +6,7 @@
 import { useEffect, useRef, useCallback, RefObject } from 'react';
 import { useEnhancedAndroidComposition } from './use-enhanced-android-composition';
 import { useUnifiedTouchActionManager } from './use-unified-touch-action-manager';
-import { useEnhancedPlatformDetection } from './use-enhanced-platform-detection';
+import { usePlatformDetection } from './use-platform-detection';
 
 interface CoordinatedDetectionOptions {
   inputRef?: RefObject<HTMLInputElement | HTMLTextAreaElement>;
@@ -38,7 +38,7 @@ export const useCoordinatedSwipeInputDetection = (
   swipeCallbacks: SwipeCallbacks,
   options: CoordinatedDetectionOptions = {}
 ) => {
-  const { platform, isNative } = useEnhancedPlatformDetection();
+  const { platform, isNative } = usePlatformDetection();
   const touchActionManager = useUnifiedTouchActionManager({
     debugMode: options.debugMode
   });
@@ -52,19 +52,11 @@ export const useCoordinatedSwipeInputDetection = (
     debugMode = false
   } = options;
 
-  // Android composition integration - only on Android to prevent circular dependencies
-  const androidComposition = platform === 'android' && enableSwipeDetection ? 
-    useEnhancedAndroidComposition(inputRef || { current: null }, {
-      enableCapacitorIntegration: isNative,
-      debugMode
-    }) : {
-      isAndroid: false,
-      isComposing: false,
-      hasSwipeGesture: false,
-      compositionLength: 0,
-      keyboardBrand: 'unknown',
-      capacitorKeyboardHeight: 0
-    };
+  // Android composition integration
+  const androidComposition = useEnhancedAndroidComposition(inputRef || { current: null }, {
+    enableCapacitorIntegration: isNative,
+    debugMode
+  });
 
   const detectionState = useRef<DetectionState>({
     isInputActive: false,
@@ -367,13 +359,7 @@ export const useCoordinatedSwipeInputDetection = (
   ]);
 
   return {
-    // Return actual state values instead of nested object
-    isInputActive: detectionState.current.isInputActive,
-    isComposing: detectionState.current.isComposing,
-    hasActiveSwipe: detectionState.current.hasActiveSwipe,
-    swipeBlocked: detectionState.current.swipeBlocked,
-    inputBlocked: detectionState.current.inputBlocked,
-    lastInteractionType: detectionState.current.lastInteractionType,
+    detectionState: detectionState.current,
     androidComposition,
     platform,
     isNative
