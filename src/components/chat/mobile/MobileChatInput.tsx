@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Send, Loader2 } from "lucide-react";
@@ -8,7 +7,7 @@ import { useTutorial } from "@/contexts/TutorialContext";
 import { useTranslation } from "@/contexts/TranslationContext";
 import { cn } from "@/lib/utils";
 import { useUnifiedKeyboard } from "@/hooks/use-unified-keyboard";
-import { useEnhancedSwipeGestures } from "@/hooks/use-enhanced-swipe-gestures";
+
 interface MobileChatInputProps {
   onSendMessage: (message: string, isAudio?: boolean) => void;
   isLoading: boolean;
@@ -38,11 +37,6 @@ export default function MobileChatInput({
     isCapacitorWebView,
     hideKeyboard 
   } = useUnifiedKeyboard();
-
-  // Enhanced swipe gestures that work with keyboard state
-  const swipeRef = useEnhancedSwipeGestures({
-    disabled: isKeyboardVisible && document.activeElement === inputRef.current
-  });
 
   const isInChatTutorialStep = isActive && isInStep(5);
 
@@ -96,7 +90,7 @@ export default function MobileChatInput({
     }
   }, [isKeyboardVisible, keyboardHeight, platform, isNative, isMobileBrowser, isCapacitorWebView]);
 
-
+  // Don't render during tutorial step 5
   if (isInChatTutorialStep) {
     return null;
   }
@@ -137,16 +131,13 @@ export default function MobileChatInput({
         
         await Promise.resolve(onSendMessage(trimmedValue));
         
-        // Blur input and hide keyboard
-        try {
-          inputRef.current?.blur();
-          if (document.activeElement && (document.activeElement as HTMLElement).blur) {
-            (document.activeElement as HTMLElement).blur();
-          }
-        } catch {}
+        // Keep input focused to maintain keyboard state
+        if (inputRef.current) {
+          inputRef.current.focus();
+        }
 
-        // Use unified keyboard hiding
-        if (hideKeyboard) {
+        // Use unified keyboard hiding only if explicitly requested
+        if (hideKeyboard && !isMobileBrowser) {
           try {
             await hideKeyboard();
           } catch (error) {
@@ -154,10 +145,12 @@ export default function MobileChatInput({
           }
         }
         
-        chatDebug.addEvent("User Input", "Reset input field and hid keyboard after sending", "success");
+        chatDebug.addEvent("User Input", "Message sent successfully", "success");
       } catch (error) {
         console.error("Error sending message:", error);
         chatDebug.addEvent("Send Error", error instanceof Error ? error.message : "Unknown error sending message", "error");
+        // Restore input value on error
+        setInputValue(trimmedValue);
       } finally {
         setIsSubmitting(false);
       }
@@ -166,12 +159,7 @@ export default function MobileChatInput({
 
   return (
     <div 
-      ref={(element) => {
-        inputContainerRef.current = element;
-        if (swipeRef) {
-          swipeRef.current = element;
-        }
-      }}
+      ref={inputContainerRef}
       className={cn(
         "mobile-chat-input-container flex items-center gap-3 p-3",
         isKeyboardVisible && "keyboard-visible",

@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useMemo } from 'react';
 
 export interface EnvironmentInfo {
@@ -7,10 +8,11 @@ export interface EnvironmentInfo {
   platform: 'ios' | 'android' | 'web';
   isNative: boolean;
   userAgent: string;
+  hasVisualViewport: boolean;
 }
 
 /**
- * Reliable environment detection for mobile browser vs Capacitor WebView
+ * Enhanced environment detection for mobile browser vs Capacitor WebView
  */
 export const useEnvironmentDetection = (): EnvironmentInfo => {
   const [environmentInfo, setEnvironmentInfo] = useState<EnvironmentInfo>({
@@ -19,7 +21,8 @@ export const useEnvironmentDetection = (): EnvironmentInfo => {
     isDesktop: true,
     platform: 'web',
     isNative: false,
-    userAgent: ''
+    userAgent: '',
+    hasVisualViewport: false
   });
 
   const detectedInfo = useMemo(() => {
@@ -30,20 +33,22 @@ export const useEnvironmentDetection = (): EnvironmentInfo => {
         isDesktop: true,
         platform: 'web' as const,
         isNative: false,
-        userAgent: ''
+        userAgent: '',
+        hasVisualViewport: false
       };
     }
 
     const userAgent = navigator.userAgent.toLowerCase();
     
-    // Detect Capacitor native environment
+    // Enhanced Capacitor detection
     const isCapacitorWebView = !!(
       (window as any).Capacitor?.isNative ||
       window.location.href.includes('capacitor://') ||
-      window.location.href.includes('ionic://')
+      window.location.href.includes('ionic://') ||
+      (window as any).Capacitor?.isPluginAvailable
     );
 
-    // Detect mobile platform
+    // Enhanced mobile platform detection
     const isIOS = /iphone|ipad|ipod/.test(userAgent) || 
                  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     const isAndroid = /android/.test(userAgent);
@@ -51,10 +56,14 @@ export const useEnvironmentDetection = (): EnvironmentInfo => {
     // Determine platform
     const platform: 'ios' | 'android' | 'web' = isAndroid ? 'android' : isIOS ? 'ios' : 'web';
     
-    // Detect mobile browser (mobile but not Capacitor) - enhanced detection
+    // Check for Visual Viewport API support
+    const hasVisualViewport = typeof window.visualViewport !== 'undefined';
+    
+    // Enhanced mobile browser detection - must be mobile AND not Capacitor AND have Visual Viewport
     const isMobileBrowser = (isIOS || isAndroid) && 
                             !isCapacitorWebView && 
-                            typeof window.visualViewport !== 'undefined';
+                            hasVisualViewport &&
+                            'ontouchstart' in window;
     
     // Desktop detection
     const isDesktop = !isIOS && !isAndroid;
@@ -65,18 +74,21 @@ export const useEnvironmentDetection = (): EnvironmentInfo => {
       isDesktop,
       platform,
       isNative: isCapacitorWebView,
-      userAgent
+      userAgent,
+      hasVisualViewport
     };
   }, []);
 
   useEffect(() => {
     setEnvironmentInfo(detectedInfo);
     
-    console.log('[EnvironmentDetection] Environment detected:', {
+    console.log('[EnvironmentDetection] Enhanced environment detected:', {
       ...detectedInfo,
       windowCapacitor: !!(window as any).Capacitor,
       windowCapacitorIsNative: !!(window as any).Capacitor?.isNative,
-      href: window.location.href
+      visualViewport: !!window.visualViewport,
+      href: window.location.href,
+      touchSupport: 'ontouchstart' in window
     });
   }, [detectedInfo]);
 
