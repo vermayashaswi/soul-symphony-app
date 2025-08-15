@@ -102,36 +102,42 @@ export const useMobileBrowserKeyboard = () => {
 
     const currentHeight = vv.height;
     const heightDiff = initialViewportHeight - currentHeight;
-    const threshold = 50;
+    const threshold = 100; // More conservative threshold
 
     let isKeyboardVisible = false;
     let keyboardHeight = 0;
 
-    // Method 1: Visual Viewport height difference
+    // Enhanced detection logic - more conservative approach
+    // Method 1: Visual Viewport height difference (primary)
     if (heightDiff > threshold) {
       isKeyboardVisible = true;
       keyboardHeight = heightDiff;
     }
 
-    // Method 2: Viewport ratio detection (backup)
+    // Method 2: Viewport ratio detection (stricter)
     if (!isKeyboardVisible) {
       const currentRatio = currentHeight / initialViewportHeight;
-      if (currentRatio < 0.75) {
+      if (currentRatio < 0.65) { // More conservative ratio
         isKeyboardVisible = true;
         keyboardHeight = heightDiff > 0 ? heightDiff : estimatedKeyboardHeight;
       }
     }
 
-    // Method 3: Offset detection (iOS specific)
-    if (!isKeyboardVisible && vv.offsetTop > 0) {
+    // Method 3: iOS offset detection
+    if (!isKeyboardVisible && platform === 'ios' && vv.offsetTop > 0) {
       isKeyboardVisible = true;
       keyboardHeight = vv.offsetTop;
     }
 
-    // Method 4: Fallback estimation
-    if (!isKeyboardVisible && currentHeight < window.screen.height * 0.6) {
-      isKeyboardVisible = true;
-      keyboardHeight = estimatedKeyboardHeight;
+    // Only apply if we have a focused input element
+    const activeElement = document.activeElement;
+    const isInputFocused = activeElement && 
+                          (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA');
+    
+    // Override: if no input is focused, keyboard should not be visible
+    if (!isInputFocused && isKeyboardVisible) {
+      isKeyboardVisible = false;
+      keyboardHeight = 0;
     }
 
     const newState = { isVisible: isKeyboardVisible, height: keyboardHeight, isReady: true };
@@ -142,9 +148,11 @@ export const useMobileBrowserKeyboard = () => {
       heightDiff,
       currentHeight,
       initialHeight: initialViewportHeight,
+      isInputFocused,
+      activeElement: activeElement?.tagName,
       ...newState
     });
-  }, [isMobileBrowser, initialViewportHeight, estimatedKeyboardHeight, applyMobileBrowserKeyboardStyles]);
+  }, [isMobileBrowser, initialViewportHeight, estimatedKeyboardHeight, applyMobileBrowserKeyboardStyles, platform]);
 
   useEffect(() => {
     if (!isMobileBrowser) {
@@ -166,13 +174,15 @@ export const useMobileBrowserKeyboard = () => {
       const target = e.target as HTMLElement;
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) {
         console.log('[MobileBrowserKeyboard] Input focused, scheduling detection');
-        setTimeout(detectKeyboardState, 300);
+        // Longer delay for mobile browsers to settle
+        setTimeout(detectKeyboardState, 500);
       }
     };
 
     const handleFocusOut = () => {
       console.log('[MobileBrowserKeyboard] Input blurred, scheduling detection');
-      setTimeout(detectKeyboardState, 100);
+      // Immediate detection on blur
+      setTimeout(detectKeyboardState, 50);
     };
 
     // Set up event listeners

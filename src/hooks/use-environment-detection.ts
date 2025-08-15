@@ -51,8 +51,10 @@ export const useEnvironmentDetection = (): EnvironmentInfo => {
     // Determine platform
     const platform: 'ios' | 'android' | 'web' = isAndroid ? 'android' : isIOS ? 'ios' : 'web';
     
-    // Detect mobile browser (mobile but not Capacitor)
-    const isMobileBrowser = (isIOS || isAndroid) && !isCapacitorWebView;
+    // Detect mobile browser (mobile but not Capacitor) - enhanced detection
+    const isMobileBrowser = (isIOS || isAndroid) && 
+                            !isCapacitorWebView && 
+                            typeof window.visualViewport !== 'undefined';
     
     // Desktop detection
     const isDesktop = !isIOS && !isAndroid;

@@ -31,6 +31,12 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   
   const { isKeyboardVisible, keyboardHeight, platform } = useKeyboardDetection();
   
+  // Override keyboard visibility for navigation - be more conservative
+  const shouldHideForKeyboard = isKeyboardVisible && 
+                               keyboardHeight > 150 && // Only hide if substantial keyboard height
+                               document.activeElement && 
+                               (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA');
+  
   const navRef = useRef<HTMLDivElement>(null);
   const [renderKey, setRenderKey] = useState(0);
   
@@ -61,8 +67,8 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     
     const nav = navRef.current;
     
-    // Prevent race conditions by ensuring only this component manages these classes
-    nav.classList.toggle('keyboard-visible', isKeyboardVisible);
+    // Use conservative keyboard hiding logic
+    nav.classList.toggle('keyboard-visible', shouldHideForKeyboard);
     nav.classList.toggle(`platform-${platform}`, true);
     
     // Debug attributes - DISABLED for production
@@ -74,10 +80,11 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
       isVisible: isKeyboardVisible, 
       height: keyboardHeight, 
       platform,
-      navHidden: isKeyboardVisible,
+      shouldHideForKeyboard,
+      navHidden: shouldHideForKeyboard,
       elementClasses: nav.className
     });
-  }, [isKeyboardVisible, keyboardHeight, platform]);
+  }, [isKeyboardVisible, keyboardHeight, platform, shouldHideForKeyboard]);
   
   // Enhanced visibility logic - aligned with ViewportManager
   useEffect(() => {

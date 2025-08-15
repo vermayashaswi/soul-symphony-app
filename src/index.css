@@ -306,16 +306,23 @@ body {
   will-change: auto;
 }
 
-/* Mobile Browser Keyboard Positioning */
+/* Mobile Browser Keyboard Positioning - ENHANCED */
 .mobile-browser-keyboard-visible .mobile-chat-input-container {
   position: fixed !important;
   bottom: var(--mobile-browser-keyboard-height, 0px) !important;
   left: 0;
   right: 0;
   transform: none !important;
-  transition: bottom 0.25s ease-out;
+  transition: bottom 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   z-index: 1000;
   will-change: bottom;
+}
+
+/* Ensure input stays visible and accessible */
+.mobile-browser-keyboard-visible .mobile-chat-input-container {
+  visibility: visible !important;
+  opacity: 1 !important;
+  display: flex !important;
 }
 
 /* Chat content adjustments for mobile browser */
@@ -323,7 +330,7 @@ body {
   transition: padding-bottom 0.25s ease-out;
 }
 
-/* Base mobile chat input container */
+/* Base mobile chat input container - ENHANCED */
 .mobile-chat-input-container {
   position: fixed;
   bottom: 0;
@@ -334,6 +341,10 @@ body {
   transform: translateZ(0);
   will-change: transform;
   z-index: 100;
+  visibility: visible;
+  opacity: 1;
+  display: flex;
+  min-height: 60px;
 }
 
 /* Platform-specific optimizations */
