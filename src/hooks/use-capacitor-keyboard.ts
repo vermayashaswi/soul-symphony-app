@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { Keyboard } from '@capacitor/keyboard';
 import { useEnvironmentDetection } from './use-environment-detection';
@@ -53,9 +54,10 @@ export const useCapacitorKeyboard = () => {
         element.style.setProperty('z-index', '1000');
       } else {
         element.classList.remove('capacitor-keyboard-visible');
-        // Reset to safe area positioning
-        element.style.setProperty('bottom', 'env(safe-area-inset-bottom, 0px)');
+        // Reset to safe area positioning WITH navigation bar height
+        element.style.setProperty('bottom', 'calc(env(safe-area-inset-bottom, 0px) + var(--nav-bar-height))');
         element.style.setProperty('transform', 'translateZ(0)');
+        element.style.setProperty('transition', 'bottom 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94)');
       }
     });
 

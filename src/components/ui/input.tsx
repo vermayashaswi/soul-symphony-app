@@ -1,3 +1,4 @@
+
 import * as React from "react"
 import { cn } from "@/lib/utils"
 
@@ -16,13 +17,53 @@ const Input = React.forwardRef<HTMLInputElement, EnhancedInputProps>(
     preventSwipeConflicts = true,
     onFocus,
     onBlur,
+    onChange,
     ...props 
   }, ref) => {
     const inputRef = React.useRef<HTMLInputElement>(null);
     const [isFocused, setIsFocused] = React.useState(false);
+    const [isComposing, setIsComposing] = React.useState(false);
 
     // Combine refs
     React.useImperativeHandle(ref, () => inputRef.current!);
+
+    // Handle composition events for better swipe typing (Android)
+    const handleCompositionStart = React.useCallback((e: React.CompositionEvent<HTMLInputElement>) => {
+      setIsComposing(true);
+      console.log('[Input] Composition started');
+    }, []);
+
+    const handleCompositionUpdate = React.useCallback((e: React.CompositionEvent<HTMLInputElement>) => {
+      if (onChange && e.target instanceof HTMLInputElement) {
+        // Create synthetic event for immediate feedback during composition
+        const syntheticEvent = {
+          target: { value: e.target.value },
+          currentTarget: e.target
+        } as React.ChangeEvent<HTMLInputElement>;
+        onChange(syntheticEvent);
+      }
+    }, [onChange]);
+
+    const handleCompositionEnd = React.useCallback((e: React.CompositionEvent<HTMLInputElement>) => {
+      setIsComposing(false);
+      console.log('[Input] Composition ended');
+      
+      if (onChange && e.target instanceof HTMLInputElement) {
+        // Ensure final value is captured
+        const syntheticEvent = {
+          target: { value: e.target.value },
+          currentTarget: e.target
+        } as React.ChangeEvent<HTMLInputElement>;
+        onChange(syntheticEvent);
+      }
+    }, [onChange]);
+
+    // Enhanced change handler that works with composition
+    const handleChange = React.useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+      if (onChange) {
+        onChange(e);
+      }
+    }, [onChange]);
 
     // Enhanced focus handling for mobile optimization
     const handleFocus = React.useCallback((e: React.FocusEvent<HTMLInputElement>) => {
@@ -111,15 +152,14 @@ const Input = React.forwardRef<HTMLInputElement, EnhancedInputProps>(
         "touch-action-manipulation",
       ],
       
-      // Focus state classes
-      isFocused && [
-        "input-focused",
-      ],
+      // Focus and composition state classes
+      isFocused && "input-focused",
+      isComposing && "input-composing",
       
       className
     );
 
-    // Enhanced input props for mobile
+    // Enhanced input props for mobile and composition
     const enhancedProps = {
       ...props,
       // Mobile-optimized defaults
@@ -134,6 +174,7 @@ const Input = React.forwardRef<HTMLInputElement, EnhancedInputProps>(
       'data-mobile-optimized': mobileOptimized,
       'data-keyboard-aware': keyboardAware,
       'data-prevent-swipe': preventSwipeConflicts,
+      'data-composing': isComposing,
     };
 
     return (
@@ -143,6 +184,10 @@ const Input = React.forwardRef<HTMLInputElement, EnhancedInputProps>(
         ref={inputRef}
         onFocus={handleFocus}
         onBlur={handleBlur}
+        onChange={handleChange}
+        onCompositionStart={handleCompositionStart}
+        onCompositionUpdate={handleCompositionUpdate}
+        onCompositionEnd={handleCompositionEnd}
         {...enhancedProps}
       />
     )

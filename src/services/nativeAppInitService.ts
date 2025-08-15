@@ -111,9 +111,9 @@ class NativeAppInitService {
         });
       }
 
-      // Listen for network changes
+      // Listen for network changes - ONLY in actual Capacitor environment
       const networkPlugin = nativeIntegrationService.getPlugin('Network');
-      if (networkPlugin) {
+      if (networkPlugin && nativeIntegrationService.isRunningNatively()) {
         networkPlugin.addListener('networkStatusChange', (status: any) => {
           console.log('[NativeAppInit] Network status changed:', status);
           
