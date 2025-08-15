@@ -4,8 +4,8 @@ import { Mic, ArrowUp, X, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useVoiceRecorder } from '@/hooks/use-voice-recorder';
-import { TranscriptionService } from '@/utils/audio/transcription-service';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -59,6 +59,21 @@ function AudioVisualizer({ isRecording, audioLevel }: AudioVisualizerProps) {
       })}
     </div>
   );
+}
+
+// Helper function to convert blob to base64
+async function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      // Remove the data URL prefix (e.g., "data:audio/webm;base64,")
+      const base64 = result.split(',')[1];
+      resolve(base64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
 }
 
 export function VoiceChatRecorder({ 
@@ -142,28 +157,49 @@ export function VoiceChatRecorder({
       setRecordingState('processing');
       cleanupAudioAnalysis();
       
-      const transcriptionService = new TranscriptionService(
-        import.meta.env.VITE_SUPABASE_URL,
-        user.id
-      );
-
-      const result = await transcriptionService.transcribeAudio(audioBlob, {
-        directTranscription: true,
-        highQuality: true,
-        recordingTime: elapsedTimeMs
+      console.log('[VoiceChatRecorder] Starting transcription process');
+      
+      // Convert blob to base64
+      const base64Audio = await blobToBase64(audioBlob);
+      
+      // Use Supabase function invocation like the journal does
+      const { data, error } = await supabase.functions.invoke('transcribe-audio', {
+        body: {
+          audio: base64Audio,
+          userId: user.id,
+          recordingTime: elapsedTimeMs,
+          highQuality: true,
+          directTranscription: true
+        }
       });
 
-      if (result.transcription && result.transcription.trim()) {
-        onTranscriptionComplete(result.transcription.trim());
+      if (error) {
+        console.error('[VoiceChatRecorder] Edge function error:', error);
+        throw new Error(error.message || 'Transcription service error');
+      }
+
+      if (!data) {
+        throw new Error('No response from transcription service');
+      }
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      const transcription = data.transcription || data.refined || '';
+      
+      if (transcription && transcription.trim()) {
+        console.log('[VoiceChatRecorder] Transcription successful:', transcription);
+        onTranscriptionComplete(transcription.trim());
         clearRecording();
         setRecordingState('idle');
       } else {
-        throw new Error('No transcription received');
+        throw new Error('No transcription received from service');
       }
     } catch (error) {
       console.error('[VoiceChatRecorder] Transcription error:', error);
       setRecordingState('error');
-      toast.error('Failed to transcribe audio. Please try again.');
+      toast.error(`Transcription failed: ${error.message}`);
       setTimeout(() => setRecordingState('idle'), 2000);
     }
   }
