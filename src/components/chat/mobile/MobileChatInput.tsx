@@ -7,8 +7,8 @@ import { Input } from "@/components/ui/input";
 import { useTutorial } from "@/contexts/TutorialContext";
 import { useTranslation } from "@/contexts/TranslationContext";
 import { cn } from "@/lib/utils";
-import { useReliableKeyboard } from "@/hooks/use-reliable-keyboard";
-import { Keyboard } from "@capacitor/keyboard";
+import { useUnifiedKeyboard } from "@/hooks/use-unified-keyboard";
+import { useEnhancedSwipeGestures } from "@/hooks/use-enhanced-swipe-gestures";
 interface MobileChatInputProps {
   onSendMessage: (message: string, isAudio?: boolean) => void;
   isLoading: boolean;
@@ -29,7 +29,20 @@ export default function MobileChatInput({
   const { isActive, isInStep } = useTutorial();
   const { translate, currentLanguage } = useTranslation();
   
-  const { isKeyboardVisible, keyboardHeight, platform, isNative } = useReliableKeyboard();
+  const { 
+    isKeyboardVisible, 
+    keyboardHeight, 
+    platform, 
+    isNative,
+    isMobileBrowser,
+    isCapacitorWebView,
+    hideKeyboard 
+  } = useUnifiedKeyboard();
+
+  // Enhanced swipe gestures that work with keyboard state
+  const swipeRef = useEnhancedSwipeGestures({
+    disabled: isKeyboardVisible && document.activeElement === inputRef.current
+  });
 
   const isInChatTutorialStep = isActive && isInStep(5);
 
@@ -52,28 +65,27 @@ export default function MobileChatInput({
     translatePlaceholder();
   }, [currentLanguage, translate]);
 
-  // Handle keyboard state changes and ensure proper scrolling with enhanced logging
+  // Handle keyboard state changes and ensure proper scrolling
   useEffect(() => {
-    console.log('[MobileChatInput] Enhanced keyboard state changed:', { 
+    console.log('[MobileChatInput] Unified keyboard state changed:', { 
       isKeyboardVisible, 
       keyboardHeight, 
       platform, 
       isNative,
-      userAgent: navigator.userAgent
+      isMobileBrowser,
+      isCapacitorWebView
     });
     
     if (isKeyboardVisible) {
-      // Enhanced scroll logic with mobile browser detection
-      const isMobileBrowser = !isNative && /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent);
-      const scrollDelay = isMobileBrowser ? 300 : 100; // Longer delay for mobile browsers
+      const scrollDelay = isMobileBrowser ? 300 : isCapacitorWebView ? 100 : 50;
       
       setTimeout(() => {
         const chatContent = document.querySelector('.mobile-chat-content');
         if (chatContent) {
           chatContent.scrollTop = chatContent.scrollHeight;
-          console.log('[MobileChatInput] Scrolled chat content to bottom (mobile browser mode:', isMobileBrowser, ')');
+          console.log('[MobileChatInput] Scrolled chat content to bottom');
           
-          // Additional scroll attempt for stubborn mobile browsers
+          // Additional scroll for mobile browsers
           if (isMobileBrowser) {
             setTimeout(() => {
               chatContent.scrollTop = chatContent.scrollHeight;
@@ -82,7 +94,7 @@ export default function MobileChatInput({
         }
       }, scrollDelay);
     }
-  }, [isKeyboardVisible, keyboardHeight, platform, isNative]);
+  }, [isKeyboardVisible, keyboardHeight, platform, isNative, isMobileBrowser, isCapacitorWebView]);
 
 
   if (isInChatTutorialStep) {
@@ -125,7 +137,7 @@ export default function MobileChatInput({
         
         await Promise.resolve(onSendMessage(trimmedValue));
         
-        // Blur input and hide the mobile keyboard after sending
+        // Blur input and hide keyboard
         try {
           inputRef.current?.blur();
           if (document.activeElement && (document.activeElement as HTMLElement).blur) {
@@ -133,14 +145,13 @@ export default function MobileChatInput({
           }
         } catch {}
 
-        try {
-          await Keyboard.hide();
-          // Some Android WebViews need a second hide call after a short delay
-          setTimeout(() => {
-            Keyboard.hide().catch(() => {});
-          }, 50);
-        } catch {
-          // no-op on web or if plugin unavailable
+        // Use unified keyboard hiding
+        if (hideKeyboard) {
+          try {
+            await hideKeyboard();
+          } catch (error) {
+            console.warn('[MobileChatInput] Failed to hide keyboard:', error);
+          }
         }
         
         chatDebug.addEvent("User Input", "Reset input field and hid keyboard after sending", "success");
@@ -155,10 +166,17 @@ export default function MobileChatInput({
 
   return (
     <div 
-      ref={inputContainerRef}
+      ref={(element) => {
+        inputContainerRef.current = element;
+        if (swipeRef) {
+          swipeRef.current = element;
+        }
+      }}
       className={cn(
         "mobile-chat-input-container flex items-center gap-3 p-3",
         isKeyboardVisible && "keyboard-visible",
+        isCapacitorWebView && isKeyboardVisible && "capacitor-keyboard-visible",
+        isMobileBrowser && isKeyboardVisible && "mobile-browser-keyboard-visible",
         platform === 'android' && "platform-android",
         platform === 'ios' && "platform-ios"
       )}

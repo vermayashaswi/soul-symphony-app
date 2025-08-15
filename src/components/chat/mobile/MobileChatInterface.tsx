@@ -19,8 +19,8 @@ import { processChatMessage } from "@/services/chatService";
 import { MentalHealthInsights } from "@/hooks/use-mental-health-insights";
 import { useChatRealtime } from "@/hooks/use-chat-realtime";
 import { updateThreadProcessingStatus, generateThreadTitle } from "@/utils/chat/threadUtils";
-import { useReliableKeyboard } from "@/hooks/use-reliable-keyboard";
-import { useChatSwipeGestures } from "@/hooks/use-chat-swipe-gestures";
+import { useUnifiedKeyboard } from "@/hooks/use-unified-keyboard";
+import { useEnhancedSwipeGestures } from "@/hooks/use-enhanced-swipe-gestures";
 import { useStreamingChat } from "@/hooks/useStreamingChat";
 import { threadSafetyManager } from "@/utils/threadSafetyManager";
 import ChatErrorBoundary from "../ChatErrorBoundary";
@@ -85,10 +85,10 @@ export default function MobileChatInterface({
     setLocalLoading
   } = useChatRealtime(threadId);
   
-  const { isKeyboardVisible } = useReliableKeyboard();
+  const { isKeyboardVisible } = useUnifiedKeyboard();
   
-  // Add swipe gesture support for navigation and quick actions
-  const chatContainerRef = useChatSwipeGestures({
+  // Enhanced swipe gesture support for navigation and quick actions
+  const chatContainerRef = useEnhancedSwipeGestures({
     onSwipeLeft: () => {
       console.log('[MobileChatInterface] Swipe left - could open thread list');
       // Future: implement thread list navigation
