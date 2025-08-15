@@ -7,7 +7,6 @@ import { useVoiceRecorder } from '@/hooks/use-voice-recorder';
 import { TranscriptionService } from '@/utils/audio/transcription-service';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
-import { formatTime } from '@/utils/format-time';
 import { toast } from 'sonner';
 
 type RecordingState = 'idle' | 'recording' | 'processing' | 'error';
@@ -38,7 +37,7 @@ function AudioVisualizer({ isRecording, audioLevel }: AudioVisualizerProps) {
         return (
           <motion.div
             key={i}
-            className="w-0.5 bg-blue-500 rounded-full"
+            className="w-0.5 bg-primary rounded-full"
             initial={{ height: 4 }}
             animate={{ 
               height: isRecording 
@@ -242,17 +241,12 @@ export function VoiceChatRecorder({
               <AudioVisualizer isRecording={isRecording} audioLevel={audioLevel} />
             </div>
 
-            {/* Recording Time */}
-            <div className="text-xs text-muted-foreground font-mono mr-2 shrink-0">
-              {formatTime(elapsedTimeMs)}
-            </div>
-
             {/* Stop/Send Button (Up Arrow) */}
             <Button
               variant="ghost"
               size="sm"
               onClick={handleStopRecording}
-              className="h-8 w-8 p-0 text-blue-500 hover:text-blue-600 shrink-0"
+              className="h-8 w-8 p-0 text-primary hover:text-primary/80 shrink-0"
             >
               <ArrowUp className="h-4 w-4" />
             </Button>
