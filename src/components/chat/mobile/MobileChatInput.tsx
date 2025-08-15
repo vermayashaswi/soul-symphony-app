@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Send, Loader2 } from "lucide-react";
@@ -7,6 +8,7 @@ import { useTutorial } from "@/contexts/TutorialContext";
 import { useTranslation } from "@/contexts/TranslationContext";
 import { cn } from "@/lib/utils";
 import { useUnifiedKeyboard } from "@/hooks/use-unified-keyboard";
+import { VoiceChatRecorder } from "./VoiceChatRecorder";
 
 interface MobileChatInputProps {
   onSendMessage: (message: string, isAudio?: boolean) => void;
@@ -157,11 +159,25 @@ export default function MobileChatInput({
     }
   };
 
+  const handleVoiceTranscription = async (transcribedText: string) => {
+    try {
+      chatDebug.addEvent("Voice Message", `Voice transcribed: "${transcribedText.substring(0, 30)}${transcribedText.length > 30 ? '...' : ''}"`, "info");
+      
+      // Send the transcribed message with audio flag
+      await Promise.resolve(onSendMessage(transcribedText, true));
+      
+      chatDebug.addEvent("Voice Input", "Voice message sent successfully", "success");
+    } catch (error) {
+      console.error("Error sending voice message:", error);
+      chatDebug.addEvent("Voice Error", error instanceof Error ? error.message : "Unknown error sending voice message", "error");
+    }
+  };
+
   return (
     <div 
       ref={inputContainerRef}
       className={cn(
-        "mobile-chat-input-container flex items-center gap-3 p-3",
+        "mobile-chat-input-container flex items-center gap-2 p-3 relative",
         isKeyboardVisible && "keyboard-visible",
         isCapacitorWebView && isKeyboardVisible && "capacitor-keyboard-visible",
         isMobileBrowser && isKeyboardVisible && "mobile-browser-keyboard-visible",
@@ -169,7 +185,8 @@ export default function MobileChatInput({
         platform === 'ios' && "platform-ios"
       )}
     >
-      <div className="flex-1">
+      {/* Text Input Container with Voice Recorder Overlay */}
+      <div className="flex-1 relative">
         <Input
           ref={inputRef}
           type="text"
@@ -187,8 +204,26 @@ export default function MobileChatInput({
           inputMode="text"
           data-testid="mobile-chat-input"
         />
+        
+        {/* Voice Recorder positioned as overlay when recording */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="pointer-events-auto">
+            <VoiceChatRecorder
+              onTranscriptionComplete={handleVoiceTranscription}
+              isDisabled={isSubmitting || isLoading}
+              className="opacity-0 pointer-events-none [&>*]:pointer-events-auto [&>*]:opacity-100"
+            />
+          </div>
+        </div>
       </div>
       
+      {/* Voice Recording Button */}
+      <VoiceChatRecorder
+        onTranscriptionComplete={handleVoiceTranscription}
+        isDisabled={isSubmitting || isLoading}
+      />
+      
+      {/* Send Button */}
       <Button
         type="button"
         size="icon"
