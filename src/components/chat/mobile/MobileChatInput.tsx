@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Send, Loader2 } from "lucide-react";
@@ -185,7 +184,7 @@ export default function MobileChatInput({
         platform === 'ios' && "platform-ios"
       )}
     >
-      {/* Text Input Container with Voice Recorder Overlay */}
+      {/* Text Input Container with Voice Recorder Integration */}
       <div className="flex-1 relative">
         <Input
           ref={inputRef}
@@ -195,7 +194,7 @@ export default function MobileChatInput({
           onKeyDown={handleKeyPress}
           onFocus={handleInputFocus}
           placeholder={placeholderText}
-          className="w-full border border-muted shadow-sm bg-background text-foreground focus:outline-none focus:ring-0 focus:border-muted"
+          className="w-full pr-12 border border-muted shadow-sm bg-background text-foreground focus:outline-none focus:ring-0 focus:border-muted"
           disabled={isSubmitting}
           autoComplete="off"
           autoCorrect="on"
@@ -205,23 +204,13 @@ export default function MobileChatInput({
           data-testid="mobile-chat-input"
         />
         
-        {/* Voice Recorder positioned as overlay when recording */}
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="pointer-events-auto">
-            <VoiceChatRecorder
-              onTranscriptionComplete={handleVoiceTranscription}
-              isDisabled={isSubmitting || isLoading}
-              className="opacity-0 pointer-events-none [&>*]:pointer-events-auto [&>*]:opacity-100"
-            />
-          </div>
-        </div>
+        {/* Voice Recorder Overlay - positioned absolutely within input */}
+        <VoiceChatRecorder
+          onTranscriptionComplete={handleVoiceTranscription}
+          isDisabled={isSubmitting || isLoading}
+          className="absolute inset-0"
+        />
       </div>
-      
-      {/* Voice Recording Button */}
-      <VoiceChatRecorder
-        onTranscriptionComplete={handleVoiceTranscription}
-        isDisabled={isSubmitting || isLoading}
-      />
       
       {/* Send Button */}
       <Button
