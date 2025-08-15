@@ -157,9 +157,10 @@ export const useMasterAndroidKeyboardCoordinator = (
           coordinatedDetection: {
             detectionState: coordinatedDetection?.detectionState || {}
           },
-          capacitorOptimization: capacitorOptimization.isCapacitorAndroid ? {
+          capacitorOptimization: capacitorOptimization?.isCapacitorAndroid ? {
             webViewInfo: capacitorOptimization.webViewInfo,
-            keyboardInfo: capacitorOptimization.keyboardInfo
+            keyboardInfo: capacitorOptimization.keyboardInfo,
+            workaroundsApplied: capacitorOptimization.webViewInfo?.workaroundsApplied?.length || 0
           } : null
         }
       }
