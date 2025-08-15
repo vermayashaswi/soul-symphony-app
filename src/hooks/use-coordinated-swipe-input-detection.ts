@@ -367,7 +367,13 @@ export const useCoordinatedSwipeInputDetection = (
   ]);
 
   return {
-    detectionState: detectionState.current,
+    // Return actual state values instead of nested object
+    isInputActive: detectionState.current.isInputActive,
+    isComposing: detectionState.current.isComposing,
+    hasActiveSwipe: detectionState.current.hasActiveSwipe,
+    swipeBlocked: detectionState.current.swipeBlocked,
+    inputBlocked: detectionState.current.inputBlocked,
+    lastInteractionType: detectionState.current.lastInteractionType,
     androidComposition,
     platform,
     isNative
