@@ -1,11 +1,10 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Mic, ArrowUp, X, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useVoiceRecorder } from '@/hooks/use-voice-recorder';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import { processRecording } from '@/utils/audio-processing';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -61,21 +60,6 @@ function AudioVisualizer({ isRecording, audioLevel }: AudioVisualizerProps) {
   );
 }
 
-// Helper function to convert blob to base64
-async function blobToBase64(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      // Remove the data URL prefix (e.g., "data:audio/webm;base64,")
-      const base64 = result.split(',')[1];
-      resolve(base64);
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-}
-
 export function VoiceChatRecorder({ 
   onTranscriptionComplete, 
   isDisabled = false,
@@ -83,6 +67,7 @@ export function VoiceChatRecorder({
 }: VoiceChatRecorderProps) {
   const [recordingState, setRecordingState] = useState<RecordingState>('idle');
   const [audioLevel, setAudioLevel] = useState(0);
+  const [processingTempId, setProcessingTempId] = useState<string | null>(null);
   const { user } = useAuth();
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -104,6 +89,53 @@ export function VoiceChatRecorder({
     },
     maxDuration: 120
   });
+
+  // Listen for processing completion events (like the journal does)
+  useEffect(() => {
+    const handleProcessingCompleted = (event: CustomEvent) => {
+      const { tempId, entryId } = event.detail;
+      
+      if (tempId === processingTempId) {
+        console.log('[VoiceChatRecorder] Processing completed for tempId:', tempId);
+        setProcessingTempId(null);
+        setRecordingState('idle');
+        
+        // We'll get the transcription from the entryContentReady event
+      }
+    };
+
+    const handleEntryContentReady = (event: CustomEvent) => {
+      const { tempId, content } = event.detail;
+      
+      if (tempId === processingTempId && content) {
+        console.log('[VoiceChatRecorder] Content ready:', content);
+        onTranscriptionComplete(content.trim());
+        clearRecording();
+      }
+    };
+
+    const handleProcessingFailed = (event: CustomEvent) => {
+      const { tempId, error } = event.detail;
+      
+      if (tempId === processingTempId) {
+        console.error('[VoiceChatRecorder] Processing failed:', error);
+        setRecordingState('error');
+        setProcessingTempId(null);
+        toast.error(`Transcription failed: ${error}`);
+        setTimeout(() => setRecordingState('idle'), 2000);
+      }
+    };
+
+    window.addEventListener('processingEntryCompleted', handleProcessingCompleted as EventListener);
+    window.addEventListener('entryContentReady', handleEntryContentReady as EventListener);
+    window.addEventListener('processingEntryFailed', handleProcessingFailed as EventListener);
+
+    return () => {
+      window.removeEventListener('processingEntryCompleted', handleProcessingCompleted as EventListener);
+      window.removeEventListener('entryContentReady', handleEntryContentReady as EventListener);
+      window.removeEventListener('processingEntryFailed', handleProcessingFailed as EventListener);
+    };
+  }, [processingTempId, onTranscriptionComplete, clearRecording]);
 
   // Real-time audio level detection
   const setupAudioAnalysis = async (stream: MediaStream) => {
@@ -157,49 +189,22 @@ export function VoiceChatRecorder({
       setRecordingState('processing');
       cleanupAudioAnalysis();
       
-      console.log('[VoiceChatRecorder] Starting transcription process');
+      console.log('[VoiceChatRecorder] Starting processing using journal methodology');
       
-      // Convert blob to base64
-      const base64Audio = await blobToBase64(audioBlob);
+      // Use the journal's exact processing methodology
+      const result = await processRecording(audioBlob, user.id);
       
-      // Use Supabase function invocation like the journal does
-      const { data, error } = await supabase.functions.invoke('transcribe-audio', {
-        body: {
-          audio: base64Audio,
-          userId: user.id,
-          recordingTime: elapsedTimeMs,
-          highQuality: true,
-          directTranscription: true
-        }
-      });
-
-      if (error) {
-        console.error('[VoiceChatRecorder] Edge function error:', error);
-        throw new Error(error.message || 'Transcription service error');
-      }
-
-      if (!data) {
-        throw new Error('No response from transcription service');
-      }
-
-      if (data.error) {
-        throw new Error(data.error);
-      }
-
-      const transcription = data.transcription || data.refined || '';
-      
-      if (transcription && transcription.trim()) {
-        console.log('[VoiceChatRecorder] Transcription successful:', transcription);
-        onTranscriptionComplete(transcription.trim());
-        clearRecording();
-        setRecordingState('idle');
+      if (result.success && result.tempId) {
+        console.log('[VoiceChatRecorder] Processing initiated with tempId:', result.tempId);
+        setProcessingTempId(result.tempId);
+        // Keep processing state - will be cleared when processing completes
       } else {
-        throw new Error('No transcription received from service');
+        throw new Error(result.error || 'Failed to start processing');
       }
     } catch (error) {
-      console.error('[VoiceChatRecorder] Transcription error:', error);
+      console.error('[VoiceChatRecorder] Processing error:', error);
       setRecordingState('error');
-      toast.error(`Transcription failed: ${error.message}`);
+      toast.error(`Processing failed: ${error.message}`);
       setTimeout(() => setRecordingState('idle'), 2000);
     }
   }
