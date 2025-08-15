@@ -6,7 +6,7 @@
 import { useEffect, useRef, useCallback, RefObject } from 'react';
 import { useEnhancedAndroidComposition } from './use-enhanced-android-composition';
 import { useUnifiedTouchActionManager } from './use-unified-touch-action-manager';
-import { usePlatformDetection } from './use-platform-detection';
+import { useEnhancedPlatformDetection } from './use-enhanced-platform-detection';
 
 interface CoordinatedDetectionOptions {
   inputRef?: RefObject<HTMLInputElement | HTMLTextAreaElement>;
@@ -38,7 +38,7 @@ export const useCoordinatedSwipeInputDetection = (
   swipeCallbacks: SwipeCallbacks,
   options: CoordinatedDetectionOptions = {}
 ) => {
-  const { platform, isNative } = usePlatformDetection();
+  const { platform, isNative } = useEnhancedPlatformDetection();
   const touchActionManager = useUnifiedTouchActionManager({
     debugMode: options.debugMode
   });
@@ -52,11 +52,19 @@ export const useCoordinatedSwipeInputDetection = (
     debugMode = false
   } = options;
 
-  // Android composition integration
-  const androidComposition = useEnhancedAndroidComposition(inputRef || { current: null }, {
-    enableCapacitorIntegration: isNative,
-    debugMode
-  });
+  // Android composition integration - only on Android to prevent circular dependencies
+  const androidComposition = platform === 'android' && enableSwipeDetection ? 
+    useEnhancedAndroidComposition(inputRef || { current: null }, {
+      enableCapacitorIntegration: isNative,
+      debugMode
+    }) : {
+      isAndroid: false,
+      isComposing: false,
+      hasSwipeGesture: false,
+      compositionLength: 0,
+      keyboardBrand: 'unknown',
+      capacitorKeyboardHeight: 0
+    };
 
   const detectionState = useRef<DetectionState>({
     isInputActive: false,

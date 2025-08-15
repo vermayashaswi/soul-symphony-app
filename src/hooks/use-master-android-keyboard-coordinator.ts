@@ -140,9 +140,9 @@ export const useMasterAndroidKeyboardCoordinator = (
   const generateSystemReport = useCallback(() => {
     if (!enableDebugAnalytics) return null;
 
-    const report = debugAnalytics.generateReport();
+    const report = debugAnalytics?.generateReport?.() || { message: 'Debug analytics not available' };
     
-    // Add master coordinator context
+    // Add master coordinator context with safe property access
     const enhancedReport = {
       ...report,
       masterCoordinator: {
@@ -156,19 +156,19 @@ export const useMasterAndroidKeyboardCoordinator = (
           debugAnalytics: enableDebugAnalytics
         },
         phases: {
-          touchActionManager: touchActionManager.platform,
-          androidComposition: androidComposition.isAndroid ? {
-            keyboardBrand: androidComposition.keyboardBrand,
-            hasSwipeGesture: androidComposition.hasSwipeGesture,
-            isComposing: androidComposition.isComposing
+          touchActionManager: touchActionManager?.platform || platform,
+          androidComposition: androidComposition?.isAndroid ? {
+            keyboardBrand: androidComposition?.keyboardBrand || 'unknown',
+            hasSwipeGesture: androidComposition?.hasSwipeGesture || false,
+            isComposing: androidComposition?.isComposing || false
           } : null,
           coordinatedDetection: {
             detectionState: coordinatedDetection?.detectionState || {}
           },
           capacitorOptimization: capacitorOptimization?.isCapacitorAndroid ? {
-            webViewInfo: capacitorOptimization.webViewInfo,
-            keyboardInfo: capacitorOptimization.keyboardInfo,
-            workaroundsApplied: capacitorOptimization.webViewInfo?.workaroundsApplied?.length || 0
+            webViewInfo: capacitorOptimization?.webViewInfo || {},
+            keyboardInfo: capacitorOptimization?.keyboardInfo || {},
+            workaroundsApplied: capacitorOptimization?.webViewInfo?.workaroundsApplied?.length || 0
           } : null
         }
       }
