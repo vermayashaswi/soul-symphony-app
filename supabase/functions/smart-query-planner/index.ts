@@ -17,11 +17,99 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+// Enhanced debugging wrapper for authentication and user validation
+async function debugAuthenticationContext(req: Request): Promise<{
+  userId: string | null;
+  hasValidAuth: boolean;
+  userEntryCount: number;
+  authDetails: any;
+}> {
+  const authHeader = req.headers.get('authorization');
+  console.log('[DEBUG AUTH] Authorization header present:', !!authHeader);
+  
+  if (!authHeader) {
+    return {
+      userId: null,
+      hasValidAuth: false,
+      userEntryCount: 0,
+      authDetails: { error: 'No authorization header' }
+    };
+  }
+
+  try {
+    // Create authenticated client using the user's token
+    const authenticatedSupabase = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY') || '', {
+      global: {
+        headers: { Authorization: authHeader }
+      }
+    });
+
+    // Get user info from the token
+    const { data: { user }, error: userError } = await authenticatedSupabase.auth.getUser();
+    console.log('[DEBUG AUTH] User verification:', { 
+      hasUser: !!user, 
+      userId: user?.id, 
+      userError: userError?.message 
+    });
+
+    if (userError || !user) {
+      return {
+        userId: null,
+        hasValidAuth: false,
+        userEntryCount: 0,
+        authDetails: { error: userError?.message || 'No user found' }
+      };
+    }
+
+    // Test database access with RLS
+    const { data: entriesTest, error: entriesError } = await authenticatedSupabase
+      .from('Journal Entries')
+      .select('id')
+      .limit(1);
+
+    console.log('[DEBUG AUTH] RLS test:', { 
+      canAccessEntries: !entriesError, 
+      entriesError: entriesError?.message,
+      sampleEntryFound: !!entriesTest?.length 
+    });
+
+    // Get total entry count for this user (using service role for count)
+    const { data: countData, error: countError } = await supabase.rpc('get_journal_entry_count', {
+      user_id_filter: user.id
+    });
+
+    console.log('[DEBUG AUTH] Entry count check:', { 
+      totalEntries: countData, 
+      countError: countError?.message 
+    });
+
+    return {
+      userId: user.id,
+      hasValidAuth: true,
+      userEntryCount: countData || 0,
+      authDetails: {
+        email: user.email,
+        rlsWorking: !entriesError,
+        totalEntries: countData || 0
+      }
+    };
+  } catch (error) {
+    console.error('[DEBUG AUTH] Exception during auth check:', error);
+    return {
+      userId: null,
+      hasValidAuth: false,
+      userEntryCount: 0,
+      authDetails: { error: error.message }
+    };
+  }
+}
+
 /**
  * Generate embedding for text using OpenAI API
  */
 async function generateEmbedding(text) {
   try {
+    console.log('[DEBUG EMBEDDING] Starting embedding generation for text length:', text.length);
     const response = await fetch('https://api.openai.com/v1/embeddings', {
       method: 'POST',
       headers: {
@@ -37,7 +125,7 @@ async function generateEmbedding(text) {
 
     if (!response.ok) {
       const error = await response.text();
-      console.error('Failed to generate embedding:', error);
+      console.error('[DEBUG EMBEDDING] Failed to generate embedding:', error);
       throw new Error('Could not generate embedding for the text');
     }
 
@@ -46,11 +134,107 @@ async function generateEmbedding(text) {
       throw new Error('Empty embedding data received from OpenAI');
     }
 
-    return embeddingData.data[0].embedding;
+    const embedding = embeddingData.data[0].embedding;
+    console.log('[DEBUG EMBEDDING] Successfully generated embedding with dimensions:', embedding.length);
+    return embedding;
   } catch (error) {
-    console.error('Error generating embedding:', error);
+    console.error('[DEBUG EMBEDDING] Error generating embedding:', error);
     throw error;
   }
+}
+
+// Enhanced vector search testing with comprehensive debugging
+async function debugVectorSearchExecution(userId: string, queryEmbedding: number[], timeRange?: any) {
+  console.log('\n=== VECTOR SEARCH DEBUG SESSION ===');
+  console.log('[DEBUG VECTOR] Parameters:', {
+    userId: userId.substring(0, 8) + '...',
+    embeddingDimensions: queryEmbedding.length,
+    embeddingSample: queryEmbedding.slice(0, 5),
+    timeRange
+  });
+
+  const vectorResults = {
+    standardSearch: null,
+    timeFilteredSearch: null,
+    directEmbeddingTest: null,
+    errors: []
+  };
+
+  // Test 1: Standard vector search
+  try {
+    console.log('[DEBUG VECTOR] Test 1: Standard vector search');
+    const { data: standardData, error: standardError } = await supabase.rpc('match_journal_entries', {
+      query_embedding: queryEmbedding,
+      match_threshold: 0.1, // Lower threshold for debugging
+      match_count: 10,
+      user_id_filter: userId
+    });
+
+    vectorResults.standardSearch = {
+      success: !standardError,
+      resultCount: standardData?.length || 0,
+      error: standardError?.message,
+      sampleResults: standardData?.slice(0, 2)
+    };
+
+    console.log('[DEBUG VECTOR] Standard search results:', vectorResults.standardSearch);
+  } catch (error) {
+    console.error('[DEBUG VECTOR] Standard search exception:', error);
+    vectorResults.errors.push(`Standard search: ${error.message}`);
+  }
+
+  // Test 2: Time-filtered search (if timeRange provided)
+  if (timeRange?.start || timeRange?.end) {
+    try {
+      console.log('[DEBUG VECTOR] Test 2: Time-filtered vector search');
+      const { data: timeData, error: timeError } = await supabase.rpc('match_journal_entries_with_date', {
+        query_embedding: queryEmbedding,
+        match_threshold: 0.1,
+        match_count: 10,
+        user_id_filter: userId,
+        start_date: timeRange.start || null,
+        end_date: timeRange.end || null
+      });
+
+      vectorResults.timeFilteredSearch = {
+        success: !timeError,
+        resultCount: timeData?.length || 0,
+        error: timeError?.message,
+        sampleResults: timeData?.slice(0, 2)
+      };
+
+      console.log('[DEBUG VECTOR] Time-filtered search results:', vectorResults.timeFilteredSearch);
+    } catch (error) {
+      console.error('[DEBUG VECTOR] Time-filtered search exception:', error);
+      vectorResults.errors.push(`Time-filtered search: ${error.message}`);
+    }
+  }
+
+  // Test 3: Direct embedding table check
+  try {
+    console.log('[DEBUG VECTOR] Test 3: Direct embedding table check');
+    const { data: embeddingData, error: embeddingError } = await supabase
+      .from('journal_embeddings')
+      .select('journal_entry_id, embedding')
+      .limit(5);
+
+    vectorResults.directEmbeddingTest = {
+      success: !embeddingError,
+      embeddingCount: embeddingData?.length || 0,
+      error: embeddingError?.message,
+      hasEmbeddings: embeddingData && embeddingData.length > 0
+    };
+
+    console.log('[DEBUG VECTOR] Direct embedding test:', vectorResults.directEmbeddingTest);
+  } catch (error) {
+    console.error('[DEBUG VECTOR] Direct embedding test exception:', error);
+    vectorResults.errors.push(`Direct embedding test: ${error.message}`);
+  }
+
+  console.log('[DEBUG VECTOR] Complete vector search debug results:', vectorResults);
+  console.log('=== END VECTOR SEARCH DEBUG ===\n');
+
+  return vectorResults;
 }
 
 /**
@@ -495,7 +679,7 @@ function deriveTimeRangeFromSql(sqlQuery) {
   return res;
 }
 
-// Execute plan by directly running GPT-produced steps with staged parallelism
+// Enhanced execution plan with comprehensive vector search debugging
 async function executePlan(plan, userId, normalizedTimeRange, supabaseClient) {
   // Clear any potential variable persistence to prevent stale data contamination
   let executionMetadata = {
@@ -506,8 +690,8 @@ async function executePlan(plan, userId, normalizedTimeRange, supabaseClient) {
     planQuestion: plan?.subQuestions?.[0]?.question || 'unknown'
   };
 
-  console.log(`[EXECUTION START] ${executionMetadata.requestId}:`, {
-    userId,
+  console.log(`\n🚀 [EXECUTION START] ${executionMetadata.requestId}:`, {
+    userId: userId.substring(0, 8) + '...',
     timeRange: normalizedTimeRange,
     planType: plan?.queryType,
     subQuestionCount: plan?.subQuestions?.length || 0,
@@ -532,11 +716,11 @@ async function executePlan(plan, userId, normalizedTimeRange, supabaseClient) {
     }
 
     // Log SQL execution with full details
-    console.log(`[SQL EXECUTION] ${executionMetadata.requestId}:`, {
+    console.log(`📊 [SQL EXECUTION] ${executionMetadata.requestId}:`, {
       originalQuery: sqlQuery,
       finalSql: finalSql,
       timeRange: timeRange,
-      userId: userId
+      userId: userId.substring(0, 8) + '...'
     });
 
     const { data, error } = await supabaseClient.rpc('execute_dynamic_query', {
@@ -545,69 +729,17 @@ async function executePlan(plan, userId, normalizedTimeRange, supabaseClient) {
 
     // Log SQL results with data freshness validation
     if (error) {
-      console.error(`[SQL ERROR] ${executionMetadata.requestId}:`, error);
+      console.error(`❌ [SQL ERROR] ${executionMetadata.requestId}:`, error);
       return { ok: false, error: error.message };
     }
 
     if (!data || data.success === false) {
-      console.error(`[SQL FAILED] ${executionMetadata.requestId}:`, data);
+      console.error(`❌ [SQL FAILED] ${executionMetadata.requestId}:`, data);
       return { ok: false, error: (data && data.error) || 'Unknown SQL execution error' };
     }
 
     const rows = Array.isArray(data.data) ? data.data : [];
-
-    // Data freshness validation - check if returned data matches query parameters
-    if (rows.length > 0 && timeRange) {
-      const sampleRow = rows[0];
-      const dateFields = ['created_at', 'date', 'timestamp'];
-      let foundDateField = null;
-      let sampleDate = null;
-
-      for (const field of dateFields) {
-        if (sampleRow[field]) {
-          foundDateField = field;
-          sampleDate = new Date(sampleRow[field]);
-          break;
-        }
-      }
-
-      if (foundDateField && sampleDate) {
-        const queryStart = timeRange.start ? new Date(timeRange.start) : null;
-        const queryEnd = timeRange.end ? new Date(timeRange.end) : null;
-
-        let dataFreshness = 'unknown';
-        if (queryStart && queryEnd) {
-          dataFreshness = (sampleDate >= queryStart && sampleDate <= queryEnd) ? 'fresh' : 'stale';
-        } else if (queryStart) {
-          dataFreshness = sampleDate >= queryStart ? 'fresh' : 'stale';
-        } else if (queryEnd) {
-          dataFreshness = sampleDate <= queryEnd ? 'fresh' : 'stale';
-        }
-
-        console.log(`[DATA FRESHNESS] ${executionMetadata.requestId}:`, {
-          status: dataFreshness,
-          sampleDate: sampleDate.toISOString(),
-          queryStart: queryStart?.toISOString() || null,
-          queryEnd: queryEnd?.toISOString() || null,
-          foundDateField,
-          rowCount: rows.length
-        });
-
-        // Alert if stale data detected
-        if (dataFreshness === 'stale') {
-          console.error(`[STALE DATA ALERT] ${executionMetadata.requestId}: Returned data outside query time range!`, {
-            sampleDate: sampleDate.toISOString(),
-            expectedRange: {
-              start: queryStart?.toISOString(),
-              end: queryEnd?.toISOString()
-            },
-            sqlQuery: finalSql
-          });
-        }
-      }
-    }
-
-    console.log(`[SQL SUCCESS] ${executionMetadata.requestId}:`, {
+    console.log(`✅ [SQL SUCCESS] ${executionMetadata.requestId}:`, {
       rowCount: rows.length,
       sampleData: rows.slice(0, 2) // Log first 2 rows for inspection
     });
@@ -632,14 +764,14 @@ async function executePlan(plan, userId, normalizedTimeRange, supabaseClient) {
   });
 
   const stages = [...new Set(subQuestions.map(sq => sq.executionStage))].sort((a, b) => a - b);
-  console.log(`[executePlan] Processing ${subQuestions.length} sub-questions across stages: ${stages.join(', ')}`);
+  console.log(`🔄 [EXECUTION PLAN] Processing ${subQuestions.length} sub-questions across stages: ${stages.join(', ')}`);
 
   const processSubQuestion = async (subQuestion) => {
-    console.log(`[executePlan] Processing sub-question: ${subQuestion.question}`);
+    console.log(`🎯 [SUB-QUESTION] Processing: ${subQuestion.question}`);
 
     const stepPromises = (subQuestion.analysisSteps || []).map(async (step) => {
       try {
-        console.log(`[executePlan] Executing step ${step.step}: ${step.description}`);
+        console.log(`⚡ [STEP] Executing step ${step.step}: ${step.description}`);
 
         // Determine per-step time range
         let stepTimeRange = normalizedTimeRange || null;
@@ -659,52 +791,37 @@ async function executePlan(plan, userId, normalizedTimeRange, supabaseClient) {
 
         if (step.queryType === 'vector_search' && step.vectorSearch) {
           try {
-            console.log(`[executePlan] Generating embedding for vector search: "${step.vectorSearch.query}"`);
+            console.log(`🔍 [VECTOR SEARCH] Starting embedding generation for: "${step.vectorSearch.query}"`);
             const queryEmbedding = await generateEmbedding(step.vectorSearch.query);
-            console.log(`[executePlan] Embedding generated successfully with ${queryEmbedding.length} dimensions`);
+            console.log(`✅ [VECTOR SEARCH] Embedding generated successfully with ${queryEmbedding.length} dimensions`);
             
-            const useDated = !!(stepTimeRange && (stepTimeRange.start || stepTimeRange.end));
-            const rpcName = useDated ? 'match_journal_entries_with_date' : 'match_journal_entries';
-
-            const rpcArgs = {
-              query_embedding: queryEmbedding,
-              match_threshold: step.vectorSearch.threshold || 0.3,
-              match_count: step.vectorSearch.limit || 10,
-              user_id_filter: userId
-            };
-
-            if (useDated) {
-              rpcArgs.start_date = stepTimeRange?.start || null;
-              rpcArgs.end_date = stepTimeRange?.end || null;
-              console.log(`[executePlan] Using time-filtered vector search: ${stepTimeRange?.start} to ${stepTimeRange?.end}`);
+            // Run comprehensive vector search debugging
+            const vectorDebugResults = await debugVectorSearchExecution(userId, queryEmbedding, stepTimeRange);
+            
+            // Determine which search method worked best
+            let bestResult = null;
+            let usedMethod = 'none';
+            
+            if (vectorDebugResults.timeFilteredSearch?.success && vectorDebugResults.timeFilteredSearch.resultCount > 0) {
+              bestResult = vectorDebugResults.timeFilteredSearch.sampleResults;
+              usedMethod = 'time_filtered';
+            } else if (vectorDebugResults.standardSearch?.success && vectorDebugResults.standardSearch.resultCount > 0) {
+              bestResult = vectorDebugResults.standardSearch.sampleResults;
+              usedMethod = 'standard';
             }
 
-            console.log(`[executePlan] Calling ${rpcName} with threshold ${rpcArgs.match_threshold}, limit ${rpcArgs.match_count}`);
-
-            const { data: vectorData, error: vectorError } = await supabaseClient.rpc(rpcName, rpcArgs);
-
-            if (vectorError) {
-              console.error(`[executePlan] Vector search error:`, vectorError);
-              return { kind: 'vector', ok: false, error: vectorError.message };
-            }
-
-            console.log(`[executePlan] Vector search returned ${vectorData?.length || 0} results`);
-            if (vectorData && vectorData.length > 0) {
-              console.log(`[executePlan] Sample vector result:`, {
-                id: vectorData[0].id,
-                similarity: vectorData[0].similarity,
-                content_preview: vectorData[0].content?.slice(0, 100)
-              });
-            }
+            console.log(`🎯 [VECTOR RESULT] Best method: ${usedMethod}, Results: ${bestResult?.length || 0}`);
 
             return {
               kind: 'vector',
-              ok: true,
-              entries: vectorData || [],
-              timeRange: stepTimeRange
+              ok: bestResult !== null,
+              entries: bestResult || [],
+              timeRange: stepTimeRange,
+              debugInfo: vectorDebugResults,
+              method: usedMethod
             };
           } catch (e) {
-            console.error(`[executePlan] Vector search execution error:`, e);
+            console.error(`❌ [VECTOR ERROR] Exception:`, e);
             return { kind: 'vector', ok: false, error: e.message };
           }
         }
@@ -722,7 +839,7 @@ async function executePlan(plan, userId, normalizedTimeRange, supabaseClient) {
 
         return { kind: 'unknown', ok: false, error: 'Unknown or missing step configuration' };
       } catch (err) {
-        console.error(`[executePlan] Step execution error:`, err);
+        console.error(`❌ [STEP ERROR] Exception:`, err);
         return { kind: 'unknown', ok: false, error: err.message };
       }
     });
@@ -733,10 +850,9 @@ async function executePlan(plan, userId, normalizedTimeRange, supabaseClient) {
 
     const sqlResults = sqlRows.flatMap(r => r.rows);
     const vectorResults = vectorOk.flatMap(r => r.entries);
-    const stepTimeRanges = resolved.map(r => ({
-      kind: r.kind,
-      timeRange: r.timeRange || null
-    }));
+    const vectorDebugInfo = resolved.find(r => r.kind === 'vector')?.debugInfo || null;
+
+    console.log(`📋 [SUB-QUESTION RESULTS] SQL rows: ${sqlResults.length}, Vector entries: ${vectorResults.length}`);
 
     // Prefer SQL-derived metrics when available
     let sqlPercentage = null;
@@ -755,8 +871,6 @@ async function executePlan(plan, userId, normalizedTimeRange, supabaseClient) {
     const finalPercentage = sqlPercentage ?? vectorBasedPercentage;
     const finalCount = sqlCountValue ?? vectorIds.size;
 
-    console.log(`[executePlan] Sub-question results: ${sqlResults.length} SQL rows, ${vectorResults.length} vector entries`);
-
     return {
       subQuestion: {
         question: subQuestion.question,
@@ -773,7 +887,7 @@ async function executePlan(plan, userId, normalizedTimeRange, supabaseClient) {
       executionResults: {
         sqlResults,
         vectorResults,
-        stepTimeRanges,
+        vectorDebugInfo, // Include debug information
         combinedMetrics: {
           sqlCount: sqlResults.length,
           vectorCount: vectorResults.length,
@@ -788,37 +902,17 @@ async function executePlan(plan, userId, normalizedTimeRange, supabaseClient) {
   const allResults = [];
   for (const stage of stages) {
     const inStage = subQuestions.filter(sq => sq.executionStage === stage);
-    console.log(`[executePlan] Executing stage ${stage} with ${inStage.length} sub-questions in parallel`);
+    console.log(`🔄 [STAGE ${stage}] Executing ${inStage.length} sub-questions in parallel`);
     const stageResults = await Promise.all(inStage.map(processSubQuestion));
     allResults.push(...stageResults);
   }
 
-  console.log(`[EXECUTION COMPLETE] ${executionMetadata.requestId}:`, {
+  console.log(`🏁 [EXECUTION COMPLETE] ${executionMetadata.requestId}:`, {
     totalSubQuestions: allResults.length,
     stages: stages.length,
-    successfulQuestions: allResults.filter(r => r.executionResults?.sqlResults || r.executionResults?.vectorResults).length,
+    successfulQuestions: allResults.filter(r => r.executionResults?.sqlResults?.length > 0 || r.executionResults?.vectorResults?.length > 0).length,
     timeRange: normalizedTimeRange,
-    resultsSummary: allResults.map((r, idx) => ({
-      index: idx,
-      question: r.subQuestion?.question?.substring(0, 50),
-      sqlRowCount: r.executionResults?.sqlResults?.length || 0,
-      vectorResultCount: r.executionResults?.vectorResults?.length || 0,
-      hasError: !!r.executionResults?.error
-    }))
-  });
-
-  // Final data integrity check
-  allResults.forEach((result, idx) => {
-    const sqlCount = result.executionResults?.sqlResults?.length || 0;
-    const vectorCount = result.executionResults?.vectorResults?.length || 0;
-    console.log(`[RESULT SUMMARY] ${executionMetadata.requestId} #${idx + 1}: ${sqlCount} SQL rows, ${vectorCount} vector results`);
-
-    if (vectorCount > 0) {
-      console.log(`[VECTOR SAMPLE] ${executionMetadata.requestId} #${idx + 1}:`, JSON.stringify(result.executionResults.vectorResults.slice(0, 2), null, 2));
-    }
-    if (sqlCount > 0) {
-      console.log(`[SQL SAMPLE] ${executionMetadata.requestId} #${idx + 1}:`, JSON.stringify(result.executionResults.sqlResults.slice(0, 2), null, 2));
-    }
+    vectorDebugAvailable: allResults.some(r => r.executionResults?.vectorDebugInfo)
   });
 
   return { researchResults: allResults };
@@ -850,7 +944,7 @@ serve(async (req) => {
     const requestId = `planner_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const { message, conversationContext = [], userId, execute = false, timeRange = null, threadId = null, messageId = null, isFollowUp = false } = await req.json();
 
-    console.log(`[REQUEST START] ${requestId}:`, {
+    console.log(`\n🎬 [REQUEST START] ${requestId}:`, {
       message: message?.substring(0, 100),
       userId: userId?.substring(0, 8),
       execute,
@@ -863,7 +957,7 @@ serve(async (req) => {
     });
 
     if (!message || !userId) {
-      console.error(`[REQUEST ERROR] ${requestId}: Missing required fields`);
+      console.error(`❌ [REQUEST ERROR] ${requestId}: Missing required fields`);
       return new Response(JSON.stringify({
         error: 'Message and userId are required'
       }), {
@@ -872,11 +966,23 @@ serve(async (req) => {
       });
     }
 
+    // Enhanced authentication debugging
+    const authContext = await debugAuthenticationContext(req);
+    console.log(`🔐 [AUTH DEBUG] ${requestId}:`, authContext);
+
+    if (!authContext.hasValidAuth) {
+      return new Response(JSON.stringify({
+        error: 'Authentication failed',
+        authDebug: authContext.authDetails
+      }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
     // Get user's journal entry count for context
-    const { data: countData } = await supabase.rpc('get_journal_entry_count', {
-      user_id_filter: userId
-    });
-    const userEntryCount = countData || 0;
+    const userEntryCount = authContext.userEntryCount;
+    console.log(`📊 [USER CONTEXT] ${requestId}: User has ${userEntryCount} journal entries`);
 
     // Generate comprehensive analysis plan
     const analysisResult = await analyzeQueryWithSubQuestions(message, conversationContext, userEntryCount, isFollowUp);
@@ -886,7 +992,8 @@ serve(async (req) => {
       return new Response(JSON.stringify({
         success: true,
         queryPlan: analysisResult,
-        userEntryCount
+        userEntryCount,
+        authDebug: authContext.authDetails
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
@@ -911,18 +1018,25 @@ serve(async (req) => {
 
     const executionResult = await executePlan(analysisResult, userId, normalizedTimeRange, supabase);
 
+    console.log(`🎉 [REQUEST COMPLETE] ${requestId}: Returning results with ${executionResult.researchResults.length} research results`);
+
     return new Response(JSON.stringify({
       success: true,
       queryPlan: analysisResult,
       researchResults: executionResult.researchResults,
       userEntryCount,
-      timeRange: normalizedTimeRange
+      timeRange: normalizedTimeRange,
+      authDebug: authContext.authDetails,
+      debugInfo: {
+        requestId,
+        hasVectorDebug: executionResult.researchResults.some(r => r.executionResults?.vectorDebugInfo)
+      }
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
 
   } catch (error) {
-    console.error('Smart Query Planner error:', error);
+    console.error('❌ Smart Query Planner error:', error);
     return new Response(JSON.stringify({
       success: false,
       error: error.message,
