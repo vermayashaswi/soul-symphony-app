@@ -1,8 +1,8 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 import { OptimizedRagPipeline } from './utils/optimizedPipeline.ts'
-import { OptimizedApiClient } from './utils/optimizedApiClient.ts'
+import { SSEStreamManager, createStreamingResponse } from './utils/streamingResponseManager.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,154 +12,139 @@ const corsHeaders = {
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { headers: corsHeaders })
   }
+
+  let streamManager: SSEStreamManager | null = null;
+  let streamingResponse: Response | null = null;
 
   try {
-    console.log(`[ChatWithRAG] Received ${req.method} request`);
+    console.log('[ChatWithRAG] Starting request processing')
     
-    if (req.method !== 'POST') {
-      return new Response(
-        JSON.stringify({ error: 'Method not allowed' }),
-        { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const requestData = await req.json();
-    const { message, userId, conversationContext = [], userProfile = {} } = requestData;
-    
-    if (!message || !userId) {
-      return new Response(
-        JSON.stringify({ error: 'Missing required parameters: message and userId' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    console.log(`[ChatWithRAG] Processing query for user: ${userId}`);
-    console.log(`[ChatWithRAG] Message: ${message}`);
-
-    // Get API keys
-    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
-    if (!openaiApiKey) {
-      console.error('[ChatWithRAG] OpenAI API key not configured');
-      return new Response(
-        JSON.stringify({ error: 'OpenAI API key not configured' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
     // Initialize Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseAnonKey);
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
 
-    // Step 1: Call smart query planner to get query plan with embeddings
-    console.log('[ChatWithRAG] Calling smart query planner...');
-    
-    let queryPlanResponse;
-    try {
-      queryPlanResponse = await supabase.functions.invoke('smart-query-planner', {
-        body: { 
-          message, 
-          userId, 
-          timeRange: userProfile.timezone ? { timezone: userProfile.timezone } : undefined 
-        }
-      });
+    // Get OpenAI API key
+    const openaiApiKey = Deno.env.get('OPENAI_API_KEY')
+    if (!openaiApiKey) {
+      throw new Error('OpenAI API key not configured')
+    }
 
-      if (queryPlanResponse.error) {
-        console.error('[ChatWithRAG] Query planner error:', queryPlanResponse.error);
-        throw new Error(`Query planner failed: ${queryPlanResponse.error.message}`);
-      }
-    } catch (error) {
-      console.error('[ChatWithRAG] Failed to call smart query planner:', error);
-      // Fallback: create basic query plan and generate embedding here
-      console.log('[ChatWithRAG] Falling back to basic query plan with local embedding generation');
+    // Parse request data
+    const requestData = await req.json()
+    console.log('[ChatWithRAG] Request data received:', {
+      hasMessage: !!requestData.message,
+      hasUserId: !!requestData.userId,
+      messageLength: requestData.message?.length || 0,
+      streamingMode: requestData.streamingMode
+    })
+
+    // Validate required fields
+    if (!requestData.message || !requestData.userId) {
+      throw new Error('Missing required fields: message and userId')
+    }
+
+    // Check if streaming mode is requested (default to true for backward compatibility)
+    const useStreamingMode = requestData.streamingMode !== false
+
+    if (useStreamingMode) {
+      // Initialize streaming response using factory function
+      const { response, controller } = createStreamingResponse()
+      streamingResponse = response
+      streamManager = new SSEStreamManager(controller)
       
-      try {
-        const queryEmbedding = await OptimizedApiClient.getEmbedding(message, openaiApiKey);
-        queryPlanResponse = {
-          data: {
-            success: true,
-            queryPlan: {
-              strategy: 'comprehensive',
-              complexity: 'simple',
-              requiresTimeFilter: false,
-              requiresAggregation: false,
-              expectedResponseType: 'narrative',
-              subQueries: [message],
-              filters: {},
-              embeddingNeeded: true,
-              queryEmbedding,
-              embeddingDimensions: queryEmbedding.length,
-              subQueryCount: 1,
-              timestamp: new Date().toISOString()
+      // Initialize optimized RAG pipeline
+      const pipeline = new OptimizedRagPipeline(
+        streamManager,
+        supabaseClient,
+        openaiApiKey
+      )
+
+      // Process the query through the optimized pipeline
+      await pipeline.processQuery(requestData)
+
+      // Return the streaming response
+      return streamingResponse
+    } else {
+      // Non-streaming mode: collect results and return as JSON
+      console.log('[ChatWithRAG] Using non-streaming mode')
+      
+      // Create a simple collector for non-streaming results
+      let finalResponse = ''
+      let analysisData = null
+      
+      // Create a mock stream manager that collects instead of streaming
+      const mockStreamManager = {
+        sendEvent: async (type: string, data: any) => {
+          if (type === 'final_response' || type === 'response_chunk') {
+            if (data.response) {
+              finalResponse = data.response
+            } else if (data.chunk) {
+              finalResponse += data.chunk
+            }
+            if (data.analysis) {
+              analysisData = data.analysis
             }
           }
-        };
-        console.log('[ChatWithRAG] Generated fallback query plan with embedding');
-      } catch (embeddingError) {
-        console.error('[ChatWithRAG] Failed to generate fallback embedding:', embeddingError);
-        throw new Error('Unable to process query - both query planner and fallback embedding generation failed');
+        },
+        sendUserMessage: async () => {},
+        sendBackendTask: async () => {},
+        sendProgress: async () => {},
+        close: async () => {}
       }
-    }
+      
+      // Initialize optimized RAG pipeline with mock manager
+      const pipeline = new OptimizedRagPipeline(
+        mockStreamManager as any,
+        supabaseClient,
+        openaiApiKey
+      )
 
-    const { queryPlan } = queryPlanResponse.data;
-    console.log('[ChatWithRAG] Received query plan:', {
-      strategy: queryPlan.strategy,
-      complexity: queryPlan.complexity,
-      embeddingDimensions: queryPlan.embeddingDimensions,
-      subQueryCount: queryPlan.subQueryCount
-    });
+      // Process the query through the optimized pipeline
+      await pipeline.processQuery(requestData)
 
-    // Validate embedding
-    if (!queryPlan.queryEmbedding || !OptimizedApiClient.validateEmbedding(queryPlan.queryEmbedding)) {
-      console.error('[ChatWithRAG] Invalid or missing embedding in query plan');
+      // Return standard JSON response
+      const responseData = {
+        response: finalResponse || 'No response generated',
+        analysis: analysisData,
+        success: true
+      }
+
+      console.log('[ChatWithRAG] Non-streaming response:', { hasResponse: !!finalResponse, hasAnalysis: !!analysisData })
+
       return new Response(
-        JSON.stringify({ 
-          error: 'Invalid embedding generated for query',
-          details: 'The semantic search component is not available'
-        }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+        JSON.stringify(responseData),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
     }
-
-    // Initialize and run the optimized RAG pipeline (synchronously)
-    const pipeline = new OptimizedRagPipeline(supabase, openaiApiKey);
-    
-    // Process the query with the enhanced pipeline
-    const result = await pipeline.processQuerySync({
-      ...requestData,
-      queryPlan
-    });
-
-    // Return the result as JSON
-    return new Response(
-      JSON.stringify(result),
-      { 
-        status: 200,
-        headers: { 
-          ...corsHeaders, 
-          'Content-Type': 'application/json' 
-        } 
-      }
-    );
 
   } catch (error) {
-    console.error('[ChatWithRAG] Error:', error);
+    console.error('[ChatWithRAG] Error processing request:', error)
     
+    if (streamManager && streamingResponse) {
+      await streamManager.sendEvent('error', {
+        message: error.message || 'An unexpected error occurred',
+        type: 'processing_error'
+      })
+      return streamingResponse
+    }
+
+    // Fallback error response
     return new Response(
-      JSON.stringify({ 
-        success: false, 
-        error: error.message || 'Internal server error',
-        timestamp: new Date().toISOString()
+      JSON.stringify({
+        error: error.message || 'An unexpected error occurred',
+        type: 'processing_error',
+        success: false
       }),
-      { 
-        status: 500, 
-        headers: { 
-          ...corsHeaders, 
-          'Content-Type': 'application/json' 
-        } 
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
-    );
+    )
   }
-});
+})
