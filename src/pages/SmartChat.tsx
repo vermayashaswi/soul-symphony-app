@@ -24,28 +24,6 @@ const SmartChat = () => {
     feature: 'Smart Chat'
   });
 
-  // Show authentication prompt if user is not logged in
-  if (!isLoading && !isAuthenticated) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-background">
-        <AuthPrompt 
-          title="Smart Chat Access"
-          description="Connect with your AI assistant for personalized conversations"
-          feature="Smart Chat"
-        />
-      </div>
-    );
-  }
-
-  // Show loading while checking authentication
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
   // Load the last active thread on component mount
   useEffect(() => {
     if (!requireAuth()) return;
@@ -158,6 +136,28 @@ const SmartChat = () => {
   };
 
   console.log("[SmartChat] Rendering with mobile detection:", isMobile.isMobile);
+
+  // Show authentication prompt if user is not logged in
+  if (!isLoading && !isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-background">
+        <AuthPrompt 
+          title="Smart Chat Access"
+          description="Connect with your AI assistant for personalized conversations"
+          feature="Smart Chat"
+        />
+      </div>
+    );
+  }
+
+  // Show loading while checking authentication
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <PremiumFeatureGuard feature="chat">
