@@ -1,3 +1,4 @@
+
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { showEdgeFunctionRetryToast } from '@/utils/toast-messages';
@@ -100,6 +101,30 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
   // Create message fingerprint to prevent duplicates
   const createMessageFingerprint = useCallback((message: string, threadId: string, timestamp: number) => {
     return `${message}_${threadId}_${Math.floor(timestamp / 5000)}`; // 5-second window
+  }, []);
+
+  // Get authentication headers for edge function calls
+  const getAuthHeaders = useCallback(async () => {
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      if (error) {
+        console.error('[useStreamingChat] Error getting session:', error);
+        throw new Error('Failed to get authentication session');
+      }
+
+      if (!session?.access_token) {
+        throw new Error('No authentication session found. Please sign in to continue.');
+      }
+
+      return {
+        Authorization: `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json'
+      };
+    } catch (error) {
+      console.error('[useStreamingChat] Authentication error:', error);
+      throw error;
+    }
   }, []);
 
   // Page Visibility API for mobile browser handling
@@ -251,11 +276,24 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     );
   }, []);
 
+  // Detect authentication errors
+  const isAuthError = useCallback((error: any): boolean => {
+    const msg = (error?.message || error?.toString() || '').toLowerCase();
+    return (
+      error?.status === 401 ||
+      msg.includes('unauthorized') ||
+      msg.includes('authentication') ||
+      msg.includes('auth session missing') ||
+      msg.includes('invalid token')
+    );
+  }, []);
+
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
   // Backoff wrapper for supabase.functions.invoke with abort support
   const invokeWithBackoff = useCallback(
     async (
+      functionName: string,
       body: Record<string, any>,
       options?: { attempts?: number; baseDelay?: number },
       targetThreadId?: string
@@ -276,12 +314,18 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
         }
 
         try {
+          // Get fresh auth headers for each attempt
+          const headers = await getAuthHeaders();
+          
           const category = (body as any)?.category || threadState.queryCategory;
           let result: { data: any; error: any };
 
           if (category === 'JOURNAL_SPECIFIC') {
             // Disable client-side timeout for long-running analysis
-            result = (await supabase.functions.invoke('chat-with-rag', { body })) as { data: any; error: any };
+            result = (await supabase.functions.invoke(functionName, { 
+              body,
+              headers
+            })) as { data: any; error: any };
           } else {
             const timeoutMs = 20000 + i * 5000;
             const timeoutPromise = new Promise((_, rej) =>
@@ -289,13 +333,20 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
             );
 
             result = (await Promise.race([
-              supabase.functions.invoke('chat-with-rag', { body }),
+              supabase.functions.invoke(functionName, { 
+                body,
+                headers
+              }),
               timeoutPromise,
             ])) as { data: any; error: any };
           }
+          
           if ((result as any)?.error) {
             lastErr = (result as any).error;
-            if (isEdgeFunctionError(lastErr) || isNetworkError(lastErr)) {
+            if (isAuthError(lastErr)) {
+              // Don't retry auth errors, throw immediately
+              throw new Error('Authentication failed. Please sign in again.');
+            } else if (isEdgeFunctionError(lastErr) || isNetworkError(lastErr)) {
               // retryable
             } else {
               return result;
@@ -303,8 +354,13 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
           } else {
             return result;
           }
-        } catch (e) {
+        } catch (e: any) {
           lastErr = e;
+          
+          // Don't retry authentication errors
+          if (isAuthError(e)) {
+            throw new Error('Authentication failed. Please sign in again.');
+          }
         }
         
         const delay = Math.min(6000, baseDelay * Math.pow(2, i)) + Math.floor(Math.random() * 250);
@@ -312,7 +368,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
       }
       return { data: null, error: lastErr || new Error('Unknown error') };
     },
-    [isEdgeFunctionError, isNetworkError, threadId, getThreadState]
+    [isEdgeFunctionError, isNetworkError, isAuthError, threadId, getThreadState, getAuthHeaders]
   );
 
   const addStreamingMessage = useCallback((message: StreamingMessage, targetThreadId?: string) => {
@@ -412,13 +468,15 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     }
 
     try {
+      const headers = await getAuthHeaders();
       const { data, error } = await supabase.functions.invoke('generate-streaming-messages', {
         body: {
           userMessage: message,
           category,
           conversationContext,
           userProfile
-        }
+        },
+        headers
       });
 
       if (error) throw error;
@@ -435,14 +493,25 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
           currentMessageIndex: 0
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('[useStreamingChat] Error generating streaming messages:', error);
+      
+      // Handle auth errors specifically
+      if (isAuthError(error)) {
+        addStreamingMessage({
+          type: 'error',
+          error: 'Authentication failed. Please sign in again.',
+          timestamp: Date.now()
+        }, activeThreadId);
+        return;
+      }
+      
       updateThreadState(activeThreadId!, {
         useThreeDotFallback: true,
         dynamicMessages: []
       });
     }
-  }, [threadId, updateThreadState]);
+  }, [threadId, updateThreadState, getAuthHeaders, isAuthError, addStreamingMessage]);
 
   // Automatic retry function for failed messages
   const retryLastMessage = useCallback(async (targetThreadId?: string) => {
@@ -474,7 +543,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
         activeThreadId
       );
 
-      const { data, error } = await invokeWithBackoff({
+      const { data, error } = await invokeWithBackoff('chat-with-rag', {
         message: threadState.lastFailedMessage.message,
         userId: threadState.lastFailedMessage.userId,
         threadId: threadState.lastFailedMessage.threadId,
@@ -487,9 +556,13 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
         if (isEdgeFunctionError(error) && threadState.retryAttempts < maxRetryAttempts - 1) {
           throw error;
         } else {
+          const errorMsg = isAuthError(error) 
+            ? 'Authentication failed. Please sign in again.' 
+            : 'Unable to process your request after multiple attempts. Please try again later.';
+          
           addStreamingMessage({
             type: 'error',
-            error: 'Unable to process your request after multiple attempts. Please try again later.',
+            error: errorMsg,
             timestamp: Date.now()
           }, activeThreadId);
           resetRetryState(activeThreadId);
@@ -510,13 +583,17 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
         throw new Error('No response received from chat service');
       }
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('[useStreamingChat] Retry failed:', error);
       const currentState = getThreadState(activeThreadId);
       if (currentState.retryAttempts >= maxRetryAttempts - 1) {
+        const errorMsg = isAuthError(error) 
+          ? 'Authentication failed. Please sign in again.' 
+          : 'Unable to process your request after multiple attempts. Please try again later.';
+        
         addStreamingMessage({
           type: 'error',
-          error: 'Unable to process your request after multiple attempts. Please try again later.',
+          error: errorMsg,
           timestamp: Date.now()
         }, activeThreadId);
         resetRetryState(activeThreadId);
@@ -524,7 +601,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     } finally {
       updateThreadState(activeThreadId, { isRetrying: false });
     }
-  }, [threadId, getThreadState, updateThreadState, generateStreamingMessages, invokeWithBackoff, isEdgeFunctionError, addStreamingMessage, resetRetryState]);
+  }, [threadId, getThreadState, updateThreadState, generateStreamingMessages, invokeWithBackoff, isEdgeFunctionError, isAuthError, addStreamingMessage, resetRetryState]);
 
   // Enhanced timing logic with thread validation
   useEffect(() => {
@@ -664,19 +741,31 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     // Classify message to determine streaming behavior
     let messageCategory = 'GENERAL_MENTAL_HEALTH';
     try {
+      const headers = await getAuthHeaders();
       const { data: classificationData, error: classificationError } = await supabase.functions.invoke('chat-query-classifier', {
         body: {
           message,
           conversationContext: conversationContext || []
-        }
+        },
+        headers
       });
       
       if (!classificationError && classificationData?.category) {
         messageCategory = classificationData.category;
         console.log(`[useStreamingChat] Message classified as: ${messageCategory} for thread: ${targetThreadId}`);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('[useStreamingChat] Classification failed, using fallback:', error);
+      
+      // Handle auth errors in classification
+      if (isAuthError(error)) {
+        addStreamingMessage({
+          type: 'error',
+          error: 'Authentication failed. Please sign in again.',
+          timestamp: Date.now()
+        }, targetThreadId);
+        return;
+      }
     }
 
     updateThreadState(targetThreadId, { queryCategory: messageCategory });
@@ -702,7 +791,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     });
 
     try {
-      const { data, error } = await invokeWithBackoff({
+      const { data, error } = await invokeWithBackoff('chat-with-rag', {
         message,
         userId,
         threadId: targetThreadId,
@@ -712,6 +801,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
         requestId, // Include request ID for deduplication
         category: messageCategory,
       }, { attempts: 3, baseDelay: 900 }, targetThreadId);
+      
       // Check if request is still active (not superseded by another request)
       const currentThreadState = getThreadState(targetThreadId);
       if (currentThreadState.activeRequestId !== requestId) {
@@ -720,7 +810,14 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
       }
 
       if (error) {
-        if (isEdgeFunctionError(error) || isNetworkError(error)) {
+        if (isAuthError(error)) {
+          addStreamingMessage({
+            type: 'error',
+            error: 'Authentication failed. Please sign in again.',
+            timestamp: Date.now()
+          }, targetThreadId);
+          return;
+        } else if (isEdgeFunctionError(error) || isNetworkError(error)) {
           updateThreadState(targetThreadId, {
             lastFailedMessage: { message, userId, threadId: targetThreadId, conversationContext, userProfile }
           });
@@ -752,13 +849,17 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
         return;
       }
       
+      const errorMsg = isAuthError(err) 
+        ? 'Authentication failed. Please sign in again.' 
+        : err?.message || 'Unknown error occurred';
+      
       addStreamingMessage({
         type: 'error',
-        error: err?.message || 'Unknown error occurred',
+        error: errorMsg,
         timestamp: Date.now()
       }, targetThreadId);
     }
-  }, [threadId, getThreadState, updateThreadState, addStreamingMessage, generateStreamingMessages, invokeWithBackoff, isEdgeFunctionError, isNetworkError, retryLastMessage, createMessageFingerprint, isPageVisible, isAppActive]);
+  }, [threadId, getThreadState, updateThreadState, addStreamingMessage, generateStreamingMessages, invokeWithBackoff, isEdgeFunctionError, isNetworkError, isAuthError, retryLastMessage, createMessageFingerprint, isPageVisible, isAppActive, getAuthHeaders]);
 
   const stopStreaming = useCallback((targetThreadId?: string) => {
     const activeThreadId = targetThreadId || threadId;
