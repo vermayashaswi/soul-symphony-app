@@ -2,7 +2,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 import { OptimizedRagPipeline } from './utils/optimizedPipeline.ts'
-import { SSEStreamManager } from './utils/streamingResponseManager.ts'
+import { SSEStreamManager, createStreamingResponse } from './utils/streamingResponseManager.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -16,6 +16,7 @@ serve(async (req) => {
   }
 
   let streamManager: SSEStreamManager | null = null;
+  let streamingResponse: Response | null = null;
 
   try {
     console.log('[ChatWithRAG] Starting request processing')
@@ -45,8 +46,10 @@ serve(async (req) => {
       throw new Error('Missing required fields: message and userId')
     }
 
-    // Initialize streaming response manager
-    streamManager = new SSEStreamManager()
+    // Initialize streaming response using factory function
+    const { response, controller } = createStreamingResponse()
+    streamingResponse = response
+    streamManager = new SSEStreamManager(controller)
     
     // Initialize optimized RAG pipeline
     const pipeline = new OptimizedRagPipeline(
@@ -59,17 +62,17 @@ serve(async (req) => {
     await pipeline.processQuery(requestData)
 
     // Return the streaming response
-    return streamManager.getResponse()
+    return streamingResponse
 
   } catch (error) {
     console.error('[ChatWithRAG] Error processing request:', error)
     
-    if (streamManager) {
+    if (streamManager && streamingResponse) {
       await streamManager.sendEvent('error', {
         message: error.message || 'An unexpected error occurred',
         type: 'processing_error'
       })
-      return streamManager.getResponse()
+      return streamingResponse
     }
 
     // Fallback error response
