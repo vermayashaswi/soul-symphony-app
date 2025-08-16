@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
@@ -26,6 +25,143 @@ interface QueryPlan {
   databaseContext: string;
 }
 
+// Enhanced vector search debugging function
+async function debugVectorSearch(supabaseClient: any, userId: string, requestId: string) {
+  console.log(`[${requestId}] Starting vector search debugging for user: ${userId}`);
+  
+  try {
+    // Check if user has any journal entries
+    const { data: entries, error: entriesError } = await supabaseClient
+      .from('Journal Entries')
+      .select('id, created_at, user_id')
+      .eq('user_id', userId)
+      .limit(5);
+    
+    if (entriesError) {
+      console.error(`[${requestId}] Error fetching entries:`, entriesError);
+      return { hasEntries: false, error: entriesError.message };
+    }
+    
+    console.log(`[${requestId}] Found ${entries?.length || 0} journal entries for user`);
+    
+    if (!entries || entries.length === 0) {
+      return { hasEntries: false, message: 'No journal entries found' };
+    }
+    
+    // Check if user has any embeddings
+    const { data: embeddings, error: embeddingsError } = await supabaseClient
+      .from('journal_embeddings')
+      .select('id, journal_entry_id, created_at')
+      .in('journal_entry_id', entries.map(e => e.id))
+      .limit(5);
+    
+    if (embeddingsError) {
+      console.error(`[${requestId}] Error fetching embeddings:`, embeddingsError);
+      return { hasEntries: true, hasEmbeddings: false, error: embeddingsError.message };
+    }
+    
+    console.log(`[${requestId}] Found ${embeddings?.length || 0} embeddings for user entries`);
+    
+    return {
+      hasEntries: true,
+      entriesCount: entries.length,
+      hasEmbeddings: embeddings && embeddings.length > 0,
+      embeddingsCount: embeddings?.length || 0,
+      sampleEntryIds: entries.slice(0, 3).map(e => e.id)
+    };
+    
+  } catch (error) {
+    console.error(`[${requestId}] Debug vector search error:`, error);
+    return { hasEntries: false, error: error.message };
+  }
+}
+
+// Enhanced vector search execution with detailed logging
+async function executeVectorSearchWithDebug(step: any, userId: string, supabaseClient: any, requestId: string) {
+  console.log(`[${requestId}] ================ VECTOR SEARCH DEBUG START ================`);
+  
+  try {
+    const queryText = step.vectorSearch.query;
+    console.log(`[${requestId}] Query text: "${queryText}"`);
+    
+    // Generate embedding with detailed logging
+    console.log(`[${requestId}] Generating embedding for query...`);
+    const embedding = await generateEmbedding(queryText);
+    
+    if (!embedding || !Array.isArray(embedding)) {
+      console.error(`[${requestId}] Invalid embedding generated:`, typeof embedding);
+      throw new Error('Failed to generate valid embedding');
+    }
+    
+    console.log(`[${requestId}] Embedding generated successfully:`);
+    console.log(`[${requestId}] - Dimensions: ${embedding.length}`);
+    console.log(`[${requestId}] - Sample values: [${embedding.slice(0, 5).map(n => n.toFixed(4)).join(', ')}...]`);
+    console.log(`[${requestId}] - All values are numbers: ${embedding.every(n => typeof n === 'number' && !isNaN(n))}`);
+    
+    // Enhanced database call with lower threshold for testing
+    const testThreshold = 0.1; // Lower threshold for debugging
+    const testLimit = 15; // More results for debugging
+    
+    console.log(`[${requestId}] Calling match_journal_entries with parameters:`);
+    console.log(`[${requestId}] - query_embedding: [${embedding.length} dimensional vector]`);
+    console.log(`[${requestId}] - match_threshold: ${testThreshold}`);
+    console.log(`[${requestId}] - match_count: ${testLimit}`);
+    console.log(`[${requestId}] - user_id_filter: ${userId}`);
+    
+    const { data, error } = await supabaseClient.rpc('match_journal_entries', {
+      query_embedding: embedding,
+      match_threshold: testThreshold,
+      match_count: testLimit,
+      user_id_filter: userId
+    });
+    
+    if (error) {
+      console.error(`[${requestId}] Vector search RPC error:`, error);
+      console.error(`[${requestId}] Error code: ${error.code}`);
+      console.error(`[${requestId}] Error message: ${error.message}`);
+      console.error(`[${requestId}] Error details:`, JSON.stringify(error.details || {}));
+      throw error;
+    }
+    
+    console.log(`[${requestId}] Vector search completed successfully:`);
+    console.log(`[${requestId}] - Results count: ${data?.length || 0}`);
+    
+    if (data && data.length > 0) {
+      console.log(`[${requestId}] Sample results:`);
+      data.slice(0, 3).forEach((result, idx) => {
+        console.log(`[${requestId}]   Result ${idx + 1}:`);
+        console.log(`[${requestId}]     - Entry ID: ${result.id}`);
+        console.log(`[${requestId}]     - Similarity: ${result.similarity}`);
+        console.log(`[${requestId}]     - Created: ${result.created_at}`);
+        console.log(`[${requestId}]     - Content preview: "${(result.content || '').substring(0, 100)}..."`);
+      });
+    } else {
+      console.warn(`[${requestId}] No vector search results found - this indicates potential issues:`);
+      console.warn(`[${requestId}] - User may have no journal entries with embeddings`);
+      console.warn(`[${requestId}] - Query embedding may not match any stored embeddings`);
+      console.warn(`[${requestId}] - Similarity threshold (${testThreshold}) may still be too high`);
+      
+      // Run debug check
+      const debugInfo = await debugVectorSearch(supabaseClient, userId, requestId);
+      console.log(`[${requestId}] Debug info:`, JSON.stringify(debugInfo, null, 2));
+    }
+    
+    console.log(`[${requestId}] ================ VECTOR SEARCH DEBUG END ================`);
+    return data || [];
+
+  } catch (error) {
+    console.error(`[${requestId}] ================ VECTOR SEARCH ERROR ================`);
+    console.error(`[${requestId}] Vector search execution failed:`, error);
+    console.error(`[${requestId}] Error type:`, error.constructor.name);
+    console.error(`[${requestId}] Error message:`, error.message);
+    if (error.stack) {
+      console.error(`[${requestId}] Stack trace:`, error.stack);
+    }
+    console.error(`[${requestId}] ================ VECTOR SEARCH ERROR END ================`);
+    throw error;
+  }
+}
+
 async function executePlan(plan: any, userId: string, supabaseClient: any, requestId: string) {
   console.log(`[${requestId}] Executing plan:`, JSON.stringify(plan, null, 2));
 
@@ -42,7 +178,7 @@ async function executePlan(plan: any, userId: string, supabaseClient: any, reque
         let stepResult;
         if (step.queryType === 'vector_search') {
           console.log(`[${requestId}] Vector search:`, step.vectorSearch.query);
-          stepResult = await executeVectorSearch(step, userId, supabaseClient, requestId);
+          stepResult = await executeVectorSearchWithDebug(step, userId, supabaseClient, requestId);
         } else if (step.queryType === 'sql_analysis') {
           console.log(`[${requestId}] SQL analysis:`, step.sqlQuery);
           stepResult = await executeSQLAnalysis(step, userId, supabaseClient, requestId);
@@ -67,29 +203,6 @@ async function executePlan(plan: any, userId: string, supabaseClient: any, reque
 
   console.log(`[${requestId}] Execution complete. Results:`, JSON.stringify(results, null, 2));
   return results;
-}
-
-async function executeVectorSearch(step: any, userId: string, supabaseClient: any, requestId: string) {
-  try {
-    const { data, error } = await supabaseClient.rpc('match_journal_entries', {
-      query_embedding: await generateEmbedding(step.vectorSearch.query),
-      match_threshold: step.vectorSearch.threshold || 0.3,
-      match_count: step.vectorSearch.limit || 10,
-      user_id_filter: userId
-    });
-
-    if (error) {
-      console.error(`[${requestId}] Vector search error:`, error);
-      throw error;
-    }
-
-    console.log(`[${requestId}] Vector search results:`, data?.length);
-    return data;
-
-  } catch (error) {
-    console.error(`[${requestId}] Error in vector search:`, error);
-    throw error;
-  }
 }
 
 async function executeSQLAnalysis(step: any, userId: string, supabaseClient: any, requestId: string) {
@@ -118,7 +231,7 @@ async function executeHybridSearch(step: any, userId: string, supabaseClient: an
   try {
     // Execute both vector and SQL searches in parallel
     const [vectorResults, sqlResults] = await Promise.all([
-      executeVectorSearch(step, userId, supabaseClient, requestId),
+      executeVectorSearchWithDebug(step, userId, supabaseClient, requestId),
       executeSQLAnalysis(step, userId, supabaseClient, requestId)
     ]);
 
@@ -144,6 +257,8 @@ async function generateEmbedding(text: string): Promise<number[]> {
     throw new Error('OpenAI API key not configured');
   }
 
+  console.log(`[Embedding] Generating embedding for text length: ${text.length}`);
+
   const response = await fetch('https://api.openai.com/v1/embeddings', {
     method: 'POST',
     headers: {
@@ -152,16 +267,31 @@ async function generateEmbedding(text: string): Promise<number[]> {
     },
     body: JSON.stringify({
       model: 'text-embedding-3-small',
-      input: text,
+      input: text.substring(0, 8000), // Limit to prevent API errors
+      encoding_format: 'float'
     }),
   });
 
   if (!response.ok) {
-    throw new Error(`OpenAI API error: ${response.status}`);
+    const errorText = await response.text();
+    console.error('[Embedding] OpenAI API error:', errorText);
+    throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
   }
 
   const data = await response.json();
-  return data.data[0].embedding;
+  
+  if (!data.data || data.data.length === 0) {
+    throw new Error('Empty embedding data received from OpenAI');
+  }
+
+  const embedding = data.data[0].embedding;
+  
+  if (!Array.isArray(embedding) || embedding.length !== 1536) {
+    throw new Error(`Invalid embedding dimensions: expected 1536, got ${embedding?.length}`);
+  }
+
+  console.log(`[Embedding] Successfully generated embedding with ${embedding.length} dimensions`);
+  return embedding;
 }
 
 /**
@@ -308,7 +438,7 @@ Response format:
           "sqlQuery": "SQL query if needed" or null,
           "vectorSearch": {
             "query": "Semantically rich search query using user's words",
-            "threshold": 0.3,
+            "threshold": 0.1,
             "limit": 15
           } or null,
           "timeRange": {"start": "ISO_DATE", "end": "ISO_DATE", "timezone": "${userTimezone}"} or null
@@ -368,10 +498,13 @@ Response format:
             if (!step.vectorSearch) {
               step.vectorSearch = {
                 query: `${message} personal journal content experiences thoughts feelings`,
-                threshold: 0.3,
+                threshold: 0.1, // Lower threshold for better results
                 limit: 15
               };
               step.queryType = step.queryType === 'sql_analysis' ? 'hybrid_search' : 'vector_search';
+            } else {
+              // Ensure lower threshold for existing vector searches
+              step.vectorSearch.threshold = 0.1;
             }
             // Ensure timezone is included in timeRange
             if (step.timeRange && !step.timeRange.timezone) {
@@ -448,7 +581,7 @@ function createEnhancedFallbackPlan(originalMessage, isContentSeekingQuery, infe
             sqlQuery: null,
             vectorSearch: {
               query: vectorQuery,
-              threshold: 0.3,
+              threshold: 0.1, // Lower threshold for better results
               limit: 15
             },
             timeRange: inferredTimeContext ? { ...inferredTimeContext, timezone: userTimezone } : null
@@ -469,7 +602,7 @@ function createEnhancedFallbackPlan(originalMessage, isContentSeekingQuery, infe
 async function generateDatabaseSchemaContext(supabaseClient: any): Promise<string> {
   try {
     const { data: emotions, error: emotionError } = await supabaseClient
-      .from('Emotions')
+      .from('emotions')
       .select('name, description');
 
     if (emotionError) {
@@ -478,7 +611,7 @@ async function generateDatabaseSchemaContext(supabaseClient: any): Promise<strin
     }
 
     const { data: themes, error: themeError } = await supabaseClient
-      .from('Themes')
+      .from('themes')
       .select('name, description');
 
     if (themeError) {
@@ -498,9 +631,9 @@ async function generateDatabaseSchemaContext(supabaseClient: any): Promise<strin
 DATABASE CONTEXT:
 - The database contains journal entries with text content, emotions, and themes.
 - Each entry is associated with a user ID.
-- The Emotions table contains a list of emotions with descriptions:
+- The emotions table contains a list of emotions with descriptions:
 ${emotionDescriptions}
-- The Themes table contains a list of themes with descriptions:
+- The themes table contains a list of themes with descriptions:
 ${themeDescriptions}
 `;
   } catch (error) {
@@ -549,6 +682,11 @@ serve(async (req) => {
       .eq('user_id', userId);
     
     const userEntryCount = countData || 0;
+    console.log(`[${requestId}] User has ${userEntryCount} journal entries`);
+
+    // Run vector search debugging first
+    const debugInfo = await debugVectorSearch(supabaseClient, userId, requestId);
+    console.log(`[${requestId}] Debug info:`, JSON.stringify(debugInfo, null, 2));
 
     // Generate comprehensive analysis plan with timezone support
     const analysisResult = await analyzeQueryWithSubQuestions(message, conversationContext, userEntryCount, isFollowUp, supabaseClient, userTimezone);
@@ -557,6 +695,7 @@ serve(async (req) => {
       // Return just the plan without execution
       return new Response(JSON.stringify({
         queryPlan: analysisResult,
+        debugInfo,
         timestamp: new Date().toISOString(),
         requestId
       }), {
@@ -570,6 +709,7 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       queryPlan: analysisResult,
       executionResult,
+      debugInfo,
       timestamp: new Date().toISOString(),
       requestId
     }), {
@@ -591,7 +731,7 @@ serve(async (req) => {
             queryType: "vector_search",
             vectorSearch: {
               query: "personal journal experiences thoughts feelings",
-              threshold: 0.3,
+              threshold: 0.1,
               limit: 10
             },
             timeRange: null
