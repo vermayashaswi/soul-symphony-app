@@ -1,4 +1,3 @@
-
 import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 import { v4 as uuidv4 } from 'https://deno.land/std@0.168.0/uuid/mod.ts';
 import { Configuration, OpenAIApi } from "https://esm.sh/openai@3.2.1";
@@ -230,24 +229,25 @@ export async function storeJournalEntry(
 }
 
 /**
- * Stores an embedding in the database
+ * Stores an embedding in the database using the fixed upsert function
  */
 export async function storeEmbedding(supabase: SupabaseClient, entryId: number, content: string, embedding: number[]) {
   try {
-    const { error } = await supabase
-      .rpc('upsert_journal_embedding', {
-        entry_id: entryId,
-        embedding_vector: embedding
-      });
+    console.log('[storeEmbedding] Storing embedding for entry ID:', entryId, 'with dimensions:', embedding.length);
+    
+    const { error } = await supabase.rpc('upsert_journal_embedding', {
+      entry_id: entryId,
+      embedding_vector: embedding
+    });
 
     if (error) {
-      console.error('Error storing embedding:', error);
+      console.error('[storeEmbedding] Error storing embedding:', error);
       throw error;
     }
 
-    console.log('Embedding stored successfully for entry ID:', entryId);
+    console.log('[storeEmbedding] Embedding stored successfully for entry ID:', entryId);
   } catch (error) {
-    console.error('Error in storeEmbedding:', error);
+    console.error('[storeEmbedding] Error in storeEmbedding:', error);
     throw error;
   }
 }
