@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { generateDatabaseSchemaContext } from "../_shared/databaseSchemaContext.ts";
@@ -203,7 +202,23 @@ async function analyzeQueryWithSubQuestions(message, conversationContext, userEn
     const hasPersonalPronouns = /\b(i|me|my|mine|myself)\b/i.test(message.toLowerCase());
     const hasExplicitTimeReference = /\b(last week|yesterday|this week|last month|today|recently|lately|since|started|began)\b/i.test(message.toLowerCase());
     
-    console.log(`[Analyst Agent] Personal pronouns: ${hasPersonalPronouns}, Time reference: ${hasExplicitTimeReference}, Follow-up: ${isFollowUp}`);
+    // Enhanced content-seeking query detection
+    const isContentSeekingQuery = /\b(what.*talking about|what.*discussed|what.*said|tell me about|show me|examples|anecdotes|content|entries)\b/i.test(message.toLowerCase());
+    
+    // Extract time context from conversation if not explicit in current message
+    let inferredTimeContext = null;
+    if (!hasExplicitTimeReference && conversationContext.length > 0) {
+      const recentMessages = conversationContext.slice(-3);
+      for (const msg of recentMessages) {
+        if (msg.content && /\b(last week|this week|yesterday|recently|lately)\b/i.test(msg.content)) {
+          inferredTimeContext = msg.content.match(/\b(last week|this week|yesterday|recently|lately)\b/i)?.[0];
+          console.log(`[Analyst Agent] Inferred time context from conversation: ${inferredTimeContext}`);
+          break;
+        }
+      }
+    }
+    
+    console.log(`[Analyst Agent] Query analysis - Personal pronouns: ${hasPersonalPronouns}, Time reference: ${hasExplicitTimeReference}, Content-seeking: ${isContentSeekingQuery}, Follow-up: ${isFollowUp}`);
 
     // Get live database schema with real themes and emotions
     const databaseSchemaContext = await generateDatabaseSchemaContext(supabase);
@@ -217,6 +232,15 @@ ${databaseSchemaContext}
 - Current year: ${new Date().getFullYear()}
 - User query: "${message}"
 - User has ${userEntryCount} journal entries${contextString}
+- Content-seeking query detected: ${isContentSeekingQuery}
+- Inferred time context: ${inferredTimeContext || 'none'}
+
+**CRITICAL REQUIREMENTS FOR CONTENT-SEEKING QUERIES:**
+When the user asks "what I was talking about" or similar content questions, you MUST:
+1. ALWAYS include at least one vector search step using the user's actual question as the query
+2. Use hybrid strategy combining both SQL statistics AND vector content retrieval
+3. Apply time filtering if any time context is mentioned or inferred
+4. Ensure vector searches use semantic similarity, not generic clustering queries
 
 **YOUR RESPONSIBILITIES AS ANALYST AGENT:**
 1. Smart Hypothesis Formation: infer what the user truly wants to know, then deduce focused sub-questions to answer it comprehensively
@@ -244,7 +268,7 @@ Return ONLY valid JSON with this exact structure:
           "queryType": "sql_analysis" | "vector_search" | "sql_count" | "sql_calculation",
           "sqlQuery": "SELECT ... FROM \"Journal Entries\" WHERE user_id = $user_id AND ..." | null,
           "vectorSearch": {
-            "query": "optimized search query",
+            "query": "Use the actual user question or specific semantic search terms",
             "threshold": 0.3,
             "limit": 10
           } | null,
@@ -277,12 +301,18 @@ Return ONLY valid JSON with this exact structure:
 - For date filtering: apply created_at comparisons when time is implied or stated
 - Do NOT call RPCs; generate plain SQL only
 
+**VECTOR SEARCH GUIDELINES:**
+- Use the user's actual question or semantically similar terms as the vector query
+- For content-seeking queries, use search terms that will find relevant journal content
+- Set appropriate thresholds (0.2-0.4 range typically works best)
+- Include time filtering in vector searches when time context is present
+
 **SEARCH STRATEGY SELECTION:**
 - sql_primary: statistical analysis, counts, percentages
-- vector_primary: semantic content analysis, similar entries
-- hybrid: combine both when needed
+- vector_primary: semantic content analysis, similar entries, content retrieval
+- hybrid: combine both when user wants both statistics AND content examples
 
-Focus on creating comprehensive, executable analysis plans that will provide meaningful insights.`;
+Focus on creating comprehensive, executable analysis plans that will provide meaningful insights with actual content when requested.`;
 
     const promptFunction = () => fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -295,7 +325,7 @@ Focus on creating comprehensive, executable analysis plans that will provide mea
         messages: [
           {
             role: "system", 
-            content: "You are SOULo's Analyst Agent. Respond only with valid JSON analysis plans."
+            content: "You are SOULo's Analyst Agent. Respond only with valid JSON analysis plans. For content-seeking queries, ALWAYS include vector search steps."
           },
           {
             role: "user",
@@ -313,22 +343,126 @@ Focus on creating comprehensive, executable analysis plans that will provide mea
     const analysisResult = extractAndParseJSON(content, message);
 
     if (!analysisResult || !analysisResult.subQuestions) {
-      console.error("Failed to parse Analyst Agent response, using fallback");
-      return createFallbackPlan(message);
+      console.error("Failed to parse Analyst Agent response, using enhanced fallback for content queries");
+      return createEnhancedFallbackPlan(message, isContentSeekingQuery, inferredTimeContext);
     }
 
     // Enhance with detected characteristics
     analysisResult.hasPersonalPronouns = hasPersonalPronouns;
     analysisResult.hasExplicitTimeReference = hasExplicitTimeReference;
     analysisResult.useAllEntries = hasPersonalPronouns && !hasExplicitTimeReference;
+    analysisResult.inferredTimeContext = inferredTimeContext;
 
     console.log("Final Analyst Plan:", JSON.stringify(analysisResult, null, 2));
     return analysisResult;
 
   } catch (error) {
     console.error("Error in Analyst Agent:", error);
-    return createFallbackPlan(message);
+    return createEnhancedFallbackPlan(message, isContentSeekingQuery, inferredTimeContext);
   }
+}
+
+/**
+ * Create enhanced fallback plan with vector search for content queries
+ */
+function createEnhancedFallbackPlan(originalMessage, isContentSeekingQuery, inferredTimeContext) {
+  const lowerMessage = originalMessage.toLowerCase();
+  const isEmotionQuery = /emotion|feel|mood|happy|sad|anxious|stressed/.test(lowerMessage);
+  const isThemeQuery = /work|relationship|family|health|goal|travel/.test(lowerMessage);
+  const hasPersonalPronouns = /\b(i|me|my|mine)\b/i.test(originalMessage);
+
+  // Enhanced fallback for content-seeking queries
+  if (isContentSeekingQuery) {
+    const contentSubQuestion = {
+      question: "What content and themes appear in my journal entries?",
+      purpose: "Retrieve actual journal content to show what the user was discussing",
+      searchStrategy: "hybrid",
+      executionStage: 1,
+      analysisSteps: [
+        {
+          step: 1,
+          description: "Search for relevant journal content using semantic similarity",
+          queryType: "vector_search",
+          sqlQuery: null,
+          vectorSearch: {
+            query: originalMessage.includes("talking about") ? "journal topics content themes discussions" : originalMessage,
+            threshold: 0.25,
+            limit: 15
+          },
+          timeRange: inferredTimeContext ? {
+            start: inferredTimeContext === "last week" ? new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString() : null,
+            end: null
+          } : null
+        },
+        {
+          step: 2,
+          description: "Get theme frequency statistics to complement content",
+          queryType: "sql_analysis",
+          sqlQuery: 'SELECT unnest(master_themes) AS theme, COUNT(*) AS frequency FROM "Journal Entries" WHERE user_id = $user_id GROUP BY theme ORDER BY frequency DESC LIMIT 8',
+          vectorSearch: null,
+          timeRange: null
+        }
+      ]
+    };
+
+    return {
+      queryType: "journal_specific",
+      strategy: "intelligent_sub_query",
+      userStatusMessage: "Finding your journal content",
+      subQuestions: [contentSubQuestion],
+      confidence: 0.7,
+      reasoning: "Enhanced fallback with vector search for content retrieval and theme analysis",
+      useAllEntries: hasPersonalPronouns,
+      hasPersonalPronouns,
+      hasExplicitTimeReference: false,
+      inferredTimeContext
+    };
+  }
+
+  // Original fallback logic for non-content queries
+  const subQuestion = {
+    question: isEmotionQuery 
+      ? "What emotional patterns emerge from my journal entries?"
+      : "What key themes and insights can be found in my journal entries?",
+    purpose: "Analyze journal data to provide personalized insights",
+    searchStrategy: "hybrid",
+    executionStage: 1,
+    analysisSteps: [
+      {
+        step: 1,
+        description: "Retrieve relevant journal entries using semantic search",
+        queryType: "vector_search",
+        sqlQuery: null,
+        vectorSearch: {
+          query: isEmotionQuery ? "emotions, feelings, mood" : "themes, insights, patterns",
+          threshold: 0.3,
+          limit: 10
+        }
+      },
+      {
+        step: 2,
+        description: isEmotionQuery 
+          ? "Analyze emotion patterns and frequencies"
+          : "Analyze theme distributions and patterns",
+        queryType: "sql_analysis",
+        sqlQuery: isEmotionQuery
+          ? "SELECT emotion_key, AVG((emotion_value)::numeric) as avg_score FROM \"Journal Entries\", jsonb_each(emotions) WHERE user_id = $user_id GROUP BY emotion_key ORDER BY avg_score DESC LIMIT 10"
+          : "SELECT theme, COUNT(*) as frequency FROM (SELECT unnest(master_themes) as theme FROM \"Journal Entries\" WHERE user_id = $user_id) t GROUP BY theme ORDER BY frequency DESC LIMIT 10"
+      }
+    ]
+  };
+
+  return {
+    queryType: "journal_specific",
+    strategy: "intelligent_sub_query",
+    userStatusMessage: "Analyzing your journal patterns",
+    subQuestions: [subQuestion],
+    confidence: 0.6,
+    reasoning: "Fallback analysis plan with hybrid search strategy",
+    useAllEntries: hasPersonalPronouns,
+    hasPersonalPronouns,
+    hasExplicitTimeReference: false
+  };
 }
 
 // Helper: derive time range hints from SQL WHERE clauses
@@ -525,7 +659,10 @@ async function executePlan(plan, userId, normalizedTimeRange, supabaseClient) {
 
         if (step.queryType === 'vector_search' && step.vectorSearch) {
           try {
+            console.log(`[executePlan] Generating embedding for vector search: "${step.vectorSearch.query}"`);
             const queryEmbedding = await generateEmbedding(step.vectorSearch.query);
+            console.log(`[executePlan] Embedding generated successfully with ${queryEmbedding.length} dimensions`);
+            
             const useDated = !!(stepTimeRange && (stepTimeRange.start || stepTimeRange.end));
             const rpcName = useDated ? 'match_journal_entries_with_date' : 'match_journal_entries';
 
@@ -539,11 +676,26 @@ async function executePlan(plan, userId, normalizedTimeRange, supabaseClient) {
             if (useDated) {
               rpcArgs.start_date = stepTimeRange?.start || null;
               rpcArgs.end_date = stepTimeRange?.end || null;
+              console.log(`[executePlan] Using time-filtered vector search: ${stepTimeRange?.start} to ${stepTimeRange?.end}`);
             }
+
+            console.log(`[executePlan] Calling ${rpcName} with threshold ${rpcArgs.match_threshold}, limit ${rpcArgs.match_count}`);
 
             const { data: vectorData, error: vectorError } = await supabaseClient.rpc(rpcName, rpcArgs);
 
-            if (vectorError) return { kind: 'vector', ok: false, error: vectorError.message };
+            if (vectorError) {
+              console.error(`[executePlan] Vector search error:`, vectorError);
+              return { kind: 'vector', ok: false, error: vectorError.message };
+            }
+
+            console.log(`[executePlan] Vector search returned ${vectorData?.length || 0} results`);
+            if (vectorData && vectorData.length > 0) {
+              console.log(`[executePlan] Sample vector result:`, {
+                id: vectorData[0].id,
+                similarity: vectorData[0].similarity,
+                content_preview: vectorData[0].content?.slice(0, 100)
+              });
+            }
 
             return {
               kind: 'vector',
@@ -552,6 +704,7 @@ async function executePlan(plan, userId, normalizedTimeRange, supabaseClient) {
               timeRange: stepTimeRange
             };
           } catch (e) {
+            console.error(`[executePlan] Vector search execution error:`, e);
             return { kind: 'vector', ok: false, error: e.message };
           }
         }
@@ -569,6 +722,7 @@ async function executePlan(plan, userId, normalizedTimeRange, supabaseClient) {
 
         return { kind: 'unknown', ok: false, error: 'Unknown or missing step configuration' };
       } catch (err) {
+        console.error(`[executePlan] Step execution error:`, err);
         return { kind: 'unknown', ok: false, error: err.message };
       }
     });
@@ -600,6 +754,8 @@ async function executePlan(plan, userId, normalizedTimeRange, supabaseClient) {
     const vectorBasedPercentage = totalCount > 0 ? Math.round((vectorIds.size / totalCount) * 1000) / 10 : 0;
     const finalPercentage = sqlPercentage ?? vectorBasedPercentage;
     const finalCount = sqlCountValue ?? vectorIds.size;
+
+    console.log(`[executePlan] Sub-question results: ${sqlResults.length} SQL rows, ${vectorResults.length} vector entries`);
 
     return {
       subQuestion: {
@@ -657,8 +813,11 @@ async function executePlan(plan, userId, normalizedTimeRange, supabaseClient) {
     const vectorCount = result.executionResults?.vectorResults?.length || 0;
     console.log(`[RESULT SUMMARY] ${executionMetadata.requestId} #${idx + 1}: ${sqlCount} SQL rows, ${vectorCount} vector results`);
 
+    if (vectorCount > 0) {
+      console.log(`[VECTOR SAMPLE] ${executionMetadata.requestId} #${idx + 1}:`, JSON.stringify(result.executionResults.vectorResults.slice(0, 2), null, 2));
+    }
     if (sqlCount > 0) {
-      console.log(`[SAMPLE DATA] ${executionMetadata.requestId} #${idx + 1}:`, JSON.stringify(result.executionResults.sqlResults.slice(0, 2), null, 2));
+      console.log(`[SQL SAMPLE] ${executionMetadata.requestId} #${idx + 1}:`, JSON.stringify(result.executionResults.sqlResults.slice(0, 2), null, 2));
     }
   });
 
