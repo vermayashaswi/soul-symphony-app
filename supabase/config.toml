@@ -1,16 +1,15 @@
 
-# A string used to distinguish different Supabase projects on the same host. Defaults to the working
-# directory name when running `supabase init`.
 project_id = "kwnwhgucnzqxndzjayyq"
 
 [api]
 enabled = true
 port = 54321
-schemas = ["public", "storage", "graphql_public"]
+schemas = ["public", "graphql_public"]
 extra_search_path = ["public", "extensions"]
 max_rows = 1000
 
 [db]
+enabled = true
 port = 54322
 shadow_port = 54320
 major_version = 15
@@ -24,66 +23,64 @@ max_client_conn = 100
 
 [realtime]
 enabled = true
-webhook_port = 54323
+ip_version = "ipv4"
+port = 54323
+secure_port = 54324
 
 [studio]
 enabled = true
-port = 54324
-api_url = "https://supabase.lovable.dev"
+api_url = "http://127.0.0.1:54321"
+port = 54323
 
 [inbucket]
-enabled = false
-port = 54325
+enabled = true
+port = 54324
+pop3_port = 54325
+smtp_port = 54326
 
 [storage]
-enabled = false
-port = 54328
+enabled = true
+file_size_limit = "50MiB"
+image_transformation = true
 
-[functions]
-port = 54326
-serve_port = 54327
+[auth]
+enabled = true
+site_url = "http://127.0.0.1:3000"
+additional_redirect_urls = ["https://127.0.0.1:3000"]
+jwt_expiry = 3600
+enable_signup = true
+enable_anonymous_sign_ins = false
 
-# Enhanced intelligent edge functions with database schema awareness
-[functions.chat-query-classifier]
-verify_jwt = true
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = false
 
-[functions.intelligent-query-planner]
-verify_jwt = true
+[edge_runtime]
+enabled = true
+port = 54327
+inspector_port = 54328
 
-[functions.gpt-search-orchestrator]
-verify_jwt = true
-
-[functions.intelligent-response-generator]
-verify_jwt = true
-
-[functions.gpt-master-orchestrator]
-verify_jwt = true
-
-[functions.translate-text]
-verify_jwt = false
-
-# RevenueCat integration edge functions
-[functions.revenuecat-webhook]
-verify_jwt = false
-
-[functions.revenuecat-init]
-verify_jwt = true
-
-[functions.revenuecat-purchase]
-verify_jwt = true
-
-# Enhanced GPT-driven RAG pipeline functions
-[functions.gpt-analysis-orchestrator]
-verify_jwt = true
-
-[functions.gpt-response-consolidator]
-verify_jwt = true
-
-[functions.chat-with-rag]
+[functions.transcribe-audio]
 verify_jwt = true
 
 [functions.smart-query-planner]
 verify_jwt = true
 
-[functions.generate-streaming-messages]
+[functions.chat-with-rag]
+verify_jwt = true
+
+[functions.gpt-response-consolidator]
+verify_jwt = false
+
+[functions.generate-analysis-themes]
+verify_jwt = true
+
+[functions.generate-emotions-for-entries]
+verify_jwt = true
+
+[functions.sentiment-analysis-batcher]
+verify_jwt = true
+
+[functions.ensure-chat-persistence]
 verify_jwt = true

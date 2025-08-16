@@ -192,12 +192,13 @@ serve(async (req) => {
     }
     
     // Extract validated parameters - userId comes from authenticated JWT token
-    const { highQuality = true, directTranscription = false, recordingTime = null } = requestData;
+    const { highQuality = true, directTranscription = false, recordingTime = null, chatMode = false } = requestData;
     const actualAudioData = requestData.audio || requestData.audioData;
     const userId = userContext.userId; // Use authenticated user ID, not request data
     
     console.log("=== FIXED REQUEST PARAMETERS ===");
     console.log(`Authenticated User ID: ${userId}`);
+    console.log(`Chat mode: ${chatMode ? 'YES (skip journal entry)' : 'NO (create journal entry)'}`);
     console.log(`Direct transcription mode: ${directTranscription ? 'YES' : 'NO'}`);
     console.log(`High quality mode: ${highQuality ? 'YES' : 'NO'}`);
     console.log(`Audio data length: ${actualAudioData?.length || 0}`);
@@ -213,15 +214,19 @@ serve(async (req) => {
     
     logMemoryUsage('request-validated');
 
-    // Step 5: Enhanced user profile management
-    processingStage = 'profile-management';
-    try {
-      await createProfileIfNeeded(supabaseAdmin, userId, timezone);
-      console.log("FIXED: User profile validated/created");
-    } catch (error) {
-      console.error("FIXED: Profile management failed:", error);
-      // Don't fail the entire process for profile issues
-      console.warn("FIXED: Continuing without profile validation");
+    // Step 5: Enhanced user profile management (skip for chat mode)
+    if (!chatMode) {
+      processingStage = 'profile-management';
+      try {
+        await createProfileIfNeeded(supabaseAdmin, userId, timezone);
+        console.log("FIXED: User profile validated/created");
+      } catch (error) {
+        console.error("FIXED: Profile management failed:", error);
+        // Don't fail the entire process for profile issues
+        console.warn("FIXED: Continuing without profile validation");
+      }
+    } else {
+      console.log("FIXED: Skipping profile management for chat mode");
     }
 
     // Step 6: Enhanced audio processing with memory management
@@ -273,24 +278,29 @@ serve(async (req) => {
       console.log(`FIXED: Estimated duration from audio size: ${durationSeconds}s`);
     }
 
-    // Step 8: Enhanced audio file storage with error handling
+    // Step 8: Enhanced audio file storage with error handling (skip for chat mode)
     processingStage = 'file-storage';
-    const timestamp = Date.now();
-    const fileName = `journal-entry-${userId}-${timestamp}.${detectedFileType}`;
-    
     let audioUrl: string | null = null;
-    try {
-      console.log(`FIXED: Storing audio file ${fileName} with size ${bytes.length} bytes`);
-      audioUrl = await storeAudioFile(supabaseAdmin, bytes, fileName, detectedFileType);
+    
+    if (!chatMode) {
+      const timestamp = Date.now();
+      const fileName = `journal-entry-${userId}-${timestamp}.${detectedFileType}`;
       
-      if (audioUrl) {
-        console.log(`FIXED: File uploaded successfully: ${audioUrl}`);
-      } else {
-        console.warn('FIXED: File storage failed, continuing without URL');
+      try {
+        console.log(`FIXED: Storing audio file ${fileName} with size ${bytes.length} bytes`);
+        audioUrl = await storeAudioFile(supabaseAdmin, bytes, fileName, detectedFileType);
+        
+        if (audioUrl) {
+          console.log(`FIXED: File uploaded successfully: ${audioUrl}`);
+        } else {
+          console.warn('FIXED: File storage failed, continuing without URL');
+        }
+      } catch (storageError) {
+        console.error('FIXED: Audio storage failed:', storageError);
+        console.warn('FIXED: Continuing without audio URL');
       }
-    } catch (storageError) {
-      console.error('FIXED: Audio storage failed:', storageError);
-      console.warn('FIXED: Continuing without audio URL');
+    } else {
+      console.log("FIXED: Skipping audio file storage for chat mode");
     }
     
     logMemoryUsage('after-file-storage');
@@ -335,6 +345,21 @@ serve(async (req) => {
     }
     
     logMemoryUsage('after-transcription');
+
+    // CHAT MODE: Return early with just transcription
+    if (chatMode) {
+      console.log('FIXED: Chat mode detected, returning transcription only');
+      const totalTime = Date.now() - startTime;
+      
+      return new Response(JSON.stringify({
+        transcription: transcribedText,
+        duration: durationSeconds,
+        processingTime: totalTime,
+        success: true
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     // Enhanced direct transcription mode response
     if (directTranscription) {

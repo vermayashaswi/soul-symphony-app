@@ -1,10 +1,12 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Mic, ArrowUp, X, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useVoiceRecorder } from '@/hooks/use-voice-recorder';
 import { useAuth } from '@/contexts/AuthContext';
-import { processRecording } from '@/utils/audio-processing';
+import { processChatVoiceRecording } from '@/utils/chat-audio-processing';
+import { normalizeAudioBlob, validateAudioBlob, blobToBase64 } from '@/utils/audio/blob-utils';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -67,7 +69,7 @@ export function VoiceChatRecorder({
 }: VoiceChatRecorderProps) {
   const [recordingState, setRecordingState] = useState<RecordingState>('idle');
   const [audioLevel, setAudioLevel] = useState(0);
-  const [processingTempId, setProcessingTempId] = useState<string | null>(null);
+  const [isCancelled, setIsCancelled] = useState(false);
   const { user } = useAuth();
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -84,58 +86,12 @@ export function VoiceChatRecorder({
     onError: (error) => {
       console.error('[VoiceChatRecorder] Recording error:', error);
       setRecordingState('error');
+      setIsCancelled(false);
       toast.error('Recording failed. Please try again.');
       setTimeout(() => setRecordingState('idle'), 2000);
     },
     maxDuration: 120
   });
-
-  // Listen for processing completion events (like the journal does)
-  useEffect(() => {
-    const handleProcessingCompleted = (event: CustomEvent) => {
-      const { tempId, entryId } = event.detail;
-      
-      if (tempId === processingTempId) {
-        console.log('[VoiceChatRecorder] Processing completed for tempId:', tempId);
-        setProcessingTempId(null);
-        setRecordingState('idle');
-        
-        // We'll get the transcription from the entryContentReady event
-      }
-    };
-
-    const handleEntryContentReady = (event: CustomEvent) => {
-      const { tempId, content } = event.detail;
-      
-      if (tempId === processingTempId && content) {
-        console.log('[VoiceChatRecorder] Content ready:', content);
-        onTranscriptionComplete(content.trim());
-        clearRecording();
-      }
-    };
-
-    const handleProcessingFailed = (event: CustomEvent) => {
-      const { tempId, error } = event.detail;
-      
-      if (tempId === processingTempId) {
-        console.error('[VoiceChatRecorder] Processing failed:', error);
-        setRecordingState('error');
-        setProcessingTempId(null);
-        toast.error(`Transcription failed: ${error}`);
-        setTimeout(() => setRecordingState('idle'), 2000);
-      }
-    };
-
-    window.addEventListener('processingEntryCompleted', handleProcessingCompleted as EventListener);
-    window.addEventListener('entryContentReady', handleEntryContentReady as EventListener);
-    window.addEventListener('processingEntryFailed', handleProcessingFailed as EventListener);
-
-    return () => {
-      window.removeEventListener('processingEntryCompleted', handleProcessingCompleted as EventListener);
-      window.removeEventListener('entryContentReady', handleEntryContentReady as EventListener);
-      window.removeEventListener('processingEntryFailed', handleProcessingFailed as EventListener);
-    };
-  }, [processingTempId, onTranscriptionComplete, clearRecording]);
 
   // Real-time audio level detection
   const setupAudioAnalysis = async (stream: MediaStream) => {
@@ -180,6 +136,14 @@ export function VoiceChatRecorder({
   };
 
   async function handleRecordingComplete(audioBlob: Blob) {
+    // Don't process if recording was cancelled
+    if (isCancelled) {
+      console.log('[VoiceChatRecorder] Recording was cancelled, skipping processing');
+      setRecordingState('idle');
+      setIsCancelled(false);
+      return;
+    }
+
     if (!user?.id) {
       toast.error('Please sign in to use voice recording');
       return;
@@ -189,22 +153,60 @@ export function VoiceChatRecorder({
       setRecordingState('processing');
       cleanupAudioAnalysis();
       
-      console.log('[VoiceChatRecorder] Starting processing using journal methodology');
+      console.log('[VoiceChatRecorder] Starting chat transcription with blob:', {
+        size: audioBlob.size,
+        type: audioBlob.type,
+        hasDuration: 'duration' in audioBlob
+      });
       
-      // Use the journal's exact processing methodology
-      const result = await processRecording(audioBlob, user.id);
-      
-      if (result.success && result.tempId) {
-        console.log('[VoiceChatRecorder] Processing initiated with tempId:', result.tempId);
-        setProcessingTempId(result.tempId);
-        // Keep processing state - will be cleared when processing completes
-      } else {
-        throw new Error(result.error || 'Failed to start processing');
+      // Add the same validation and normalization as journal
+      const validation = validateAudioBlob(audioBlob);
+      if (!validation.isValid) {
+        throw new Error(validation.errorMessage || 'Invalid audio data');
       }
-    } catch (error) {
+      
+      // Normalize the audio blob
+      let normalizedBlob: Blob;
+      try {
+        normalizedBlob = await normalizeAudioBlob(audioBlob);
+        console.log('[VoiceChatRecorder] Audio blob normalized:', {
+          type: normalizedBlob.type,
+          size: normalizedBlob.size,
+          hasDuration: 'duration' in normalizedBlob
+        });
+      } catch (error) {
+        console.error('[VoiceChatRecorder] Error normalizing audio:', error);
+        throw new Error('Error processing audio. Please try again.');
+      }
+      
+      // Test base64 conversion
+      try {
+        const base64Test = await blobToBase64(normalizedBlob);
+        console.log('[VoiceChatRecorder] Base64 test successful, length:', base64Test.length);
+        
+        if (base64Test.length < 50) {
+          throw new Error('Audio data appears too short or invalid');
+        }
+      } catch (error) {
+        console.error('[VoiceChatRecorder] Base64 test failed:', error);
+        throw new Error('Error preparing audio for processing');
+      }
+      
+      // Use chat-specific processing - no journal entries
+      const result = await processChatVoiceRecording(normalizedBlob, user.id);
+      
+      if (result.success && result.transcription) {
+        console.log('[VoiceChatRecorder] Chat transcription successful:', result.transcription);
+        onTranscriptionComplete(result.transcription.trim());
+        clearRecording();
+        setRecordingState('idle');
+      } else {
+        throw new Error(result.error || 'Failed to transcribe audio');
+      }
+    } catch (error: any) {
       console.error('[VoiceChatRecorder] Processing error:', error);
       setRecordingState('error');
-      toast.error(`Processing failed: ${error.message}`);
+      toast.error(`Transcription failed: ${error.message}`);
       setTimeout(() => setRecordingState('idle'), 2000);
     }
   }
@@ -212,6 +214,7 @@ export function VoiceChatRecorder({
   const handleStartRecording = async () => {
     try {
       setRecordingState('recording');
+      setIsCancelled(false);
       
       // Get user media for audio analysis
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -232,6 +235,8 @@ export function VoiceChatRecorder({
   };
 
   const handleCancelRecording = () => {
+    console.log('[VoiceChatRecorder] Cancelling recording...');
+    setIsCancelled(true);
     stopRecording();
     clearRecording();
     cleanupAudioAnalysis();
@@ -257,15 +262,15 @@ export function VoiceChatRecorder({
   const isError = recordingState === 'error';
 
   return (
-    <div className={cn("relative w-full h-full", className)}>
-      {/* Recording Overlay - Replaces the entire input */}
+    <div className={cn("relative", className)}>
+      {/* Recording Overlay - Only covers microphone button area, not entire input */}
       <AnimatePresence>
         {isRecording && (
           <motion.div
             initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.98 }}
-            className="absolute inset-0 bg-background border border-input rounded-md flex items-center px-3 z-20"
+            className="absolute right-0 top-0 h-full bg-background border border-input rounded-md flex items-center px-3 z-30 min-w-[200px]"
           >
             {/* Cancel Button (X) */}
             <Button
@@ -302,7 +307,7 @@ export function VoiceChatRecorder({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 bg-background border border-input rounded-md flex items-center justify-center z-20"
+            className="absolute right-0 top-0 h-full bg-background border border-input rounded-md flex items-center justify-center z-30 min-w-[150px] px-3"
           >
             <div className="flex items-center space-x-2 text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
