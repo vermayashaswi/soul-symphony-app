@@ -261,7 +261,7 @@ serve(async (req) => {
         }
         
         plannerData = gptPlan;
-        enhancedQueryPlan = gptPlan.queryPlan;
+        enhancedQueryPlan = gptPlan.plan;
         console.log('[chat-with-rag] Using GPT-generated query plan:', enhancedQueryPlan);
       } catch (error) {
         console.error('[chat-with-rag] GPT planner failed:', error);
@@ -275,7 +275,7 @@ serve(async (req) => {
       
       if (shouldUseGptAnalysis) {
         // Use researchResults returned by smart-query-planner (executed plan)
-        const researchResults = plannerData?.researchResults;
+        const researchResults = plannerData?.results;
         if (!researchResults || !Array.isArray(researchResults)) {
           throw new Error('Analysis execution failed: missing researchResults');
         }
@@ -374,7 +374,7 @@ serve(async (req) => {
 
         const reply = (typeof generalResponse?.response === 'string' && generalResponse.response.trim())
           ? generalResponse.response.trim()
-          : "I’m here to support your mental health journey. Could you share a bit more so I can respond meaningfully?";
+          : "I'm here to support your mental health journey. Could you share a bit more so I can respond meaningfully?";
 
         // Persist assistant message idempotently for general responses
         if (threadId) {
@@ -697,7 +697,7 @@ async function processStreamingPipeline(
         throw new Error(`GPT planner error: ${plannerError.message}`);
       }
       
-      const enhancedQueryPlan = gptPlan.queryPlan;
+      const enhancedQueryPlan = gptPlan.plan;
       
       // Check for user status message from query planner
       if (gptPlan.userStatusMessage) {
@@ -707,7 +707,7 @@ async function processStreamingPipeline(
       // Step 3: Analysis execution (already performed by smart-query-planner)
       streamManager.sendBackendTask("Searching your journal...", "Looking through journal entries");
 
-      const researchResults = gptPlan.researchResults;
+      const researchResults = gptPlan.results;
       if (!researchResults || !Array.isArray(researchResults)) {
         throw new Error('Analysis execution failed: missing researchResults');
       }
@@ -813,7 +813,7 @@ async function processStreamingPipeline(
 
         const reply = (typeof generalResponse?.response === 'string' && generalResponse.response.trim())
           ? generalResponse.response.trim()
-          : "I’m here to support your mental health journey. Could you share a bit more so I can respond meaningfully?";
+          : "I'm here to support your mental health journey. Could you share a bit more so I can respond meaningfully?";
 
         // Persist assistant message idempotently (streaming general)
         if (threadId) {
