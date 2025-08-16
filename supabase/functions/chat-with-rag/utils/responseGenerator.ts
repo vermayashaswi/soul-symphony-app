@@ -1,4 +1,3 @@
-
 // Enhanced conversational SOULo response generation with database-aware theme/emotion context
 import { CacheManager } from './cacheManager.ts';
 import { OptimizedApiClient } from './optimizedApiClient.ts';
@@ -227,16 +226,28 @@ export async function generateResponse(
     const contextMessages = Array.isArray(conversationContext) ? conversationContext.slice(-8) : [];
     console.log(`[responseGenerator] Using ${contextMessages.length} conversation messages with database context`);
     
-    // Generate response with enhanced database-aware conversational formatting and performance optimization
-    const performanceMode = contextMessages.length > 8 ? 'fast' : 'balanced';
+    // Build messages array for the completion call
+    const messages = [];
     
-    const response = await OptimizedApiClient.generateResponseOptimized(
-      systemPrompt,
-      userPrompt,
-      contextMessages,
+    // Add system prompt
+    messages.push({ role: 'system', content: systemPrompt });
+    
+    // Add conversation context
+    if (contextMessages.length > 0) {
+      messages.push(...contextMessages);
+    }
+    
+    // Add current user prompt
+    messages.push({ role: 'user', content: userPrompt });
+    
+    // Generate response using the correct OptimizedApiClient method
+    const response = await OptimizedApiClient.generateCompletion(
+      messages,
       openAiApiKey,
-      isAnalyticalQuery,
-      performanceMode
+      {
+        model: 'gpt-5-2025-08-07',
+        maxTokens: 1000
+      }
     );
     
     // Cache the response
