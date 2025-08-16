@@ -1,6 +1,7 @@
 
-// Enhanced dual search orchestrator with proper vector search integration
+// Dual search orchestrator for combined vector and SQL search execution
 import { searchWithStrategy } from './searchService.ts';
+import { CacheManager } from './cacheManager.ts';
 import { OptimizedApiClient } from './optimizedApiClient.ts';
 
 export class DualSearchOrchestrator {
@@ -13,26 +14,29 @@ export class DualSearchOrchestrator {
     message: string
   ): Promise<{ vectorResults: any[], sqlResults: any[], combinedResults: any[] }> {
     console.log('[DualSearchOrchestrator] Executing parallel vector and SQL search');
-    console.log(`[DualSearchOrchestrator] Query embedding dimensions: ${queryEmbedding?.length || 'none'}`);
     
     try {
-      // Validate embedding
-      if (!OptimizedApiClient.validateEmbedding(queryEmbedding)) {
-        console.error('[DualSearchOrchestrator] Invalid embedding provided, falling back to SQL-only search');
-        const sqlResults = await this.executeSQLBasedSearch(supabase, userId, queryPlan, message);
-        return {
-          vectorResults: [],
-          sqlResults,
-          combinedResults: sqlResults
-        };
-      }
-
       // Execute both searches in parallel
       const [vectorResults, sqlResults] = await Promise.all([
-        // Vector search with proper embedding
-        this.executeVectorSearch(supabase, userId, queryEmbedding, queryPlan),
+        // Vector search
+        searchWithStrategy(
+          supabase,
+          userId,
+          queryEmbedding,
+          'vector',
+          queryPlan.filters?.timeRange,
+          queryPlan.filters?.themes,
+          queryPlan.filters?.entities,
+          queryPlan.filters?.emotions,
+          15
+        ),
         // SQL-based search (theme/entity focused)
-        this.executeSQLBasedSearch(supabase, userId, queryPlan, message)
+        this.executeSQLBasedSearch(
+          supabase,
+          userId,
+          queryPlan,
+          message
+        )
       ]);
 
       // Combine and deduplicate results
@@ -47,18 +51,7 @@ export class DualSearchOrchestrator {
       };
     } catch (error) {
       console.error('[DualSearchOrchestrator] Error in parallel search:', error);
-      // Fallback to SQL-only search
-      try {
-        const sqlResults = await this.executeSQLBasedSearch(supabase, userId, queryPlan, message);
-        return {
-          vectorResults: [],
-          sqlResults,
-          combinedResults: sqlResults
-        };
-      } catch (fallbackError) {
-        console.error('[DualSearchOrchestrator] Fallback SQL search also failed:', fallbackError);
-        throw fallbackError;
-      }
+      throw error;
     }
   }
 
@@ -73,12 +66,17 @@ export class DualSearchOrchestrator {
     
     try {
       // Execute vector search first
-      let vectorResults: any[] = [];
-      if (OptimizedApiClient.validateEmbedding(queryEmbedding)) {
-        vectorResults = await this.executeVectorSearch(supabase, userId, queryEmbedding, queryPlan);
-      } else {
-        console.warn('[DualSearchOrchestrator] Invalid embedding, skipping vector search');
-      }
+      const vectorResults = await searchWithStrategy(
+        supabase,
+        userId,
+        queryEmbedding,
+        'vector',
+        queryPlan.filters?.timeRange,
+        queryPlan.filters?.themes,
+        queryPlan.filters?.entities,
+        queryPlan.filters?.emotions,
+        15
+      );
 
       // Execute SQL search with vector results context
       const sqlResults = await this.executeSQLBasedSearch(
@@ -105,43 +103,6 @@ export class DualSearchOrchestrator {
     }
   }
 
-  private static async executeVectorSearch(
-    supabase: any,
-    userId: string,
-    queryEmbedding: number[],
-    queryPlan: any
-  ): Promise<any[]> {
-    try {
-      console.log('[DualSearchOrchestrator] Executing vector search');
-      
-      // Use the enhanced search service with proper vector strategy
-      const results = await searchWithStrategy(
-        supabase,
-        userId,
-        queryEmbedding,
-        'vector',
-        queryPlan.filters?.timeRange,
-        queryPlan.filters?.themes,
-        queryPlan.filters?.entities,
-        queryPlan.filters?.emotions,
-        20 // Increased limit for vector search
-      );
-
-      console.log(`[DualSearchOrchestrator] Vector search found ${results.length} entries`);
-      
-      // Add search method metadata
-      return results.map(result => ({
-        ...result,
-        searchMethod: 'vector',
-        searchScore: result.similarity || 0
-      }));
-      
-    } catch (error) {
-      console.error('[DualSearchOrchestrator] Error in vector search:', error);
-      return [];
-    }
-  }
-
   private static async executeSQLBasedSearch(
     supabase: any,
     userId: string,
@@ -150,8 +111,6 @@ export class DualSearchOrchestrator {
     vectorContext?: any[]
   ): Promise<any[]> {
     try {
-      console.log('[DualSearchOrchestrator] Executing SQL-based search');
-      
       // Determine best SQL search strategy based on query plan
       let sqlStrategy = 'hybrid';
       
@@ -166,7 +125,7 @@ export class DualSearchOrchestrator {
 
       console.log(`[DualSearchOrchestrator] Using SQL strategy: ${sqlStrategy}`);
 
-      // Use a dummy embedding for SQL-focused searches (won't be used in pure SQL functions)
+      // Use a dummy embedding for SQL-focused searches
       const dummyEmbedding = new Array(1536).fill(0);
       
       const results = await searchWithStrategy(
@@ -181,15 +140,7 @@ export class DualSearchOrchestrator {
         15
       );
 
-      console.log(`[DualSearchOrchestrator] SQL search found ${results.length} entries`);
-      
-      // Add search method metadata
-      return results.map(result => ({
-        ...result,
-        searchMethod: 'sql',
-        searchScore: result.match_strength || result.similarity || 0
-      }));
-
+      return results;
     } catch (error) {
       console.error('[DualSearchOrchestrator] Error in SQL-based search:', error);
       return [];
@@ -206,8 +157,7 @@ export class DualSearchOrchestrator {
         seenIds.add(result.id);
         combined.push({
           ...result,
-          searchMethod: 'vector',
-          searchPriority: 1
+          searchMethod: 'vector'
         });
       }
     });
@@ -218,22 +168,15 @@ export class DualSearchOrchestrator {
         seenIds.add(result.id);
         combined.push({
           ...result,
-          searchMethod: 'sql',
-          searchPriority: 2
+          searchMethod: 'sql'
         });
       }
     });
 
-    // Sort by search priority and relevance score
+    // Sort by relevance (vector similarity or SQL match strength)
     combined.sort((a, b) => {
-      // First priority: search method (vector first)
-      if (a.searchPriority !== b.searchPriority) {
-        return a.searchPriority - b.searchPriority;
-      }
-      
-      // Second priority: relevance score
-      const scoreA = a.similarity || a.match_strength || a.searchScore || 0;
-      const scoreB = b.similarity || b.match_strength || b.searchScore || 0;
+      const scoreA = a.similarity || a.match_strength || 0;
+      const scoreB = b.similarity || b.match_strength || 0;
       return scoreB - scoreA;
     });
 
@@ -246,7 +189,6 @@ export class DualSearchOrchestrator {
     // Use parallel execution for complex queries or when time is critical
     return queryPlan.complexity === 'complex' || 
            queryPlan.expectedResponseType === 'analysis' ||
-           queryPlan.strategy === 'comprehensive' ||
-           queryPlan.embeddingNeeded === true;
+           queryPlan.strategy === 'comprehensive';
   }
 }
