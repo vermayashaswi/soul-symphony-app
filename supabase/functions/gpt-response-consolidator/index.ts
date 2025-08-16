@@ -53,7 +53,7 @@ function sanitizeConsolidatorOutput(raw: string): { responseText: string; status
   const meta: Record<string, any> = { hadCodeFence: /```/i.test(raw || '') };
   try {
     if (!raw) {
-      return { responseText: 'I ran into a formatting issue preparing your insights. Let\'s try again.', statusMsg: null, meta };
+      return { responseText: 'I ran into a formatting issue preparing your insights. Let’s try again.', statusMsg: null, meta };
     }
     let s = stripCodeFences(raw);
     meta.afterStripPrefix = s.slice(0, 60);
@@ -112,7 +112,7 @@ serve(async (req) => {
       timestamp: new Date().toISOString()
     });
 
-    // Enhanced data validation - check for content availability
+    // Data integrity validation - check for stale research results
     if (researchResults && researchResults.length > 0) {
       console.log(`[RESEARCH DATA VALIDATION] ${consolidationId}:`, {
         totalResults: researchResults.length,
@@ -122,7 +122,6 @@ serve(async (req) => {
           sqlRowCount: r?.executionResults?.sqlResults?.length || 0,
           vectorResultCount: r?.executionResults?.vectorResults?.length || 0,
           hasError: !!r?.executionResults?.error,
-          hasContentSamples: r?.executionResults?.vectorResults?.some((v: any) => v?.content || v?.["refined text"] || v?.["transcription text"]) || false,
           sampleSqlData: r?.executionResults?.sqlResults?.slice(0, 1) || null
         }))
       });
@@ -132,20 +131,16 @@ serve(async (req) => {
         sum + (r?.executionResults?.sqlResults?.length || 0), 0);
       const totalVectorResults = researchResults.reduce((sum: number, r: any) => 
         sum + (r?.executionResults?.vectorResults?.length || 0), 0);
-      const hasContentExamples = researchResults.some((r: any) => 
-        r?.executionResults?.vectorResults?.some((v: any) => 
-          v?.content || v?.["refined text"] || v?.["transcription text"]));
         
       console.log(`[DATA SUMMARY] ${consolidationId}:`, {
         totalSqlRows,
         totalVectorResults,
-        hasContentExamples,
         userQuestion: userMessage,
         potentialStaleDataRisk: totalSqlRows > 0 ? 'check_sql_dates' : 'no_sql_data'
       });
     }
 
-    // Enhanced payload processing to include content examples
+    // Permissive pass-through of Researcher results (no restrictive parsing)
     const MAX_SQL_ROWS = 200;
     const MAX_VECTOR_ITEMS = 20;
 
@@ -170,19 +165,6 @@ serve(async (req) => {
         });
       }
 
-      // Enhanced vector results processing to preserve content
-      const processedVectorResults = originalVector ? originalVector.slice(0, MAX_VECTOR_ITEMS).map((item: any) => ({
-        ...item,
-        contentPreview: item?.content?.substring(0, 300) || 
-                       item?.["refined text"]?.substring(0, 300) || 
-                       item?.["transcription text"]?.substring(0, 300) || 
-                       'No content available',
-        hasContent: !!(item?.content || item?.["refined text"] || item?.["transcription text"]),
-        created_at: item?.created_at,
-        themes: item?.master_themes || item?.themes || [],
-        emotions: item?.emotions || {}
-      })) : null;
-
       return {
         subQuestion: research?.subQuestion ?? null,
         researcherOutput: research?.researcherOutput ?? null,
@@ -191,7 +173,7 @@ serve(async (req) => {
           sqlResults: originalSql ? originalSql.slice(0, MAX_SQL_ROWS) : originalSql,
           sqlRowCount: originalSql?.length ?? 0,
           sqlRowCappedTo: sqlTrimmed ? MAX_SQL_ROWS : (originalSql?.length ?? 0),
-          vectorResults: processedVectorResults,
+          vectorResults: originalVector ? originalVector.slice(0, MAX_VECTOR_ITEMS) : originalVector,
           vectorItemCount: originalVector?.length ?? 0,
           vectorItemCappedTo: vectorTrimmed ? MAX_VECTOR_ITEMS : (originalVector?.length ?? 0),
         },
@@ -206,7 +188,7 @@ serve(async (req) => {
       };
     });
 
-    // Build lightweight context snapshot
+    // Build lightweight context snapshot (conversation context removed entirely)
     const contextData = {
       userProfile: {
         timezone: userProfile?.timezone || 'UTC',
@@ -219,7 +201,7 @@ serve(async (req) => {
     };
 
     const consolidationPrompt = `
-    You are Ruh by SOuLO, an analytical wellness coach specializing in data-driven insights from journal analysis. You transform complex data into meaningful, actionable insights with specific examples from the user's actual journal entries.
+    You are Ruh by SOuLO, an analytical wellness coach specializing in data-driven insights from journal analysis. You transform complex data into meaningful, actionable insights.
     
     **USER QUESTION:** "${userMessage}"
     
@@ -233,14 +215,7 @@ serve(async (req) => {
     - CRITICAL: Verify that the data you're analyzing actually corresponds to the user's question timeframe
     - If you detect data inconsistencies or mismatches, flag this immediately
     
-    **ENHANCED ANALYSIS SYNTHESIS GUIDELINES:**
-    
-    **For Content-Specific Insights (PRIORITY - Include Specific Examples):**
-    - **Reference actual journal entry content** from the vectorResults when available
-    - **Quote specific topics, subjects, or themes** the user discussed
-    - **Include concrete examples** like "You recently wrote about modern parenting challenges" or "You mentioned your fitness routine showing good results"
-    - **Use contentPreview fields** from vector search results to provide specific examples
-    - **Combine statistical insights with real content references**
+    **ANALYSIS SYNTHESIS GUIDELINES:**
     
     **For Quantitative Findings (percentages, counts, calculations):**
     - State the **specific numerical results** clearly
@@ -251,41 +226,33 @@ serve(async (req) => {
     **For Qualitative Insights (semantic content analysis):**
     - Reference **specific themes and emotions** found
     - Highlight **notable patterns or correlations**
-    - Include **sample insights** from the actual journal content when available
-    - **Quote or paraphrase specific topics** the user discussed
+    - Include **sample insights** from the content when relevant
     - Connect findings to **personal growth opportunities**
     
-    **ENHANCED Communication Style:**
+    **Communication Style:**
     - **Professional yet warm** 🌟
-    - **Content-focused and personalized** - reference what they actually wrote about
-    - **Specific rather than vague** 🎯 - mention actual topics discussed
+    - **Data-focused but human-centered** 📊
+    - **Specific rather than vague** 🎯
     - **Insightful and actionable** 💡
     - **Must include 1-3 relevant emojis** throughout the response to enhance engagement
     
-    **Enhanced Response Structure:**
+    **Response Structure:**
     1. **Lead with the key finding** (the answer to their question)
-    2. **Provide specific content examples** (what they actually wrote about)
-    3. **Include supporting statistical data** (percentages, patterns, specifics)
-    4. **Offer interpretation and context** (what this means for them)
-    5. **Suggest next steps or follow-up questions**
+    2. **Provide supporting data details** (percentages, patterns, specifics)
+    3. **Offer interpretation and context** (what this means for them)
+    4. **Suggest next steps or follow-up questions**
     
     **Mandatory Requirements:**
-    - **PRIORITY**: Include specific examples from their actual journal entries when vector search results are available
     - Always include **specific numbers/percentages** when available
     - Reference **actual data points** from the analysis
-    - **Quote or reference specific topics** they discussed (e.g., "parenting", "fitness", "work challenges")
     - Use **bold** for key insights and **italics** for reflective observations
     - **Include 1-3 relevant emojis** throughout the response (mandatory)
     - End with **1-2 thoughtful follow-up questions**
     
-    **Example of Enhanced Response Style:**
-    Instead of: "Your entries show Mental Health as a top theme"
-    Use: "Your entries reveal Mental Health as a dominant theme (appearing in 14 entries), and looking at your actual writings, you've been discussing things like modern parenting challenges and how your fitness routine is showing good results 💪"
-    
     Your response should be a JSON object with this structure:
     {
-      "userStatusMessage": "exactly 5 words describing your synthesis approach that emphasizes content analysis",
-      "response": "your complete natural response based on both statistical analysis AND specific journal content examples with mandatory formatting and follow-up questions"
+      "userStatusMessage": "exactly 5 words describing your synthesis approach (e.g., 'Revealing your hidden emotional patterns' or 'Connecting insights to personal growth')",
+      "response": "your complete natural response based on the analysis and conversation context with mandatory formatting and follow-up questions"
     }
     
     STRICT OUTPUT RULES:
@@ -304,10 +271,10 @@ serve(async (req) => {
         body: JSON.stringify({
           model: 'gpt-4o-mini',
           messages: [
-            { role: 'system', content: 'You are Ruh by SOuLO, a warm and insightful wellness coach. You analyze ONLY the current research results provided to you, including both statistical data AND specific journal content examples when available. Never reference or use data from previous conversations or responses.' },
+            { role: 'system', content: 'You are Ruh by SOuLO, a warm and insightful wellness coach. You analyze ONLY the current research results provided to you. Never reference or use data from previous conversations or responses.' },
             { role: 'user', content: consolidationPrompt }
           ],
-          max_tokens: 1800
+          max_tokens: 1500
         }),
     });
 
@@ -315,7 +282,7 @@ serve(async (req) => {
     if (!response.ok) {
       const errText = await response.text();
       console.error('OpenAI Responses API error:', response.status, errText);
-      const fallbackText = "I couldn't finalize your insight right now. Let's try again in a moment.";
+      const fallbackText = "I couldn’t finalize your insight right now. Let’s try again in a moment.";
       return new Response(JSON.stringify({
         success: true,
         response: fallbackText,
@@ -336,7 +303,6 @@ serve(async (req) => {
 
     const data = await response.json();
     const rawResponse = data?.choices?.[0]?.message?.content || '';
-    
     // Sanitize and extract consolidated response
     const sanitized = sanitizeConsolidatorOutput(rawResponse);
     console.log(`[CONSOLIDATION SUCCESS] ${consolidationId}:`, {
