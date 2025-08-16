@@ -180,7 +180,7 @@ async function retryOpenAICall(promptFunction, maxRetries = 2) {
 /**
  * Enhanced Analyst Agent - generates comprehensive analysis plans
  */
-async function analyzeQueryWithSubQuestions(message, conversationContext, userEntryCount, isFollowUp = false) {
+async function analyzeQueryWithSubQuestions(message, conversationContext, userEntryCount, isFollowUp = false, supabaseClient) {
   try {
     const last = Array.isArray(conversationContext) ? conversationContext.slice(-5) : [];
     
@@ -220,8 +220,8 @@ async function analyzeQueryWithSubQuestions(message, conversationContext, userEn
     
     console.log(`[Analyst Agent] Query analysis - Personal pronouns: ${hasPersonalPronouns}, Time reference: ${hasExplicitTimeReference}, Content-seeking: ${isContentSeekingQuery}, Follow-up: ${isFollowUp}`);
 
-    // Get live database schema with real themes and emotions
-    const databaseSchemaContext = await generateDatabaseSchemaContext(supabase);
+    // Get live database schema with real themes and emotions using the authenticated client
+    const databaseSchemaContext = await generateDatabaseSchemaContext(supabaseClient);
 
     const prompt = `You are SOULo's Analyst Agent - an intelligent query planning specialist for journal data analysis. Your role is to break down user queries into comprehensive, actionable analysis plans.
 
@@ -344,7 +344,7 @@ Focus on creating comprehensive, executable analysis plans that will provide mea
 
     if (!analysisResult || !analysisResult.subQuestions) {
       console.error("Failed to parse Analyst Agent response, using enhanced fallback for content queries");
-      return createEnhancedFallbackPlan(message, isContentSeekingQuery, inferredTimeContext);
+      return createEnhancedFallbackPlan(message, isContentSeekingQuery, inferredTimeContext, supabaseClient);
     }
 
     // Enhance with detected characteristics
@@ -358,14 +358,14 @@ Focus on creating comprehensive, executable analysis plans that will provide mea
 
   } catch (error) {
     console.error("Error in Analyst Agent:", error);
-    return createEnhancedFallbackPlan(message, isContentSeekingQuery, inferredTimeContext);
+    return createEnhancedFallbackPlan(message, isContentSeekingQuery, inferredTimeContext, supabaseClient);
   }
 }
 
 /**
  * Create enhanced fallback plan with vector search for content queries
  */
-function createEnhancedFallbackPlan(originalMessage, isContentSeekingQuery, inferredTimeContext) {
+function createEnhancedFallbackPlan(originalMessage, isContentSeekingQuery, inferredTimeContext, supabaseClient) {
   const lowerMessage = originalMessage.toLowerCase();
   const isEmotionQuery = /emotion|feel|mood|happy|sad|anxious|stressed/.test(lowerMessage);
   const isThemeQuery = /work|relationship|family|health|goal|travel/.test(lowerMessage);
@@ -780,7 +780,7 @@ function getLastWeekRangeUTC() {
   startOfThisWeek.setUTCDate(startOfThisWeek.getUTCDate() - daysSinceMonday);
 
   const start = new Date(startOfThisWeek);
-  start.setUTCDate(start.getUTCDate() - 7);
+  start.setUTCDate(startOfThisWeek.getUTCDate() - 7);
   
   const end = startOfThisWeek; // exclusive
 
@@ -843,8 +843,8 @@ serve(async (req) => {
     });
     const userEntryCount = countData || 0;
 
-    // Generate comprehensive analysis plan
-    const analysisResult = await analyzeQueryWithSubQuestions(message, conversationContext, userEntryCount, isFollowUp);
+    // Generate comprehensive analysis plan - now passing supabaseClient
+    const analysisResult = await analyzeQueryWithSubQuestions(message, conversationContext, userEntryCount, isFollowUp, supabaseClient);
 
     if (!execute) {
       // Return just the plan without execution
