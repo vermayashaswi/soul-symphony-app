@@ -49,40 +49,61 @@ const ChatInput: React.FC<ChatInputProps> = ({
     translatePlaceholder();
   }, [currentLanguage, translate]);
 
-  // Simplified tutorial visibility management
+  // Effect to manage visibility during and after tutorial
   useEffect(() => {
-    if (inputContainerRef.current) {
-      if (isInTutorial) {
-        // Hide during tutorial step 5
-        inputContainerRef.current.style.display = 'none';
-      } else {
-        // Show and ensure full functionality when not in tutorial
-        inputContainerRef.current.style.display = 'block';
-        inputContainerRef.current.style.opacity = '1';
-        inputContainerRef.current.style.pointerEvents = 'auto';
-        inputContainerRef.current.style.visibility = 'visible';
-        inputContainerRef.current.style.zIndex = '20';
-        
-        // Clear any conflicting styles that might prevent interaction
-        inputContainerRef.current.style.height = 'auto';
-        inputContainerRef.current.style.overflow = 'visible';
-        inputContainerRef.current.style.margin = '';
-        inputContainerRef.current.style.padding = '';
+    const ensureInputVisibility = () => {
+      if (inputContainerRef.current) {
+        if (isInTutorial) {
+          // Completely hide input during tutorial step 5
+          inputContainerRef.current.style.opacity = '0';
+          inputContainerRef.current.style.pointerEvents = 'none';
+          inputContainerRef.current.style.height = '0';
+          inputContainerRef.current.style.visibility = 'hidden';
+          inputContainerRef.current.style.overflow = 'hidden';
+          inputContainerRef.current.style.margin = '0';
+          inputContainerRef.current.style.padding = '0';
+          inputContainerRef.current.style.backgroundColor = 'transparent';
+          inputContainerRef.current.style.border = 'none';
+          inputContainerRef.current.style.boxShadow = 'none';
+        } else {
+          // Show normally when not in tutorial or when tutorial completed
+          inputContainerRef.current.style.opacity = '1';
+          inputContainerRef.current.style.pointerEvents = 'auto';
+          inputContainerRef.current.style.cursor = 'text';
+          inputContainerRef.current.style.display = 'block';
+          inputContainerRef.current.style.visibility = 'visible';
+          inputContainerRef.current.style.height = 'auto';
+          inputContainerRef.current.style.zIndex = '20';
+          inputContainerRef.current.style.margin = '';
+          inputContainerRef.current.style.padding = '';
+          inputContainerRef.current.style.backgroundColor = '';
+          inputContainerRef.current.style.border = '';
+          inputContainerRef.current.style.boxShadow = '';
+        }
       }
-    }
-  }, [isInTutorial, tutorialCompleted]);
+    };
 
-  // Don't render anything during tutorial step 5
+    // Run on initial render and whenever relevant states change
+    ensureInputVisibility();
+    
+    // Recheck visibility after a delay to handle any DOM updates
+    const visibilityTimeout = setTimeout(ensureInputVisibility, 300);
+    
+    return () => {
+      clearTimeout(visibilityTimeout);
+    };
+  }, [isLoading, isInTutorial, tutorialCompleted]);
+
+  // If completely hidden during step 5, return an empty div with height 0 (not 40px)
   if (isInTutorial) {
-    return null;
+    return <div ref={inputContainerRef} className="chat-input-container opacity-0 h-0 overflow-hidden" style={{ height: '0', padding: 0, margin: 0, border: 'none', backgroundColor: 'transparent' }}></div>;
   }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!message.trim() || isLoading) return;
+    if (!message.trim()) return;
     
-    console.log('[ChatInput] Submitting message:', message.substring(0, 50));
     onSendMessage(message);
     setMessage("");
 
@@ -119,12 +140,8 @@ const ChatInput: React.FC<ChatInputProps> = ({
             value={message}
             onChange={handleTextareaChange}
             placeholder={placeholderText}
-            className="min-h-[24px] h-[32px] text-sm md:text-base resize-none rounded-full pl-4 pr-12 py-0 shadow-sm border-muted bg-background text-foreground overflow-hidden focus:outline-none focus:ring-0 focus:border-muted cursor-text"
+            className="min-h-[24px] h-[32px] text-sm md:text-base resize-none rounded-full pl-4 pr-12 py-0 shadow-sm border-muted bg-background text-foreground overflow-hidden focus:outline-none focus:ring-0 focus:border-muted"
             disabled={isLoading}
-            style={{ 
-              pointerEvents: 'auto',
-              cursor: 'text'
-            }}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -132,7 +149,6 @@ const ChatInput: React.FC<ChatInputProps> = ({
               }
             }}
             onFocus={() => {
-              console.log('[ChatInput] Textarea focused');
               // Only for mobile, ensure the textarea is visible when focused
               if (isMobile) {
                 setTimeout(() => {
@@ -144,9 +160,6 @@ const ChatInput: React.FC<ChatInputProps> = ({
                 }, 300);
               }
             }}
-            onClick={() => {
-              console.log('[ChatInput] Textarea clicked');
-            }}
           />
         </div>
         
@@ -155,7 +168,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
             type="submit" 
             size={isMobile ? "sm" : "default"}
             className="rounded-full h-7 w-7 p-0 bg-primary text-primary-foreground"
-            disabled={isLoading || !message.trim()}
+            disabled={isLoading}
           >
             <Send className="h-3 w-3" />
           </Button>

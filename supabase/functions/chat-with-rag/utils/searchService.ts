@@ -1,10 +1,12 @@
-// Enhanced search service with improved vector search and content mapping
+
+// Enhanced search service with optimized array-based theme filtering and entity filtering
 export async function searchEntriesWithVector(
   supabase: any,
   userId: string, 
   queryEmbedding: number[]
 ) {
   try {
+    // Ensure userId is a string
     const userIdString = typeof userId === 'string' ? userId : String(userId);
     console.log(`[chat-with-rag/searchService] Searching entries with vector similarity for userId: ${userIdString}`);
     
@@ -12,8 +14,8 @@ export async function searchEntriesWithVector(
       'match_journal_entries',
       {
         query_embedding: queryEmbedding,
-        match_threshold: 0.3,
-        match_count: 15,
+        match_threshold: 0.3, // Lowered threshold for better recall
+        match_count: 10,
         user_id_filter: userIdString
       }
     );
@@ -25,37 +27,25 @@ export async function searchEntriesWithVector(
     
     console.log(`[chat-with-rag/searchService] Found ${data?.length || 0} entries with vector similarity`);
     
-    // Ensure content field is properly mapped from database results
-    const mappedResults = (data || []).map(entry => ({
-      ...entry,
-      content: entry.content || entry['refined text'] || entry['transcription text'] || '',
-      themes: entry.themes || entry.master_themes || [],
-      searchMethod: 'vector'
-    }));
-    
-    // Log sample content to verify data flow
-    if (mappedResults.length > 0) {
-      console.log("[chat-with-rag/searchService] Sample entry content preview:", 
-        mappedResults[0].content?.substring(0, 100) || 'No content');
-      console.log("[chat-with-rag/searchService] Vector search results - entry details:", 
-        mappedResults.map((entry: any) => ({
+    // Add more detailed logging of results
+    if (data && data.length > 0) {
+      console.log("[chat-with-rag/searchService] Vector search results - entry dates:", 
+        data.map((entry: any) => ({
           id: entry.id,
           date: new Date(entry.created_at).toISOString(),
-          score: entry.similarity,
-          contentLength: entry.content?.length || 0,
-          hasContent: !!entry.content
+          score: entry.similarity
         }))
       );
     }
     
-    return mappedResults;
+    return data || [];
   } catch (error) {
     console.error('[chat-with-rag/searchService] Error searching entries with vector:', error);
     throw error;
   }
 }
 
-// Enhanced search service with optimized array-based theme filtering and entity filtering
+// Time-filtered vector search
 export async function searchEntriesWithTimeRange(
   supabase: any,
   userId: string, 
