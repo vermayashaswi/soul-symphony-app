@@ -158,13 +158,27 @@ const Index = () => {
           }
         });
       } else {
-        navigate('/app/auth');
+        // Show authentication prompt with clear messaging
+        navigate('/app/auth?redirectTo=' + encodeURIComponent('/app/home'));
       }
     }
     
     // Check URL parameters for specific app features redirects
     if (urlParams.has('insights')) {
-      navigate('/app/insights');
+      if (user) {
+        navigate('/app/insights');
+      } else {
+        navigate('/app/auth?redirectTo=' + encodeURIComponent('/app/insights'));
+      }
+    }
+
+    // Handle chat feature access
+    if (urlParams.has('chat')) {
+      if (user) {
+        navigate('/app/chat');
+      } else {
+        navigate('/app/auth?redirectTo=' + encodeURIComponent('/app/chat'));
+      }
     }
   }, [user, navigate, urlParams, checkOnboardingStatus, isNative]);
 

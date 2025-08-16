@@ -27,6 +27,13 @@ export default function Auth() {
   const fromLocation = location.state?.from?.pathname;
   const storedRedirect = typeof window !== 'undefined' ? localStorage.getItem('authRedirectTo') : null;
 
+  // Store redirect parameter in localStorage for persistence
+  useEffect(() => {
+    if (redirectParam) {
+      localStorage.setItem('authRedirectTo', redirectParam);
+    }
+  }, [redirectParam]);
+
   // Enhanced error handling and auth state tracking
   useEffect(() => {
     const checkAuthState = async () => {
@@ -191,6 +198,18 @@ export default function Auth() {
               forceTranslate={true}
             />
           </p>
+
+          {/* Show what feature they're trying to access */}
+          {redirectParam && (
+            <div className="mt-4 p-3 bg-primary/10 border border-primary/20 rounded-lg">
+              <p className="text-sm text-primary font-medium">
+                <TranslatableText 
+                  text={`Sign in to access ${redirectParam.replace('/app/', '').replace('-', ' ')}`}
+                  forceTranslate={true}
+                />
+              </p>
+            </div>
+          )}
         </div>
 
         {authError && (
