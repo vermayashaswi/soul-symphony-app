@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
+  // Allows to automatically instanciate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
@@ -738,34 +738,34 @@ export type Database = {
       enhanced_manage_user_session: {
         Args:
           | {
-              p_attribution_data?: Json
-              p_country_code?: string
-              p_currency?: string
-              p_device_type: string
-              p_entry_page: string
-              p_fbclid?: string
-              p_gclid?: string
-              p_ip_address?: string
-              p_language?: string
-              p_last_active_page: string
-              p_referrer?: string
-              p_user_agent: string
               p_user_id: string
-              p_utm_campaign?: string
-              p_utm_content?: string
-              p_utm_medium?: string
-              p_utm_source?: string
-              p_utm_term?: string
+              p_device_type: string
+              p_user_agent: string
+              p_entry_page: string
+              p_last_active_page: string
+              p_language?: string
+              p_referrer?: string
+              p_ip_address?: string
             }
           | {
-              p_device_type: string
-              p_entry_page: string
-              p_ip_address?: string
-              p_language?: string
-              p_last_active_page: string
-              p_referrer?: string
-              p_user_agent: string
               p_user_id: string
+              p_device_type: string
+              p_user_agent: string
+              p_entry_page: string
+              p_last_active_page: string
+              p_language?: string
+              p_referrer?: string
+              p_ip_address?: string
+              p_country_code?: string
+              p_currency?: string
+              p_utm_source?: string
+              p_utm_medium?: string
+              p_utm_campaign?: string
+              p_utm_term?: string
+              p_utm_content?: string
+              p_gclid?: string
+              p_fbclid?: string
+              p_attribution_data?: Json
             }
         Returns: string
       }
@@ -784,42 +784,42 @@ export type Database = {
       get_active_themes: {
         Args: Record<PropertyKey, never>
         Returns: {
-          description: string
-          display_order: number
           id: number
           name: string
+          description: string
+          display_order: number
         }[]
       }
       get_entity_emotion_statistics: {
         Args: {
+          user_id_filter: string
+          start_date?: string
           end_date?: string
           limit_count?: number
-          start_date?: string
-          user_id_filter: string
         }
         Returns: {
-          avg_strength: number
-          emotion_name: string
           entity_name: string
           entity_type: string
+          emotion_name: string
+          relationship_count: number
+          avg_strength: number
+          max_strength: number
           first_occurrence: string
           last_occurrence: string
-          max_strength: number
-          relationship_count: number
         }[]
       }
       get_entity_statistics: {
         Args: {
+          user_id_filter: string
+          start_date?: string
           end_date?: string
           limit_count?: number
-          start_date?: string
-          user_id_filter: string
         }
         Returns: {
-          avg_sentiment_score: number
-          entity_name: string
           entity_type: string
+          entity_name: string
           entry_count: number
+          avg_sentiment_score: number
           first_occurrence: string
           last_occurrence: string
         }[]
@@ -827,38 +827,38 @@ export type Database = {
       get_entries_by_emotion_term: {
         Args: {
           emotion_term: string
+          user_id_filter: string
+          start_date?: string
           end_date?: string
           limit_count?: number
-          start_date?: string
-          user_id_filter: string
         }
         Returns: {
+          id: number
           content: string
           created_at: string
-          id: number
         }[]
       }
       get_journal_entry_count: {
-        Args: { end_date?: string; start_date?: string; user_id_filter: string }
+        Args: { user_id_filter: string; start_date?: string; end_date?: string }
         Returns: number
       }
       get_theme_statistics: {
         Args: {
+          user_id_filter: string
+          start_date?: string
           end_date?: string
           limit_count?: number
-          start_date?: string
-          user_id_filter: string
         }
         Returns: {
-          avg_sentiment_score: number
+          theme: string
           entry_count: number
+          avg_sentiment_score: number
           first_occurrence: string
           last_occurrence: string
-          theme: string
         }[]
       }
       get_time_of_day_distribution: {
-        Args: { end_date?: string; start_date?: string; user_timezone?: string }
+        Args: { start_date?: string; end_date?: string; user_timezone?: string }
         Returns: {
           bucket: string
           entry_count: number
@@ -867,12 +867,12 @@ export type Database = {
       }
       get_top_emotions: {
         Args:
-          | { end_date?: string; limit_count?: number; start_date?: string }
+          | { start_date?: string; end_date?: string; limit_count?: number }
           | {
+              user_id_param: string
+              start_date?: string
               end_date?: string
               limit_count?: number
-              start_date?: string
-              user_id_param: string
             }
         Returns: {
           emotion: string
@@ -881,60 +881,60 @@ export type Database = {
       }
       get_top_emotions_by_chunks: {
         Args: {
+          user_id_param: string
+          start_date?: string
           end_date?: string
           limit_count?: number
-          start_date?: string
-          user_id_param: string
         }
         Returns: {
           emotion: string
-          sample_chunks: Json
           score: number
+          sample_chunks: Json
         }[]
       }
       get_top_emotions_with_entries: {
         Args:
-          | { end_date?: string; limit_count?: number; start_date?: string }
+          | { start_date?: string; end_date?: string; limit_count?: number }
           | {
+              user_id_param: string
+              start_date?: string
               end_date?: string
               limit_count?: number
-              start_date?: string
-              user_id_param: string
             }
         Returns: {
           emotion: string
-          sample_entries: Json
           score: number
+          sample_entries: Json
         }[]
       }
       get_top_entities_with_entries: {
         Args: {
+          user_id_param: string
+          start_date?: string
           end_date?: string
           limit_count?: number
-          start_date?: string
-          user_id_param: string
         }
         Returns: {
-          avg_sentiment: number
-          entity_name: string
           entity_type: string
+          entity_name: string
           entry_count: number
+          avg_sentiment: number
           sample_entries: Json
         }[]
       }
       get_top_entity_emotion_relationships: {
         Args: {
+          user_id_filter: string
+          start_date?: string
           end_date?: string
           limit_count?: number
-          start_date?: string
-          user_id_filter: string
         }
         Returns: {
-          emotion_name: string
           entity_name: string
           entity_type: string
-          entry_count: number
+          emotion_name: string
           relationship_strength: number
+          entry_count: number
           sample_entries: Json
         }[]
       }
@@ -945,18 +945,18 @@ export type Database = {
       get_user_subscription_status: {
         Args: { user_id_param: string }
         Returns: {
-          current_status: string
           current_tier: string
-          is_premium_access: boolean
-          is_trial_active: boolean
+          current_status: string
           trial_end_date: string
+          is_trial_active: boolean
+          is_premium_access: boolean
         }[]
       }
       insert_sample_journal_entries: {
         Args: { target_user_id: string }
         Returns: {
-          inserted_created_at: string
           inserted_id: number
+          inserted_created_at: string
         }[]
       }
       is_trial_eligible: {
@@ -965,11 +965,11 @@ export type Database = {
       }
       manage_user_session: {
         Args: {
+          p_user_id: string
           p_device_type: string
+          p_user_agent: string
           p_entry_page: string
           p_last_active_page: string
-          p_user_agent: string
-          p_user_id: string
         }
         Returns: string
       }
@@ -979,184 +979,213 @@ export type Database = {
       }
       match_chunks_with_date: {
         Args: {
-          end_date?: string
-          match_count: number
-          match_threshold: number
           query_embedding: string
-          start_date?: string
+          match_threshold: number
+          match_count: number
           user_id_filter: string
+          start_date?: string
+          end_date?: string
         }
         Returns: {
+          id: number
           chunk_id: number
-          chunk_index: number
           content: string
           created_at: string
-          emotions: Json
-          entry_content: string
-          id: number
           similarity: number
-          themes: string[]
+          chunk_index: number
           total_chunks: number
+          entry_content: string
+          themes: string[]
+          emotions: Json
         }[]
       }
       match_journal_entries: {
         Args:
           | Record<PropertyKey, never>
           | {
-              match_count: number
-              match_threshold: number
               query_embedding: string
+              match_threshold: number
+              match_count: number
+            }
+          | {
+              query_embedding: string
+              match_threshold: number
+              match_count: number
               user_id_filter: string
             }
         Returns: {
-          content: string
-          created_at: string
-          embedding: string
-          emotions: Json
           id: number
+          content: string
           similarity: number
+          embedding: string
+          created_at: string
           themes: string[]
+          emotions: Json
         }[]
       }
       match_journal_entries_by_emotion: {
-        Args: {
-          emotion_name: string
-          end_date?: string
-          limit_count?: number
-          min_score?: number
-          start_date?: string
-          user_id_filter: string
-        }
+        Args:
+          | {
+              emotion_name: string
+              min_score?: number
+              start_date?: string
+              end_date?: string
+              limit_count?: number
+            }
+          | {
+              emotion_name: string
+              user_id_filter: string
+              min_score?: number
+              start_date?: string
+              end_date?: string
+              limit_count?: number
+            }
         Returns: {
+          id: number
           content: string
           created_at: string
-          embedding: string
           emotion_score: number
-          id: number
+          embedding: string
         }[]
       }
       match_journal_entries_by_emotion_strength: {
         Args: {
           emotion_name: string
-          end_date?: string
+          user_id_filter: string
           match_count?: number
           start_date?: string
-          user_id_filter: string
+          end_date?: string
         }
         Returns: {
+          id: number
           content: string
           created_at: string
-          embedding: string
           emotion_score: number
-          id: number
+          embedding: string
         }[]
       }
       match_journal_entries_by_entities: {
         Args: {
-          end_date?: string
           entity_queries: string[]
-          match_count?: number
-          match_threshold?: number
-          start_date?: string
           user_id_filter: string
+          match_threshold?: number
+          match_count?: number
+          start_date?: string
+          end_date?: string
         }
         Returns: {
+          id: number
           content: string
           created_at: string
           entities: Json
-          entity_matches: Json
-          id: number
           similarity: number
+          entity_matches: Json
         }[]
       }
       match_journal_entries_by_entity_emotion: {
         Args: {
-          emotion_queries: string[]
-          end_date?: string
           entity_queries: string[]
-          match_count?: number
-          match_threshold?: number
-          start_date?: string
+          emotion_queries: string[]
           user_id_filter: string
+          match_threshold?: number
+          match_count?: number
+          start_date?: string
+          end_date?: string
         }
         Returns: {
+          id: number
           content: string
           created_at: string
-          emotions: Json
           entities: Json
-          entity_emotion_matches: Json
+          emotions: Json
           entityemotion: Json
-          id: number
-          relationship_strength: number
           similarity: number
+          entity_emotion_matches: Json
+          relationship_strength: number
         }[]
       }
       match_journal_entries_by_theme: {
-        Args: {
-          end_date?: string
-          match_count?: number
-          match_threshold?: number
-          start_date?: string
-          theme_query: string
-          user_id_filter: string
-        }
+        Args:
+          | {
+              theme_query: string
+              match_threshold?: number
+              match_count?: number
+              start_date?: string
+              end_date?: string
+            }
+          | {
+              theme_query: string
+              user_id_filter: string
+              match_threshold?: number
+              match_count?: number
+              start_date?: string
+              end_date?: string
+            }
         Returns: {
+          id: number
           content: string
           created_at: string
-          id: number
-          similarity: number
           themes: string[]
+          similarity: number
         }[]
       }
       match_journal_entries_by_theme_array: {
         Args: {
-          end_date?: string
-          match_count?: number
-          match_threshold?: number
-          start_date?: string
           theme_queries: string[]
           user_id_filter: string
+          match_threshold?: number
+          match_count?: number
+          start_date?: string
+          end_date?: string
         }
         Returns: {
+          id: number
           content: string
           created_at: string
-          id: number
+          themes: string[]
           similarity: number
           theme_matches: string[]
-          themes: string[]
         }[]
       }
       match_journal_entries_fixed: {
         Args: {
-          match_count: number
-          match_threshold: number
           query_embedding: string
+          match_threshold: number
+          match_count: number
           user_id_filter: string
         }
         Returns: {
-          content: string
-          created_at: string
-          embedding: string
           id: number
+          content: string
           similarity: number
+          embedding: string
+          created_at: string
         }[]
       }
       match_journal_entries_with_date: {
-        Args: {
-          end_date?: string
-          match_count: number
-          match_threshold: number
-          query_embedding: string
-          start_date?: string
-          user_id_filter: string
-        }
+        Args:
+          | {
+              query_embedding: string
+              match_threshold: number
+              match_count: number
+              start_date?: string
+              end_date?: string
+            }
+          | {
+              query_embedding: string
+              match_threshold: number
+              match_count: number
+              user_id_filter: string
+              start_date?: string
+              end_date?: string
+            }
         Returns: {
+          id: number
           content: string
           created_at: string
-          emotions: Json
-          id: number
           similarity: number
           themes: string[]
+          emotions: Json
         }[]
       }
       perform_database_maintenance: {
@@ -1173,9 +1202,9 @@ export type Database = {
       }
       resume_or_create_session: {
         Args: {
+          p_user_id: string
           p_device_type?: string
           p_entry_page?: string
-          p_user_id: string
         }
         Returns: string
       }
@@ -1185,9 +1214,9 @@ export type Database = {
       }
       simple_session_manager: {
         Args: {
+          p_user_id: string
           p_device_type?: string
           p_entry_page?: string
-          p_user_id: string
         }
         Returns: string
       }
@@ -1195,11 +1224,11 @@ export type Database = {
         Args:
           | Record<PropertyKey, never>
           | {
-              message_id?: string
-              query_embedding: string
-              query_text: string
-              thread_id: string
               user_id: string
+              query_text: string
+              query_embedding: string
+              thread_id: string
+              message_id?: string
             }
         Returns: undefined
       }
@@ -1212,11 +1241,11 @@ export type Database = {
         Returns: Json
       }
       update_session_activity: {
-        Args: { p_language?: string; p_page?: string; p_session_id: string }
+        Args: { p_session_id: string; p_page?: string; p_language?: string }
         Returns: undefined
       }
       upsert_journal_embedding: {
-        Args: { embedding_vector: string; entry_id: number }
+        Args: { entry_id: number; embedding_vector: string }
         Returns: undefined
       }
     }
