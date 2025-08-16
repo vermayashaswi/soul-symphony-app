@@ -184,7 +184,7 @@ export default function MobileChatInput({
         platform === 'ios' && "platform-ios"
       )}
     >
-      {/* Text Input Container with Voice Recorder positioned on the right */}
+      {/* Text Input Container with Voice Recorder Integration */}
       <div className="flex-1 relative">
         <Input
           ref={inputRef}
@@ -204,11 +204,11 @@ export default function MobileChatInput({
           data-testid="mobile-chat-input"
         />
         
-        {/* Voice Recorder positioned only over the microphone icon area */}
+        {/* Voice Recorder Overlay - positioned absolutely within input */}
         <VoiceChatRecorder
           onTranscriptionComplete={handleVoiceTranscription}
           isDisabled={isSubmitting || isLoading}
-          className="absolute right-0 top-0 h-full w-12"
+          className="absolute inset-0"
         />
       </div>
       

@@ -69,7 +69,6 @@ export function VoiceChatRecorder({
 }: VoiceChatRecorderProps) {
   const [recordingState, setRecordingState] = useState<RecordingState>('idle');
   const [audioLevel, setAudioLevel] = useState(0);
-  const [isCancelled, setIsCancelled] = useState(false);
   const { user } = useAuth();
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -86,7 +85,6 @@ export function VoiceChatRecorder({
     onError: (error) => {
       console.error('[VoiceChatRecorder] Recording error:', error);
       setRecordingState('error');
-      setIsCancelled(false);
       toast.error('Recording failed. Please try again.');
       setTimeout(() => setRecordingState('idle'), 2000);
     },
@@ -136,14 +134,6 @@ export function VoiceChatRecorder({
   };
 
   async function handleRecordingComplete(audioBlob: Blob) {
-    // Don't process if recording was cancelled
-    if (isCancelled) {
-      console.log('[VoiceChatRecorder] Recording was cancelled, skipping processing');
-      setRecordingState('idle');
-      setIsCancelled(false);
-      return;
-    }
-
     if (!user?.id) {
       toast.error('Please sign in to use voice recording');
       return;
@@ -214,7 +204,6 @@ export function VoiceChatRecorder({
   const handleStartRecording = async () => {
     try {
       setRecordingState('recording');
-      setIsCancelled(false);
       
       // Get user media for audio analysis
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -235,8 +224,6 @@ export function VoiceChatRecorder({
   };
 
   const handleCancelRecording = () => {
-    console.log('[VoiceChatRecorder] Cancelling recording...');
-    setIsCancelled(true);
     stopRecording();
     clearRecording();
     cleanupAudioAnalysis();
@@ -262,15 +249,15 @@ export function VoiceChatRecorder({
   const isError = recordingState === 'error';
 
   return (
-    <div className={cn("relative", className)}>
-      {/* Recording Overlay - Only covers microphone button area, not entire input */}
+    <div className={cn("relative w-full h-full", className)}>
+      {/* Recording Overlay - Replaces the entire input */}
       <AnimatePresence>
         {isRecording && (
           <motion.div
             initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.98 }}
-            className="absolute right-0 top-0 h-full bg-background border border-input rounded-md flex items-center px-3 z-30 min-w-[200px]"
+            className="absolute inset-0 bg-background border border-input rounded-md flex items-center px-3 z-20"
           >
             {/* Cancel Button (X) */}
             <Button
@@ -307,7 +294,7 @@ export function VoiceChatRecorder({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute right-0 top-0 h-full bg-background border border-input rounded-md flex items-center justify-center z-30 min-w-[150px] px-3"
+            className="absolute inset-0 bg-background border border-input rounded-md flex items-center justify-center z-20"
           >
             <div className="flex items-center space-x-2 text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
