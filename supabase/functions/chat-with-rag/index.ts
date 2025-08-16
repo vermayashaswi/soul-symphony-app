@@ -2,13 +2,76 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
-import { processTimeRange } from '../chat-rag/utils/dateProcessor.ts';
-import { detectTimeframeInQuery } from '../chat-rag/utils/queryClassifier.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Helper function to process time range
+function processTimeRange(timeRange: any, userTimezone: string = 'UTC'): { startDate?: string; endDate?: string } {
+  if (!timeRange) return {};
+  
+  console.log("Processing time range:", timeRange);
+  console.log(`Using user timezone: ${userTimezone}`);
+  
+  const result: { startDate?: string; endDate?: string } = {};
+  
+  try {
+    // Handle startDate if provided
+    if (timeRange.startDate) {
+      const startDate = new Date(timeRange.startDate);
+      if (!isNaN(startDate.getTime())) {
+        result.startDate = startDate.toISOString();
+      } else {
+        console.warn(`Invalid startDate: ${timeRange.startDate}`);
+      }
+    }
+    
+    // Handle endDate if provided
+    if (timeRange.endDate) {
+      const endDate = new Date(timeRange.endDate);
+      if (!isNaN(endDate.getTime())) {
+        result.endDate = endDate.toISOString();
+      } else {
+        console.warn(`Invalid endDate: ${timeRange.endDate}`);
+      }
+    }
+    
+    console.log("Final processed time range with UTC conversion:", result);
+    return result;
+  } catch (error) {
+    console.error("Error processing time range:", error);
+    return {};
+  }
+}
+
+// Helper function to detect timeframe in query
+function detectTimeframeInQuery(message: string, userTimezone: string = 'UTC'): any {
+  // Simple timeframe detection logic
+  const lowerMessage = message.toLowerCase();
+  
+  if (lowerMessage.includes('today')) {
+    return { type: 'today' };
+  }
+  if (lowerMessage.includes('yesterday')) {
+    return { type: 'yesterday' };
+  }
+  if (lowerMessage.includes('this week')) {
+    return { type: 'week' };
+  }
+  if (lowerMessage.includes('last week')) {
+    return { type: 'lastWeek' };
+  }
+  if (lowerMessage.includes('this month')) {
+    return { type: 'month' };
+  }
+  if (lowerMessage.includes('last month')) {
+    return { type: 'lastMonth' };
+  }
+  
+  return null;
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
