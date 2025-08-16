@@ -38,7 +38,8 @@ serve(async (req) => {
     console.log('[ChatWithRAG] Request data received:', {
       hasMessage: !!requestData.message,
       hasUserId: !!requestData.userId,
-      messageLength: requestData.message?.length || 0
+      messageLength: requestData.message?.length || 0,
+      streamingMode: requestData.streamingMode
     })
 
     // Validate required fields
@@ -46,23 +47,81 @@ serve(async (req) => {
       throw new Error('Missing required fields: message and userId')
     }
 
-    // Initialize streaming response using factory function
-    const { response, controller } = createStreamingResponse()
-    streamingResponse = response
-    streamManager = new SSEStreamManager(controller)
-    
-    // Initialize optimized RAG pipeline
-    const pipeline = new OptimizedRagPipeline(
-      streamManager,
-      supabaseClient,
-      openaiApiKey
-    )
+    // Check if streaming mode is requested (default to true for backward compatibility)
+    const useStreamingMode = requestData.streamingMode !== false
 
-    // Process the query through the optimized pipeline
-    await pipeline.processQuery(requestData)
+    if (useStreamingMode) {
+      // Initialize streaming response using factory function
+      const { response, controller } = createStreamingResponse()
+      streamingResponse = response
+      streamManager = new SSEStreamManager(controller)
+      
+      // Initialize optimized RAG pipeline
+      const pipeline = new OptimizedRagPipeline(
+        streamManager,
+        supabaseClient,
+        openaiApiKey
+      )
 
-    // Return the streaming response
-    return streamingResponse
+      // Process the query through the optimized pipeline
+      await pipeline.processQuery(requestData)
+
+      // Return the streaming response
+      return streamingResponse
+    } else {
+      // Non-streaming mode: collect results and return as JSON
+      console.log('[ChatWithRAG] Using non-streaming mode')
+      
+      // Create a simple collector for non-streaming results
+      let finalResponse = ''
+      let analysisData = null
+      
+      // Create a mock stream manager that collects instead of streaming
+      const mockStreamManager = {
+        sendEvent: async (type: string, data: any) => {
+          if (type === 'final_response' || type === 'response_chunk') {
+            if (data.response) {
+              finalResponse = data.response
+            } else if (data.chunk) {
+              finalResponse += data.chunk
+            }
+            if (data.analysis) {
+              analysisData = data.analysis
+            }
+          }
+        },
+        sendUserMessage: async () => {},
+        sendBackendTask: async () => {},
+        sendProgress: async () => {},
+        close: async () => {}
+      }
+      
+      // Initialize optimized RAG pipeline with mock manager
+      const pipeline = new OptimizedRagPipeline(
+        mockStreamManager as any,
+        supabaseClient,
+        openaiApiKey
+      )
+
+      // Process the query through the optimized pipeline
+      await pipeline.processQuery(requestData)
+
+      // Return standard JSON response
+      const responseData = {
+        response: finalResponse || 'No response generated',
+        analysis: analysisData,
+        success: true
+      }
+
+      console.log('[ChatWithRAG] Non-streaming response:', { hasResponse: !!finalResponse, hasAnalysis: !!analysisData })
+
+      return new Response(
+        JSON.stringify(responseData),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
+    }
 
   } catch (error) {
     console.error('[ChatWithRAG] Error processing request:', error)
@@ -79,7 +138,8 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         error: error.message || 'An unexpected error occurred',
-        type: 'processing_error'
+        type: 'processing_error',
+        success: false
       }),
       {
         status: 500,
