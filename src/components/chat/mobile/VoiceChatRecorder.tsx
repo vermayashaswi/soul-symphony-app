@@ -78,6 +78,7 @@ export function VoiceChatRecorder({
     status,
     startRecording,
     stopRecording,
+    cancelRecording,
     clearRecording,
     elapsedTimeMs
   } = useVoiceRecorder({
@@ -224,8 +225,8 @@ export function VoiceChatRecorder({
   };
 
   const handleCancelRecording = () => {
-    stopRecording();
-    clearRecording();
+    console.log('[VoiceChatRecorder] Cancelling recording');
+    cancelRecording(); // Use the new cancel method instead of stop
     cleanupAudioAnalysis();
     setRecordingState('idle');
   };
