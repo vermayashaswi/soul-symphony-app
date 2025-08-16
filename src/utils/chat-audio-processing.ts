@@ -3,7 +3,7 @@
  * Chat-specific audio processing module
  * Handles transcription for voice chat queries without creating journal entries
  */
-import { blobToBase64 } from './audio/blob-utils';
+import { blobToBase64, normalizeAudioBlob, validateAudioBlob } from './audio/blob-utils';
 import { supabase } from '@/integrations/supabase/client';
 
 /**
@@ -15,8 +15,9 @@ function validateChatAudioBlob(audioBlob: Blob | null): boolean {
     return false;
   }
   
-  if (audioBlob.size < 100) {
-    console.error('[ChatAudioProcessing] Audio blob too small');
+  const validation = validateAudioBlob(audioBlob);
+  if (!validation.isValid) {
+    console.error('[ChatAudioProcessing] Audio validation failed:', validation.errorMessage);
     return false;
   }
   
@@ -53,13 +54,58 @@ export async function processChatVoiceRecording(
   }
   
   try {
-    // Convert blob to base64
-    const base64Audio = await blobToBase64(audioBlob!);
+    console.log('[ChatAudioProcessing] Normalizing audio blob before processing...');
+    
+    // Normalize the audio blob (same as journal)
+    let normalizedBlob: Blob;
+    try {
+      normalizedBlob = await normalizeAudioBlob(audioBlob!);
+      console.log('[ChatAudioProcessing] Blob normalized successfully:', {
+        type: normalizedBlob.type,
+        size: normalizedBlob.size,
+        hasDuration: 'duration' in normalizedBlob,
+        duration: (normalizedBlob as any).duration || 'unknown'
+      });
+      
+      const validation = validateAudioBlob(normalizedBlob);
+      if (!validation.isValid) {
+        throw new Error(validation.errorMessage || "Invalid audio data after normalization");
+      }
+    } catch (error) {
+      console.error('[ChatAudioProcessing] Error normalizing audio blob:', error);
+      return {
+        success: false,
+        error: "Error processing audio. Please try again."
+      };
+    }
+    
+    // Test base64 conversion before proceeding (same as journal)
+    console.log('[ChatAudioProcessing] Testing base64 conversion...');
+    let base64Audio: string;
+    try {
+      base64Audio = await blobToBase64(normalizedBlob);
+      console.log('[ChatAudioProcessing] Base64 conversion successful, length:', base64Audio.length);
+      
+      if (base64Audio.length < 50) {
+        return {
+          success: false,
+          error: 'Audio data appears too short or invalid'
+        };
+      }
+    } catch (error) {
+      console.error('[ChatAudioProcessing] Base64 conversion failed:', error);
+      return {
+        success: false,
+        error: 'Error preparing audio data for processing'
+      };
+    }
     
     // Get the duration of the audio
     let recordingTime = 0;
-    if ('duration' in audioBlob!) {
-      recordingTime = Math.round((audioBlob as any).duration * 1000);
+    if ('duration' in normalizedBlob) {
+      recordingTime = Math.round((normalizedBlob as any).duration * 1000);
+    } else {
+      console.log('[ChatAudioProcessing] No duration found in blob, estimating from recording time');
     }
     
     // Prepare the payload for chat transcription
@@ -68,7 +114,12 @@ export async function processChatVoiceRecording(
       recordingTime
     };
     
-    console.log('[ChatAudioProcessing] Calling transcribe-chat-audio Edge Function');
+    console.log('[ChatAudioProcessing] Calling transcribe-chat-audio Edge Function with payload:', {
+      audioLength: base64Audio.length,
+      recordingTime,
+      blobSize: normalizedBlob.size,
+      blobType: normalizedBlob.type
+    });
     
     // Call the chat-specific Supabase Edge Function
     const { data, error } = await supabase.functions.invoke('transcribe-chat-audio', {

@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useVoiceRecorder } from '@/hooks/use-voice-recorder';
 import { useAuth } from '@/contexts/AuthContext';
 import { processChatVoiceRecording } from '@/utils/chat-audio-processing';
+import { normalizeAudioBlob, validateAudioBlob, blobToBase64 } from '@/utils/audio/blob-utils';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -142,10 +143,47 @@ export function VoiceChatRecorder({
       setRecordingState('processing');
       cleanupAudioAnalysis();
       
-      console.log('[VoiceChatRecorder] Starting chat transcription');
+      console.log('[VoiceChatRecorder] Starting chat transcription with blob:', {
+        size: audioBlob.size,
+        type: audioBlob.type,
+        hasDuration: 'duration' in audioBlob
+      });
+      
+      // Add the same validation and normalization as journal
+      const validation = validateAudioBlob(audioBlob);
+      if (!validation.isValid) {
+        throw new Error(validation.errorMessage || 'Invalid audio data');
+      }
+      
+      // Normalize the audio blob
+      let normalizedBlob: Blob;
+      try {
+        normalizedBlob = await normalizeAudioBlob(audioBlob);
+        console.log('[VoiceChatRecorder] Audio blob normalized:', {
+          type: normalizedBlob.type,
+          size: normalizedBlob.size,
+          hasDuration: 'duration' in normalizedBlob
+        });
+      } catch (error) {
+        console.error('[VoiceChatRecorder] Error normalizing audio:', error);
+        throw new Error('Error processing audio. Please try again.');
+      }
+      
+      // Test base64 conversion
+      try {
+        const base64Test = await blobToBase64(normalizedBlob);
+        console.log('[VoiceChatRecorder] Base64 test successful, length:', base64Test.length);
+        
+        if (base64Test.length < 50) {
+          throw new Error('Audio data appears too short or invalid');
+        }
+      } catch (error) {
+        console.error('[VoiceChatRecorder] Base64 test failed:', error);
+        throw new Error('Error preparing audio for processing');
+      }
       
       // Use chat-specific processing - no journal entries
-      const result = await processChatVoiceRecording(audioBlob, user.id);
+      const result = await processChatVoiceRecording(normalizedBlob, user.id);
       
       if (result.success && result.transcription) {
         console.log('[VoiceChatRecorder] Chat transcription successful:', result.transcription);
@@ -155,7 +193,7 @@ export function VoiceChatRecorder({
       } else {
         throw new Error(result.error || 'Failed to transcribe audio');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('[VoiceChatRecorder] Processing error:', error);
       setRecordingState('error');
       toast.error(`Transcription failed: ${error.message}`);
