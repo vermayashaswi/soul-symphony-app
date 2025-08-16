@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Mic, ArrowUp, X, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -9,6 +8,7 @@ import { processChatVoiceRecording } from '@/utils/chat-audio-processing';
 import { normalizeAudioBlob, validateAudioBlob, blobToBase64 } from '@/utils/audio/blob-utils';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { MovingWaveform } from '@/components/voice-recorder/MovingWaveform';
 
 type RecordingState = 'idle' | 'recording' | 'processing' | 'error';
 
@@ -16,50 +16,6 @@ interface VoiceChatRecorderProps {
   onTranscriptionComplete: (text: string) => void;
   isDisabled?: boolean;
   className?: string;
-}
-
-interface AudioVisualizerProps {
-  isRecording: boolean;
-  audioLevel: number;
-}
-
-// Real-time audio visualizer component
-function AudioVisualizer({ isRecording, audioLevel }: AudioVisualizerProps) {
-  const bars = Array.from({ length: 40 });
-  
-  return (
-    <div className="flex items-center justify-center h-8 space-x-0.5 flex-1">
-      {bars.map((_, i) => {
-        const baseHeight = Math.sin((i / 40) * Math.PI * 2) * 20 + 10;
-        const height = isRecording 
-          ? Math.max(4, baseHeight + (audioLevel * 0.5)) 
-          : Math.max(4, baseHeight * 0.3);
-          
-        return (
-          <motion.div
-            key={i}
-            className="w-0.5 bg-primary rounded-full"
-            initial={{ height: 4 }}
-            animate={{ 
-              height: isRecording 
-                ? [height * 0.5, height, height * 0.7, height * 0.9, height * 0.6] 
-                : [4, 8, 6]
-            }}
-            transition={{
-              duration: isRecording ? 0.8 : 1.5,
-              repeat: Infinity,
-              repeatType: "reverse",
-              ease: "easeInOut",
-              delay: i * 0.03
-            }}
-            style={{
-              opacity: isRecording ? 0.8 : 0.4
-            }}
-          />
-        );
-      })}
-    </div>
-  );
 }
 
 export function VoiceChatRecorder({ 
@@ -107,7 +63,7 @@ export function VoiceChatRecorder({
         if (analyserRef.current) {
           analyserRef.current.getByteFrequencyData(dataArray);
           const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
-          setAudioLevel(average);
+          setAudioLevel(average / 255); // Normalize to 0-1
           
           if (status === 'recording') {
             animationFrameRef.current = requestAnimationFrame(updateAudioLevel);
@@ -249,40 +205,55 @@ export function VoiceChatRecorder({
   const isError = recordingState === 'error';
 
   return (
-    <div className={cn("relative w-full h-full", className)}>
-      {/* Recording Overlay - Replaces the entire input */}
+    <div className={cn("relative", className)}>
+      {/* Recording Overlay - Full Screen When Recording */}
       <AnimatePresence>
         {isRecording && (
           <motion.div
             initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.98 }}
-            className="absolute inset-0 bg-background border border-input rounded-md flex items-center px-3 z-20"
+            className="fixed inset-0 bg-background/95 backdrop-blur-sm z-50 flex flex-col items-center justify-center"
           >
-            {/* Cancel Button (X) */}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleCancelRecording}
-              className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive shrink-0"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-
-            {/* Waveform Visualization */}
-            <div className="flex-1 mx-3">
-              <AudioVisualizer isRecording={isRecording} audioLevel={audioLevel} />
+            {/* Header with Cancel */}
+            <div className="absolute top-6 left-0 right-0 flex justify-between items-center px-6">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleCancelRecording}
+                className="text-muted-foreground hover:text-destructive"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+              <span className="text-sm text-muted-foreground">Recording...</span>
+              <div className="w-10" /> {/* Spacer for centering */}
             </div>
 
-            {/* Stop/Send Button (Up Arrow) */}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleStopRecording}
-              className="h-8 w-8 p-0 text-primary hover:text-primary/80 shrink-0"
-            >
-              <ArrowUp className="h-4 w-4" />
-            </Button>
+            {/* Main Recording Area */}
+            <div className="flex-1 flex flex-col items-center justify-center px-8 w-full max-w-md">
+              {/* Moving Waveform */}
+              <div className="w-full mb-8">
+                <MovingWaveform 
+                  isRecording={isRecording} 
+                  audioLevel={audioLevel} 
+                />
+              </div>
+              
+              {/* Timer */}
+              <div className="text-2xl font-mono text-foreground mb-8">
+                {Math.floor(elapsedTimeMs / 60000).toString().padStart(2, '0')}:
+                {Math.floor((elapsedTimeMs % 60000) / 1000).toString().padStart(2, '0')}
+              </div>
+              
+              {/* Stop/Send Button */}
+              <Button
+                size="lg"
+                onClick={handleStopRecording}
+                className="h-16 w-16 rounded-full bg-primary hover:bg-primary/90"
+              >
+                <ArrowUp className="h-6 w-6" />
+              </Button>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -304,7 +275,7 @@ export function VoiceChatRecorder({
         )}
       </AnimatePresence>
 
-      {/* Microphone Button - Only visible when idle */}
+      {/* Microphone Button - Only visible when idle, positioned absolutely on the right */}
       {recordingState === 'idle' && (
         <Button
           type="button"
