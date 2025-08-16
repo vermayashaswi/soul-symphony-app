@@ -13,9 +13,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
 };
 
+// Create user-authenticated client instead of service role client
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
 
 /**
  * Generate embedding for text using OpenAI API
@@ -531,7 +531,6 @@ async function executePlan(plan, userId, normalizedTimeRange, supabaseClient) {
       finalSql = finalSql.replace(/\$end_date\b/g, endVal ? `'${endVal}'::timestamptz` : 'NULL');
     }
 
-    // Log SQL execution with full details
     console.log(`[SQL EXECUTION] ${executionMetadata.requestId}:`, {
       originalQuery: sqlQuery,
       finalSql: finalSql,
@@ -543,7 +542,6 @@ async function executePlan(plan, userId, normalizedTimeRange, supabaseClient) {
       query_text: finalSql
     });
 
-    // Log SQL results with data freshness validation
     if (error) {
       console.error(`[SQL ERROR] ${executionMetadata.requestId}:`, error);
       return { ok: false, error: error.message };
@@ -555,61 +553,9 @@ async function executePlan(plan, userId, normalizedTimeRange, supabaseClient) {
     }
 
     const rows = Array.isArray(data.data) ? data.data : [];
-
-    // Data freshness validation - check if returned data matches query parameters
-    if (rows.length > 0 && timeRange) {
-      const sampleRow = rows[0];
-      const dateFields = ['created_at', 'date', 'timestamp'];
-      let foundDateField = null;
-      let sampleDate = null;
-
-      for (const field of dateFields) {
-        if (sampleRow[field]) {
-          foundDateField = field;
-          sampleDate = new Date(sampleRow[field]);
-          break;
-        }
-      }
-
-      if (foundDateField && sampleDate) {
-        const queryStart = timeRange.start ? new Date(timeRange.start) : null;
-        const queryEnd = timeRange.end ? new Date(timeRange.end) : null;
-
-        let dataFreshness = 'unknown';
-        if (queryStart && queryEnd) {
-          dataFreshness = (sampleDate >= queryStart && sampleDate <= queryEnd) ? 'fresh' : 'stale';
-        } else if (queryStart) {
-          dataFreshness = sampleDate >= queryStart ? 'fresh' : 'stale';
-        } else if (queryEnd) {
-          dataFreshness = sampleDate <= queryEnd ? 'fresh' : 'stale';
-        }
-
-        console.log(`[DATA FRESHNESS] ${executionMetadata.requestId}:`, {
-          status: dataFreshness,
-          sampleDate: sampleDate.toISOString(),
-          queryStart: queryStart?.toISOString() || null,
-          queryEnd: queryEnd?.toISOString() || null,
-          foundDateField,
-          rowCount: rows.length
-        });
-
-        // Alert if stale data detected
-        if (dataFreshness === 'stale') {
-          console.error(`[STALE DATA ALERT] ${executionMetadata.requestId}: Returned data outside query time range!`, {
-            sampleDate: sampleDate.toISOString(),
-            expectedRange: {
-              start: queryStart?.toISOString(),
-              end: queryEnd?.toISOString()
-            },
-            sqlQuery: finalSql
-          });
-        }
-      }
-    }
-
     console.log(`[SQL SUCCESS] ${executionMetadata.requestId}:`, {
       rowCount: rows.length,
-      sampleData: rows.slice(0, 2) // Log first 2 rows for inspection
+      sampleData: rows.slice(0, 2)
     });
 
     return { ok: true, rows };
@@ -681,6 +627,7 @@ async function executePlan(plan, userId, normalizedTimeRange, supabaseClient) {
 
             console.log(`[executePlan] Calling ${rpcName} with threshold ${rpcArgs.match_threshold}, limit ${rpcArgs.match_count}`);
 
+            // Use the user-authenticated client for vector search
             const { data: vectorData, error: vectorError } = await supabaseClient.rpc(rpcName, rpcArgs);
 
             if (vectorError) {
@@ -872,8 +819,26 @@ serve(async (req) => {
       });
     }
 
+    // Create user-authenticated Supabase client using the authorization header
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      console.error(`[REQUEST ERROR] ${requestId}: No authorization header found`);
+      return new Response(JSON.stringify({
+        error: 'Authorization required'
+      }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: { Authorization: authHeader },
+      },
+    });
+
     // Get user's journal entry count for context
-    const { data: countData } = await supabase.rpc('get_journal_entry_count', {
+    const { data: countData } = await supabaseClient.rpc('get_journal_entry_count', {
       user_id_filter: userId
     });
     const userEntryCount = countData || 0;
@@ -892,7 +857,7 @@ serve(async (req) => {
       });
     }
 
-    // Execute the analysis plan
+    // Execute the analysis plan with user-authenticated client
     let normalizedTimeRange = null;
     if (timeRange) {
       if (timeRange.type === 'last_week') {
@@ -909,7 +874,7 @@ serve(async (req) => {
       }
     }
 
-    const executionResult = await executePlan(analysisResult, userId, normalizedTimeRange, supabase);
+    const executionResult = await executePlan(analysisResult, userId, normalizedTimeRange, supabaseClient);
 
     return new Response(JSON.stringify({
       success: true,
