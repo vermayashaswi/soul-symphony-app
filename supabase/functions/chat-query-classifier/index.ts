@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
@@ -16,8 +17,8 @@ serve(async (req) => {
 
   // Parse body once to avoid re-reading on fallback
   const body = await req.json().catch(() => null);
-  const message: string | undefined = body?.message;
-  const conversationContext: any[] = Array.isArray(body?.conversationContext) ? body.conversationContext : [];
+  const message = body?.message;
+  const conversationContext = Array.isArray(body?.conversationContext) ? body.conversationContext : [];
 
   if (!message) {
     return new Response(
@@ -42,7 +43,7 @@ serve(async (req) => {
     // Use GPT for natural conversation flow classification
     const classification = await gptClassifyMessage(message, conversationContext, openAiApiKey);
 
-    console.log(`[Query Classifier] Result: ${classification.category} (confidence: ${classification.confidence})`);
+    console.log(`[Query Classifier] Result: ${classification.category}`);
 
     return new Response(
       JSON.stringify(classification),
@@ -52,7 +53,7 @@ serve(async (req) => {
     console.error('[Query Classifier] Error:', error);
 
     return new Response(
-      JSON.stringify({ error: 'Classification failed', details: String((error as any)?.message || error) }),
+      JSON.stringify({ error: 'Classification failed', details: String((error).message || error) }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     );
   }
@@ -62,33 +63,17 @@ serve(async (req) => {
  * GPT-powered classification with conversational flow prioritization
  */
 async function gptClassifyMessage(
-  message: string, 
-  conversationContext: any[], 
-  apiKey: string
-): Promise<{
-  category: string;
-  confidence: number;
-  reasoning: string;
-  useAllEntries?: boolean;
-  recommendedPipeline?: 'general' | 'clarification' | 'rag_full';
-  clarifyingQuestion?: string | null;
-  journalHintStrength?: 'low' | 'medium' | 'high';
-  timeScopeHint?: 'all' | 'recent' | 'last_week' | 'this_month' | 'last_month' | null;
-}> {
+  message, 
+  conversationContext, 
+  apiKey
+) {
   
   // Short-circuit acknowledgements to avoid unnecessary analysis
   const trimmed = (message || '').trim();
   const ackRegex = /^(ok(?:ay)?|k|kk|thanks|thank you|thx|cool|got it|sounds good|roger|understood|yep|yup|sure|👌|👍)[.!]?$/i;
   if (ackRegex.test(trimmed)) {
     return {
-      category: 'GENERAL_MENTAL_HEALTH',
-      confidence: 0.99,
-      reasoning: 'Acknowledgment/closure detected; no analysis requested.',
-      useAllEntries: false,
-      recommendedPipeline: 'general',
-      clarifyingQuestion: null,
-      journalHintStrength: 'low',
-      timeScopeHint: null
+      category: 'GENERAL_MENTAL_HEALTH'
     };
   }
 
@@ -96,42 +81,39 @@ async function gptClassifyMessage(
     ? `\nConversation context: ${conversationContext.slice(-6).map(msg => `${(msg.role || msg.sender || 'user')}: ${msg.content}`).join('\n')}`
     : '';
 
-  const classificationPrompt = `You are the intent router for "Ruh by SOuLO". Use the conversation context to classify the latest user message and return ONE JSON object that exactly matches the schema. Be decisive and consistent.
+  const classificationPrompt = `You are the a chat conversation query classifier for a voice journaling app, SOuLO's chatot called "Ruh'. On this app users record their journal entries and SOuLO application has all their entries, emotions, themes, time of entry, entry text etc. available for analysis. People visit the Ruh chatbot on SOuLO to converse about their feelings, problems, share stories, get analysis out of their regular journaling etc. 
+  
+  Use the conversation context provided to you to classify the latest user message and return ONE JSON object that exactly matches the schema. Be decisive and consistent. Below we have the categories and information about what happens downstream in SOuLO app's back end code if you classify a certain way
 
-**CONTEXT OVERRIDE RULES (CHECK FIRST):**
+**STRONG TRIGGER WORD OVERRIDE (HIGHEST PRIORITY):**
+- Messages containing "analyze", "score me", "rate me", "evaluate me", "assess me", "tell me about my", "what am I like", "scale of [number]" should ALWAYS be JOURNAL_SPECIFIC regardless of typos or informal grammar
+- Messages with personal pronouns + analysis requests ("analyze if I", "score me on", "rate my") = JOURNAL_SPECIFIC
+- Numerical scoring requests ("scale of 100", "1 to 10", "rate from 1-5") = JOURNAL_SPECIFIC
+- Requests like "Can you help me uncover this?" , "I want you to tell me this about me" 
+- These override all other considerations including typos, grammar, or conversation context
+
+**CONTEXT OVERRIDE RULES (CHECK SECOND):**
 - If the user is answering previous clarifying questions or providing requested details, immediately classify as "JOURNAL_SPECIFIC" with "rag_full" pipeline
 - If user says "check", "look at", "analyze", "what does my", "in my entries", "from my data" - classify as "JOURNAL_SPECIFIC" with "rag_full" pipeline
 - If previous message was asking for clarification and current message provides more info, upgrade to "JOURNAL_SPECIFIC"
 
+**CLARIFICATION LOOP PREVENTION:**
+- If user has already provided analysis request + specific parameters (like scoring method), do NOT ask for more clarification
+- If conversation shows user trying to proceed with analysis, classify as JOURNAL_SPECIFIC
+- Only use NEEDS_CLARIFICATION for genuinely vague messages like single words or unclear emotional statements
+- If the user acknowledged the chatbot's response, classify as "GENERAL_MENTAL_HEALTH"
+
 Categories (choose exactly one):
-- JOURNAL_SPECIFIC: First-person, analyzable questions about the user's own patterns/feelings/behaviors. Examples: "How have I felt this month?", "Did meditation help me?", "What are my stress patterns lately?", "Check my entries for anxiety", "Look at my data from last week".
-- JOURNAL_SPECIFIC_NEEDS_CLARIFICATION: Personal but too vague to analyze. Examples: "I'm sad", "Help", "How am I?". A single short follow-up question would unlock analysis.
-- GENERAL_MENTAL_HEALTH: General advice/skills/resources not about their own data. Examples: "How to manage anxiety?", "Tips for sleep".
-- UNRELATED: Small talk or off-topic. Examples: "Thanks", "Tell me more", "How are you?".
+- JOURNAL_SPECIFIC: First-person, analyzable questions about the user's own patterns/feelings/behaviors. Examples: "How have I felt this month?", "Did meditation help me?", "What are my stress patterns lately?", "Check my entries for anxiety", "Look at my data from last week". Post this classification in downstream, SOuLO does a RAG anaysis of user's journal entries and helps them out with the coversational query or any ask that they might have about their personal,physical, mental or emotional wellbeing. Even if you are 50% confident that you can go ahead and analyze, classify as journal specific
+- JOURNAL_SPECIFIC_NEEDS_CLARIFICATION: Personal but a little vague to analyze. Examples: "I'm sad", "Help", "How am I?" . A single short follow-up question would unlock analysis.Post this classification in downstream, SOuLO, further clarifies more about the user query and tries to dig into their asks by cross-questioning so that chatbot can help analyze journal 
+- GENERAL_MENTAL_HEALTH: If user's queries contain conversational greetings, General ask for advices on mental health topics/skills/resources. This category also should contain conversational messages like greetings/acknowledgements/statements etc. Post this classification in downstream, SOuLO maintains normal conversations and/or answers general queries about mental health, physical and emotional health. Examples: "How to manage anxiety?", "Tips for sleep". "What causes bloating and fatigue?" "Why are People weird?" "Hey There" "Thanks for the help" "I loved your analysis" , "Perfect! That helped"
+	- UNRELATED: Totally unrelated topics which can in no way gravitate towards exploring user's mental. physical or emotional well-being (Examples: "Who is the president of India", "Tell me more about quantum physics", "Who won the last FIFA World cup?". Post this classification in downstream, SOuLO, refuses politely to respond to unrelated stuff and instead inspires users to ask relevant questions
 
-**DIRECT ANALYSIS TRIGGERS (HIGH PRIORITY):**
-- Messages containing: "check my", "look at my", "analyze my", "what does my", "in my entries", "from my data", "patterns in my"
-- These should bypass clarification and go straight to JOURNAL_SPECIFIC with rag_full pipeline
-
-Decisions:
-- useAllEntries: true if holistic with no explicit timeframe words ("overall", "in general", "what do my entries say about me?"); otherwise false when any timeframe appears or is implied ("today", "yesterday", "last week", "this month", "last month", "recently", "lately").
-- timeScopeHint: one of "all" | "recent" | "last_week" | "this_month" | "last_month" | null.
-  - "recent" for vague near-term ("recently", "lately", "these days").
-  - pick the exact window when stated; null for GENERAL_MENTAL_HEALTH or UNRELATED.
-- recommendedPipeline: "rag_full" for JOURNAL_SPECIFIC; "clarification" for JOURNAL_SPECIFIC_NEEDS_CLARIFICATION; "general" for GENERAL_MENTAL_HEALTH or UNRELATED.
-- clarifyingQuestion: Only for JOURNAL_SPECIFIC_NEEDS_CLARIFICATION; else null. Keep it one short, specific question.
-- journalHintStrength: "high" for clear first-person self-reflection; "medium" for personal but lighter focus; "low" otherwise.
+  You need to generate an output as below, depending on the conversation history that's provided to you. Your objective is to ensure, user's queries/concerns/asks are all met. You need to accordingly classify since you know what happens downstreaam post your classification
 
 Output strictly a single JSON object (no code fences, no extra text) with this schema:
 {
-  "category": "JOURNAL_SPECIFIC" | "JOURNAL_SPECIFIC_NEEDS_CLARIFICATION" | "GENERAL_MENTAL_HEALTH" | "UNRELATED",
-  "confidence": number,
-  "useAllEntries": boolean,
-  "reasoning": string,
-  "recommendedPipeline": "general" | "clarification" | "rag_full",
-  "clarifyingQuestion": string | null,
-  "journalHintStrength": "low" | "medium" | "high",
-  "timeScopeHint": "all" | "recent" | "last_week" | "this_month" | "last_month" | null
+	  "category": "JOURNAL_SPECIFIC" | "JOURNAL_SPECIFIC_NEEDS_CLARIFICATION" | "GENERAL_MENTAL_HEALTH" | "UNRELATED",
 }
 
 Latest user message: "${message}"${contextString}`;
@@ -147,13 +129,13 @@ Latest user message: "${message}"${contextString}`;
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4.1-mini-2025-04-14',
-            messages: [
-              { role: 'system', content: 'You are a strict JSON classifier. Respond with a single JSON object only that matches the provided schema. No code fences, no commentary.' },
-              { role: 'user', content: classificationPrompt }
-            ],
-            response_format: { type: 'json_object' },
-            max_tokens: 600
+        model: 'gpt-4.1-mini',
+        messages: [
+          { role: 'system', content: 'You are a strict JSON classifier. Respond with a single JSON object only that matches the provided schema. No code fences, no commentary.' },
+          { role: 'user', content: classificationPrompt }
+        ],
+        response_format: { type: 'json_object' },
+        max_completion_tokens: 600
       }),
       signal: controller.signal
     });
@@ -174,7 +156,7 @@ Latest user message: "${message}"${contextString}`;
     console.log(`[Query Classifier] GPT Response: ${content}`);
 
     // Helper to extract JSON from possible fenced or prefixed content
-    const extractJsonObject = (text: string): string => {
+    const extractJsonObject = (text) => {
       // ```json ... ```
       const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
       if (fenceMatch) return fenceMatch[1].trim();
@@ -195,14 +177,7 @@ Latest user message: "${message}"${contextString}`;
     }
 
     return {
-      category: result.category,
-      confidence: Math.max(0, Math.min(1, result.confidence ?? 0.85)),
-      useAllEntries: !!result.useAllEntries,
-      reasoning: result.reasoning || 'GPT classification for conversational flow',
-      recommendedPipeline: result.recommendedPipeline,
-      clarifyingQuestion: result.clarifyingQuestion ?? null,
-      journalHintStrength: result.journalHintStrength,
-      timeScopeHint: result.timeScopeHint ?? null
+      category: result.category
     };
 
   } catch (error) {
@@ -210,5 +185,3 @@ Latest user message: "${message}"${contextString}`;
     throw error;
   }
 }
-
-// Rule-based classification removed — GPT-only per requirements.

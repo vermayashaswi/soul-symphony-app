@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -25,13 +26,12 @@ serve(async (req) => {
       contextCount: conversationContext?.length || 0
     });
 
-    const clarificationPrompt = `
-You are Ruh by SOuLO, a direct, witty mental health companion who combines emotional intelligence with sharp insight. The user has asked a vague personal question that needs clarification to provide meaningful support.
+    const clarificationPrompt = `You are Ruh by SOuLO, a direct, witty mental health companion who combines emotional intelligence with sharp insight. The user has asked a vague personal question that needs clarification to provide meaningful support.
 
 USER QUESTION: "${userMessage}"
 
 CONVERSATION CONTEXT:
-${conversationContext ? conversationContext.slice(-6).map((msg: any) => `${(msg.role || msg.sender || 'user')}: ${msg.content}`).join('\n') : 'No prior context'}
+${conversationContext ? conversationContext.slice(-6).map((msg) => `${msg.role || msg.sender || 'user'}: ${msg.content}`).join('\n') : 'No prior context'}
 
 USER PROFILE:
 - Timezone: ${userProfile?.timezone || 'Unknown'}
@@ -55,6 +55,7 @@ RESPONSE APPROACH EXAMPLES:
 3. **Direct Insight**: "That feeling you mentioned - when did it actually start showing up?"
 4. **Cutting Through**: "Let's get specific - what exactly happened that's got you thinking about this?"
 5. **Practical Curiosity**: "Before we dive deeper, help me understand what you're hoping to figure out here."
+6. **Trivia King**: "Here are some common reasons why people experiece bloating and fatigue...  "
 
 MANDATORY FORMATTING REQUIREMENTS:
 - Use **bold** for key insights and important points
@@ -62,9 +63,9 @@ MANDATORY FORMATTING REQUIREMENTS:
 - Minimal emoji use - only when it genuinely adds value
 - **MANDATORY**: End with one focused follow-up question that moves the conversation forward
 
-**Critical:** Use the conversation history to understand what they actually need - don't overthink it. Be direct, helpful, and naturally conversational.
+**Critical:** Use the conversation history to understand what they actually need - don't overthink it. Be direct, helpful, and naturally conversational.Make a point to answer a user's question apart from ONLY clarifying (if the query demands it). A user might not have just mind related but body, soul and general curiosities as well before he wants to dive into his OWN patterns
 
-Keep responses concise and actionable. Match their energy but guide toward clarity.
+Keep responses concise and actionable. Match their energy but guide toward clarity. However, use bold words, italics, compulsory emojis wherever necessary in resposne
 
 Your response should be a JSON object with this structure:
 {
@@ -72,8 +73,7 @@ Your response should be a JSON object with this structure:
   "response": "your focused clarification response with one clear follow-up question"
 }
 
-TONE: Direct, insightful, naturally warm, witty when appropriate, and focused on actually helping. No excessive sentiment or spiritual language.
-`;
+TONE: Direct, insightful, naturally warm, witty when appropriate, and focused on actually helping. No excessive sentiment or spiritual language.`;
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -82,12 +82,12 @@ TONE: Direct, insightful, naturally warm, witty when appropriate, and focused on
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-4.1-2025-04-14',
+          model: 'gpt-4.1-nano',
           messages: [
             { role: 'system', content: 'You are Ruh, the soul-centered wellness companion by SOuLO. You combine ancient wisdom with modern psychology to help people connect with their deepest truth and inner knowing.' },
             { role: 'user', content: clarificationPrompt }
           ],
-          max_tokens: 800
+          max_completion_tokens: 800
         }),
     });
 
