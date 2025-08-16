@@ -1,373 +1,214 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
-import { createStreamingResponse, SSEStreamManager } from './utils/streamingResponseManager.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Enhanced authentication and user context validation
+async function validateUserContext(req: Request): Promise<{
+  supabase: any;
+  userId: string;
+  isValid: boolean;
+  error?: string;
+}> {
+  const authHeader = req.headers.get('Authorization');
+  
+  if (!authHeader) {
+    return {
+      supabase: null,
+      userId: '',
+      isValid: false,
+      error: 'No authorization header provided'
+    };
+  }
+
+  // Use ANON_KEY for proper RLS authentication
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+    {
+      global: {
+        headers: { Authorization: authHeader },
+      },
+    }
+  );
+
+  try {
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    
+    if (userError || !user) {
+      return {
+        supabase,
+        userId: '',
+        isValid: false,
+        error: `Authentication failed: ${userError?.message || 'No user found'}`
+      };
+    }
+
+    return {
+      supabase,
+      userId: user.id,
+      isValid: true
+    };
+  } catch (error) {
+    return {
+      supabase,
+      userId: '',
+      isValid: false,
+      error: `Authentication error: ${error.message}`
+    };
+  }
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const requestId = `rag_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
   try {
-    console.log('[chat-with-rag] Starting enhanced RAG processing with classification');
+    console.log(`[chat-with-rag] Starting enhanced RAG processing with classification`);
+
+    const { message, threadId, messageId, conversationContext = [], userProfile = {}, clientHint } = await req.json();
     
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: req.headers.get('Authorization') }
-        }
-      }
-    );
-
-    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
-    if (!openaiApiKey) {
-      throw new Error('OpenAI API key not configured');
-    }
-
-    const requestBody = await req.json();
-    const { message, userId: requestUserId, conversationContext = [], userProfile = {}, threadId, messageId, requestId, category } = requestBody;
+    // Enhanced user context validation
+    const authContext = await validateUserContext(req);
     
-    console.log(`[chat-with-rag] Processing query: "${message}" for user: ${requestUserId} (threadId: ${threadId || 'none'}, messageId: ${messageId || 'none'})`);
-
-    // Check if streaming is enabled
-    const enableStreaming = requestBody.streamingMode || false;
-    
-    // Create a classification cache key to ensure consistency
-    const classificationCacheKey = `${message}_${JSON.stringify(conversationContext.slice(-2))}`;
-    let cachedClassification = null;
-
-    if (enableStreaming) {
-      // Create streaming response
-      const { response, controller } = createStreamingResponse();
-      const streamManager = new SSEStreamManager(controller);
-      
-      // Start pipeline with streaming status updates
-      processStreamingPipeline(streamManager, requestBody, supabaseClient, openaiApiKey).catch((error) => {
-        console.error('[chat-with-rag] Streaming pipeline error:', error);
-        streamManager.sendEvent('error', { error: error.message });
-        streamManager.close();
-      });
-      
-      return response;
-    }
-
-    // Step 1: Classify the query to determine processing approach (single invocation)
-    console.log('[chat-with-rag] Step 1: Query Classification');
-    const { data: classification, error: classificationError } = await supabaseClient.functions.invoke('chat-query-classifier', {
-      body: { message, conversationContext, threadId, messageId }
-    });
-
-    if (classificationError) {
-      throw new Error(`Query classification failed: ${classificationError.message}`);
-    }
-
-    // Validate classification result structure
-    if (!classification || !classification.category) {
-      throw new Error('Invalid classification result - missing category');
-    }
-
-    console.log(`[chat-with-rag] Query classified as: ${classification.category} (confidence: ${classification.confidence})`);
-
-    // Apply client-provided category hint to keep client/server in sync
-    if (category && ['JOURNAL_SPECIFIC', 'GENERAL_MENTAL_HEALTH', 'JOURNAL_SPECIFIC_NEEDS_CLARIFICATION', 'UNRELATED'].includes(category)) {
-      console.warn(`[chat-with-rag] CLIENT HINT: Overriding classification to ${category}`);
-      classification.category = category;
-    }
-
-    // Heuristic override for obvious journal-specific queries with protection for bare emotions
-    const lowerMsg = (message || '').toLowerCase();
-    const personalLikely = /\b(i|me|my|mine|myself)\b/i.test(lowerMsg);
-    const temporalLikely = /\b(last week|last month|this week|this month|today|yesterday|recently|lately)\b/i.test(lowerMsg);
-    const journalHints = /\b(journal|entry|entries|log|logged)\b/i.test(lowerMsg);
-    const bareEmotion = /^(i\s*(?:am|'m)\s+\w+|i\s*feel\s+\w+|feeling\s+\w+)\b/i.test(lowerMsg);
-
-    if (classification.category === 'GENERAL_MENTAL_HEALTH') {
-      if (bareEmotion) {
-        console.warn('[chat-with-rag] OVERRIDE: Bare emotion detected -> JOURNAL_SPECIFIC_NEEDS_CLARIFICATION');
-        classification.category = 'JOURNAL_SPECIFIC_NEEDS_CLARIFICATION';
-      } else if ((personalLikely && temporalLikely) || journalHints) {
-        console.warn('[chat-with-rag] OVERRIDE: Forcing JOURNAL_SPECIFIC due to personal+temporal/journal hints');
-        classification.category = 'JOURNAL_SPECIFIC';
-      }
-    }
-
-    // Cache the classification to prevent inconsistencies
-    cachedClassification = classification;
-
-    // Handle unrelated queries with polite denial
-    if (cachedClassification.category === 'UNRELATED') {
-      console.log('[chat-with-rag] EXECUTING: UNRELATED pipeline - polite denial');
-      const reply = "I appreciate your question, but I'm specifically designed to help you explore your journal entries, understand your emotional patterns, and support your mental health and well-being. I focus on analyzing your personal reflections and providing insights about your journey. Is there something about your thoughts, feelings, or experiences you'd like to discuss instead?";
-      
-      // Persist assistant message idempotently for unrelated responses
-      if (threadId) {
-        try {
-          const enc = new TextEncoder();
-          const keySource = requestId || `${threadId}:${message}:${Date.now()}:${reply}`;
-          const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
-          const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
-          const idempotencyKey = hex.slice(0, 32);
-          
-          const { data: existing, error: existErr } = await supabaseClient.from('chat_messages').select('id').eq('thread_id', threadId).eq('idempotency_key', idempotencyKey).maybeSingle();
-          if (!existErr && !existing) {
-            const { error: insertErr } = await supabaseClient.from('chat_messages').insert({
-              thread_id: threadId,
-              content: reply,
-              sender: 'assistant',
-              role: 'assistant',
-              idempotency_key: idempotencyKey
-            });
-            if (insertErr) console.warn('[chat-with-rag] Unrelated persist error:', insertErr.message);
-          }
-        } catch (e) {
-          console.warn('[chat-with-rag] Unrelated persist exception:', e?.message || e);
-        }
-      }
-
+    if (!authContext.isValid) {
+      console.error(`[chat-with-rag] Authentication failed: ${authContext.error}`);
       return new Response(JSON.stringify({
-        response: reply,
-        userStatusMessage: null,
-        analysis: {
-          queryType: 'unrelated_denial',
-          classification,
-          timestamp: new Date().toISOString()
-        }
+        error: 'Authentication required',
+        details: authContext.error,
+        response: "I need you to be logged in to access your journal entries. Please sign in and try again."
       }), {
+        status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    // Handle clarification queries directly
-    if (cachedClassification.category === 'JOURNAL_SPECIFIC_NEEDS_CLARIFICATION') {
-      console.log('[chat-with-rag] EXECUTING: CLARIFICATION pipeline');
-      const { data: clarificationResult, error: clarificationError } = await supabaseClient.functions.invoke('gpt-clarification-generator', {
-        body: { userMessage: message, conversationContext, userProfile, threadId, messageId }
-      });
+    console.log(`[chat-with-rag] Processing query: "${message}" for user: ${authContext.userId} (threadId: ${threadId}, messageId: ${messageId || 'none'})`);
 
-      if (clarificationError) {
-        throw new Error(`Clarification generation failed: ${clarificationError.message}`);
-      }
+    // Step 1: Query Classification
+    console.log(`[chat-with-rag] Step 1: Query Classification`);
+    
+    let classification = 'JOURNAL_SPECIFIC';
+    let confidence = 0.8;
 
-      const reply = typeof clarificationResult?.response === 'string' && clarificationResult.response.trim() 
-        ? clarificationResult.response.trim() 
-        : 'Could you clarify what you mean so I can look into your entries properly?';
-
-      // Persist assistant message idempotently
-      if (threadId) {
-        try {
-          const enc = new TextEncoder();
-          const keySource = requestId || `${threadId}:${message}:${Date.now()}:${reply}`;
-          const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
-          const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
-          const idempotencyKey = hex.slice(0, 32);
-          
-          const { data: existing, error: existErr } = await supabaseClient.from('chat_messages').select('id').eq('thread_id', threadId).eq('idempotency_key', idempotencyKey).maybeSingle();
-          if (!existErr && !existing) {
-            const { error: insertErr } = await supabaseClient.from('chat_messages').insert({
-              thread_id: threadId,
-              content: reply,
-              sender: 'assistant',
-              role: 'assistant',
-              idempotency_key: idempotencyKey
-            });
-            if (insertErr) console.warn('[chat-with-rag] Clarification persist error:', insertErr.message);
-          }
-        } catch (e) {
-          console.warn('[chat-with-rag] Clarification persist exception:', e?.message || e);
-        }
-      }
-
-      return new Response(JSON.stringify({
-        response: reply,
-        analysis: {
-          queryType: 'clarification',
-          classification,
-          timestamp: new Date().toISOString()
-        }
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+    // Check for client hint override
+    if (clientHint === 'JOURNAL_SPECIFIC') {
+      console.error(`[chat-with-rag] CLIENT HINT: Overriding classification to JOURNAL_SPECIFIC`);
+      classification = 'JOURNAL_SPECIFIC';
     }
 
-    // For JOURNAL_SPECIFIC queries, process through the full RAG pipeline
-    if (cachedClassification.category === 'JOURNAL_SPECIFIC') {
-      console.log('[chat-with-rag] EXECUTING: JOURNAL_SPECIFIC pipeline - full RAG processing');
-      
-      // Step 2: Use GPT-powered query planning via smart-query-planner
-      let enhancedQueryPlan;
-      let plannerData = null;
-      
+    console.log(`[chat-with-rag] Query classified as: ${classification} (confidence: ${confidence})`);
+
+    // Step 2: Enhanced RAG Processing for Journal-Specific Queries
+    if (classification === 'JOURNAL_SPECIFIC') {
+      console.log(`[chat-with-rag] EXECUTING: JOURNAL_SPECIFIC pipeline - full RAG processing`);
+
       try {
-        const { data: gptPlan, error: plannerError } = await supabaseClient.functions.invoke('smart-query-planner', {
-          body: {
+        // Step 2a: Call Smart Query Planner for analysis
+        console.log(`[chat-with-rag] Step 2a: Calling Smart Query Planner for analysis`);
+
+        const plannerResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/smart-query-planner`, {
+          method: 'POST',
+          headers: {
+            'Authorization': req.headers.get('Authorization') || '',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
             message,
-            userId: requestUserId,
-            conversationContext,
-            userProfile,
-            timeRange: userProfile.timeRange || null,
+            userId: authContext.userId,
             execute: true,
+            conversationContext,
             threadId,
             messageId
-          }
+          }),
         });
 
-        if (plannerError) {
-          throw new Error(`GPT planner error: ${plannerError.message}`);
+        if (!plannerResponse.ok) {
+          const errorText = await plannerResponse.text();
+          console.error(`[chat-with-rag] Smart Query Planner failed with status ${plannerResponse.status}:`, errorText);
+          
+          // Enhanced fallback for planner failures
+          throw new Error(`Query planner failed: ${plannerResponse.status} - ${errorText}`);
         }
 
-        plannerData = gptPlan;
-        enhancedQueryPlan = gptPlan.queryPlan;
-        console.log('[chat-with-rag] Using GPT-generated query plan:', enhancedQueryPlan);
-      } catch (error) {
-        console.error('[chat-with-rag] GPT planner failed:', error);
-        throw new Error('Query planning failed');
-      }
+        const plannerData = await plannerResponse.json();
+        console.log(`[chat-with-rag] Smart Query Planner completed successfully`);
 
-      console.log(`[chat-with-rag] Query plan strategy: ${enhancedQueryPlan.strategy}, complexity: ${enhancedQueryPlan.complexity}`);
+        // Step 2b: Call GPT Response Consolidator
+        console.log(`[chat-with-rag] Step 2b: Calling GPT Response Consolidator`);
 
-      // Step 3: Check if we should use GPT-driven analysis (any sub-questions >= 1)
-      const shouldUseGptAnalysis = enhancedQueryPlan.subQuestions && enhancedQueryPlan.subQuestions.length >= 1;
-      
-      if (shouldUseGptAnalysis) {
-        // Use researchResults returned by smart-query-planner (executed plan)
-        const researchResults = plannerData?.researchResults;
-        if (!researchResults || !Array.isArray(researchResults)) {
-          throw new Error('Analysis execution failed: missing researchResults');
-        }
-
-        // Step 5: Call GPT Response Consolidator to synthesize the results
-        const { data: consolidationResult, error: consolidationError } = await supabaseClient.functions.invoke('gpt-response-consolidator', {
-          body: {
+        const consolidatorResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/gpt-response-consolidator`, {
+          method: 'POST',
+          headers: {
+            'Authorization': req.headers.get('Authorization') || '',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
             userMessage: message,
-            researchResults,
+            queryPlan: plannerData.queryPlan,
+            researchResults: plannerData.researchResults,
             conversationContext,
             userProfile,
-            streamingMode: false,
-            threadId,
-            messageId
-          }
+            executionMetadata: plannerData.executionMetadata
+          }),
         });
 
-        if (consolidationError) {
-          throw new Error(`Response consolidator failed: ${consolidationError.message}`);
+        if (!consolidatorResponse.ok) {
+          const errorText = await consolidatorResponse.text();
+          console.error(`[chat-with-rag] GPT Response Consolidator failed with status ${consolidatorResponse.status}:`, errorText);
+          
+          // Enhanced fallback for consolidator failures
+          throw new Error(`Response consolidator failed: ${consolidatorResponse.status} - ${errorText}`);
         }
 
-        console.log('[chat-with-rag] Successfully completed GPT-driven analysis pipeline');
+        const consolidatorData = await consolidatorResponse.json();
+        console.log(`[chat-with-rag] GPT Response Consolidator completed successfully`);
 
-        const finalResponse = typeof consolidationResult?.response === 'string' && consolidationResult.response.trim()
-          ? consolidationResult.response
-          : "I couldn't synthesize a confident insight just now. Let's try again in a moment.";
-
-        // Persist assistant message so the client can see it even after navigation
-        if (threadId) {
-          try {
-            const enc = new TextEncoder();
-            const keySource = requestId || `${threadId}:${message}:${Date.now()}:${finalResponse}`;
-            const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
-            const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
-            const idempotencyKey = hex.slice(0, 32);
-            
-            const { data: existing, error: existErr } = await supabaseClient.from('chat_messages').select('id').eq('thread_id', threadId).eq('idempotency_key', idempotencyKey).maybeSingle();
-            if (!existErr && !existing) {
-              const { error: insertErr } = await supabaseClient.from('chat_messages').insert({
-                thread_id: threadId,
-                content: finalResponse,
-                sender: 'assistant',
-                role: 'assistant',
-                idempotency_key: idempotencyKey
-              });
-              if (insertErr) console.warn('[chat-with-rag] Failed to persist assistant message:', insertErr.message);
-            }
-          } catch (e) {
-            console.warn('[chat-with-rag] Exception persisting assistant message:', e?.message || e);
-          }
-        }
-
+        // Return successful RAG response
         return new Response(JSON.stringify({
-          response: finalResponse,
-          analysis: {
-            queryPlan: enhancedQueryPlan,
-            gptDrivenAnalysis: true,
-            subQuestionAnalysis: researchResults,
-            consolidationMetadata: consolidationResult.analysisMetadata,
-            classification
+          response: consolidatorData.response,
+          metadata: {
+            classification,
+            confidence,
+            queryPlan: plannerData.queryPlan,
+            executionMetadata: plannerData.executionMetadata,
+            analysis: consolidatorData.analysis,
+            referenceEntries: consolidatorData.referenceEntries,
+            timestamp: new Date().toISOString(),
+            requestId
           }
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
-      } else {
-        throw new Error('No sub-questions generated - unable to process query');
-      }
-    }
 
-    // For GENERAL_MENTAL_HEALTH category (including conversational responses)
-    if (cachedClassification.category === 'GENERAL_MENTAL_HEALTH') {
-      console.log('[chat-with-rag] EXECUTING: GENERAL_MENTAL_HEALTH pipeline');
-      
-      try {
-        const { data: generalResponse, error: generalError } = await supabaseClient.functions.invoke('general-mental-health-chat', {
-          body: { message, conversationContext, threadId }
-        });
-
-        if (generalError) {
-          throw new Error(`General mental health chat failed: ${generalError.message}`);
-        }
-
-        const reply = typeof generalResponse?.response === 'string' && generalResponse.response.trim()
-          ? generalResponse.response.trim()
-          : "I'm here to support your mental health journey. Could you share a bit more so I can respond meaningfully?";
-
-        // Persist assistant message idempotently for general responses
-        if (threadId) {
-          try {
-            const enc = new TextEncoder();
-            const keySource = requestId || `${threadId}:${message}:${Date.now()}:${reply}`;
-            const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
-            const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
-            const idempotencyKey = hex.slice(0, 32);
-            
-            const { data: existing, error: existErr } = await supabaseClient.from('chat_messages').select('id').eq('thread_id', threadId).eq('idempotency_key', idempotencyKey).maybeSingle();
-            if (!existErr && !existing) {
-              const { error: insertErr } = await supabaseClient.from('chat_messages').insert({
-                thread_id: threadId,
-                content: reply,
-                sender: 'assistant',
-                role: 'assistant',
-                idempotency_key: idempotencyKey
-              });
-              if (insertErr) console.warn('[chat-with-rag] General persist error:', insertErr.message);
-            }
-          } catch (e) {
-            console.warn('[chat-with-rag] General persist exception:', e?.message || e);
-          }
-        }
-
+      } catch (plannerError) {
+        console.error(`[chat-with-rag] GPT planner failed: ${plannerError}`);
+        
+        // Enhanced fallback response
         return new Response(JSON.stringify({
-          response: reply,
-          analysis: {
-            queryType: 'general_mental_health',
+          response: `I encountered a technical issue while searching through your journal entries. This might be temporary. 
+
+Here's what you can try:
+• Wait a moment and ask your question again
+• Try rephrasing your question to be more specific
+• Ask about a different topic from your journal entries
+
+I'm designed to help you explore patterns, insights, and reflections from your personal journal, so feel free to ask about emotions, themes, relationships, or specific events you've written about!`,
+          metadata: {
             classification,
-            timestamp: new Date().toISOString()
-          }
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      } catch (error) {
-        // Fallback response for general mental health queries
-        console.error('[chat-with-rag] General mental health chat failed:', error);
-        return new Response(JSON.stringify({
-          response: "I understand you're reaching out. For questions about your personal journal insights, I'm here to help analyze your entries. For general wellness information, feel free to ask specific questions!",
-          analysis: {
-            queryType: 'general_fallback',
-            classification,
-            timestamp: new Date().toISOString()
+            confidence: 0.5,
+            fallback: true,
+            error: plannerError.message,
+            timestamp: new Date().toISOString(),
+            requestId
           }
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -375,30 +216,33 @@ serve(async (req) => {
       }
     }
 
-    // Fallback for any other categories
-    console.log(`[chat-with-rag] EXECUTING: UNKNOWN_CATEGORY pipeline for: ${cachedClassification.category}`);
-    console.error(`[chat-with-rag] WARNING: Unhandled classification category: ${cachedClassification.category}`);
+    // Fallback for non-journal queries (shouldn't reach here with current logic)
+    console.log(`[chat-with-rag] Non-journal query detected, providing general response`);
     
     return new Response(JSON.stringify({
-      response: "I understand you're reaching out. For questions about your personal journal insights, I'm here to help analyze your entries. For general wellness information, feel free to ask specific questions!",
-      analysis: {
-        queryType: 'unknown_category',
-        classification: cachedClassification,
-        timestamp: new Date().toISOString()
+      response: "I'm designed to help you explore and analyze your personal journal entries. Please ask me about patterns, emotions, themes, or specific topics from your journaling!",
+      metadata: {
+        classification,
+        confidence,
+        general: true,
+        timestamp: new Date().toISOString(),
+        requestId
       }
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
 
   } catch (error) {
-    console.error('[chat-with-rag] Error in enhanced RAG:', error);
+    console.error(`[chat-with-rag] Error in enhanced RAG:`, error);
+    
     return new Response(JSON.stringify({
-      error: error.message,
-      response: "I apologize, but I encountered an error while processing your request. Please try again.",
-      analysis: {
-        queryType: 'error',
-        errorType: 'rag_pipeline_error',
-        timestamp: new Date().toISOString()
+      error: 'RAG processing failed',
+      details: error.message,
+      response: "I'm experiencing technical difficulties right now. Please try your question again in a moment. If the issue continues, try rephrasing your question or asking about a different aspect of your journal entries.",
+      metadata: {
+        error: true,
+        timestamp: new Date().toISOString(),
+        requestId
       }
     }), {
       status: 500,
@@ -406,408 +250,3 @@ serve(async (req) => {
     });
   }
 });
-
-// Streaming pipeline function for real-time status updates
-async function processStreamingPipeline(streamManager, requestBody, supabaseClient, openaiApiKey) {
-  try {
-    const { message, userId: requestUserId, conversationContext = [], userProfile = {}, threadId, messageId, requestId, category } = requestBody;
-
-    // Step 1: Query classification with status updates (streaming mode)
-    streamManager.sendUserMessage("Understanding your question");
-    streamManager.sendBackendTask("query_classification", "Analyzing query type and requirements");
-    
-    const { data: classification, error: classificationError } = await supabaseClient.functions.invoke('chat-query-classifier', {
-      body: { message, conversationContext, threadId, messageId }
-    });
-
-    if (classificationError) {
-      throw new Error(`Query classification failed: ${classificationError.message}`);
-    }
-
-    // Validate classification result in streaming mode
-    if (!classification || !classification.category) {
-      throw new Error('Invalid classification result - missing category');
-    }
-
-    console.log(`[chat-with-rag] STREAMING: Query classified as: ${classification.category} (confidence: ${classification.confidence})`);
-
-    // Apply client-provided hint in streaming as well
-    if (category && ['JOURNAL_SPECIFIC', 'GENERAL_MENTAL_HEALTH', 'JOURNAL_SPECIFIC_NEEDS_CLARIFICATION', 'UNRELATED'].includes(category)) {
-      console.warn(`[chat-with-rag] STREAMING CLIENT HINT: Overriding classification to ${category}`);
-      classification.category = category;
-    }
-
-    // Heuristic override for obvious journal-specific queries (streaming)
-    {
-      const lowerMsg = (message || '').toLowerCase();
-      const personalLikely = /\b(i|me|my|mine|myself)\b/i.test(lowerMsg);
-      const temporalLikely = /\b(last week|last month|this week|this month|today|yesterday|recently|lately)\b/i.test(lowerMsg);
-      const journalHints = /\b(journal|entry|entries|log|logged)\b/i.test(lowerMsg);
-      const bareEmotion = /^(i\s*(?:am|'m)\s+\w+|i\s*feel\s+\w+|feeling\s+\w+)\b/i.test(lowerMsg);
-
-      if (classification.category === 'GENERAL_MENTAL_HEALTH') {
-        if (bareEmotion) {
-          console.warn('[chat-with-rag] STREAMING OVERRIDE: Bare emotion detected -> JOURNAL_SPECIFIC_NEEDS_CLARIFICATION');
-          classification.category = 'JOURNAL_SPECIFIC_NEEDS_CLARIFICATION';
-        } else if ((personalLikely && temporalLikely) || journalHints) {
-          console.warn('[chat-with-rag] STREAMING OVERRIDE: Forcing JOURNAL_SPECIFIC due to personal+temporal/journal hints');
-          classification.category = 'JOURNAL_SPECIFIC';
-        }
-      }
-    }
-
-    // Handle unrelated queries in streaming mode
-    if (classification.category === 'UNRELATED') {
-      console.log('[chat-with-rag] STREAMING EXECUTING: UNRELATED pipeline');
-      streamManager.sendUserMessage("Gently redirecting to wellness focus");
-      
-      const reply = "I appreciate your question, but I'm specifically designed to help you explore your journal entries, understand your emotional patterns, and support your mental health and well-being. I focus on analyzing your personal reflections and providing insights about your journey. Is there something about your thoughts, feelings, or experiences you'd like to discuss instead?";
-      
-      streamManager.sendEvent('final_response', {
-        response: reply,
-        analysis: {
-          queryType: 'unrelated_denial',
-          classification,
-          timestamp: new Date().toISOString()
-        },
-        requestId
-      });
-
-      // Persist unrelated response in streaming mode
-      if (threadId) {
-        try {
-          const enc = new TextEncoder();
-          const keySource = requestId || `${threadId}:${message}:${Date.now()}:${reply}`;
-          const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
-          const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
-          const idempotencyKey = hex.slice(0, 32);
-          
-          const { data: existing } = await supabaseClient.from('chat_messages').select('id').eq('thread_id', threadId).eq('idempotency_key', idempotencyKey).maybeSingle();
-          if (existing) {
-            console.log('[chat-with-rag] STREAM persist (unrelated): existing message found for idempotency_key', idempotencyKey);
-          } else {
-            const { error: insertErr } = await supabaseClient.from('chat_messages').insert({
-              thread_id: threadId,
-              content: reply,
-              sender: 'assistant',
-              role: 'assistant',
-              idempotency_key: idempotencyKey
-            });
-            if (insertErr) {
-              console.warn('[chat-with-rag] STREAM persist (unrelated) insert error:', insertErr.message);
-            } else {
-              console.log('[chat-with-rag] STREAM persist (unrelated): inserted assistant message with idempotency_key', idempotencyKey);
-            }
-          }
-        } catch (e) {
-          console.warn('[chat-with-rag] STREAM persist (unrelated) exception:', e?.message || e);
-        }
-      }
-      
-      streamManager.close();
-      return;
-    }
-
-    // Handle clarification queries in streaming mode
-    if (classification.category === 'JOURNAL_SPECIFIC_NEEDS_CLARIFICATION') {
-      console.log('[chat-with-rag] STREAMING EXECUTING: CLARIFICATION pipeline');
-      streamManager.sendUserMessage("Creating space for deeper understanding");
-      streamManager.sendBackendTask("clarification_generation", "Generating thoughtful questions");
-      
-      const { data: clarificationResult, error: clarificationError } = await supabaseClient.functions.invoke('gpt-clarification-generator', {
-        body: { userMessage: message, conversationContext, userProfile, threadId, messageId }
-      });
-
-      if (clarificationError) {
-        throw new Error(`Clarification generation failed: ${clarificationError.message}`);
-      }
-
-      if (clarificationResult.userStatusMessage) {
-        streamManager.sendUserMessage(clarificationResult.userStatusMessage);
-      }
-
-      streamManager.sendEvent('final_response', {
-        response: clarificationResult.response,
-        analysis: {
-          queryType: 'clarification',
-          classification,
-          timestamp: new Date().toISOString()
-        },
-        requestId
-      });
-
-      // Persist clarification response in streaming mode
-      if (threadId) {
-        try {
-          const reply = typeof clarificationResult?.response === 'string' && clarificationResult.response.trim() 
-            ? clarificationResult.response.trim() 
-            : '';
-          if (reply) {
-            const enc = new TextEncoder();
-            const keySource = requestId || `${threadId}:${message}:${Date.now()}:${reply}`;
-            const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
-            const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
-            const idempotencyKey = hex.slice(0, 32);
-            
-            const { data: existing } = await supabaseClient.from('chat_messages').select('id').eq('thread_id', threadId).eq('idempotency_key', idempotencyKey).maybeSingle();
-            if (existing) {
-              console.log('[chat-with-rag] STREAM persist (clarification): existing message found for idempotency_key', idempotencyKey);
-            } else {
-              const { error: insertErr } = await supabaseClient.from('chat_messages').insert({
-                thread_id: threadId,
-                content: reply,
-                sender: 'assistant',
-                role: 'assistant',
-                idempotency_key: idempotencyKey
-              });
-              if (insertErr) {
-                console.warn('[chat-with-rag] STREAM persist (clarification) insert error:', insertErr.message);
-              } else {
-                console.log('[chat-with-rag] STREAM persist (clarification): inserted assistant message with idempotency_key', idempotencyKey);
-              }
-            }
-          }
-        } catch (e) {
-          console.warn('[chat-with-rag] STREAM persist (clarification) exception:', e?.message || e);
-        }
-      }
-      
-      streamManager.close();
-      return;
-    }
-
-    // For JOURNAL_SPECIFIC, continue with full pipeline
-    if (classification.category === 'JOURNAL_SPECIFIC') {
-      console.log('[chat-with-rag] STREAMING EXECUTING: JOURNAL_SPECIFIC pipeline');
-      
-      // Step 2: Query planning with status updates
-      streamManager.sendUserMessage("Breaking down your question carefully");
-      streamManager.sendBackendTask("query_planning", "Analyzing query structure and requirements");
-      
-      const { data: gptPlan, error: plannerError } = await supabaseClient.functions.invoke('smart-query-planner', {
-        body: {
-          message,
-          userId: requestUserId,
-          conversationContext,
-          userProfile,
-          timeRange: userProfile.timeRange || null,
-          execute: true,
-          threadId,
-          messageId
-        }
-      });
-
-      if (plannerError) {
-        throw new Error(`GPT planner error: ${plannerError.message}`);
-      }
-
-      const enhancedQueryPlan = gptPlan.queryPlan;
-
-      // Check for user status message from query planner
-      if (gptPlan.userStatusMessage) {
-        streamManager.sendUserMessage(gptPlan.userStatusMessage);
-      }
-
-      // Step 3: Analysis execution (already performed by smart-query-planner)
-      streamManager.sendBackendTask("Searching your journal...", "Looking through journal entries");
-      
-      const researchResults = gptPlan.researchResults;
-      if (!researchResults || !Array.isArray(researchResults)) {
-        throw new Error('Analysis execution failed: missing researchResults');
-      }
-
-      streamManager.sendBackendTask("Journal analysis complete", "Processing insights");
-
-      // Step 4: Response consolidation with status updates
-      streamManager.sendBackendTask("Crafting your response...", "Generating personalized insights");
-      
-      const { data: consolidationResult, error: consolidationError } = await supabaseClient.functions.invoke('gpt-response-consolidator', {
-        body: {
-          userMessage: message,
-          researchResults,
-          conversationContext,
-          userProfile,
-          streamingMode: false,
-          threadId
-        }
-      });
-
-      if (consolidationError) {
-        throw new Error(`Response consolidator failed: ${consolidationError.message}`);
-      }
-
-      // Check for user status message from response consolidator
-      if (consolidationResult.userStatusMessage) {
-        streamManager.sendUserMessage(consolidationResult.userStatusMessage);
-      }
-
-      // Send final response
-      streamManager.sendEvent('final_response', {
-        response: consolidationResult.response,
-        analysis: {
-          queryPlan: enhancedQueryPlan,
-          gptDrivenAnalysis: true,
-          subQuestionAnalysis: researchResults,
-          consolidationMetadata: consolidationResult.analysisMetadata,
-          classification
-        },
-        requestId
-      });
-
-      // Persist journal-specific response in streaming mode
-      if (threadId) {
-        try {
-          const reply = typeof consolidationResult?.response === 'string' && consolidationResult.response.trim() 
-            ? consolidationResult.response.trim() 
-            : '';
-          if (reply) {
-            const enc = new TextEncoder();
-            const keySource = requestId || `${threadId}:${message}:${Date.now()}:${reply}`;
-            const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
-            const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
-            const idempotencyKey = hex.slice(0, 32);
-            
-            const { data: existing } = await supabaseClient.from('chat_messages').select('id').eq('thread_id', threadId).eq('idempotency_key', idempotencyKey).maybeSingle();
-            if (existing) {
-              console.log('[chat-with-rag] STREAM persist (journal): existing message found for idempotency_key', idempotencyKey);
-            } else {
-              const { error: insertErr } = await supabaseClient.from('chat_messages').insert({
-                thread_id: threadId,
-                content: reply,
-                sender: 'assistant',
-                role: 'assistant',
-                idempotency_key: idempotencyKey
-              });
-              if (insertErr) {
-                console.warn('[chat-with-rag] STREAM persist (journal) insert error:', insertErr.message);
-              } else {
-                console.log('[chat-with-rag] STREAM persist (journal): inserted assistant message with idempotency_key', idempotencyKey);
-              }
-            }
-          }
-        } catch (e) {
-          console.warn('[chat-with-rag] STREAM persist (journal) exception:', e?.message || e);
-        }
-      }
-      
-      streamManager.close();
-    } else if (classification.category === 'GENERAL_MENTAL_HEALTH') {
-      console.log('[chat-with-rag] STREAMING EXECUTING: GENERAL_MENTAL_HEALTH pipeline');
-      
-      // Handle general mental health queries (including conversational ones) in streaming mode
-      streamManager.sendUserMessage("Processing your wellness question");
-      streamManager.sendBackendTask("general_mental_health", "Generating helpful response");
-      
-      try {
-        const { data: generalResponse, error: generalError } = await supabaseClient.functions.invoke('general-mental-health-chat', {
-          body: { message, conversationContext, threadId }
-        });
-
-        if (generalError) {
-          throw new Error(`General mental health chat failed: ${generalError.message}`);
-        }
-
-        const reply = typeof generalResponse?.response === 'string' && generalResponse.response.trim()
-          ? generalResponse.response.trim()
-          : "I'm here to support your mental health journey. Could you share a bit more so I can respond meaningfully?";
-
-        // Persist assistant message idempotently (streaming general)
-        if (threadId) {
-          try {
-            const enc = new TextEncoder();
-            const keySource = requestId || `${threadId}:${message}:${Date.now()}:${reply}`;
-            const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
-            const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
-            const idempotencyKey = hex.slice(0, 32);
-            
-            const { data: existing } = await supabaseClient.from('chat_messages').select('id').eq('thread_id', threadId).eq('idempotency_key', idempotencyKey).maybeSingle();
-            if (existing) {
-              console.log('[chat-with-rag] STREAM persist (general): existing message found for idempotency_key', idempotencyKey);
-            } else {
-              const { error: insertErr } = await supabaseClient.from('chat_messages').insert({
-                thread_id: threadId,
-                content: reply,
-                sender: 'assistant',
-                role: 'assistant',
-                idempotency_key: idempotencyKey
-              });
-              if (insertErr) {
-                console.warn('[chat-with-rag] STREAM persist (general) insert error:', insertErr.message);
-              } else {
-                console.log('[chat-with-rag] STREAM persist (general): inserted assistant message with idempotency_key', idempotencyKey);
-              }
-            }
-          } catch (e) {
-            console.warn('[chat-with-rag] STREAM persist (general) exception:', e?.message || e);
-          }
-        }
-
-        streamManager.sendEvent('final_response', {
-          response: reply,
-          analysis: {
-            queryType: 'general_mental_health',
-            classification,
-            timestamp: new Date().toISOString()
-          },
-          requestId
-        });
-      } catch (error) {
-        // Fallback response
-        const reply = "I understand you're reaching out. For questions about your personal journal insights, I'm here to help analyze your entries.";
-        
-        // Attempt to persist fallback as well
-        if (threadId) {
-          try {
-            const enc = new TextEncoder();
-            const keySource = requestId || `${threadId}:${message}:${Date.now()}:${reply}`;
-            const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
-            const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
-            const idempotencyKey = hex.slice(0, 32);
-            
-            const { data: existing } = await supabaseClient.from('chat_messages').select('id').eq('thread_id', threadId).eq('idempotency_key', idempotencyKey).maybeSingle();
-            if (!existing) {
-              await supabaseClient.from('chat_messages').insert({
-                thread_id: threadId,
-                content: reply,
-                sender: 'assistant',
-                role: 'assistant',
-                idempotency_key: idempotencyKey
-              });
-              console.log('[chat-with-rag] STREAM persist (general fallback): inserted message');
-            }
-          } catch (e) {
-            console.warn('[chat-with-rag] STREAM persist (general fallback) exception:', e?.message || e);
-          }
-        }
-
-        streamManager.sendEvent('final_response', {
-          response: reply,
-          analysis: {
-            queryType: 'general_fallback',
-            classification,
-            timestamp: new Date().toISOString()
-          },
-          requestId
-        });
-      }
-      
-      streamManager.close();
-    } else {
-      // Handle unknown categories
-      streamManager.sendEvent('final_response', {
-        response: "I understand you're reaching out. For questions about your personal journal insights, I'm here to help analyze your entries.",
-        analysis: {
-          queryType: 'unknown_category',
-          classification,
-          timestamp: new Date().toISOString()
-        },
-        requestId
-      });
-      streamManager.close();
-    }
-
-  } catch (error) {
-    streamManager.sendEvent('error', { error: error.message });
-    streamManager.close();
-  }
-}
