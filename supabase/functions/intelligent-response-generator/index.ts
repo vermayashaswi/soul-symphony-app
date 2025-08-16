@@ -89,7 +89,7 @@ function generateIntelligentSystemPrompt(
   const themeGuidelines = getThemeAnalysisGuidelines();
   
   let contextualInfo = `Date: ${currentDate}, Timezone: ${userProfile.timezone || 'UTC'}
-Strategy: ${queryPlan.strategy}, Methods: ${queryPlan.searchMethods.join(', ')}`;
+Strategy: ${queryPlan.strategy}, Methods: ${queryPlan.searchMethods ? queryPlan.searchMethods.join(', ') : 'unknown'}`;
 
   if (queryPlan.filters?.timeRange) {
     const startStr = new Date(queryPlan.filters.timeRange.startDate).toLocaleDateString();

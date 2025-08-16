@@ -105,8 +105,8 @@ async function executeVectorSearchWithDebug(step: any, userId: string, supabaseC
     console.log(`[${requestId}] - Max value: ${Math.max(...embedding).toFixed(4)}`);
     console.log(`[${requestId}] - Has infinite values: ${embedding.some(n => !isFinite(n)) ? '❌ YES' : '✅ NO'}`);
     
-    // Enhanced database call with debugging parameters
-    const debugThreshold = 0.1; // Lowered threshold for debugging
+    // Enhanced database call with optimized threshold
+    const debugThreshold = 0.6; // Updated threshold as requested
     const debugLimit = 20; // More results for analysis
     
     console.log(`[${requestId}] Calling match_journal_entries with ENHANCED debugging:`);
@@ -135,12 +135,27 @@ async function executeVectorSearchWithDebug(step: any, userId: string, supabaseC
     console.log(`[${requestId}] Executing vector search...`);
     const startTime = Date.now();
     
-    const { data, error } = await supabaseClient.rpc('match_journal_entries', {
+    // Choose correct RPC function based on time range
+    let rpcFunctionName = 'match_journal_entries';
+    let rpcParams: any = {
       query_embedding: embedding,
       match_threshold: debugThreshold,
       match_count: debugLimit,
       user_id_filter: userId
-    });
+    };
+    
+    // Use time-based function if timeRange is provided
+    if (step.timeRange && step.timeRange.start && step.timeRange.end) {
+      rpcFunctionName = 'match_journal_entries_with_date';
+      rpcParams.start_date = step.timeRange.start;
+      rpcParams.end_date = step.timeRange.end;
+      console.log(`[${requestId}] Using time-based search with range: ${step.timeRange.start} to ${step.timeRange.end}`);
+    }
+    
+    console.log(`[${requestId}] Calling RPC function: ${rpcFunctionName}`);
+    console.log(`[${requestId}] With parameters:`, Object.keys(rpcParams));
+    
+    const { data, error } = await supabaseClient.rpc(rpcFunctionName, rpcParams);
     
     const executionTime = Date.now() - startTime;
     console.log(`[${requestId}] Vector search execution time: ${executionTime}ms`);
@@ -645,13 +660,13 @@ Response format:
             if (!step.vectorSearch) {
               step.vectorSearch = {
                 query: `${message} personal journal content experiences thoughts feelings`,
-                threshold: 0.1, // Lower threshold for better results
+              threshold: 0.6, // Optimized threshold
                 limit: 15
               };
               step.queryType = step.queryType === 'sql_analysis' ? 'hybrid_search' : 'vector_search';
             } else {
-              // Ensure lower threshold for existing vector searches
-              step.vectorSearch.threshold = 0.1;
+              // Ensure optimal threshold for existing vector searches
+              step.vectorSearch.threshold = 0.6;
             }
             // Ensure timezone is included in timeRange
             if (step.timeRange && !step.timeRange.timezone) {
@@ -728,7 +743,7 @@ function createEnhancedFallbackPlan(originalMessage, isContentSeekingQuery, infe
             sqlQuery: null,
             vectorSearch: {
               query: vectorQuery,
-              threshold: 0.1, // Lower threshold for better results
+              threshold: 0.6, // Optimized threshold
               limit: 15
             },
             timeRange: inferredTimeContext ? { ...inferredTimeContext, timezone: userTimezone } : null
@@ -878,7 +893,7 @@ serve(async (req) => {
             queryType: "vector_search",
             vectorSearch: {
               query: "personal journal experiences thoughts feelings",
-              threshold: 0.1,
+              threshold: 0.6,
               limit: 10
             },
             timeRange: null
