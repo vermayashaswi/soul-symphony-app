@@ -1,250 +1,117 @@
 
-// Enhanced conversational SOULo response generation with database-aware theme/emotion context
-import { CacheManager } from './cacheManager.ts';
 import { OptimizedApiClient } from './optimizedApiClient.ts';
-import { createThemeEmotionService } from '../../_shared/themeEmotionService.ts';
 
 export function generateSystemPrompt(
-  userTimezone: string,
+  timezone: string,
   timeRange?: any,
-  queryType?: string,
-  entryCount?: number,
-  analysisScope?: string,
+  expectedResponseType?: string,
+  resultsCount?: number,
+  searchInfo?: string,
   conversationContext?: any[],
-  hasPersonalPronouns?: boolean,
-  hasTimeReference?: boolean,
-  searchMethod?: string
+  isPersonalQuery?: boolean,
+  requiresTimeFilter?: boolean,
+  searchStrategy?: string
 ): string {
-  const currentDate = new Date().toISOString();
-  
-  let contextualInfo = `Current date: ${currentDate}
-User timezone: ${userTimezone || 'UTC'}`;
-  
-  if (entryCount) {
-    contextualInfo += `\nUser has ${entryCount} journal entries`;
-  }
-  
-  if (analysisScope) {
-    contextualInfo += `\nAnalysis scope: ${analysisScope}`;
-  }
-  
-  if (timeRange) {
-    const startStr = timeRange.startDate ? new Date(timeRange.startDate).toLocaleDateString() : 'start';
-    const endStr = timeRange.endDate ? new Date(timeRange.endDate).toLocaleDateString() : 'end';
-    contextualInfo += `\nTimeframe: ${startStr} to ${endStr}`;
-  }
-  
-  if (searchMethod) {
-    contextualInfo += `\nSearch method: ${searchMethod}`;
-  }
+  let prompt = `You are an AI assistant specializing in analyzing personal journal entries and providing insightful responses based on the user's documented experiences, thoughts, and emotions.
 
-  // Detect analytical vs conversational responses
-  const needsAnalyticalFormat = queryType === 'analysis' || 
-    queryType === 'aggregated' ||
-    /\b(pattern|trend|when do|what time|how often|frequency|usually|typically|statistics|insights|breakdown|analysis)\b/i.test(analysisScope || '');
+CONTEXT AND SEARCH INFORMATION:
+- Search strategy: ${searchStrategy || 'comprehensive'}
+- Results found: ${resultsCount || 0} relevant entries
+- Search details: ${searchInfo || 'Standard search'}
+- User timezone: ${timezone}
+- Query type: ${isPersonalQuery ? 'Personal reflection' : 'General inquiry'}
 
-  let systemPrompt = `You are SOULo ("Ruh"), a direct, insightful emotional wellness coach specializing in journal-based therapy. You're naturally warm but cut through emotional fog with clarity and wit.
+RESPONSE GUIDELINES:
+1. **Personalization**: Use insights from the journal entries to provide personalized, relevant responses
+2. **Empathy**: Show understanding and emotional intelligence when discussing personal experiences
+3. **Analysis**: ${expectedResponseType === 'analysis' ? 'Provide detailed analytical insights with patterns and trends' : 'Focus on conversational, supportive responses'}
+4. **Time Awareness**: ${requiresTimeFilter ? 'Pay attention to temporal patterns and time-based insights' : 'Consider the chronological context of entries'}
+5. **Confidentiality**: Treat all journal content with utmost privacy and respect
 
-${contextualInfo}
+FORMAT:
+- Use a warm, conversational tone
+- Reference specific experiences when relevant
+- Provide actionable insights when appropriate
+- ${expectedResponseType === 'analysis' ? 'Structure analytical responses with clear sections and bullet points' : 'Keep responses natural and flowing'}
 
-**DATABASE-AWARE ANALYSIS:**
-• Use PRECISE emotion scores (0.0-1.0) from database-validated AI analysis
-• Use theme-emotion relationships from themeemotion column 
-• Master themes use exact database categories
-• Trust database-validated data completely - no guessing
+CONVERSATION CONTEXT:
+${conversationContext && conversationContext.length > 0 ? 
+  `Previous conversation:\n${conversationContext.map(msg => `${msg.role}: ${msg.content}`).join('\n')}\n` : 
+  'This is the start of the conversation.\n'}`;
 
-**EVIDENCE RULE FOR SYMPTOMS:**
-• Only assert specific symptoms (fatigue, bloating, headaches, etc.) if exact words appear in the text
-• Otherwise refer to "Body & Health-related entries" and require reference snippets for any symptom claims
-• Be precise about what you actually found vs. what you're inferring
-
-**CONVERSATION APPROACH:**
-• Be direct: "Looking at your entries, here's what stands out..." "The data shows..."
-• Keep focused: 150-250 words unless deeper analysis needed
-• Use natural emphasis: *like this* sparingly
-• Reference specifics: scores, dates, patterns
-• Match their energy but stay grounded and helpful
-
-**FORMATTING REQUIREMENTS:**
-• Use **bold text** for key insights, emotion names, and important findings
-• Use *italics* for emotional validation, gentle emphasis, and reflective observations
-• Create proper paragraph breaks with empty lines between different topics
-• Use bullet points (•) for lists, patterns, and key observations
-• Use numbered lists (1., 2., 3.) for sequential insights or recommendations
-• Use ## headers for main sections when providing structured analysis
-• Add appropriate line spacing for better readability
-• Include relevant emojis sparingly for warmth and emotional connection (💙, 🌱, ✨, 💭, 🤗)
-• Format all responses in proper markdown syntax for optimal frontend rendering`;
-
-  if (needsAnalyticalFormat) {
-    systemPrompt += `
-
-**FOR DETAILED ANALYSIS WITH DATABASE CONTEXT:**
-When providing deeper insights using database-validated data, structure naturally but clearly:
-• **What I'm seeing**: [specific finding with database-validated emotion data and theme connections]
-• **Pattern I notice**: [trend with examples, dates, and database-confirmed relationships]
-• **What this might mean**: [caring interpretation based on validated data]
-
-For complex insights, use friendly headers with proper markdown formatting:
-## What I'm Noticing
-## Patterns That Stand Out  
-## Things to Consider
-
-**MARKDOWN FORMATTING FOR ANALYSIS:**
-- Use **bold** for emotion names, scores, dates, and key findings
-- Use *italics* for reflective insights and emotional validation
-- Create clear paragraph breaks between different analytical points
-- Use bullet points for listing observations and patterns
-- Use numbered lists for sequential recommendations or steps
-- Include appropriate emojis for emotional warmth (💙, 🌱, ✨)
-- Ensure proper line spacing between sections for readability
-
-Always ground insights in specific database-validated emotion scores, theme-emotion relationships, and dates with proper markdown formatting.`;
-  }
-
-  systemPrompt += `
-
-**RESPONSE STYLES:**
-• Simple questions: Direct answer + gentle follow-up
-• Exploration: Validate → Share insights → Invite reflection
-• Crisis: Validate + suggest support
-• Patterns: Share findings + help connect dots
-
-You ARE a certified emotional wellness coach. Use therapeutic training for meaningful conversations through validated journal data.`;
-
-  return systemPrompt;
+  return prompt;
 }
 
-export function formatJournalEntriesForAnalysis(entries: any[], searchMethod?: string): string {
-  // Limit for performance while maintaining quality
-  const limitedEntries = entries.slice(0, 20);
-  
-  let formattedContent = '';
-  
-  if (searchMethod === 'dual') {
-    formattedContent += `Search Results (Enhanced Database-Aware Analysis):\n\n`;
-  }
-  
-  formattedContent += limitedEntries.map(entry => {
-    const date = new Date(entry.created_at).toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+export function generateUserPrompt(message: string, searchResults: any[], searchType: string): string {
+  const contextEntries = searchResults.slice(0, 10).map(entry => {
+    const content = entry.content || entry.refined_text || entry.transcription_text || 'No content';
+    const themes = entry.master_themes ? entry.master_themes.join(', ') : 'No themes';
+    const emotions = entry.emotions ? Object.keys(entry.emotions).join(', ') : 'No emotions';
+    const date = entry.created_at ? new Date(entry.created_at).toLocaleDateString() : 'No date';
     
-    let emotionInfo = '';
-    if (entry.emotions && typeof entry.emotions === 'object') {
-      const emotions = Object.entries(entry.emotions)
-        .filter(([_, score]) => typeof score === 'number' && score > 0.3)
-        .sort(([_, a], [__, b]) => (b as number) - (a as number))
-        .slice(0, 4)
-        .map(([emotion, score]) => `${emotion}: ${(score as number).toFixed(2)}`)
-        .join(', ');
-      
-      if (emotions) {
-        emotionInfo = `\nDatabase-Validated Emotions: ${emotions}`;
-      }
-    }
-    
-    let themeInfo = '';
-    if (entry.master_themes && Array.isArray(entry.master_themes)) {
-      themeInfo = `\nDatabase Themes: ${entry.master_themes.slice(0, 3).join(', ')}`;
-    }
+    return `Entry (${date}): ${content.slice(0, 300)}${content.length > 300 ? '...' : ''}\nThemes: ${themes}\nEmotions: ${emotions}\n---`;
+  }).join('\n');
 
-    // Enhanced theme-emotion relationship data with database validation
-    let themeEmotionInfo = '';
-    if (entry.themeemotion && typeof entry.themeemotion === 'object') {
-      const themeEmotions = Object.entries(entry.themeemotion)
-        .slice(0, 2)
-        .map(([theme, emotions]: [string, any]) => {
-          if (emotions && typeof emotions === 'object') {
-            const topEmotions = Object.entries(emotions)
-              .sort(([_, a], [__, b]) => (b as number) - (a as number))
-              .slice(0, 2)
-              .map(([emotion, score]) => `${emotion}: ${(score as number).toFixed(2)}`)
-              .join(', ');
-            return `${theme} → ${topEmotions}`;
-          }
-          return null;
-        })
-        .filter(Boolean)
-        .join('; ');
-      
-      if (themeEmotions) {
-        themeEmotionInfo = `\nValidated Theme-Emotion Links: ${themeEmotions}`;
-      }
-    }
+  return `Based on the following journal entries, please respond to the user's message:
 
-    let searchInfo = '';
-    if (entry.searchMethod) {
-      searchInfo = `\nFound via: ${entry.searchMethod} search (database-enhanced)`;
-    }
-    
-    // Limit content for performance
-    const content = entry.content.substring(0, 350) + (entry.content.length > 350 ? '...' : '');
-    
-    return `Entry from ${date}: ${content}${emotionInfo}${themeInfo}${themeEmotionInfo}${searchInfo}`;
-  }).join('\n\n');
+USER MESSAGE: "${message}"
 
-  return formattedContent;
-}
+RELEVANT JOURNAL ENTRIES:
+${contextEntries}
 
-export function generateUserPrompt(message: string, entries: any[], searchMethod?: string): string {
-  const formattedEntries = formatJournalEntriesForAnalysis(entries, searchMethod);
-  
-  return `Here are the relevant journal entries I found using database-validated themes and emotions: 
-
-${formattedEntries}
-
-The user is asking: "${message}"
-
-Please respond as SOULo - be warm, conversational, and genuinely insightful. Use the database-validated emotion scores, theme-emotion relationships, and patterns you see to provide caring, authentic insights about their emotional journey. Be naturally supportive and human, not clinical or robotic. Trust the database-validated data completely as it represents precise emotional analysis.`;
+Please provide a thoughtful, personalized response based on these entries and the user's question.`;
 }
 
 export async function generateResponse(
   systemPrompt: string,
   userPrompt: string,
-  conversationContext: any[] = [],
-  openAiApiKey: string,
-  isAnalyticalQuery: boolean = false
+  conversationContext: any[],
+  apiKey: string,
+  isAnalytical: boolean = false
 ): Promise<string> {
+  console.log('[responseGenerator] Generating database-aware conversational response...');
+  console.log(`[responseGenerator] Using ${conversationContext.length} conversation messages with database context`);
+
   try {
-    console.log('[responseGenerator] Generating database-aware conversational response...');
-    
-    // Check cache first
-    const cacheKey = CacheManager.generateQueryHash(userPrompt, 'system', { analytical: isAnalyticalQuery, databaseAware: true });
-    const cachedResponse = CacheManager.getCachedResponse(cacheKey);
-    
-    if (cachedResponse) {
-      console.log('[responseGenerator] Using cached database-aware response');
-      return cachedResponse;
+    const messages = [
+      { role: 'system', content: systemPrompt },
+      ...conversationContext.slice(-5), // Include last 5 messages for context
+      { role: 'user', content: userPrompt }
+    ];
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4-1106-preview',
+        messages,
+        max_tokens: isAnalytical ? 1000 : 600,
+        temperature: 0.7,
+        presence_penalty: 0.1,
+        frequency_penalty: 0.1,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('[responseGenerator] OpenAI API error:', error);
+      throw new Error(`OpenAI API error: ${response.status}`);
     }
+
+    const data = await response.json();
     
-    // Use last 8 messages for context
-    const contextMessages = Array.isArray(conversationContext) ? conversationContext.slice(-8) : [];
-    console.log(`[responseGenerator] Using ${contextMessages.length} conversation messages with database context`);
+    if (!data.choices || data.choices.length === 0) {
+      throw new Error('No response generated from OpenAI');
+    }
+
+    const generatedResponse = data.choices[0].message.content;
+    console.log('[responseGenerator] Successfully generated response');
     
-    // Generate response with enhanced database-aware conversational formatting and performance optimization
-    const performanceMode = contextMessages.length > 8 ? 'fast' : 'balanced';
-    
-    const response = await OptimizedApiClient.generateResponseOptimized(
-      systemPrompt,
-      userPrompt,
-      contextMessages,
-      openAiApiKey,
-      isAnalyticalQuery,
-      performanceMode
-    );
-    
-    // Cache the response
-    CacheManager.setCachedResponse(cacheKey, response);
-    
-    console.log('[responseGenerator] Generated database-aware conversational response');
-    return response;
-    
+    return generatedResponse;
+
   } catch (error) {
     console.error('[responseGenerator] Error:', error);
     throw error;

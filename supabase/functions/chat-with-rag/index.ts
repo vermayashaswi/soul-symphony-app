@@ -2,7 +2,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { OptimizedRagPipeline } from './utils/optimizedPipeline.ts'
-import { SSEStreamManager } from './utils/streamingResponseManager.ts'
 import { OptimizedApiClient } from './utils/optimizedApiClient.ts'
 
 const corsHeaders = {
@@ -124,37 +123,26 @@ serve(async (req) => {
       );
     }
 
-    // Create streaming response manager
-    const encoder = new TextEncoder();
-    const stream = new ReadableStream({
-      start(controller) {
-        const streamManager = new SSEStreamManager(controller, encoder);
-        
-        // Initialize and run the optimized RAG pipeline
-        const pipeline = new OptimizedRagPipeline(streamManager, supabase, openaiApiKey);
-        
-        // Process the query with the enhanced pipeline
-        pipeline.processQuery({
-          ...requestData,
-          queryPlan
-        }).catch(error => {
-          console.error('[ChatWithRAG] Pipeline error:', error);
-          streamManager.sendEvent('error', { 
-            message: error.message || 'Processing failed',
-            stage: 'pipeline_error' 
-          });
-        });
-      }
+    // Initialize and run the optimized RAG pipeline (synchronously)
+    const pipeline = new OptimizedRagPipeline(supabase, openaiApiKey);
+    
+    // Process the query with the enhanced pipeline
+    const result = await pipeline.processQuerySync({
+      ...requestData,
+      queryPlan
     });
 
-    return new Response(stream, {
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
-      },
-    });
+    // Return the result as JSON
+    return new Response(
+      JSON.stringify(result),
+      { 
+        status: 200,
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json' 
+        } 
+      }
+    );
 
   } catch (error) {
     console.error('[ChatWithRAG] Error:', error);
