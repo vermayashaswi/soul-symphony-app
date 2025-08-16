@@ -53,7 +53,7 @@ function sanitizeConsolidatorOutput(raw: string): { responseText: string; status
   const meta: Record<string, any> = { hadCodeFence: /```/i.test(raw || '') };
   try {
     if (!raw) {
-      return { responseText: 'I ran into a formatting issue preparing your insights. Let's try again.', statusMsg: null, meta };
+      return { responseText: 'I ran into a formatting issue preparing your insights. Let\'s try again.', statusMsg: null, meta };
     }
     let s = stripCodeFences(raw);
     meta.afterStripPrefix = s.slice(0, 60);
