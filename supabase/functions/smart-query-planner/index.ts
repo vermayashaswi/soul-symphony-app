@@ -173,8 +173,9 @@ Respond with a JSON object containing:
     // Return the plan and results for the consolidator
     const response = {
       success: true,
-      plan: queryPlan,
-      results: processedResults,
+      queryPlan: queryPlan,  // Changed from 'plan' to 'queryPlan' to match chat-with-rag expectation
+      vectorResults: vectorResults || [],  // Added explicit vectorResults
+      recentEntries: recentEntries || [],  // Added explicit recentEntries
       metadata: {
         totalEntries: processedResults.length,
         vectorMatches: vectorResults?.length || 0,
@@ -194,7 +195,7 @@ Respond with a JSON object containing:
     return new Response(JSON.stringify({
       success: false,
       error: error.message,
-      plan: {
+      queryPlan: {
         queryType: "general_inquiry",
         strategy: "fallback",
         expectedResponseType: "direct_answer", 
@@ -202,7 +203,8 @@ Respond with a JSON object containing:
         confidenceLevel: 0.3,
         analysisApproach: "Provide general response due to processing error"
       },
-      results: []
+      vectorResults: [],
+      recentEntries: []
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

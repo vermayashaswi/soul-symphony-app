@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
@@ -92,15 +93,17 @@ serve(async (req) => {
           throw new Error('Query planning failed');
         }
 
+        // FIXED: Match the exact response structure from smart-query-planner
         const { queryPlan, vectorResults, recentEntries } = planResponse.data;
 
-        // Step 3: Call gpt-response-consolidator with fixed parameter name
+        // Step 3: Call gpt-response-consolidator with the results
         console.log('[chat-with-rag] Step 3: Response Consolidation');
         const consolidatorResponse = await supabase.functions.invoke('gpt-response-consolidator', {
           body: {
             message,
             queryPlan,
-            results: [...(vectorResults || []), ...(recentEntries || [])], // Fixed: using 'results' instead of 'researchResults'
+            vectorResults: vectorResults || [],
+            recentEntries: recentEntries || [],
             conversationContext,
             userProfile
           }

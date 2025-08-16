@@ -20,19 +20,27 @@ serve(async (req) => {
     const { 
       message, 
       queryPlan, 
-      results, 
+      vectorResults = [], 
+      recentEntries = [], 
       conversationContext = [], 
       userProfile = {} 
     } = await req.json();
 
     console.log('[GPT Response Consolidator] Processing request');
     console.log('[GPT Response Consolidator] Query plan:', queryPlan);
-    console.log('[GPT Response Consolidator] Results count:', results?.length || 0);
+    console.log('[GPT Response Consolidator] Vector results count:', vectorResults?.length || 0);
+    console.log('[GPT Response Consolidator] Recent entries count:', recentEntries?.length || 0);
+
+    // Combine and deduplicate results
+    const allResults = [...(vectorResults || []), ...(recentEntries || [])];
+    const uniqueResults = Array.from(
+      new Map(allResults.map(entry => [entry.id, entry])).values()
+    );
 
     // Format journal entries for analysis
-    const formattedEntries = (results || []).map((entry, index) => {
+    const formattedEntries = uniqueResults.map((entry, index) => {
       const date = new Date(entry.created_at).toLocaleDateString();
-      const content = entry.content || '';
+      const content = entry.content || entry['refined text'] || entry['transcription text'] || '';
       const themes = Array.isArray(entry.themes) ? entry.themes.join(', ') : 
                     Array.isArray(entry.master_themes) ? entry.master_themes.join(', ') : '';
       const emotions = entry.emotions ? Object.keys(entry.emotions).join(', ') : '';
@@ -48,7 +56,7 @@ serve(async (req) => {
 
     // Structure data as analysisSummary for the Ruh prompt
     const analysisSummary = {
-      totalEntries: results?.length || 0,
+      totalEntries: uniqueResults.length,
       entries: formattedEntries,
       queryType: queryPlan?.queryType || 'general',
       timeRange: queryPlan?.timeRange || null,
@@ -163,7 +171,7 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       ...parsedResponse,
       metadata: {
-        entriesAnalyzed: results?.length || 0,
+        entriesAnalyzed: uniqueResults?.length || 0,
         queryPlan: queryPlan,
         responseGenerated: new Date().toISOString()
       }
