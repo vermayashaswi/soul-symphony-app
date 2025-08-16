@@ -64,9 +64,6 @@ inspector_port = 54328
 [functions.transcribe-audio]
 verify_jwt = true
 
-[functions.transcribe-chat-audio]
-verify_jwt = true
-
 [functions.smart-query-planner]
 verify_jwt = true
 
