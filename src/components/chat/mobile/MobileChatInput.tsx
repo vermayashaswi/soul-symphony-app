@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Send, Loader2 } from "lucide-react";
@@ -41,15 +40,6 @@ export default function MobileChatInput({
   } = useUnifiedKeyboard();
 
   const isInChatTutorialStep = isActive && isInStep(5);
-
-  console.log('[MobileChatInput] Render state:', {
-    isInChatTutorialStep,
-    isActive,
-    currentStep: isInStep(5) ? 5 : 'other',
-    inputValue: inputValue.length,
-    isLoading,
-    isSubmitting
-  });
 
   // Translate placeholder
   useEffect(() => {
@@ -103,13 +93,11 @@ export default function MobileChatInput({
 
   // Don't render during tutorial step 5
   if (isInChatTutorialStep) {
-    console.log('[MobileChatInput] Hidden during tutorial step 5');
     return null;
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInputValue(e.target.value);
-    console.log('[MobileChatInput] Input changed, length:', e.target.value.length);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -120,7 +108,7 @@ export default function MobileChatInput({
   };
 
   const handleInputFocus = () => {
-    console.log('[MobileChatInput] Input focused - text input is working');
+    console.log('[MobileChatInput] Input focused');
     // Slight delay to ensure keyboard detection fires first
     setTimeout(() => {
       const chatContent = document.querySelector('.mobile-chat-content');
@@ -128,10 +116,6 @@ export default function MobileChatInput({
         chatContent.scrollTop = chatContent.scrollHeight;
       }
     }, 200);
-  };
-
-  const handleInputClick = () => {
-    console.log('[MobileChatInput] Input clicked - click events are working');
   };
 
   const handleSendMessage = async () => {
@@ -200,7 +184,7 @@ export default function MobileChatInput({
         platform === 'ios' && "platform-ios"
       )}
     >
-      {/* Main Input Container */}
+      {/* Text Input Container with Voice Recorder Integration */}
       <div className="flex-1 relative">
         <Input
           ref={inputRef}
@@ -209,9 +193,8 @@ export default function MobileChatInput({
           onChange={handleInputChange}
           onKeyDown={handleKeyPress}
           onFocus={handleInputFocus}
-          onClick={handleInputClick}
           placeholder={placeholderText}
-          className="w-full pr-20 border border-muted shadow-sm bg-background text-foreground focus:outline-none focus:ring-0 focus:border-muted relative z-10"
+          className="w-full pr-12 border border-muted shadow-sm bg-background text-foreground focus:outline-none focus:ring-0 focus:border-muted"
           disabled={isSubmitting}
           autoComplete="off"
           autoCorrect="on"
@@ -219,27 +202,21 @@ export default function MobileChatInput({
           spellCheck="true"
           inputMode="text"
           data-testid="mobile-chat-input"
-          style={{ 
-            pointerEvents: 'auto',
-            touchAction: 'manipulation'
-          }}
         />
         
-        {/* Voice Recorder - Positioned only over the right side */}
-        <div className="absolute right-12 top-0 bottom-0 w-8 flex items-center justify-center">
-          <VoiceChatRecorder
-            onTranscriptionComplete={handleVoiceTranscription}
-            isDisabled={isSubmitting || isLoading}
-            className="w-full h-full"
-          />
-        </div>
+        {/* Voice Recorder Overlay - positioned absolutely within input */}
+        <VoiceChatRecorder
+          onTranscriptionComplete={handleVoiceTranscription}
+          isDisabled={isSubmitting || isLoading}
+          className="absolute inset-0"
+        />
       </div>
       
       {/* Send Button */}
       <Button
         type="button"
         size="icon"
-        className="h-10 w-10 rounded-full shrink-0 relative z-20"
+        className="h-10 w-10 rounded-full shrink-0"
         onClick={handleSendMessage}
         disabled={isLoading || isSubmitting || !inputValue.trim()}
       >

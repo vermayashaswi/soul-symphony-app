@@ -25,25 +25,25 @@ interface AudioVisualizerProps {
 
 // Real-time audio visualizer component
 function AudioVisualizer({ isRecording, audioLevel }: AudioVisualizerProps) {
-  const bars = Array.from({ length: 20 }); // Reduced for smaller space
+  const bars = Array.from({ length: 40 });
   
   return (
-    <div className="flex items-center justify-center h-6 space-x-0.5 flex-1">
+    <div className="flex items-center justify-center h-8 space-x-0.5 flex-1">
       {bars.map((_, i) => {
-        const baseHeight = Math.sin((i / 20) * Math.PI * 2) * 10 + 5;
+        const baseHeight = Math.sin((i / 40) * Math.PI * 2) * 20 + 10;
         const height = isRecording 
-          ? Math.max(2, baseHeight + (audioLevel * 0.3)) 
-          : Math.max(2, baseHeight * 0.3);
+          ? Math.max(4, baseHeight + (audioLevel * 0.5)) 
+          : Math.max(4, baseHeight * 0.3);
           
         return (
           <motion.div
             key={i}
             className="w-0.5 bg-primary rounded-full"
-            initial={{ height: 2 }}
+            initial={{ height: 4 }}
             animate={{ 
               height: isRecording 
                 ? [height * 0.5, height, height * 0.7, height * 0.9, height * 0.6] 
-                : [2, 4, 3]
+                : [4, 8, 6]
             }}
             transition={{
               duration: isRecording ? 0.8 : 1.5,
@@ -226,7 +226,7 @@ export function VoiceChatRecorder({
 
   const handleCancelRecording = () => {
     console.log('[VoiceChatRecorder] Cancelling recording');
-    cancelRecording();
+    cancelRecording(); // Use the new cancel method instead of stop
     cleanupAudioAnalysis();
     setRecordingState('idle');
   };
@@ -249,36 +249,29 @@ export function VoiceChatRecorder({
   const isProcessing = recordingState === 'processing';
   const isError = recordingState === 'error';
 
-  console.log('[VoiceChatRecorder] Render state:', {
-    recordingState,
-    isRecording,
-    isProcessing,
-    isDisabled
-  });
-
   return (
-    <div className={cn("relative w-full h-full flex items-center justify-center", className)}>
-      {/* Recording Overlay - Only shows when recording */}
+    <div className={cn("relative w-full h-full", className)}>
+      {/* Recording Overlay - Replaces the entire input */}
       <AnimatePresence>
         {isRecording && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
+            initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            className="fixed inset-x-3 bottom-3 top-auto bg-background border border-input rounded-lg shadow-lg flex items-center px-4 py-3 z-50"
+            exit={{ opacity: 0, scale: 0.98 }}
+            className="absolute inset-0 bg-background border border-input rounded-md flex items-center px-3 z-20"
           >
             {/* Cancel Button (X) */}
             <Button
               variant="ghost"
               size="sm"
               onClick={handleCancelRecording}
-              className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive shrink-0 mr-3"
+              className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive shrink-0"
             >
               <X className="h-4 w-4" />
             </Button>
 
             {/* Waveform Visualization */}
-            <div className="flex-1 mx-2">
+            <div className="flex-1 mx-3">
               <AudioVisualizer isRecording={isRecording} audioLevel={audioLevel} />
             </div>
 
@@ -287,7 +280,7 @@ export function VoiceChatRecorder({
               variant="ghost"
               size="sm"
               onClick={handleStopRecording}
-              className="h-8 w-8 p-0 text-primary hover:text-primary/80 shrink-0 ml-3"
+              className="h-8 w-8 p-0 text-primary hover:text-primary/80 shrink-0"
             >
               <ArrowUp className="h-4 w-4" />
             </Button>
@@ -302,7 +295,7 @@ export function VoiceChatRecorder({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-x-3 bottom-3 top-auto bg-background border border-input rounded-lg shadow-lg flex items-center justify-center py-3 z-50"
+            className="absolute inset-0 bg-background border border-input rounded-md flex items-center justify-center z-20"
           >
             <div className="flex items-center space-x-2 text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -312,7 +305,7 @@ export function VoiceChatRecorder({
         )}
       </AnimatePresence>
 
-      {/* Microphone Button - Always visible when idle */}
+      {/* Microphone Button - Only visible when idle */}
       {recordingState === 'idle' && (
         <Button
           type="button"
@@ -320,11 +313,7 @@ export function VoiceChatRecorder({
           size="sm"
           onClick={handleStartRecording}
           disabled={isDisabled}
-          className="h-full w-full p-0 text-muted-foreground hover:text-foreground relative z-10"
-          style={{ 
-            pointerEvents: 'auto',
-            touchAction: 'manipulation'
-          }}
+          className="absolute right-2 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0 text-muted-foreground hover:text-foreground z-10"
         >
           <Mic className="h-4 w-4" />
         </Button>

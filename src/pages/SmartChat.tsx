@@ -11,23 +11,23 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { v4 as uuidv4 } from 'uuid';
 import { PremiumFeatureGuard } from '@/components/subscription/PremiumFeatureGuard';
 import { setupGlobalMessageDeletionListener } from '@/hooks/use-message-deletion';
-import { AuthPrompt } from '@/components/auth/AuthPrompt';
-import { useAuthGuard } from '@/hooks/useAuthGuard';
 
 const SmartChat = () => {
-  const { user, isLoading } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
   const isMobile = useIsMobile();
-  const { isAuthenticated, requireAuth } = useAuthGuard({
-    feature: 'Smart Chat'
-  });
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!user) {
+      navigate('/app/auth');
+    }
+  }, [user, navigate]);
 
   // Load the last active thread on component mount
   useEffect(() => {
-    if (!requireAuth()) return;
-    
     const loadLastThread = async () => {
       if (!user?.id) return;
       
@@ -62,11 +62,11 @@ const SmartChat = () => {
     };
     
     loadLastThread();
-  }, [user?.id, requireAuth]);
+  }, [user?.id]);
 
   // Setup global message deletion listener
   useEffect(() => {
-    if (!user?.id || !requireAuth()) return;
+    if (!user?.id) return;
     
     const subscription = setupGlobalMessageDeletionListener(user.id);
     
@@ -75,17 +75,14 @@ const SmartChat = () => {
         supabase.removeChannel(subscription);
       }
     };
-  }, [user?.id, requireAuth]);
+  }, [user?.id]);
 
   const handleSelectThread = (threadId: string) => {
-    if (!requireAuth()) return;
     setCurrentThreadId(threadId);
     localStorage.setItem("lastActiveChatThreadId", threadId);
   };
 
   const handleCreateNewThread = async (): Promise<string | null> => {
-    if (!requireAuth()) return null;
-    
     if (!user?.id) {
       console.error('[SmartChat] Cannot create thread: user not authenticated');
       toast({
@@ -136,28 +133,6 @@ const SmartChat = () => {
   };
 
   console.log("[SmartChat] Rendering with mobile detection:", isMobile.isMobile);
-
-  // Show authentication prompt if user is not logged in
-  if (!isLoading && !isAuthenticated) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-background">
-        <AuthPrompt 
-          title="Smart Chat Access"
-          description="Connect with your AI assistant for personalized conversations"
-          feature="Smart Chat"
-        />
-      </div>
-    );
-  }
-
-  // Show loading while checking authentication
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
 
   return (
     <PremiumFeatureGuard feature="chat">

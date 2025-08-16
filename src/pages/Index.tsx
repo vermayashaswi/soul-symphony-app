@@ -158,27 +158,13 @@ const Index = () => {
           }
         });
       } else {
-        // Show authentication prompt with clear messaging
-        navigate('/app/auth?redirectTo=' + encodeURIComponent('/app/home'));
+        navigate('/app/auth');
       }
     }
     
     // Check URL parameters for specific app features redirects
     if (urlParams.has('insights')) {
-      if (user) {
-        navigate('/app/insights');
-      } else {
-        navigate('/app/auth?redirectTo=' + encodeURIComponent('/app/insights'));
-      }
-    }
-
-    // Handle chat feature access
-    if (urlParams.has('chat')) {
-      if (user) {
-        navigate('/app/chat');
-      } else {
-        navigate('/app/auth?redirectTo=' + encodeURIComponent('/app/chat'));
-      }
+      navigate('/app/insights');
     }
   }, [user, navigate, urlParams, checkOnboardingStatus, isNative]);
 

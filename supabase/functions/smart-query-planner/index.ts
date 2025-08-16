@@ -1,303 +1,843 @@
-
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { generateDatabaseSchemaContext } from "../_shared/databaseSchemaContext.ts";
+
+const apiKey = Deno.env.get('OPENAI_API_KEY');
+if (!apiKey) {
+  console.error('OPENAI_API_KEY is not set');
+  Deno.exit(1);
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
 };
 
-// Enhanced debugging for authentication and user context
-async function debugAuthenticationContext(supabase: any, requestId: string): Promise<{
-  userId: string | null;
-  hasValidAuth: boolean;
-  userEntryCount: number;
-  authDetails: any;
-}> {
-  console.log(`[DEBUG AUTH] ${requestId}: Starting authentication verification`);
-  
+const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+/**
+ * Generate embedding for text using OpenAI API
+ */
+async function generateEmbedding(text) {
   try {
-    // Get current user from JWT token
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    console.log(`[DEBUG AUTH] ${requestId}: User verification: {
-      hasUser: ${!!user},
-      userId: "${user?.id?.substring(0, 8) || 'none'}",
-      userError: ${userError?.message || 'undefined'}
-    }`);
-
-    if (!user) {
-      return {
-        userId: null,
-        hasValidAuth: false,
-        userEntryCount: 0,
-        authDetails: { error: 'No authenticated user', userError: userError?.message }
-      };
-    }
-
-    // Test RLS by attempting to access user's entries
-    const { data: entriesTest, error: entriesError } = await supabase
-      .from('Journal Entries')
-      .select('id')
-      .limit(1);
-
-    console.log(`[DEBUG AUTH] ${requestId}: RLS test: {
-      canAccessEntries: ${!entriesError && entriesTest?.length >= 0},
-      entriesError: ${entriesError?.message || 'undefined'},
-      sampleEntryFound: ${entriesTest?.length > 0}
-    }`);
-
-    // Get entry count for this user
-    const { count, error: countError } = await supabase
-      .from('Journal Entries')
-      .select('*', { count: 'exact', head: true });
-
-    console.log(`[DEBUG AUTH] ${requestId}: Entry count check: { totalEntries: ${count}, countError: ${countError?.message || 'undefined'} }`);
-
-    return {
-      userId: user.id,
-      hasValidAuth: true,
-      userEntryCount: count || 0,
-      authDetails: {
-        email: user.email,
-        rlsWorking: !entriesError,
-        totalEntries: count || 0,
-        authMethod: 'jwt_token'
-      }
-    };
-
-  } catch (error) {
-    console.error(`[DEBUG AUTH] ${requestId}: Authentication context error:`, error);
-    return {
-      userId: null,
-      hasValidAuth: false,
-      userEntryCount: 0,
-      authDetails: { error: error.message, stage: 'exception_thrown' }
-    };
-  }
-}
-
-// Enhanced embedding generation with detailed logging and fallback handling
-async function generateQueryEmbedding(query: string, openaiApiKey: string, requestId: string): Promise<number[] | null> {
-  console.log(`📡 [EMBEDDING] ${requestId}: Generating embedding for query: "${query.substring(0, 100)}..."`);
-  
-  try {
-    const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+    const response = await fetch('https://api.openai.com/v1/embeddings', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${openaiApiKey}`,
-        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         model: 'text-embedding-3-small',
-        input: query.substring(0, 8000), // Prevent API errors from long input
+        input: text,
         encoding_format: 'float'
-      }),
+      })
     });
 
-    console.log(`📡 [EMBEDDING] ${requestId}: OpenAI embedding response status: ${embeddingResponse.status}`);
-
-    if (!embeddingResponse.ok) {
-      const errorText = await embeddingResponse.text();
-      console.error(`❌ [EMBEDDING ERROR] ${requestId}: OpenAI API error:`, errorText);
-      return null;
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('Failed to generate embedding:', error);
+      throw new Error('Could not generate embedding for the text');
     }
 
-    const embeddingData = await embeddingResponse.json();
-    const embedding = embeddingData?.data?.[0]?.embedding;
-
-    if (!embedding || !Array.isArray(embedding) || embedding.length !== 1536) {
-      console.error(`❌ [EMBEDDING ERROR] ${requestId}: Invalid embedding format - length: ${embedding?.length}`);
-      return null;
+    const embeddingData = await response.json();
+    if (!embeddingData.data || embeddingData.data.length === 0) {
+      throw new Error('Empty embedding data received from OpenAI');
     }
 
-    console.log(`✅ [EMBEDDING SUCCESS] ${requestId}: Generated ${embedding.length}-dimensional embedding`);
-    return embedding;
-
+    return embeddingData.data[0].embedding;
   } catch (error) {
-    console.error(`❌ [EMBEDDING ERROR] ${requestId}: Exception during embedding generation:`, error);
-    return null;
+    console.error('Error generating embedding:', error);
+    throw error;
   }
 }
 
-// Enhanced vector search execution with comprehensive debugging and fallback mechanisms
-async function executeVectorSearch(
-  supabase: any, 
-  userId: string, 
-  queryEmbedding: number[], 
-  subQuestion: string,
-  requestId: string,
-  timeRange?: { start: string; end: string }
-): Promise<{
-  vectorResults: any[];
-  vectorDebugInfo: any;
-}> {
-  console.log(`🔍 [VECTOR SEARCH] ${requestId}: Starting vector search for: "${subQuestion.substring(0, 50)}..."`);
-  
-  const debugInfo = {
-    standardSearch: { success: false, resultCount: 0, error: null },
-    timeFilteredSearch: { success: false, resultCount: 0, error: null },
-    embeddingTableCheck: { exists: false, totalEmbeddings: 0 },
-    thresholdTesting: { results: [] },
-    fallbackAttempts: [],
-    errors: []
+/**
+ * Enhanced JSON extraction with better error handling
+ */
+function extractAndParseJSON(content, originalMessage) {
+  try {
+    return JSON.parse(content);
+  } catch (error) {
+    console.log("Direct JSON parse failed, trying enhanced extraction methods");
+
+    // Try to extract JSON from code blocks
+    const jsonBlockMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    if (jsonBlockMatch) {
+      try {
+        const cleanedJson = jsonBlockMatch[1].replace(/,\s*}/g, '}').replace(/,\s*]/g, ']');
+        return JSON.parse(cleanedJson);
+      } catch (e) {
+        console.log("JSON block extraction failed");
+      }
+    }
+
+    // Try to find JSON pattern
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      try {
+        let jsonText = jsonMatch[0];
+        jsonText = jsonText.replace(/,\s*\}/g, '}');
+        jsonText = jsonText.replace(/,\s*\]/g, ']');
+        return JSON.parse(jsonText);
+      } catch (e) {
+        console.log("JSON pattern extraction failed");
+      }
+    }
+
+    console.error("All JSON extraction methods failed, using fallback");
+    return createFallbackPlan(originalMessage);
+  }
+}
+
+/**
+ * Create comprehensive fallback plan with sub-questions
+ */
+function createFallbackPlan(originalMessage) {
+  const lowerMessage = originalMessage.toLowerCase();
+  const isEmotionQuery = /emotion|feel|mood|happy|sad|anxious|stressed/.test(lowerMessage);
+  const isThemeQuery = /work|relationship|family|health|goal|travel/.test(lowerMessage);
+  const hasPersonalPronouns = /\b(i|me|my|mine)\b/i.test(originalMessage);
+
+  const subQuestion = {
+    question: isEmotionQuery 
+      ? "What emotional patterns emerge from my journal entries?"
+      : "What key themes and insights can be found in my journal entries?",
+    purpose: "Analyze journal data to provide personalized insights",
+    searchStrategy: "hybrid",
+    analysisSteps: [
+      {
+        step: 1,
+        description: "Retrieve relevant journal entries using semantic search",
+        queryType: "vector_search",
+        vectorSearch: {
+          query: isEmotionQuery ? "emotions, feelings, mood" : "themes, insights, patterns",
+          threshold: 0.3,
+          limit: 10
+        }
+      },
+      {
+        step: 2,
+        description: isEmotionQuery 
+          ? "Analyze emotion patterns and frequencies"
+          : "Analyze theme distributions and patterns",
+        queryType: "sql_analysis",
+        sqlQuery: isEmotionQuery
+          ? "SELECT emotion_key, AVG((emotion_value)::numeric) as avg_score FROM \"Journal Entries\", jsonb_each(emotions) WHERE user_id = $user_id GROUP BY emotion_key ORDER BY avg_score DESC LIMIT 10"
+          : "SELECT theme, COUNT(*) as frequency FROM (SELECT unnest(master_themes) as theme FROM \"Journal Entries\" WHERE user_id = $user_id) t GROUP BY theme ORDER BY frequency DESC LIMIT 10"
+      }
+    ]
   };
 
+  return {
+    queryType: "journal_specific",
+    strategy: "intelligent_sub_query",
+    subQuestions: [subQuestion],
+    confidence: 0.6,
+    reasoning: "Fallback analysis plan with hybrid search strategy",
+    useAllEntries: hasPersonalPronouns,
+    hasPersonalPronouns,
+    hasExplicitTimeReference: false
+  };
+}
+
+/**
+ * Retry wrapper for OpenAI API calls
+ */
+async function retryOpenAICall(promptFunction, maxRetries = 2) {
+  let lastError;
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 25000);
+      
+      const response = await promptFunction();
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        throw new Error(`OpenAI API returned error ${response.status}`);
+      }
+      
+      const data = await response.json();
+      const content = data?.choices?.[0]?.message?.content ?? '';
+      return content;
+    } catch (error) {
+      lastError = error;
+      console.log(`OpenAI attempt ${attempt + 1} failed:`, error.message);
+      
+      if (attempt < maxRetries) {
+        const delayMs = Math.pow(2, attempt) * 1000;
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      }
+    }
+  }
+  
+  throw lastError;
+}
+
+/**
+ * Enhanced Analyst Agent - generates comprehensive analysis plans
+ */
+async function analyzeQueryWithSubQuestions(message, conversationContext, userEntryCount, isFollowUp = false) {
   try {
-    // First, check if embeddings table has data
-    console.log(`📊 [VECTOR DEBUG] ${requestId}: Checking embedding table status...`);
+    const last = Array.isArray(conversationContext) ? conversationContext.slice(-5) : [];
     
-    const { count: embeddingCount, error: countError } = await supabase
-      .from('journal_embeddings')
-      .select('*', { count: 'exact', head: true });
-
-    debugInfo.embeddingTableCheck = {
-      exists: !countError,
-      totalEmbeddings: embeddingCount || 0
-    };
-
-    console.log(`📊 [VECTOR DEBUG] ${requestId}: Embedding table status: ${embeddingCount || 0} total embeddings, error: ${countError?.message || 'none'}`);
-
-    if (countError || embeddingCount === 0) {
-      debugInfo.errors.push(`No embeddings available: ${countError?.message || 'Empty table'}`);
-      console.warn(`⚠️ [VECTOR WARNING] ${requestId}: No embeddings available for vector search`);
-      
-      // Attempt text-based fallback
-      try {
-        console.log(`🔄 [FALLBACK] ${requestId}: Attempting text-based search fallback`);
-        const { data: textResults, error: textError } = await supabase
-          .from('Journal Entries')
-          .select('id, "refined text", "transcription text", created_at, master_themes, emotions')
-          .textSearch('"refined text"', subQuestion.split(' ').join(' | '), { 
-            type: 'websearch', 
-            config: 'english' 
-          })
-          .limit(5);
-
-        if (!textError && textResults?.length > 0) {
-          debugInfo.fallbackAttempts.push({ method: 'text_search', count: textResults.length });
-          console.log(`✅ [FALLBACK SUCCESS] ${requestId}: Text search found ${textResults.length} results`);
-          return { vectorResults: textResults, vectorDebugInfo: debugInfo };
-        }
-      } catch (fallbackError) {
-        debugInfo.fallbackAttempts.push({ method: 'text_search', error: fallbackError.message });
-        console.warn(`⚠️ [FALLBACK FAILED] ${requestId}: Text search fallback failed:`, fallbackError);
-      }
-      
-      return { vectorResults: [], vectorDebugInfo: debugInfo };
-    }
-
-    // Test different similarity thresholds with dynamic adjustment
-    const thresholds = [0.7, 0.6, 0.5, 0.4, 0.3];
-    let bestResults = [];
-    let bestThreshold = 0.3;
+    // Serialize last 5 messages with length safeguards
+    let serialized = last.map(msg => 
+      `${msg.role}: ${(msg.content || '').toString().replace(/\s+/g, ' ').slice(0, 200)}`
+    ).join('\n');
     
-    for (const threshold of thresholds) {
-      try {
-        console.log(`🎯 [VECTOR TEST] ${requestId}: Testing threshold ${threshold}...`);
-        
-        const { data: testResults, error: testError } = await supabase.rpc('match_journal_entries', {
-          query_embedding: queryEmbedding,
-          match_threshold: threshold,
-          match_count: 5,
-          user_id_filter: userId
-        });
+    if (serialized.length > 1000) {
+      serialized = last.map(msg => 
+        `${msg.role}: ${(msg.content || '').toString().slice(0, 120)}`
+      ).join('\n');
+    }
 
-        const resultCount = testResults?.length || 0;
-        debugInfo.thresholdTesting.results.push({
-          threshold,
-          count: resultCount,
-          success: !testError,
-          error: testError?.message
-        });
+    const contextString = last.length > 0 ? `\nConversation context (last ${last.length}): ${serialized}` : '';
+    
+    console.log(`[Analyst Agent] Context preview: ${last.map(m => `${m.role}:${(m.content || '').slice(0, 40)}`).join(' | ')}`);
 
-        console.log(`🎯 [VECTOR TEST] ${requestId}: Threshold ${threshold} returned ${resultCount} results, error: ${testError?.message || 'none'}`);
-        
-        if (!testError && resultCount > 0) {
-          bestResults = testResults;
-          bestThreshold = threshold;
-          if (resultCount >= 3) break; // Good enough results found
+    const hasPersonalPronouns = /\b(i|me|my|mine|myself)\b/i.test(message.toLowerCase());
+    const hasExplicitTimeReference = /\b(last week|yesterday|this week|last month|today|recently|lately|since|started|began)\b/i.test(message.toLowerCase());
+    
+    // Enhanced content-seeking query detection
+    const isContentSeekingQuery = /\b(what.*talking about|what.*discussed|what.*said|tell me about|show me|examples|anecdotes|content|entries)\b/i.test(message.toLowerCase());
+    
+    // Extract time context from conversation if not explicit in current message
+    let inferredTimeContext = null;
+    if (!hasExplicitTimeReference && conversationContext.length > 0) {
+      const recentMessages = conversationContext.slice(-3);
+      for (const msg of recentMessages) {
+        if (msg.content && /\b(last week|this week|yesterday|recently|lately)\b/i.test(msg.content)) {
+          inferredTimeContext = msg.content.match(/\b(last week|this week|yesterday|recently|lately)\b/i)?.[0];
+          console.log(`[Analyst Agent] Inferred time context from conversation: ${inferredTimeContext}`);
+          break;
         }
-      } catch (thresholdError) {
-        console.error(`❌ [VECTOR TEST ERROR] ${requestId}: Threshold ${threshold} failed:`, thresholdError);
-        debugInfo.thresholdTesting.results.push({
-          threshold,
-          count: 0,
-          success: false,
-          error: thresholdError.message
-        });
       }
     }
+    
+    console.log(`[Analyst Agent] Query analysis - Personal pronouns: ${hasPersonalPronouns}, Time reference: ${hasExplicitTimeReference}, Content-seeking: ${isContentSeekingQuery}, Follow-up: ${isFollowUp}`);
 
-    // Use best results found
-    if (bestResults.length > 0) {
-      debugInfo.standardSearch = {
-        success: true,
-        resultCount: bestResults.length,
-        error: null,
-        bestThreshold
-      };
-      console.log(`✅ [VECTOR SUCCESS] ${requestId}: Using threshold ${bestThreshold} with ${bestResults.length} results`);
-    }
+    // Get live database schema with real themes and emotions
+    const databaseSchemaContext = await generateDatabaseSchemaContext(supabase);
 
-    // Time-filtered search (if time range provided and we have good results)
-    let timeFilteredResults = [];
-    if (timeRange && bestResults.length > 0) {
-      console.log(`⏰ [VECTOR TIME] ${requestId}: Executing time-filtered search for range: ${timeRange.start} to ${timeRange.end}`);
-      
-      try {
-        const { data: timeResults, error: timeError } = await supabase.rpc('match_journal_entries_with_date', {
-          query_embedding: queryEmbedding,
-          match_threshold: bestThreshold,
-          match_count: 10,
-          user_id_filter: userId,
-          start_date: timeRange.start,
-          end_date: timeRange.end
-        });
+    const prompt = `You are SOULo's Analyst Agent - an intelligent query planning specialist for journal data analysis. Your role is to break down user queries into comprehensive, actionable analysis plans.
 
-        debugInfo.timeFilteredSearch = {
-          success: !timeError,
-          resultCount: timeResults?.length || 0,
-          error: timeError?.message || null
-        };
+${databaseSchemaContext}
 
-        console.log(`⏰ [VECTOR TIME] ${requestId}: Time-filtered search returned ${timeResults?.length || 0} results, error: ${timeError?.message || 'none'}`);
+**CURRENT CONTEXT:**
+- Today's date: ${new Date().toISOString()}
+- Current year: ${new Date().getFullYear()}
+- User query: "${message}"
+- User has ${userEntryCount} journal entries${contextString}
+- Content-seeking query detected: ${isContentSeekingQuery}
+- Inferred time context: ${inferredTimeContext || 'none'}
 
-        if (!timeError && timeResults?.length > 0) {
-          timeFilteredResults = timeResults;
+**CRITICAL REQUIREMENTS FOR CONTENT-SEEKING QUERIES:**
+When the user asks "what I was talking about" or similar content questions, you MUST:
+1. ALWAYS include at least one vector search step using the user's actual question as the query
+2. Use hybrid strategy combining both SQL statistics AND vector content retrieval
+3. Apply time filtering if any time context is mentioned or inferred
+4. Ensure vector searches use semantic similarity, not generic clustering queries
+
+**YOUR RESPONSIBILITIES AS ANALYST AGENT:**
+1. Smart Hypothesis Formation: infer what the user truly wants to know, then deduce focused sub-questions to answer it comprehensively
+2. Sub-Question Generation: break down the query into 1-3 precise sub-questions (no hardcoded keyword lists)
+3. Search Strategy: pick sql_primary, vector_primary, or hybrid based on the sub-question
+4. Dynamic Query Generation: produce executable SQL for our schema and/or vector queries
+5. Hybrid Analysis: combine SQL stats with semantic vector results when helpful
+
+**MANDATORY OUTPUT STRUCTURE:**
+Return ONLY valid JSON with this exact structure:
+{
+  "queryType": "journal_specific",
+  "strategy": "intelligent_sub_query",
+  "userStatusMessage": "exactly 5 words describing analysis approach",
+  "subQuestions": [
+    {
+      "question": "Specific focused sub-question",
+      "purpose": "How this helps answer the main query",
+      "searchStrategy": "sql_primary" | "vector_primary" | "hybrid",
+      "executionStage": 1,
+      "analysisSteps": [
+        {
+          "step": 1,
+          "description": "Clear description of what this step accomplishes",
+          "queryType": "sql_analysis" | "vector_search" | "sql_count" | "sql_calculation",
+          "sqlQuery": "SELECT ... FROM \"Journal Entries\" WHERE user_id = $user_id AND ..." | null,
+          "vectorSearch": {
+            "query": "Use the actual user question or specific semantic search terms",
+            "threshold": 0.3,
+            "limit": 10
+          } | null,
+          "timeRange": { "start": "ISO string or null", "end": "ISO string or null" } | null
         }
-      } catch (timeError) {
-        debugInfo.timeFilteredSearch = {
-          success: false,
-          resultCount: 0,
-          error: timeError.message
-        };
-        console.error(`❌ [VECTOR TIME ERROR] ${requestId}: Time-filtered search failed:`, timeError);
-      }
+      ]
+    }
+  ],
+  "confidence": 0.8,
+  "reasoning": "Brief explanation of the analysis strategy",
+  "useAllEntries": boolean,
+  "hasPersonalPronouns": boolean,
+  "hasExplicitTimeReference": boolean
+}
+
+**EXECUTION ORDERING RULES:**
+- Assign an integer executionStage to EACH sub-question starting at 1
+- Sub-questions with the SAME executionStage run in parallel
+- Stages execute in ascending order: stage 1 first, then 2, then 3, etc.
+- Keep stages contiguous (1..N) without gaps
+
+**SQL QUERY GUIDELINES:**
+- ALWAYS include WHERE user_id = $user_id
+- Use proper column names with quotes for spaced names like "refined text"
+- For emotion analysis: use emotions JSONB
+- For theme analysis: use master_themes array and/or entities/text where appropriate (no hardcoded expansions)
+- For percentages: alias as percentage
+- For counts: alias as count (or frequency for grouped counts)
+- For averages/scores: alias as avg_score (or score)
+- For date filtering: apply created_at comparisons when time is implied or stated
+- Do NOT call RPCs; generate plain SQL only
+
+**VECTOR SEARCH GUIDELINES:**
+- Use the user's actual question or semantically similar terms as the vector query
+- For content-seeking queries, use search terms that will find relevant journal content
+- Set appropriate thresholds (0.2-0.4 range typically works best)
+- Include time filtering in vector searches when time context is present
+
+**SEARCH STRATEGY SELECTION:**
+- sql_primary: statistical analysis, counts, percentages
+- vector_primary: semantic content analysis, similar entries, content retrieval
+- hybrid: combine both when user wants both statistics AND content examples
+
+Focus on creating comprehensive, executable analysis plans that will provide meaningful insights with actual content when requested.`;
+
+    const promptFunction = () => fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: "gpt-4.1-2025-04-14",
+        messages: [
+          {
+            role: "system", 
+            content: "You are SOULo's Analyst Agent. Respond only with valid JSON analysis plans. For content-seeking queries, ALWAYS include vector search steps."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        response_format: { type: 'json_object' },
+        max_tokens: 1500
+      })
+    });
+
+    const content = await retryOpenAICall(promptFunction, 2);
+    console.log("Analyst Agent response:", content);
+
+    const analysisResult = extractAndParseJSON(content, message);
+
+    if (!analysisResult || !analysisResult.subQuestions) {
+      console.error("Failed to parse Analyst Agent response, using enhanced fallback for content queries");
+      return createEnhancedFallbackPlan(message, isContentSeekingQuery, inferredTimeContext);
     }
 
-    // Combine and deduplicate results
-    const allResults = [...bestResults, ...timeFilteredResults];
-    const uniqueResults = allResults.filter((result, index, self) => 
-      index === self.findIndex(r => r.id === result.id)
-    );
+    // Enhance with detected characteristics
+    analysisResult.hasPersonalPronouns = hasPersonalPronouns;
+    analysisResult.hasExplicitTimeReference = hasExplicitTimeReference;
+    analysisResult.useAllEntries = hasPersonalPronouns && !hasExplicitTimeReference;
+    analysisResult.inferredTimeContext = inferredTimeContext;
 
-    console.log(`✅ [VECTOR COMPLETE] ${requestId}: Combined ${allResults.length} total results into ${uniqueResults.length} unique results`);
-
-    return {
-      vectorResults: uniqueResults,
-      vectorDebugInfo: debugInfo
-    };
+    console.log("Final Analyst Plan:", JSON.stringify(analysisResult, null, 2));
+    return analysisResult;
 
   } catch (error) {
-    console.error(`❌ [VECTOR ERROR] ${requestId}: Exception in vector search:`, error);
-    debugInfo.errors.push(`Vector search exception: ${error.message}`);
-    
+    console.error("Error in Analyst Agent:", error);
+    return createEnhancedFallbackPlan(message, isContentSeekingQuery, inferredTimeContext);
+  }
+}
+
+/**
+ * Create enhanced fallback plan with vector search for content queries
+ */
+function createEnhancedFallbackPlan(originalMessage, isContentSeekingQuery, inferredTimeContext) {
+  const lowerMessage = originalMessage.toLowerCase();
+  const isEmotionQuery = /emotion|feel|mood|happy|sad|anxious|stressed/.test(lowerMessage);
+  const isThemeQuery = /work|relationship|family|health|goal|travel/.test(lowerMessage);
+  const hasPersonalPronouns = /\b(i|me|my|mine)\b/i.test(originalMessage);
+
+  // Enhanced fallback for content-seeking queries
+  if (isContentSeekingQuery) {
+    const contentSubQuestion = {
+      question: "What content and themes appear in my journal entries?",
+      purpose: "Retrieve actual journal content to show what the user was discussing",
+      searchStrategy: "hybrid",
+      executionStage: 1,
+      analysisSteps: [
+        {
+          step: 1,
+          description: "Search for relevant journal content using semantic similarity",
+          queryType: "vector_search",
+          sqlQuery: null,
+          vectorSearch: {
+            query: originalMessage.includes("talking about") ? "journal topics content themes discussions" : originalMessage,
+            threshold: 0.25,
+            limit: 15
+          },
+          timeRange: inferredTimeContext ? {
+            start: inferredTimeContext === "last week" ? new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString() : null,
+            end: null
+          } : null
+        },
+        {
+          step: 2,
+          description: "Get theme frequency statistics to complement content",
+          queryType: "sql_analysis",
+          sqlQuery: 'SELECT unnest(master_themes) AS theme, COUNT(*) AS frequency FROM "Journal Entries" WHERE user_id = $user_id GROUP BY theme ORDER BY frequency DESC LIMIT 8',
+          vectorSearch: null,
+          timeRange: null
+        }
+      ]
+    };
+
     return {
-      vectorResults: [],
-      vectorDebugInfo: debugInfo
+      queryType: "journal_specific",
+      strategy: "intelligent_sub_query",
+      userStatusMessage: "Finding your journal content",
+      subQuestions: [contentSubQuestion],
+      confidence: 0.7,
+      reasoning: "Enhanced fallback with vector search for content retrieval and theme analysis",
+      useAllEntries: hasPersonalPronouns,
+      hasPersonalPronouns,
+      hasExplicitTimeReference: false,
+      inferredTimeContext
     };
   }
+
+  // Original fallback logic for non-content queries
+  const subQuestion = {
+    question: isEmotionQuery 
+      ? "What emotional patterns emerge from my journal entries?"
+      : "What key themes and insights can be found in my journal entries?",
+    purpose: "Analyze journal data to provide personalized insights",
+    searchStrategy: "hybrid",
+    executionStage: 1,
+    analysisSteps: [
+      {
+        step: 1,
+        description: "Retrieve relevant journal entries using semantic search",
+        queryType: "vector_search",
+        sqlQuery: null,
+        vectorSearch: {
+          query: isEmotionQuery ? "emotions, feelings, mood" : "themes, insights, patterns",
+          threshold: 0.3,
+          limit: 10
+        }
+      },
+      {
+        step: 2,
+        description: isEmotionQuery 
+          ? "Analyze emotion patterns and frequencies"
+          : "Analyze theme distributions and patterns",
+        queryType: "sql_analysis",
+        sqlQuery: isEmotionQuery
+          ? "SELECT emotion_key, AVG((emotion_value)::numeric) as avg_score FROM \"Journal Entries\", jsonb_each(emotions) WHERE user_id = $user_id GROUP BY emotion_key ORDER BY avg_score DESC LIMIT 10"
+          : "SELECT theme, COUNT(*) as frequency FROM (SELECT unnest(master_themes) as theme FROM \"Journal Entries\" WHERE user_id = $user_id) t GROUP BY theme ORDER BY frequency DESC LIMIT 10"
+      }
+    ]
+  };
+
+  return {
+    queryType: "journal_specific",
+    strategy: "intelligent_sub_query",
+    userStatusMessage: "Analyzing your journal patterns",
+    subQuestions: [subQuestion],
+    confidence: 0.6,
+    reasoning: "Fallback analysis plan with hybrid search strategy",
+    useAllEntries: hasPersonalPronouns,
+    hasPersonalPronouns,
+    hasExplicitTimeReference: false
+  };
+}
+
+// Helper: derive time range hints from SQL WHERE clauses
+function deriveTimeRangeFromSql(sqlQuery) {
+  const res = {};
+  if (!sqlQuery) return res;
+
+  const q = sqlQuery.replace(/\s+/g, ' ');
+
+  const between = q.match(/created_at\s+BETWEEN\s*(?:TIMESTAMP\s*)?'([^']+)'\s+AND\s*(?:TIMESTAMP\s*)?'([^']+)'/i);
+  if (between) {
+    const start = new Date(between[1]);
+    const end = new Date(between[2]);
+    if (!isNaN(start.getTime())) res.start = start.toISOString();
+    if (!isNaN(end.getTime())) res.end = end.toISOString();
+  }
+
+  const gte = q.match(/created_at\s*>=\s*(?:TIMESTAMP\s*)?'([^']+)'/i);
+  if (gte) {
+    const d = new Date(gte[1]);
+    if (!isNaN(d.getTime())) res.start = d.toISOString();
+  }
+
+  const lte = q.match(/created_at\s*<=\s*(?:TIMESTAMP\s*)?'([^']+)'/i);
+  if (lte) {
+    const d = new Date(lte[1]);
+    if (!isNaN(d.getTime())) res.end = d.toISOString();
+  }
+
+  return res;
+}
+
+// Execute plan by directly running GPT-produced steps with staged parallelism
+async function executePlan(plan, userId, normalizedTimeRange, supabaseClient) {
+  // Clear any potential variable persistence to prevent stale data contamination
+  let executionMetadata = {
+    requestId: `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    timestamp: new Date().toISOString(),
+    userId: userId,
+    timeRange: normalizedTimeRange,
+    planQuestion: plan?.subQuestions?.[0]?.question || 'unknown'
+  };
+
+  console.log(`[EXECUTION START] ${executionMetadata.requestId}:`, {
+    userId,
+    timeRange: normalizedTimeRange,
+    planType: plan?.queryType,
+    subQuestionCount: plan?.subQuestions?.length || 0,
+    firstQuestion: executionMetadata.planQuestion
+  });
+
+  // Helper: run raw SQL via RPC after injecting user id
+  const executeRawSql = async (sqlQuery, timeRange) => {
+    if (!sqlQuery || !sqlQuery.trim()) return { ok: true, rows: [] };
+
+    // Replace placeholders
+    let finalSql = sqlQuery.replace(/\$user_id\b/g, `'${userId}'::uuid`);
+    
+    const startVal = timeRange?.start || null;
+    const endVal = timeRange?.end || null;
+    
+    if (/\$start_date\b/.test(finalSql)) {
+      finalSql = finalSql.replace(/\$start_date\b/g, startVal ? `'${startVal}'::timestamptz` : 'NULL');
+    }
+    if (/\$end_date\b/.test(finalSql)) {
+      finalSql = finalSql.replace(/\$end_date\b/g, endVal ? `'${endVal}'::timestamptz` : 'NULL');
+    }
+
+    // Log SQL execution with full details
+    console.log(`[SQL EXECUTION] ${executionMetadata.requestId}:`, {
+      originalQuery: sqlQuery,
+      finalSql: finalSql,
+      timeRange: timeRange,
+      userId: userId
+    });
+
+    const { data, error } = await supabaseClient.rpc('execute_dynamic_query', {
+      query_text: finalSql
+    });
+
+    // Log SQL results with data freshness validation
+    if (error) {
+      console.error(`[SQL ERROR] ${executionMetadata.requestId}:`, error);
+      return { ok: false, error: error.message };
+    }
+
+    if (!data || data.success === false) {
+      console.error(`[SQL FAILED] ${executionMetadata.requestId}:`, data);
+      return { ok: false, error: (data && data.error) || 'Unknown SQL execution error' };
+    }
+
+    const rows = Array.isArray(data.data) ? data.data : [];
+
+    // Data freshness validation - check if returned data matches query parameters
+    if (rows.length > 0 && timeRange) {
+      const sampleRow = rows[0];
+      const dateFields = ['created_at', 'date', 'timestamp'];
+      let foundDateField = null;
+      let sampleDate = null;
+
+      for (const field of dateFields) {
+        if (sampleRow[field]) {
+          foundDateField = field;
+          sampleDate = new Date(sampleRow[field]);
+          break;
+        }
+      }
+
+      if (foundDateField && sampleDate) {
+        const queryStart = timeRange.start ? new Date(timeRange.start) : null;
+        const queryEnd = timeRange.end ? new Date(timeRange.end) : null;
+
+        let dataFreshness = 'unknown';
+        if (queryStart && queryEnd) {
+          dataFreshness = (sampleDate >= queryStart && sampleDate <= queryEnd) ? 'fresh' : 'stale';
+        } else if (queryStart) {
+          dataFreshness = sampleDate >= queryStart ? 'fresh' : 'stale';
+        } else if (queryEnd) {
+          dataFreshness = sampleDate <= queryEnd ? 'fresh' : 'stale';
+        }
+
+        console.log(`[DATA FRESHNESS] ${executionMetadata.requestId}:`, {
+          status: dataFreshness,
+          sampleDate: sampleDate.toISOString(),
+          queryStart: queryStart?.toISOString() || null,
+          queryEnd: queryEnd?.toISOString() || null,
+          foundDateField,
+          rowCount: rows.length
+        });
+
+        // Alert if stale data detected
+        if (dataFreshness === 'stale') {
+          console.error(`[STALE DATA ALERT] ${executionMetadata.requestId}: Returned data outside query time range!`, {
+            sampleDate: sampleDate.toISOString(),
+            expectedRange: {
+              start: queryStart?.toISOString(),
+              end: queryEnd?.toISOString()
+            },
+            sqlQuery: finalSql
+          });
+        }
+      }
+    }
+
+    console.log(`[SQL SUCCESS] ${executionMetadata.requestId}:`, {
+      rowCount: rows.length,
+      sampleData: rows.slice(0, 2) // Log first 2 rows for inspection
+    });
+
+    return { ok: true, rows };
+  };
+
+  const getTotalCount = async () => {
+    const { data: total } = await supabaseClient.rpc('get_journal_entry_count', {
+      user_id_filter: userId,
+      start_date: normalizedTimeRange?.start || null,
+      end_date: normalizedTimeRange?.end || null
+    });
+    return total || 0;
+  };
+
+  const subQuestions = plan.subQuestions || [];
+  
+  // Default executionStage = 1 when missing
+  subQuestions.forEach(sq => {
+    if (sq.executionStage == null) sq.executionStage = 1;
+  });
+
+  const stages = [...new Set(subQuestions.map(sq => sq.executionStage))].sort((a, b) => a - b);
+  console.log(`[executePlan] Processing ${subQuestions.length} sub-questions across stages: ${stages.join(', ')}`);
+
+  const processSubQuestion = async (subQuestion) => {
+    console.log(`[executePlan] Processing sub-question: ${subQuestion.question}`);
+
+    const stepPromises = (subQuestion.analysisSteps || []).map(async (step) => {
+      try {
+        console.log(`[executePlan] Executing step ${step.step}: ${step.description}`);
+
+        // Determine per-step time range
+        let stepTimeRange = normalizedTimeRange || null;
+        const derived = deriveTimeRangeFromSql(step.sqlQuery || '');
+
+        if (step?.timeRange && (step.timeRange.start || step.timeRange.end)) {
+          stepTimeRange = {
+            start: step.timeRange.start || null,
+            end: step.timeRange.end || null
+          };
+        } else if (derived.start || derived.end) {
+          stepTimeRange = {
+            start: derived.start || null,
+            end: derived.end || null
+          };
+        }
+
+        if (step.queryType === 'vector_search' && step.vectorSearch) {
+          try {
+            console.log(`[executePlan] Generating embedding for vector search: "${step.vectorSearch.query}"`);
+            const queryEmbedding = await generateEmbedding(step.vectorSearch.query);
+            console.log(`[executePlan] Embedding generated successfully with ${queryEmbedding.length} dimensions`);
+            
+            const useDated = !!(stepTimeRange && (stepTimeRange.start || stepTimeRange.end));
+            const rpcName = useDated ? 'match_journal_entries_with_date' : 'match_journal_entries';
+
+            const rpcArgs = {
+              query_embedding: queryEmbedding,
+              match_threshold: step.vectorSearch.threshold || 0.3,
+              match_count: step.vectorSearch.limit || 10,
+              user_id_filter: userId
+            };
+
+            if (useDated) {
+              rpcArgs.start_date = stepTimeRange?.start || null;
+              rpcArgs.end_date = stepTimeRange?.end || null;
+              console.log(`[executePlan] Using time-filtered vector search: ${stepTimeRange?.start} to ${stepTimeRange?.end}`);
+            }
+
+            console.log(`[executePlan] Calling ${rpcName} with threshold ${rpcArgs.match_threshold}, limit ${rpcArgs.match_count}`);
+
+            const { data: vectorData, error: vectorError } = await supabaseClient.rpc(rpcName, rpcArgs);
+
+            if (vectorError) {
+              console.error(`[executePlan] Vector search error:`, vectorError);
+              return { kind: 'vector', ok: false, error: vectorError.message };
+            }
+
+            console.log(`[executePlan] Vector search returned ${vectorData?.length || 0} results`);
+            if (vectorData && vectorData.length > 0) {
+              console.log(`[executePlan] Sample vector result:`, {
+                id: vectorData[0].id,
+                similarity: vectorData[0].similarity,
+                content_preview: vectorData[0].content?.slice(0, 100)
+              });
+            }
+
+            return {
+              kind: 'vector',
+              ok: true,
+              entries: vectorData || [],
+              timeRange: stepTimeRange
+            };
+          } catch (e) {
+            console.error(`[executePlan] Vector search execution error:`, e);
+            return { kind: 'vector', ok: false, error: e.message };
+          }
+        }
+
+        if (step.queryType === 'sql_analysis' || step.queryType === 'sql_calculation' || step.queryType === 'sql_count') {
+          const exec = await executeRawSql(step.sqlQuery || '', stepTimeRange);
+          if (exec.ok) return {
+            kind: 'sql',
+            ok: true,
+            rows: exec.rows || [],
+            timeRange: stepTimeRange
+          };
+          return { kind: 'sql', ok: false, error: exec.error || 'SQL execution failed' };
+        }
+
+        return { kind: 'unknown', ok: false, error: 'Unknown or missing step configuration' };
+      } catch (err) {
+        console.error(`[executePlan] Step execution error:`, err);
+        return { kind: 'unknown', ok: false, error: err.message };
+      }
+    });
+
+    const resolved = await Promise.all(stepPromises);
+    const sqlRows = resolved.filter(r => r.kind === 'sql' && r.ok && Array.isArray(r.rows));
+    const vectorOk = resolved.filter(r => r.kind === 'vector' && r.ok && Array.isArray(r.entries));
+
+    const sqlResults = sqlRows.flatMap(r => r.rows);
+    const vectorResults = vectorOk.flatMap(r => r.entries);
+    const stepTimeRanges = resolved.map(r => ({
+      kind: r.kind,
+      timeRange: r.timeRange || null
+    }));
+
+    // Prefer SQL-derived metrics when available
+    let sqlPercentage = null;
+    let sqlCountValue = null;
+
+    for (const row of sqlResults) {
+      if (sqlPercentage === null && typeof row?.percentage === 'number') sqlPercentage = Number(row.percentage);
+      if (sqlCountValue === null && typeof row?.count === 'number') sqlCountValue = Number(row.count);
+    }
+
+    const vectorIds = new Set(vectorResults.map(e => e.id));
+    let totalCount = 0;
+    try { totalCount = await getTotalCount(); } catch {}
+
+    const vectorBasedPercentage = totalCount > 0 ? Math.round((vectorIds.size / totalCount) * 1000) / 10 : 0;
+    const finalPercentage = sqlPercentage ?? vectorBasedPercentage;
+    const finalCount = sqlCountValue ?? vectorIds.size;
+
+    console.log(`[executePlan] Sub-question results: ${sqlResults.length} SQL rows, ${vectorResults.length} vector entries`);
+
+    return {
+      subQuestion: {
+        question: subQuestion.question,
+        purpose: subQuestion.purpose,
+        executionStage: subQuestion.executionStage
+      },
+      researcherOutput: {
+        plan: { searchStrategy: subQuestion.searchStrategy },
+        validatedPlan: { searchStrategy: subQuestion.searchStrategy },
+        confidence: plan.confidence ?? null,
+        validationIssues: [],
+        enhancements: []
+      },
+      executionResults: {
+        sqlResults,
+        vectorResults,
+        stepTimeRanges,
+        combinedMetrics: {
+          sqlCount: sqlResults.length,
+          vectorCount: vectorResults.length,
+          combinedCount: finalCount,
+          totalCount,
+          combinedPercentage: finalPercentage
+        }
+      }
+    };
+  };
+
+  const allResults = [];
+  for (const stage of stages) {
+    const inStage = subQuestions.filter(sq => sq.executionStage === stage);
+    console.log(`[executePlan] Executing stage ${stage} with ${inStage.length} sub-questions in parallel`);
+    const stageResults = await Promise.all(inStage.map(processSubQuestion));
+    allResults.push(...stageResults);
+  }
+
+  console.log(`[EXECUTION COMPLETE] ${executionMetadata.requestId}:`, {
+    totalSubQuestions: allResults.length,
+    stages: stages.length,
+    successfulQuestions: allResults.filter(r => r.executionResults?.sqlResults || r.executionResults?.vectorResults).length,
+    timeRange: normalizedTimeRange,
+    resultsSummary: allResults.map((r, idx) => ({
+      index: idx,
+      question: r.subQuestion?.question?.substring(0, 50),
+      sqlRowCount: r.executionResults?.sqlResults?.length || 0,
+      vectorResultCount: r.executionResults?.vectorResults?.length || 0,
+      hasError: !!r.executionResults?.error
+    }))
+  });
+
+  // Final data integrity check
+  allResults.forEach((result, idx) => {
+    const sqlCount = result.executionResults?.sqlResults?.length || 0;
+    const vectorCount = result.executionResults?.vectorResults?.length || 0;
+    console.log(`[RESULT SUMMARY] ${executionMetadata.requestId} #${idx + 1}: ${sqlCount} SQL rows, ${vectorCount} vector results`);
+
+    if (vectorCount > 0) {
+      console.log(`[VECTOR SAMPLE] ${executionMetadata.requestId} #${idx + 1}:`, JSON.stringify(result.executionResults.vectorResults.slice(0, 2), null, 2));
+    }
+    if (sqlCount > 0) {
+      console.log(`[SQL SAMPLE] ${executionMetadata.requestId} #${idx + 1}:`, JSON.stringify(result.executionResults.sqlResults.slice(0, 2), null, 2));
+    }
+  });
+
+  return { researchResults: allResults };
+}
+
+function getLastWeekRangeUTC() {
+  const now = new Date();
+  const day = now.getUTCDay(); // 0 Sun .. 6 Sat
+  const daysSinceMonday = (day + 6) % 7; // Monday = 0
+
+  const startOfThisWeek = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  startOfThisWeek.setUTCDate(startOfThisWeek.getUTCDate() - daysSinceMonday);
+
+  const start = new Date(startOfThisWeek);
+  start.setUTCDate(start.getUTCDate() - 7);
+  
+  const end = startOfThisWeek; // exclusive
+
+  return { start, end };
 }
 
 serve(async (req) => {
@@ -305,389 +845,88 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const requestId = `planner_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
   try {
-    // FIXED: Use ANON_KEY instead of SERVICE_ROLE_KEY for proper RLS authentication
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '', // Changed from SERVICE_ROLE_KEY
-      {
-        global: {
-          headers: { Authorization: req.headers.get('Authorization') ?? '' },
-        },
-      }
-    );
+    // Generate unique request ID for tracking data flow
+    const requestId = `planner_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const { message, conversationContext = [], userId, execute = false, timeRange = null, threadId = null, messageId = null, isFollowUp = false } = await req.json();
 
-    const requestBody = await req.json();
-    const { 
-      message, 
-      userId, 
-      execute = false, 
-      conversationContext = [], 
-      timeRange = null, 
-      threadId, 
-      messageId,
-      isFollowUp = false 
-    } = requestBody;
+    console.log(`[REQUEST START] ${requestId}:`, {
+      message: message?.substring(0, 100),
+      userId: userId?.substring(0, 8),
+      execute,
+      timestamp: new Date().toISOString(),
+      contextLength: conversationContext?.length || 0,
+      timeRange,
+      threadId: threadId?.substring(0, 8),
+      messageId: messageId?.substring(0, 8),
+      isFollowUp
+    });
 
-    console.log(`\n🎬 [REQUEST START] ${requestId}: {
-      message: "${message}",
-      userId: "${userId?.substring(0, 8)}",
-      execute: ${execute},
-      timestamp: "${new Date().toISOString()}",
-      contextLength: ${conversationContext?.length || 0},
-      timeRange: ${timeRange ? 'provided' : 'null'},
-      threadId: "${threadId?.substring(0, 8)}",
-      messageId: ${messageId || 'undefined'},
-      isFollowUp: ${isFollowUp}
-    }`);
-
-    // Enhanced authentication debugging with proper error handling
-    const authContext = await debugAuthenticationContext(supabase, requestId);
-    
-    console.log(`🔐 [AUTH DEBUG] ${requestId}: {
-      userId: "${authContext.userId?.substring(0, 36) || 'none'}",
-      hasValidAuth: ${authContext.hasValidAuth},
-      userEntryCount: ${authContext.userEntryCount},
-      authDetails: ${JSON.stringify(authContext.authDetails)}
-    }`);
-
-    if (!authContext.hasValidAuth || !authContext.userId) {
-      console.error(`❌ [AUTH ERROR] ${requestId}: Authentication failed`);
+    if (!message || !userId) {
+      console.error(`[REQUEST ERROR] ${requestId}: Missing required fields`);
       return new Response(JSON.stringify({
-        error: 'Authentication required',
-        details: 'User must be logged in to access journal entries',
-        authDebug: authContext,
-        requestId
+        error: 'Message and userId are required'
       }), {
-        status: 401,
+        status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    console.log(`📊 [USER CONTEXT] ${requestId}: User has ${authContext.userEntryCount} journal entries`);
+    // Get user's journal entry count for context
+    const { data: countData } = await supabase.rpc('get_journal_entry_count', {
+      user_id_filter: userId
+    });
+    const userEntryCount = countData || 0;
 
-    // Get OpenAI API key with validation
-    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
-    if (!openaiApiKey) {
-      console.error(`❌ [CONFIG ERROR] ${requestId}: OpenAI API key not configured`);
-      return new Response(JSON.stringify({
-        error: 'OpenAI API key not configured',
-        details: 'Server configuration issue - missing API key',
-        requestId
-      }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
+    // Generate comprehensive analysis plan
+    const analysisResult = await analyzeQueryWithSubQuestions(message, conversationContext, userEntryCount, isFollowUp);
 
-    // Enhanced analyst agent with improved error handling and fallbacks
-    const analystSystemPrompt = `You are an intelligent query analyst for a personal journaling system. Analyze user queries and create optimal execution plans.
-
-**MANDATORY VECTOR SEARCH RULE**: If the user query asks about things like common topics, areas of life, themes, events, or anything subjective, please consider generating a vector search related sub-query too mandatorily.
-
-**AVAILABLE DATA STRUCTURES:**
-- Journal Entries: content, emotions (jsonb), master_themes (text[]), entities (jsonb), created_at
-- Vector embeddings: semantic similarity search for content
-- SQL analytics: aggregations, statistics, time-based analysis
-
-**ANALYSIS GUIDELINES:**
-- For subjective queries (topics, themes, life areas, events): ALWAYS include vector search component
-- For statistical queries: Use SQL with potential vector enhancement
-- For time-based queries: Use appropriate date filtering
-- For entity/emotion analysis: Use targeted searches
-- If no data available: Provide helpful guidance on journaling
-
-**RESPONSE FORMAT:** JSON with queryType, strategy, subQuestions array, and detailed execution steps.
-
-User context: ${authContext.userEntryCount} total journal entries.
-Current query: "${message}"
-
-Provide a comprehensive analysis plan with both SQL and vector components when the query involves subjective content.`;
-
-    // Generate query analysis with improved error handling
-    console.log(`🤖 [ANALYST AGENT] ${requestId}: Generating query analysis plan...`);
-
-    const analystMessages = [
-      { role: 'system', content: analystSystemPrompt },
-      { role: 'user', content: message }
-    ];
-
-    if (conversationContext.length > 0) {
-      console.log(`[Analyst Agent] Context preview: ${conversationContext.slice(-2).map(m => `${m.role}: ${m.content.substring(0, 50)}`).join('; ')}`);
-    }
-
-    // Query analysis detection with enhanced pattern matching
-    const hasPersonalPronouns = /\b(i|me|my|mine|myself|am i|do i|how am i|how do i|what makes me|how was i)\b/i.test(message.toLowerCase());
-    const hasExplicitTimeReference = /\b(last week|yesterday|this week|last month|today|recently|lately|this morning|last night|when|since|august|july|september|october)\b/i.test(message.toLowerCase());
-    const isContentSeekingQuery = /\b(show me|tell me about|what did i|entries about|journal about|wrote about|mentioned|discussed|topics|themes)\b/i.test(message.toLowerCase());
-    const isFollowUpQuestion = /\b(also|additionally|what about|and|furthermore|moreover)\b/i.test(message.toLowerCase()) && conversationContext.length > 0;
-
-    console.log(`[Analyst Agent] Query analysis - Personal pronouns: ${hasPersonalPronouns}, Time reference: ${hasExplicitTimeReference}, Content-seeking: ${isContentSeekingQuery}, Follow-up: ${isFollowUpQuestion}`);
-
-    let analystResponse;
-    try {
-      analystResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${openaiApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gpt-4.1-2025-04-14',
-          messages: analystMessages,
-          max_tokens: 2000,
-          temperature: 0.3
-        }),
-      });
-
-      if (!analystResponse.ok) {
-        const errorText = await analystResponse.text();
-        console.error(`❌ [ANALYST ERROR] ${requestId}: OpenAI API error:`, errorText);
-        throw new Error(`Analyst agent failed: ${analystResponse.status} - ${errorText}`);
-      }
-    } catch (fetchError) {
-      console.error(`❌ [ANALYST FETCH ERROR] ${requestId}: Failed to call OpenAI:`, fetchError);
-      throw new Error(`Network error calling analyst agent: ${fetchError.message}`);
-    }
-
-    const analystData = await analystResponse.json();
-    const analystContent = analystData.choices[0]?.message?.content;
-
-    if (!analystContent) {
-      throw new Error('Empty response from analyst agent');
-    }
-
-    console.log(`Analyst Agent response: ${analystContent.substring(0, 200)}...`);
-
-    // Parse analyst response with better error handling
-    let queryPlan;
-    try {
-      // Extract JSON from the response
-      const jsonMatch = analystContent.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        console.error(`❌ [PARSE ERROR] ${requestId}: No JSON found in analyst response`);
-        throw new Error('No JSON found in analyst response');
-      }
-      queryPlan = JSON.parse(jsonMatch[0]);
-    } catch (parseError) {
-      console.error(`❌ [PARSE ERROR] ${requestId}: Failed to parse analyst response:`, parseError);
-      
-      // Fallback query plan
-      queryPlan = {
-        queryType: "content_search",
-        strategy: "hybrid_search",
-        subQuestions: [{
-          question: message,
-          searchStrategy: ["vector", "sql"],
-          analysisSteps: [{
-            step: 1,
-            description: "Fallback content search",
-            queryType: "sql_analysis",
-            vectorSearch: true,
-            sqlQuery: `SELECT id, "refined text", "transcription text", created_at, master_themes FROM "Journal Entries" WHERE user_id = $user_id ORDER BY created_at DESC LIMIT 10`
-          }],
-          executionStage: 1
-        }]
-      };
-    }
-
-    console.log(`Final Analyst Plan: ${JSON.stringify(queryPlan, null, 2)}`);
-
-    // If not executing, return the plan
     if (!execute) {
+      // Return just the plan without execution
       return new Response(JSON.stringify({
-        queryPlan,
-        execute: false,
-        planningComplete: true,
-        authContext: {
-          userId: authContext.userId,
-          entryCount: authContext.userEntryCount
-        }
+        success: true,
+        queryPlan: analysisResult,
+        userEntryCount
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    // Execute the query plan with enhanced error handling
-    const executionRequestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
-    console.log(`\n🚀 [EXECUTION START] ${executionRequestId}: {
-      userId: "${authContext.userId.substring(0, 8)}...",
-      timeRange: ${timeRange ? 'provided' : 'null'},
-      planType: "${queryPlan.queryType}",
-      subQuestionCount: ${queryPlan.subQuestions?.length || 0},
-      firstQuestion: "${queryPlan.subQuestions?.[0]?.question?.substring(0, 50) || 'none'}..."
-    }`);
-
-    // Generate embedding for vector searches with fallback handling
-    let queryEmbedding = null;
-    const needsEmbedding = queryPlan.subQuestions?.some(sq => 
-      sq.searchStrategy?.includes('vector') || 
-      sq.analysisSteps?.some(step => step.vectorSearch)
-    );
-
-    if (needsEmbedding) {
-      queryEmbedding = await generateQueryEmbedding(message, openaiApiKey, executionRequestId);
-      if (!queryEmbedding) {
-        console.warn(`⚠️ [EMBEDDING WARNING] ${executionRequestId}: Failed to generate embedding, vector searches will use fallback methods`);
+    // Execute the analysis plan
+    let normalizedTimeRange = null;
+    if (timeRange) {
+      if (timeRange.type === 'last_week') {
+        const range = getLastWeekRangeUTC();
+        normalizedTimeRange = {
+          start: range.start.toISOString(),
+          end: range.end.toISOString()
+        };
+      } else if (timeRange.start || timeRange.end) {
+        normalizedTimeRange = {
+          start: timeRange.start || null,
+          end: timeRange.end || null
+        };
       }
     }
 
-    // Execute sub-questions with improved error handling
-    const researchResults = [];
-    
-    // Group sub-questions by execution stage
-    const stageGroups = {};
-    for (const subQ of queryPlan.subQuestions || []) {
-      const stage = subQ.executionStage || 1;
-      if (!stageGroups[stage]) stageGroups[stage] = [];
-      stageGroups[stage].push(subQ);
-    }
-
-    const stages = Object.keys(stageGroups).sort((a, b) => parseInt(a) - parseInt(b));
-    console.log(`🔄 [EXECUTION PLAN] Processing ${queryPlan.subQuestions?.length || 0} sub-questions across stages: ${stages.join(', ')}`);
-
-    for (const stage of stages) {
-      const stageQuestions = stageGroups[stage];
-      console.log(`🔄 [STAGE ${stage}] Executing ${stageQuestions.length} sub-questions in parallel`);
-      
-      const stagePromises = stageQuestions.map(async (subQuestion) => {
-        const subRequestId = `${executionRequestId}_${Math.random().toString(36).substr(2, 6)}`;
-        
-        console.log(`🎯 [SUB-QUESTION] Processing: ${subQuestion.question}`);
-
-        const executionResults = {
-          vectorResults: [],
-          sqlResults: [],
-          vectorDebugInfo: null,
-          errors: []
-        };
-
-        // Execute analysis steps with comprehensive error handling
-        for (const step of subQuestion.analysisSteps || []) {
-          console.log(`⚡ [STEP] Executing step ${step.step}: ${step.description}`);
-
-          // SQL execution with better error handling
-          if (step.queryType === 'sql_analysis' && step.sqlQuery) {
-            try {
-              let finalSql = step.sqlQuery;
-              const stepTimeRange = step.timeRange || timeRange;
-              
-              // Replace user_id placeholder
-              finalSql = finalSql.replace(/\$user_id/g, `'${authContext.userId}'::uuid`);
-              
-              console.log(`📊 [SQL EXECUTION] ${subRequestId}: {
-                originalQuery: \`${step.sqlQuery.substring(0, 100)}...\`,
-                timeRange: ${stepTimeRange ? JSON.stringify(stepTimeRange) : 'null'},
-                userId: "${authContext.userId.substring(0, 8)}..."
-              }`);
-
-              const { data: sqlData, error: sqlError } = await supabase.rpc('execute_dynamic_query', {
-                query_text: finalSql
-              });
-
-              if (sqlError) {
-                console.error(`❌ [SQL ERROR] ${subRequestId}: SQL execution failed:`, sqlError);
-                executionResults.errors.push(`SQL Error: ${sqlError.message}`);
-                executionResults.sqlResults = [];
-              } else {
-                const results = sqlData?.data || [];
-                executionResults.sqlResults = results;
-                
-                console.log(`✅ [SQL SUCCESS] ${subRequestId}: {
-                  rowCount: ${results.length},
-                  sampleData: ${JSON.stringify(results.slice(0, 1))}
-                }`);
-              }
-            } catch (sqlException) {
-              console.error(`❌ [SQL EXCEPTION] ${subRequestId}: SQL execution exception:`, sqlException);
-              executionResults.errors.push(`SQL Exception: ${sqlException.message}`);
-              executionResults.sqlResults = [];
-            }
-          }
-
-          // Vector search execution with enhanced error handling
-          if (step.vectorSearch) {
-            if (queryEmbedding) {
-              try {
-                const vectorSearchResult = await executeVectorSearch(
-                  supabase, 
-                  authContext.userId, 
-                  queryEmbedding, 
-                  subQuestion.question,
-                  subRequestId,
-                  step.timeRange || timeRange
-                );
-                
-                executionResults.vectorResults = vectorSearchResult.vectorResults;
-                executionResults.vectorDebugInfo = vectorSearchResult.vectorDebugInfo;
-              } catch (vectorError) {
-                console.error(`❌ [VECTOR ERROR] ${subRequestId}: Vector search failed:`, vectorError);
-                executionResults.errors.push(`Vector Error: ${vectorError.message}`);
-                executionResults.vectorResults = [];
-              }
-            } else {
-              console.warn(`⚠️ [VECTOR SKIP] ${subRequestId}: Skipping vector search - no embedding available`);
-              executionResults.errors.push('Vector search skipped - no embedding generated');
-            }
-          }
-        }
-
-        console.log(`📋 [SUB-QUESTION RESULTS] SQL rows: ${executionResults.sqlResults.length}, Vector entries: ${executionResults.vectorResults.length}, Errors: ${executionResults.errors.length}`);
-
-        return {
-          subQuestion,
-          executionResults
-        };
-      });
-
-      const stageResults = await Promise.all(stagePromises);
-      researchResults.push(...stageResults);
-    }
-
-    console.log(`🏁 [EXECUTION COMPLETE] ${executionRequestId}: {
-      totalSubQuestions: ${researchResults.length},
-      stages: ${stages.length},
-      successfulQuestions: ${researchResults.filter(r => r.executionResults.sqlResults.length > 0 || r.executionResults.vectorResults.length > 0).length},
-      timeRange: ${timeRange ? 'applied' : 'null'},
-      vectorDebugAvailable: ${researchResults.some(r => r.executionResults.vectorDebugInfo) ? 'true' : 'false'}
-    }`);
-
-    console.log(`🎉 [REQUEST COMPLETE] ${requestId}: Returning results with ${researchResults.length} research results`);
+    const executionResult = await executePlan(analysisResult, userId, normalizedTimeRange, supabase);
 
     return new Response(JSON.stringify({
-      queryPlan,
-      researchResults,
-      executionMetadata: {
-        requestId,
-        executionRequestId,
-        totalStages: stages.length,
-        totalSubQuestions: researchResults.length,
-        authContext: {
-          userId: authContext.userId,
-          entryCount: authContext.userEntryCount,
-          authMethod: 'anon_key_with_jwt'
-        },
-        embeddingGenerated: !!queryEmbedding,
-        timestamp: new Date().toISOString(),
-        successRate: researchResults.filter(r => 
-          r.executionResults.sqlResults.length > 0 || r.executionResults.vectorResults.length > 0
-        ).length / Math.max(researchResults.length, 1)
-      }
+      success: true,
+      queryPlan: analysisResult,
+      researchResults: executionResult.researchResults,
+      userEntryCount,
+      timeRange: normalizedTimeRange
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
 
   } catch (error) {
-    console.error(`❌ [REQUEST ERROR] ${requestId}: Unhandled error:`, error);
+    console.error('Smart Query Planner error:', error);
     return new Response(JSON.stringify({
-      error: 'Query planning failed',
-      details: error.message,
-      requestId,
-      timestamp: new Date().toISOString(),
-      fallback: 'The system encountered an error while processing your request. Please try again or rephrase your question.'
+      success: false,
+      error: error.message,
+      fallback: true
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
