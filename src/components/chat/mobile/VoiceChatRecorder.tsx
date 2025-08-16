@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Mic, ArrowUp, X, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -74,6 +73,9 @@ export function VoiceChatRecorder({
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationFrameRef = useRef<number>();
   
+  // Add cancellation tracking
+  const isCancellingRef = useRef(false);
+  
   const {
     status,
     startRecording,
@@ -134,6 +136,16 @@ export function VoiceChatRecorder({
   };
 
   async function handleRecordingComplete(audioBlob: Blob) {
+    // Check if recording was cancelled - if so, skip processing
+    if (isCancellingRef.current) {
+      console.log('[VoiceChatRecorder] Recording was cancelled, skipping audio processing');
+      isCancellingRef.current = false; // Reset flag
+      cleanupAudioAnalysis();
+      setRecordingState('idle');
+      toast.success('Recording cancelled');
+      return;
+    }
+
     if (!user?.id) {
       toast.error('Please sign in to use voice recording');
       return;
@@ -203,6 +215,8 @@ export function VoiceChatRecorder({
 
   const handleStartRecording = async () => {
     try {
+      // Reset cancellation flag when starting new recording
+      isCancellingRef.current = false;
       setRecordingState('recording');
       
       // Get user media for audio analysis
@@ -224,10 +238,14 @@ export function VoiceChatRecorder({
   };
 
   const handleCancelRecording = () => {
+    console.log('[VoiceChatRecorder] User cancelled recording');
+    // Set cancellation flag before stopping
+    isCancellingRef.current = true;
+    
     stopRecording();
     clearRecording();
     cleanupAudioAnalysis();
-    setRecordingState('idle');
+    // Note: state will be set to idle in handleRecordingComplete when it detects cancellation
   };
 
   // Update state based on recording status
