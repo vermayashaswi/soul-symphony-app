@@ -236,17 +236,17 @@ serve(async (req) => {
       const shouldUseGptAnalysis = enhancedQueryPlan.subQuestions && enhancedQueryPlan.subQuestions.length >= 1;
       
       if (shouldUseGptAnalysis) {
-        // Use researchResults returned by smart-query-planner (executed plan)
-        const researchResults = plannerData?.researchResults;
-        if (!researchResults || !Array.isArray(researchResults)) {
-          throw new Error('Analysis execution failed: missing researchResults');
+        // Use executionResult returned by smart-query-planner (executed plan)
+        const executionResult = plannerData?.executionResult;
+        if (!executionResult || !Array.isArray(executionResult)) {
+          throw new Error('Analysis execution failed: missing executionResult');
         }
 
         // Step 5: Call GPT Response Consolidator to synthesize the results
         const { data: consolidationResult, error: consolidationError } = await supabaseClient.functions.invoke('gpt-response-consolidator', {
           body: {
             userMessage: message,
-            researchResults,
+            researchResults: executionResult,
             conversationContext,
             userProfile,
             streamingMode: false,
@@ -295,7 +295,7 @@ serve(async (req) => {
           analysis: {
             queryPlan: enhancedQueryPlan,
             gptDrivenAnalysis: true,
-            subQuestionAnalysis: researchResults,
+            subQuestionAnalysis: executionResult,
             consolidationMetadata: consolidationResult.analysisMetadata,
             classification
           }
@@ -611,9 +611,9 @@ async function processStreamingPipeline(streamManager, requestBody, supabaseClie
       // Step 3: Analysis execution (already performed by smart-query-planner)
       streamManager.sendBackendTask("Searching your journal...", "Looking through journal entries");
       
-      const researchResults = gptPlan.researchResults;
-      if (!researchResults || !Array.isArray(researchResults)) {
-        throw new Error('Analysis execution failed: missing researchResults');
+      const executionResult = gptPlan.executionResult;
+      if (!executionResult || !Array.isArray(executionResult)) {
+        throw new Error('Analysis execution failed: missing executionResult');
       }
 
       streamManager.sendBackendTask("Journal analysis complete", "Processing insights");
@@ -624,7 +624,7 @@ async function processStreamingPipeline(streamManager, requestBody, supabaseClie
       const { data: consolidationResult, error: consolidationError } = await supabaseClient.functions.invoke('gpt-response-consolidator', {
         body: {
           userMessage: message,
-          researchResults,
+          researchResults: executionResult,
           conversationContext,
           userProfile,
           streamingMode: false,
@@ -647,7 +647,7 @@ async function processStreamingPipeline(streamManager, requestBody, supabaseClie
         analysis: {
           queryPlan: enhancedQueryPlan,
           gptDrivenAnalysis: true,
-          subQuestionAnalysis: researchResults,
+          subQuestionAnalysis: executionResult,
           consolidationMetadata: consolidationResult.analysisMetadata,
           classification
         },
