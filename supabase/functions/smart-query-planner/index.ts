@@ -100,7 +100,7 @@ serve(async (req) => {
 
     console.log(`[Smart Query Planner] Processed ${processedResults.length} total entries`);
 
-    // Generate analysis plan using GPT
+    // Generate analysis plan using GPT - FIXED MODEL NAME
     const systemPrompt = `You are an AI assistant that analyzes journal queries and creates execution plans.
 
 Given a user's question about their journal, create a plan that:
@@ -136,13 +136,12 @@ Respond with a JSON object containing:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4.1-2025-01-14',
+        model: 'gpt-4.1-2025-04-14', // FIXED: Corrected model name
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: message }
         ],
-        temperature: 0.3,
-        max_tokens: 500
+        max_completion_tokens: 500
       }),
     });
 
@@ -173,9 +172,9 @@ Respond with a JSON object containing:
     // Return the plan and results for the consolidator
     const response = {
       success: true,
-      queryPlan: queryPlan,  // Changed from 'plan' to 'queryPlan' to match chat-with-rag expectation
-      vectorResults: vectorResults || [],  // Added explicit vectorResults
-      recentEntries: recentEntries || [],  // Added explicit recentEntries
+      queryPlan: queryPlan,
+      vectorResults: vectorResults || [],
+      recentEntries: recentEntries || [],
       metadata: {
         totalEntries: processedResults.length,
         vectorMatches: vectorResults?.length || 0,
