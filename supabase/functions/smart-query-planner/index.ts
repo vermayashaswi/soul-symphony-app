@@ -76,89 +76,236 @@ async function debugVectorSearch(supabaseClient: any, userId: string, requestId:
   }
 }
 
-// Enhanced vector search execution with detailed logging
+// Enhanced vector search execution with comprehensive debugging
 async function executeVectorSearchWithDebug(step: any, userId: string, supabaseClient: any, requestId: string) {
-  console.log(`[${requestId}] ================ VECTOR SEARCH DEBUG START ================`);
+  console.log(`[${requestId}] ================ ENHANCED VECTOR SEARCH DEBUG START ================`);
   
   try {
     const queryText = step.vectorSearch.query;
     console.log(`[${requestId}] Query text: "${queryText}"`);
+    console.log(`[${requestId}] User ID: ${userId}`);
     
-    // Generate embedding with detailed logging
+    // Generate embedding with detailed validation
     console.log(`[${requestId}] Generating embedding for query...`);
     const embedding = await generateEmbedding(queryText);
     
     if (!embedding || !Array.isArray(embedding)) {
-      console.error(`[${requestId}] Invalid embedding generated:`, typeof embedding);
+      console.error(`[${requestId}] ❌ CRITICAL: Invalid embedding generated:`, typeof embedding);
       throw new Error('Failed to generate valid embedding');
     }
     
-    console.log(`[${requestId}] Embedding generated successfully:`);
+    // Comprehensive embedding validation
+    console.log(`[${requestId}] ✅ Embedding generated successfully:`);
     console.log(`[${requestId}] - Dimensions: ${embedding.length}`);
+    console.log(`[${requestId}] - Expected dimensions: 1536`);
+    console.log(`[${requestId}] - Dimensions match: ${embedding.length === 1536 ? '✅ YES' : '❌ NO'}`);
     console.log(`[${requestId}] - Sample values: [${embedding.slice(0, 5).map(n => n.toFixed(4)).join(', ')}...]`);
-    console.log(`[${requestId}] - All values are numbers: ${embedding.every(n => typeof n === 'number' && !isNaN(n))}`);
+    console.log(`[${requestId}] - All values are numbers: ${embedding.every(n => typeof n === 'number' && !isNaN(n)) ? '✅ YES' : '❌ NO'}`);
+    console.log(`[${requestId}] - Min value: ${Math.min(...embedding).toFixed(4)}`);
+    console.log(`[${requestId}] - Max value: ${Math.max(...embedding).toFixed(4)}`);
+    console.log(`[${requestId}] - Has infinite values: ${embedding.some(n => !isFinite(n)) ? '❌ YES' : '✅ NO'}`);
     
-    // Enhanced database call with lower threshold for testing
-    const testThreshold = 0.1; // Lower threshold for debugging
-    const testLimit = 15; // More results for debugging
+    // Enhanced database call with debugging parameters
+    const debugThreshold = 0.1; // Lowered threshold for debugging
+    const debugLimit = 20; // More results for analysis
     
-    console.log(`[${requestId}] Calling match_journal_entries with parameters:`);
-    console.log(`[${requestId}] - query_embedding: [${embedding.length} dimensional vector]`);
-    console.log(`[${requestId}] - match_threshold: ${testThreshold}`);
-    console.log(`[${requestId}] - match_count: ${testLimit}`);
-    console.log(`[${requestId}] - user_id_filter: ${userId}`);
+    console.log(`[${requestId}] Calling match_journal_entries with ENHANCED debugging:`);
+    console.log(`[${requestId}] - Function: match_journal_entries`);
+    console.log(`[${requestId}] - query_embedding: [Array of ${embedding.length} numbers]`);
+    console.log(`[${requestId}] - match_threshold: ${debugThreshold}`);
+    console.log(`[${requestId}] - match_count: ${debugLimit}`);
+    console.log(`[${requestId}] - user_id_filter: "${userId}"`);
+    console.log(`[${requestId}] - user_id_filter type: ${typeof userId}`);
+    
+    // Test database connectivity first
+    console.log(`[${requestId}] Testing database connectivity...`);
+    const { data: healthCheck, error: healthError } = await supabaseClient
+      .from('Journal Entries')
+      .select('count')
+      .eq('user_id', userId)
+      .limit(1);
+    
+    if (healthError) {
+      console.error(`[${requestId}] ❌ Database connectivity failed:`, healthError);
+    } else {
+      console.log(`[${requestId}] ✅ Database connectivity confirmed`);
+    }
+    
+    // Execute vector search with detailed error handling
+    console.log(`[${requestId}] Executing vector search...`);
+    const startTime = Date.now();
     
     const { data, error } = await supabaseClient.rpc('match_journal_entries', {
       query_embedding: embedding,
-      match_threshold: testThreshold,
-      match_count: testLimit,
+      match_threshold: debugThreshold,
+      match_count: debugLimit,
       user_id_filter: userId
     });
     
+    const executionTime = Date.now() - startTime;
+    console.log(`[${requestId}] Vector search execution time: ${executionTime}ms`);
+    
     if (error) {
-      console.error(`[${requestId}] Vector search RPC error:`, error);
-      console.error(`[${requestId}] Error code: ${error.code}`);
-      console.error(`[${requestId}] Error message: ${error.message}`);
-      console.error(`[${requestId}] Error details:`, JSON.stringify(error.details || {}));
+      console.error(`[${requestId}] ❌ VECTOR SEARCH RPC ERROR:`);
+      console.error(`[${requestId}] - Error code: ${error.code}`);
+      console.error(`[${requestId}] - Error message: ${error.message}`);
+      console.error(`[${requestId}] - Error hint: ${error.hint || 'none'}`);
+      console.error(`[${requestId}] - Error details:`, JSON.stringify(error.details || {}, null, 2));
+      
+      // Test if the RPC function exists
+      console.log(`[${requestId}] Testing if match_journal_entries function exists...`);
+      const { data: functions, error: funcError } = await supabaseClient
+        .rpc('version'); // Test with a known function
+      
+      if (funcError) {
+        console.error(`[${requestId}] ❌ Cannot test RPC functions:`, funcError);
+      } else {
+        console.log(`[${requestId}] ✅ RPC system is working`);
+      }
+      
       throw error;
     }
     
-    console.log(`[${requestId}] Vector search completed successfully:`);
+    console.log(`[${requestId}] ✅ Vector search completed successfully:`);
     console.log(`[${requestId}] - Results count: ${data?.length || 0}`);
+    console.log(`[${requestId}] - Data type: ${typeof data}`);
+    console.log(`[${requestId}] - Is array: ${Array.isArray(data)}`);
     
     if (data && data.length > 0) {
-      console.log(`[${requestId}] Sample results:`);
-      data.slice(0, 3).forEach((result, idx) => {
-        console.log(`[${requestId}]   Result ${idx + 1}:`);
-        console.log(`[${requestId}]     - Entry ID: ${result.id}`);
-        console.log(`[${requestId}]     - Similarity: ${result.similarity}`);
-        console.log(`[${requestId}]     - Created: ${result.created_at}`);
-        console.log(`[${requestId}]     - Content preview: "${(result.content || '').substring(0, 100)}..."`);
-      });
-    } else {
-      console.warn(`[${requestId}] No vector search results found - this indicates potential issues:`);
-      console.warn(`[${requestId}] - User may have no journal entries with embeddings`);
-      console.warn(`[${requestId}] - Query embedding may not match any stored embeddings`);
-      console.warn(`[${requestId}] - Similarity threshold (${testThreshold}) may still be too high`);
+      console.log(`[${requestId}] 📊 DETAILED RESULTS ANALYSIS:`);
       
-      // Run debug check
-      const debugInfo = await debugVectorSearch(supabaseClient, userId, requestId);
-      console.log(`[${requestId}] Debug info:`, JSON.stringify(debugInfo, null, 2));
+      const similarities = data.map(r => r.similarity).filter(s => s !== undefined);
+      console.log(`[${requestId}] - Similarity scores: [${similarities.map(s => s.toFixed(4)).join(', ')}]`);
+      console.log(`[${requestId}] - Highest similarity: ${Math.max(...similarities).toFixed(4)}`);
+      console.log(`[${requestId}] - Lowest similarity: ${Math.min(...similarities).toFixed(4)}`);
+      console.log(`[${requestId}] - Average similarity: ${(similarities.reduce((a, b) => a + b, 0) / similarities.length).toFixed(4)}`);
+      
+      data.slice(0, 5).forEach((result, idx) => {
+        console.log(`[${requestId}]   📄 Result ${idx + 1}:`);
+        console.log(`[${requestId}]     - Entry ID: ${result.id}`);
+        console.log(`[${requestId}]     - Similarity: ${(result.similarity || 0).toFixed(4)}`);
+        console.log(`[${requestId}]     - Created: ${result.created_at}`);
+        console.log(`[${requestId}]     - Content length: ${(result.content || '').length}`);
+        console.log(`[${requestId}]     - Content preview: "${(result.content || '').substring(0, 100)}..."`);
+        console.log(`[${requestId}]     - Has embedding in result: ${!!result.embedding}`);
+        console.log(`[${requestId}]     - Themes: ${(result.themes || []).join(', ')}`);
+        
+        if (result.emotions) {
+          const emotionKeys = Object.keys(result.emotions);
+          console.log(`[${requestId}]     - Emotions: ${emotionKeys.slice(0, 3).join(', ')}${emotionKeys.length > 3 ? '...' : ''}`);
+        }
+      });
+      
+    } else {
+      console.warn(`[${requestId}] ⚠️ NO VECTOR SEARCH RESULTS - DIAGNOSTIC ANALYSIS:`);
+      
+      // Run comprehensive diagnostics
+      await runVectorSearchDiagnostics(supabaseClient, userId, requestId, embedding);
     }
     
-    console.log(`[${requestId}] ================ VECTOR SEARCH DEBUG END ================`);
+    console.log(`[${requestId}] ================ ENHANCED VECTOR SEARCH DEBUG END ================`);
     return data || [];
 
   } catch (error) {
-    console.error(`[${requestId}] ================ VECTOR SEARCH ERROR ================`);
-    console.error(`[${requestId}] Vector search execution failed:`, error);
-    console.error(`[${requestId}] Error type:`, error.constructor.name);
-    console.error(`[${requestId}] Error message:`, error.message);
-    if (error.stack) {
-      console.error(`[${requestId}] Stack trace:`, error.stack);
-    }
+    console.error(`[${requestId}] ================ VECTOR SEARCH CRITICAL ERROR ================`);
+    console.error(`[${requestId}] ❌ Vector search execution failed:`, error);
+    console.error(`[${requestId}] - Error type: ${error.constructor.name}`);
+    console.error(`[${requestId}] - Error message: ${error.message}`);
+    console.error(`[${requestId}] - Error stack:`, error.stack);
     console.error(`[${requestId}] ================ VECTOR SEARCH ERROR END ================`);
     throw error;
+  }
+}
+
+// Comprehensive diagnostics function
+async function runVectorSearchDiagnostics(supabaseClient: any, userId: string, requestId: string, queryEmbedding: number[]) {
+  console.log(`[${requestId}] 🔍 RUNNING COMPREHENSIVE VECTOR SEARCH DIAGNOSTICS`);
+  
+  try {
+    // 1. Check if user has journal entries
+    const { data: entries, error: entriesError } = await supabaseClient
+      .from('Journal Entries')
+      .select('id, created_at, user_id')
+      .eq('user_id', userId)
+      .limit(10);
+    
+    if (entriesError) {
+      console.error(`[${requestId}] ❌ Error fetching entries:`, entriesError);
+      return;
+    }
+    
+    console.log(`[${requestId}] 📊 Found ${entries?.length || 0} journal entries for user`);
+    
+    if (!entries || entries.length === 0) {
+      console.warn(`[${requestId}] ⚠️ ROOT CAUSE: User has no journal entries`);
+      return;
+    }
+    
+    // 2. Check embeddings for these entries
+    const entryIds = entries.map(e => e.id);
+    const { data: embeddings, error: embeddingsError } = await supabaseClient
+      .from('journal_embeddings')
+      .select('id, journal_entry_id, created_at, embedding')
+      .in('journal_entry_id', entryIds)
+      .limit(10);
+    
+    if (embeddingsError) {
+      console.error(`[${requestId}] ❌ Error fetching embeddings:`, embeddingsError);
+      return;
+    }
+    
+    console.log(`[${requestId}] 📊 Found ${embeddings?.length || 0} embeddings for user entries`);
+    
+    if (!embeddings || embeddings.length === 0) {
+      console.warn(`[${requestId}] ⚠️ ROOT CAUSE: User entries have no embeddings`);
+      return;
+    }
+    
+    // 3. Test embedding dimensions and compatibility
+    if (embeddings[0]?.embedding) {
+      const storedEmbedding = embeddings[0].embedding;
+      console.log(`[${requestId}] 🔍 Stored embedding analysis:`);
+      console.log(`[${requestId}] - Type: ${typeof storedEmbedding}`);
+      console.log(`[${requestId}] - Is array: ${Array.isArray(storedEmbedding)}`);
+      
+      if (Array.isArray(storedEmbedding)) {
+        console.log(`[${requestId}] - Stored dimensions: ${storedEmbedding.length}`);
+        console.log(`[${requestId}] - Query dimensions: ${queryEmbedding.length}`);
+        console.log(`[${requestId}] - Dimensions match: ${storedEmbedding.length === queryEmbedding.length ? '✅ YES' : '❌ NO'}`);
+      }
+    }
+    
+    // 4. Test with very low threshold
+    console.log(`[${requestId}] 🧪 Testing with threshold 0.01...`);
+    const { data: veryLowResults, error: veryLowError } = await supabaseClient.rpc('match_journal_entries', {
+      query_embedding: queryEmbedding,
+      match_threshold: 0.01,
+      match_count: 5,
+      user_id_filter: userId
+    });
+    
+    if (!veryLowError && veryLowResults) {
+      console.log(`[${requestId}] ✅ Very low threshold returned ${veryLowResults.length} results`);
+      if (veryLowResults.length > 0) {
+        console.log(`[${requestId}] ⚠️ ROOT CAUSE: Similarity threshold too high (original: 0.1, working: 0.01)`);
+      }
+    } else {
+      console.error(`[${requestId}] ❌ Very low threshold test failed:`, veryLowError);
+    }
+    
+    // 5. Test pgvector extension
+    console.log(`[${requestId}] 🔧 Testing pgvector extension...`);
+    const { data: extensionData, error: extensionError } = await supabaseClient
+      .rpc('version');
+    
+    if (extensionError) {
+      console.error(`[${requestId}] ❌ Extension test failed:`, extensionError);
+    } else {
+      console.log(`[${requestId}] ✅ Database extensions working`);
+    }
+    
+  } catch (diagnosticError) {
+    console.error(`[${requestId}] ❌ Diagnostic error:`, diagnosticError);
   }
 }
 
