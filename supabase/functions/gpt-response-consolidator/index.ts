@@ -305,7 +305,7 @@ serve(async (req) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-4.1-nano', // Changed from gpt-5-2025-08-07 to gpt-4.1-nano
+          model: 'gpt-4.1-nano', // Fixed: Using the correct model
           messages: [
             { role: 'system', content: 'You are Ruh by SOuLO, a warm and insightful wellness coach. You analyze ONLY the current research results provided to you. Never reference or use data from previous conversations or responses.' },
             { role: 'user', content: consolidationPrompt }
@@ -397,31 +397,59 @@ serve(async (req) => {
           }
         );
 
+        // Enhanced database storage with better error handling
+        const analysisData = {
+          consolidationId,
+          totalResults: researchResults.length,
+          userStatusMessage,
+          timestamp: new Date().toISOString(),
+          modelUsed: 'gpt-4.1-nano',
+          processingSuccess: true,
+          sqlResultsCount: researchResults.reduce((sum: number, r: any) => sum + (r?.executionResults?.sqlResults?.length || 0), 0),
+          vectorResultsCount: researchResults.reduce((sum: number, r: any) => sum + (r?.executionResults?.vectorResults?.length || 0), 0)
+        };
+
+        const subQueryResponses = analysisSummary.map((r: any) => ({
+          subQuestion: r.subQuestion?.question || 'Unknown question',
+          searchStrategy: r.subQuestion?.searchStrategy || 'unknown',
+          sqlResultCount: r.executionResults?.sqlResultCount || 0,
+          vectorResultCount: r.executionResults?.vectorResultCount || 0,
+          hasError: !!r.error,
+          executionSummary: {
+            sqlSuccess: (r.executionResults?.sqlResults?.length || 0) > 0,
+            vectorSuccess: (r.executionResults?.vectorResults?.length || 0) > 0,
+            error: r.error || null
+          }
+        }));
+
+        const referenceEntries = researchResults.flatMap((r: any) => [
+          ...(r?.executionResults?.vectorResults || []).map((v: any) => ({
+            id: v.id,
+            content: v.content?.substring(0, 200) || 'Vector result',
+            similarity: v.similarity,
+            source: 'vector',
+            created_at: v.created_at
+          })),
+          ...(r?.executionResults?.sqlResults || []).map((s: any) => ({
+            id: s.id,
+            content: s['refined text']?.substring(0, 200) || s.content?.substring(0, 200) || 'SQL result',
+            source: 'sql',
+            created_at: s.created_at
+          }))
+        ]).slice(0, 10); // Limit reference entries
+
+        console.log(`[${consolidationId}] Storing analysis data:`, {
+          analysisDataKeys: Object.keys(analysisData),
+          subQueryResponsesCount: subQueryResponses.length,
+          referenceEntriesCount: referenceEntries.length
+        });
+
         const updateResult = await supabaseClient
           .from('chat_messages')
           .update({
-            analysis_data: {
-              consolidationId,
-              totalResults: researchResults.length,
-              userStatusMessage,
-              timestamp: new Date().toISOString(),
-              modelUsed: 'gpt-4.1-nano',
-              processingSuccess: true
-            },
-            sub_query_responses: analysisSummary,
-            reference_entries: researchResults.flatMap((r: any) => [
-              ...(r?.executionResults?.vectorResults || []).map((v: any) => ({
-                id: v.id,
-                content: v.content?.substring(0, 200),
-                similarity: v.similarity,
-                source: 'vector'
-              })),
-              ...(r?.executionResults?.sqlResults || []).map((s: any) => ({
-                id: s.id,
-                content: s.content?.substring(0, 200) || 'SQL result',
-                source: 'sql'
-              }))
-            ]).slice(0, 10) // Limit reference entries
+            analysis_data: analysisData,
+            sub_query_responses: subQueryResponses,
+            reference_entries: referenceEntries
           })
           .eq('id', messageId);
 

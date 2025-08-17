@@ -125,15 +125,29 @@ async function executeSQLAnalysis(step: any, userId: string, supabaseClient: any
   try {
     console.log(`[${requestId}] Executing SQL query:`, step.sqlQuery);
     
-    // Execute the GPT-generated SQL query using dynamic execution
     if (step.sqlQuery && step.sqlQuery.trim()) {
+      // Enhanced SQL validation and execution
+      const cleanedQuery = step.sqlQuery.trim();
+      console.log(`[${requestId}] Cleaned SQL query:`, cleanedQuery);
+      
+      // Validate that the query is safe and follows our patterns
+      if (!validateSQLQuery(cleanedQuery, requestId)) {
+        console.error(`[${requestId}] SQL query validation failed`);
+        return await executeBasicSQLQuery(userId, supabaseClient, requestId);
+      }
+      
+      // Replace auth.uid() with actual user ID for RPC functions
+      const queryWithUserId = cleanedQuery.replace(/auth\.uid\(\)/g, `'${userId}'`);
+      console.log(`[${requestId}] Query with user ID:`, queryWithUserId);
+      
       // Use the execute_dynamic_query function to safely run GPT-generated SQL
       const { data, error } = await supabaseClient.rpc('execute_dynamic_query', {
-        query_text: step.sqlQuery
+        query_text: queryWithUserId
       });
 
       if (error) {
         console.error(`[${requestId}] SQL execution error:`, error);
+        console.error(`[${requestId}] Failed query:`, queryWithUserId);
         // Fallback to basic query if dynamic execution fails
         return await executeBasicSQLQuery(userId, supabaseClient, requestId);
       }
@@ -142,7 +156,7 @@ async function executeSQLAnalysis(step: any, userId: string, supabaseClient: any
         console.log(`[${requestId}] SQL query executed successfully, rows:`, data.data.length);
         return data.data;
       } else {
-        console.warn(`[${requestId}] SQL query returned no results or failed`);
+        console.warn(`[${requestId}] SQL query returned no results:`, data);
         return [];
       }
     } else {
@@ -154,6 +168,38 @@ async function executeSQLAnalysis(step: any, userId: string, supabaseClient: any
     console.error(`[${requestId}] Error in SQL analysis:`, error);
     // Fallback to basic query on error
     return await executeBasicSQLQuery(userId, supabaseClient, requestId);
+  }
+}
+
+function validateSQLQuery(query: string, requestId: string): boolean {
+  try {
+    const upperQuery = query.toUpperCase();
+    
+    // Check for dangerous operations
+    const dangerousKeywords = ['DROP', 'DELETE', 'INSERT', 'UPDATE', 'CREATE', 'ALTER', 'TRUNCATE'];
+    for (const keyword of dangerousKeywords) {
+      if (upperQuery.includes(keyword) && !upperQuery.includes('DELETE FROM') && !upperQuery.includes('INSERT INTO')) {
+        console.error(`[${requestId}] Dangerous SQL keyword detected: ${keyword}`);
+        return false;
+      }
+    }
+    
+    // Ensure it's a SELECT query
+    if (!upperQuery.trim().startsWith('SELECT')) {
+      console.error(`[${requestId}] Only SELECT queries are allowed`);
+      return false;
+    }
+    
+    // Check for required table reference
+    if (!upperQuery.includes('"JOURNAL ENTRIES"')) {
+      console.error(`[${requestId}] Query must reference Journal Entries table`);
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error(`[${requestId}] SQL validation error:`, error);
+    return false;
   }
 }
 
@@ -295,7 +341,7 @@ ${databaseSchemaContext}
 
 **MANDATORY SQL QUERY EXAMPLES FOR OUR POSTGRESQL DATABASE:**
 
-1. **Basic Journal Entry Query:**
+1. **Basic Journal Entry Query (ALWAYS WORKS):**
 \`\`\`sql
 SELECT id, "refined text", "transcription text", created_at, emotions, master_themes 
 FROM "Journal Entries" 
@@ -303,24 +349,28 @@ WHERE user_id = '${message.includes('user_id') ? 'USER_ID_PLACEHOLDER' : 'auth.u
 ORDER BY created_at DESC LIMIT 10;
 \`\`\`
 
-2. **Emotion-based Query:**
+2. **Emotion Analysis Query (SAFE PATTERN):**
 \`\`\`sql
-SELECT id, "refined text", created_at, emotions
+SELECT 
+  json_object_keys(emotions) as emotion_name,
+  AVG((emotions->>json_object_keys(emotions))::float) as avg_score
 FROM "Journal Entries" 
 WHERE user_id = auth.uid() 
-AND emotions IS NOT NULL 
-AND emotions ? 'happiness'
-ORDER BY created_at DESC;
+  AND emotions IS NOT NULL
+GROUP BY json_object_keys(emotions)
+ORDER BY avg_score DESC 
+LIMIT 3;
 \`\`\`
 
-3. **Theme-based Query:**
+3. **Theme-based Query (WORKING PATTERN):**
 \`\`\`sql
 SELECT id, "refined text", created_at, master_themes
 FROM "Journal Entries" 
 WHERE user_id = auth.uid() 
-AND master_themes IS NOT NULL 
-AND 'Work' = ANY(master_themes)
-ORDER BY created_at DESC;
+  AND master_themes IS NOT NULL 
+  AND 'Work' = ANY(master_themes)
+ORDER BY created_at DESC 
+LIMIT 5;
 \`\`\`
 
 **CRITICAL TIMEZONE HANDLING RULES:**
@@ -369,6 +419,7 @@ ORDER BY created_at DESC;
    - Use appropriate aggregation functions, JOINs, and filtering
    - Ensure queries return meaningful data for analysis
    - DO NOT use table or column names not present in the database schema
+   - TEST YOUR SQL LOGIC - ensure it will actually work with our schema
 
 USER QUERY: "${message}"
 USER TIMEZONE: "${userTimezone}"

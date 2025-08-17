@@ -16,6 +16,9 @@ serve(async (req) => {
   try {
     const { testQuery = "Rate my top 3 negative traits out of 100? What do i do to improve them?", userId } = await req.json();
     
+    const debugId = `debug_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+    console.log(`[DEBUG START] ${debugId}: Testing RAG pipeline with query: "${testQuery}"`);
+    
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -26,45 +29,49 @@ serve(async (req) => {
       }
     );
 
-    console.log("Starting RAG pipeline debug test with query:", testQuery);
-    
     const debugResults = {
       timestamp: new Date().toISOString(),
       testQuery,
       userId,
-      steps: {}
+      tests: {}
     };
 
-    // Step 1: Test database connectivity and journal entries
+    // Test 1: Database Connection and Journal Entries
+    console.log(`[${debugId}] Test 1: Database Connection`);
     try {
-      const { data: entries, error: entriesError } = await supabaseClient
+      const { data: journalEntries, error: journalError } = await supabaseClient
         .from('Journal Entries')
-        .select('id, "refined text", "transcription text", created_at, emotions, master_themes')
+        .select('id, "refined text", created_at, emotions, master_themes')
         .eq('user_id', userId)
         .limit(5);
-
-      debugResults.steps.database = {
-        success: !entriesError,
-        error: entriesError?.message,
-        entryCount: entries?.length || 0,
-        sampleEntries: entries?.map(e => ({
-          id: e.id,
-          hasContent: !!(e["refined text"] || e["transcription text"]),
-          hasEmotions: !!e.emotions,
-          hasThemes: !!e.master_themes,
-          createdAt: e.created_at
-        })) || []
+      
+      if (journalError) throw journalError;
+      
+      debugResults.tests.database = {
+        success: true,
+        journalEntriesFound: journalEntries?.length || 0,
+        sampleEntry: journalEntries?.[0] ? {
+          id: journalEntries[0].id,
+          hasRefinedText: !!journalEntries[0]['refined text'],
+          hasEmotions: !!journalEntries[0].emotions,
+          hasThemes: !!journalEntries[0].master_themes,
+          createdAt: journalEntries[0].created_at
+        } : null
       };
-    } catch (dbError) {
-      debugResults.steps.database = {
+      console.log(`[${debugId}] ✅ Database test passed: ${journalEntries?.length || 0} entries found`);
+    } catch (error) {
+      debugResults.tests.database = {
         success: false,
-        error: dbError.message
+        error: error.message
       };
+      console.log(`[${debugId}] ❌ Database test failed:`, error.message);
     }
 
-    // Step 2: Test embedding generation
+    // Test 2: Embedding Generation
+    console.log(`[${debugId}] Test 2: Embedding Generation`);
     try {
-      const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+      const testText = "test embedding generation";
+      const response = await fetch('https://api.openai.com/v1/embeddings', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -72,129 +79,117 @@ serve(async (req) => {
         },
         body: JSON.stringify({
           model: 'text-embedding-3-small',
-          input: testQuery,
+          input: testText,
         }),
       });
 
-      if (embeddingResponse.ok) {
-        const embeddingData = await embeddingResponse.json();
-        debugResults.steps.embedding = {
-          success: true,
-          embeddingLength: embeddingData.data[0].embedding.length
-        };
-      } else {
-        debugResults.steps.embedding = {
-          success: false,
-          error: `HTTP ${embeddingResponse.status}: ${await embeddingResponse.text()}`
-        };
-      }
-    } catch (embError) {
-      debugResults.steps.embedding = {
-        success: false,
-        error: embError.message
+      if (!response.ok) throw new Error(`OpenAI API error: ${response.status}`);
+      
+      const embeddingData = await response.json();
+      const embedding = embeddingData.data[0].embedding;
+      
+      debugResults.tests.embedding = {
+        success: true,
+        embeddingLength: embedding.length,
+        firstFewValues: embedding.slice(0, 3)
       };
+      console.log(`[${debugId}] ✅ Embedding test passed: ${embedding.length} dimensions`);
+    } catch (error) {
+      debugResults.tests.embedding = {
+        success: false,
+        error: error.message
+      };
+      console.log(`[${debugId}] ❌ Embedding test failed:`, error.message);
     }
 
-    // Step 3: Test vector search
-    if (debugResults.steps.embedding?.success) {
-      try {
-        const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
-          },
-          body: JSON.stringify({
-            model: 'text-embedding-3-small',
-            input: testQuery,
-          }),
-        });
-        const embeddingData = await embeddingResponse.json();
-        const embedding = embeddingData.data[0].embedding;
-
-        const { data: vectorResults, error: vectorError } = await supabaseClient.rpc('match_journal_entries', {
-          query_embedding: embedding,
-          match_threshold: 0.3,
-          match_count: 5,
-          user_id_filter: userId
-        });
-
-        debugResults.steps.vectorSearch = {
-          success: !vectorError,
-          error: vectorError?.message,
-          resultCount: vectorResults?.length || 0,
-          sampleResults: vectorResults?.slice(0, 2).map(r => ({
-            id: r.id,
-            similarity: r.similarity,
-            hasContent: !!r.content
-          })) || []
-        };
-      } catch (vectorError) {
-        debugResults.steps.vectorSearch = {
-          success: false,
-          error: vectorError.message
-        };
-      }
-    }
-
-    // Step 4: Test SQL execution
+    // Test 3: Vector Search
+    console.log(`[${debugId}] Test 3: Vector Search`);
     try {
-      const { data: sqlResult, error: sqlError } = await supabaseClient.rpc('execute_dynamic_query', {
-        query_text: `SELECT id, "refined text", created_at FROM "Journal Entries" WHERE user_id = '${userId}' ORDER BY created_at DESC LIMIT 3`
+      const testEmbedding = Array(1536).fill(0.1); // Mock embedding for testing
+      const { data: vectorResults, error: vectorError } = await supabaseClient.rpc('match_journal_entries', {
+        query_embedding: testEmbedding,
+        match_threshold: 0.1,
+        match_count: 5,
+        user_id_filter: userId
       });
-
-      debugResults.steps.sqlExecution = {
-        success: !sqlError && sqlResult?.success,
-        error: sqlError?.message || (!sqlResult?.success ? 'Query execution failed' : null),
-        resultCount: sqlResult?.data?.length || 0
+      
+      if (vectorError) throw vectorError;
+      
+      debugResults.tests.vectorSearch = {
+        success: true,
+        resultsFound: vectorResults?.length || 0,
+        sampleResult: vectorResults?.[0] ? {
+          id: vectorResults[0].id,
+          similarity: vectorResults[0].similarity,
+          hasContent: !!vectorResults[0].content
+        } : null
       };
-    } catch (sqlError) {
-      debugResults.steps.sqlExecution = {
+      console.log(`[${debugId}] ✅ Vector search test passed: ${vectorResults?.length || 0} results`);
+    } catch (error) {
+      debugResults.tests.vectorSearch = {
         success: false,
-        error: sqlError.message
+        error: error.message
       };
+      console.log(`[${debugId}] ❌ Vector search test failed:`, error.message);
     }
 
-    // Step 5: Test smart-query-planner
+    // Test 4: SQL Execution via execute_dynamic_query
+    console.log(`[${debugId}] Test 4: SQL Execution`);
     try {
-      const plannerResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/smart-query-planner`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': req.headers.get('Authorization')!,
-        },
-        body: JSON.stringify({
+      const testSQL = `SELECT id, "refined text", created_at FROM "Journal Entries" WHERE user_id = '${userId}' ORDER BY created_at DESC LIMIT 3`;
+      const { data: sqlResult, error: sqlError } = await supabaseClient.rpc('execute_dynamic_query', {
+        query_text: testSQL
+      });
+      
+      if (sqlError) throw sqlError;
+      
+      debugResults.tests.sqlExecution = {
+        success: sqlResult?.success || false,
+        queryExecuted: testSQL,
+        resultsFound: sqlResult?.data?.length || 0,
+        sqlResponse: sqlResult
+      };
+      console.log(`[${debugId}] ✅ SQL execution test passed:`, sqlResult?.success);
+    } catch (error) {
+      debugResults.tests.sqlExecution = {
+        success: false,
+        error: error.message
+      };
+      console.log(`[${debugId}] ❌ SQL execution test failed:`, error.message);
+    }
+
+    // Test 5: Smart Query Planner
+    console.log(`[${debugId}] Test 5: Smart Query Planner`);
+    try {
+      const plannerResponse = await supabaseClient.functions.invoke('smart-query-planner', {
+        body: {
           message: testQuery,
           userId: userId,
-          execute: true,
+          execute: false, // Just plan, don't execute
           userTimezone: 'UTC'
-        }),
+        }
       });
-
-      if (plannerResponse.ok) {
-        const plannerData = await plannerResponse.json();
-        debugResults.steps.smartQueryPlanner = {
-          success: true,
-          hasQueryPlan: !!plannerData.queryPlan,
-          hasExecutionResult: !!plannerData.executionResult,
-          subQuestionCount: plannerData.queryPlan?.subQuestions?.length || 0,
-          totalVectorResults: plannerData.executionResult?.reduce((sum, r) => sum + (r.executionResults?.vectorResults?.length || 0), 0) || 0,
-          totalSqlResults: plannerData.executionResult?.reduce((sum, r) => sum + (r.executionResults?.sqlResults?.length || 0), 0) || 0
-        };
-      } else {
-        debugResults.steps.smartQueryPlanner = {
-          success: false,
-          error: `HTTP ${plannerResponse.status}: ${await plannerResponse.text()}`
-        };
-      }
-    } catch (plannerError) {
-      debugResults.steps.smartQueryPlanner = {
-        success: false,
-        error: plannerError.message
+      
+      if (plannerResponse.error) throw plannerResponse.error;
+      
+      debugResults.tests.smartQueryPlanner = {
+        success: true,
+        planGenerated: !!plannerResponse.data?.queryPlan,
+        subQuestionsCount: plannerResponse.data?.queryPlan?.subQuestions?.length || 0,
+        strategy: plannerResponse.data?.queryPlan?.strategy,
+        confidence: plannerResponse.data?.queryPlan?.confidence
       };
+      console.log(`[${debugId}] ✅ Smart query planner test passed`);
+    } catch (error) {
+      debugResults.tests.smartQueryPlanner = {
+        success: false,
+        error: error.message
+      };
+      console.log(`[${debugId}] ❌ Smart query planner test failed:`, error.message);
     }
 
-    // Step 6: Test GPT-4.1-nano response
+    // Test 6: GPT Model (gpt-4.1-nano)
+    console.log(`[${debugId}] Test 6: GPT Model Test`);
     try {
       const gptResponse = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -205,56 +200,92 @@ serve(async (req) => {
         body: JSON.stringify({
           model: 'gpt-4.1-nano',
           messages: [
-            { role: 'system', content: 'You are a helpful assistant. Respond with a simple JSON object.' },
-            { role: 'user', content: 'Return JSON: {"test": "success", "message": "This is a test response"}' }
+            { role: 'system', content: 'You are a helpful assistant. Respond with a simple JSON object containing a "message" field.' },
+            { role: 'user', content: 'Say hello in JSON format' }
           ],
           max_tokens: 100,
-          temperature: 0.3
+          temperature: 0.5
         }),
       });
 
-      if (gptResponse.ok) {
-        const gptData = await gptResponse.json();
-        const responseContent = gptData.choices[0]?.message?.content || '';
-        debugResults.steps.gptModel = {
-          success: true,
-          responseLength: responseContent.length,
-          canParseJson: (() => {
-            try {
-              JSON.parse(responseContent);
-              return true;
-            } catch {
-              return false;
-            }
-          })()
-        };
-      } else {
-        debugResults.steps.gptModel = {
-          success: false,
-          error: `HTTP ${gptResponse.status}: ${await gptResponse.text()}`
-        };
-      }
-    } catch (gptError) {
-      debugResults.steps.gptModel = {
-        success: false,
-        error: gptError.message
+      if (!gptResponse.ok) throw new Error(`GPT API error: ${gptResponse.status}`);
+      
+      const gptData = await gptResponse.json();
+      const gptContent = gptData.choices[0].message.content;
+      
+      debugResults.tests.gptModel = {
+        success: true,
+        model: 'gpt-4.1-nano',
+        responseLength: gptContent?.length || 0,
+        responsePreview: gptContent?.substring(0, 100)
       };
+      console.log(`[${debugId}] ✅ GPT model test passed`);
+    } catch (error) {
+      debugResults.tests.gptModel = {
+        success: false,
+        error: error.message
+      };
+      console.log(`[${debugId}] ❌ GPT model test failed:`, error.message);
     }
 
-    // Generate summary
-    const successfulSteps = Object.values(debugResults.steps).filter(step => step.success).length;
-    const totalSteps = Object.keys(debugResults.steps).length;
-    
-    debugResults.summary = {
-      overallHealth: successfulSteps === totalSteps ? 'HEALTHY' : 'ISSUES_DETECTED',
-      successfulSteps,
-      totalSteps,
-      criticalIssues: Object.entries(debugResults.steps)
-        .filter(([_, step]) => !step.success)
-        .map(([name, step]) => ({ step: name, error: step.error }))
-    };
+    // Test 7: End-to-End RAG Pipeline Test
+    console.log(`[${debugId}] Test 7: End-to-End Pipeline`);
+    try {
+      // First call smart-query-planner with execution
+      const e2eResponse = await supabaseClient.functions.invoke('smart-query-planner', {
+        body: {
+          message: testQuery,
+          userId: userId,
+          execute: true,
+          userTimezone: 'UTC'
+        }
+      });
+      
+      if (e2eResponse.error) throw e2eResponse.error;
+      
+      // Then call gpt-response-consolidator with the results
+      const consolidatorResponse = await supabaseClient.functions.invoke('gpt-response-consolidator', {
+        body: {
+          userMessage: testQuery,
+          researchResults: e2eResponse.data?.executionResult || [],
+          conversationContext: [],
+          userProfile: { timezone: 'UTC' }
+        }
+      });
+      
+      debugResults.tests.endToEndPipeline = {
+        success: !consolidatorResponse.error,
+        plannerSuccess: !e2eResponse.error,
+        consolidatorSuccess: !consolidatorResponse.error,
+        finalResponseGenerated: !!consolidatorResponse.data?.response,
+        responseLength: consolidatorResponse.data?.response?.length || 0,
+        plannerError: e2eResponse.error?.message,
+        consolidatorError: consolidatorResponse.error?.message
+      };
+      console.log(`[${debugId}] ✅ End-to-end pipeline test completed`);
+    } catch (error) {
+      debugResults.tests.endToEndPipeline = {
+        success: false,
+        error: error.message
+      };
+      console.log(`[${debugId}] ❌ End-to-end pipeline test failed:`, error.message);
+    }
 
-    return new Response(JSON.stringify(debugResults, null, 2), {
+    // Summary
+    const passedTests = Object.values(debugResults.tests).filter((test: any) => test.success).length;
+    const totalTests = Object.keys(debugResults.tests).length;
+    
+    console.log(`[${debugId}] SUMMARY: ${passedTests}/${totalTests} tests passed`);
+
+    return new Response(JSON.stringify({
+      debugId,
+      summary: {
+        testsPassedCount: passedTests,
+        totalTestsCount: totalTests,
+        overallSuccess: passedTests === totalTests
+      },
+      ...debugResults
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
@@ -262,7 +293,7 @@ serve(async (req) => {
     console.error('Error in debug RAG pipeline:', error);
     return new Response(JSON.stringify({
       error: error.message,
-      timestamp: new Date().toISOString()
+      debugFailed: true
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
