@@ -35,8 +35,16 @@ serve(async (req) => {
       queryStrategy: queryPlan?.strategy
     });
 
+    // Validate input parameters
+    if (!userMessage) {
+      throw new Error('userMessage is required');
+    }
+
+    // Ensure researchResults is an array
+    const safeResearchResults = Array.isArray(researchResults) ? researchResults : [];
+
     // Format research results for GPT analysis
-    const formattedResults = formatResearchResults(researchResults);
+    const formattedResults = formatResearchResults(safeResearchResults);
 
     // Generate comprehensive system prompt
     const systemPrompt = generateSystemPrompt(userProfile, queryPlan);
@@ -67,7 +75,7 @@ Please provide a thoughtful, therapeutically informed response based on the anal
 
     messages.push({ role: 'user', content: userPrompt });
 
-    // Generate response using GPT
+    // Generate response using GPT-4.1
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -75,9 +83,10 @@ Please provide a thoughtful, therapeutically informed response based on the anal
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-5-2025-08-07',
+        model: 'gpt-4.1-2025-04-14',
         messages,
-        max_completion_tokens: 1000
+        max_tokens: 1000,
+        temperature: 0.7
       }),
     });
 
@@ -97,7 +106,7 @@ Please provide a thoughtful, therapeutically informed response based on the anal
     return new Response(JSON.stringify({
       response: generatedResponse,
       metadata: {
-        researchResultsProcessed: researchResults.length,
+        researchResultsProcessed: safeResearchResults.length,
         queryStrategy: queryPlan?.strategy,
         confidence: queryPlan?.confidence,
         timestamp: new Date().toISOString()

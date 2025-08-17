@@ -220,25 +220,33 @@ ${databaseSchemaContext}
 
 **CURRENT CONTEXT:**
 - Today's date: ${new Date().toISOString()}
+- Current year: ${new Date().getFullYear()}
 - User query: "${message}"
 - User has ${userEntryCount} journal entries${contextString}
 
-**YOUR RESPONSIBILITIES:**
-1. Break down the query into 1-3 precise sub-questions
-2. For each sub-question, create analysis steps using:
-   - vector_search: For semantic content analysis
-   - sql_analysis: For statistical analysis, counts, percentages
-   - hybrid_search: Combine both when needed
+**YOUR RESPONSIBILITIES AS ANALYST AGENT:**
+1. Smart Hypothesis Formation: infer what the user truly wants to know, then deduce focused sub-questions to answer it comprehensively
+2. Sub-Question Generation: break down the query (or previous conversational context's ask) into 1-3 precise sub-questions (no hardcoded keyword lists). For complex queries generate sub-questions in such a way that all sub-question's query when anlalyzed together give the answer to the core usr's query
+3. Search Strategy: pick sql_primary, vector_primary, or hybrid based on the sub-question
+4. Dynamic Query Generation: produce executable SQL for our schema and/or vector queries
+5. Hybrid Analysis: combine SQL stats with semantic vector results when helpful
 
-**CRITICAL SQL REQUIREMENTS:**
-- ALWAYS include WHERE user_id = $user_id (will be replaced with actual user ID)
-- Use proper table name: "Journal Entries" (with quotes)
-- For emotions: Use emotions JSONB column with jsonb_each() or -> operators
-- For themes: Use master_themes array column
-- For content: Use "refined text" or "transcription text" columns
-- Generate COMPLETE, EXECUTABLE SQL queries
+**MANDATORY VECTOR SEARCH SCENARIOS** (Always include vector search regardless of time constraints):
+   - ANY query asking for "content", "what I wrote", "what I said", "entries about", "show me", "find"
+   - Questions seeking emotional context, feelings, moods, or mental states
+   - Requests for examples, patterns, insights, or thematic analysis  
+   - Queries about achievements, progress, breakthroughs, or personal growth
+   - Comparative analysis ("similar to", "like when", "reminds me of")
+   - Reflective queries ("how was I feeling", "what was going through my mind")
+   - Follow-up questions referencing previous context
+   - Use the user's EXACT words and emotional context in vector searches
+   - For "What did I journal in August" → Vector query: "journal entries personal thoughts feelings experiences august"
+   - For achievement queries → Vector query: "achievement success accomplishment progress breakthrough proud"
+   - For emotional queries → Vector query: "emotions feelings mood emotional state [specific emotions mentioned]"
+   - Preserve user's original language patterns for better semantic matching
 
 **MANDATORY OUTPUT STRUCTURE:**
+Return ONLY valid JSON with this exact structure:
 {
   "queryType": "journal_specific",
   "strategy": "intelligent_sub_query",
@@ -253,11 +261,11 @@ ${databaseSchemaContext}
         {
           "step": 1,
           "description": "Clear description of what this step accomplishes",
-          "queryType": "sql_analysis" | "vector_search" | "hybrid_search",
-          "sqlQuery": "COMPLETE SQL query with WHERE user_id = $user_id" | null,
+          "queryType": "sql_analysis" | "vector_search" | "sql_count" | "sql_calculation",
+          "sqlQuery": "SELECT ... FROM \"Journal Entries\" WHERE user_id = $user_id AND ..." | null,
           "vectorSearch": {
             "query": "optimized search query",
-            "threshold": 0.3,
+            "threshold": 0.7,
             "limit": 10
           } | null,
           "timeRange": { "start": "ISO string or null", "end": "ISO string or null" } | null
@@ -266,16 +274,35 @@ ${databaseSchemaContext}
     }
   ],
   "confidence": 0.8,
-  "reasoning": "Brief explanation of the analysis strategy"
+  "reasoning": "Brief explanation of the analysis strategy",
+  "useAllEntries": boolean,
+  "hasPersonalPronouns": boolean,
+  "hasExplicitTimeReference": boolean
 }
 
-**EXAMPLE SQL PATTERNS:**
-- Emotion analysis: SELECT * FROM "Journal Entries" WHERE user_id = $user_id AND emotions ? 'happy'
-- Theme analysis: SELECT * FROM "Journal Entries" WHERE user_id = $user_id AND 'work' = ANY(master_themes)
-- Count queries: SELECT COUNT(*) as count FROM "Journal Entries" WHERE user_id = $user_id
-- Date filtering: SELECT * FROM "Journal Entries" WHERE user_id = $user_id AND created_at >= '2024-01-01'
+**EXECUTION ORDERING RULES:**
+- Assign an integer executionStage to EACH sub-question starting at 1
+- Sub-questions with the SAME executionStage run in parallel
+- Stages execute in ascending order: stage 1 first, then 2, then 3, etc.
+- Keep stages contiguous (1..N) without gaps
 
-Generate a comprehensive analysis plan with COMPLETE, EXECUTABLE SQL queries.`;
+**SQL QUERY GUIDELINES:**
+- ALWAYS include WHERE user_id = $user_id
+- Use proper column names with quotes for spaced names like "refined text"
+- For emotion analysis: use emotions JSONB
+- For theme analysis: use master_themes array and/or entities/text where appropriate (no hardcoded expansions)
+- For percentages: alias as percentage
+- For counts: alias as count (or frequency for grouped counts)
+- For averages/scores: alias as avg_score (or score)
+- For date filtering: apply created_at comparisons when time is implied or stated
+- Do NOT call RPCs; generate plain SQL only
+
+**SEARCH STRATEGY SELECTION:**
+- sql_primary: statistical analysis, counts, percentages
+- vector_primary: semantic content analysis, similar entries
+- hybrid: combine both when needed
+
+Focus on creating comprehensive, executable analysis plans that will provide meaningful insights.`;
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -284,9 +311,10 @@ Generate a comprehensive analysis plan with COMPLETE, EXECUTABLE SQL queries.`;
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-5-2025-08-07',
+        model: 'gpt-4.1-2025-04-14',
         messages: [{ role: 'user', content: prompt }],
-        max_completion_tokens: 2000,
+        max_tokens: 2000,
+        temperature: 0.3,
         response_format: { type: 'json_object' }
       }),
     });
@@ -296,18 +324,27 @@ Generate a comprehensive analysis plan with COMPLETE, EXECUTABLE SQL queries.`;
     }
 
     const data = await response.json();
-    console.log("Analyst Agent response:", data.choices[0].message.content);
+    const responseContent = data.choices[0].message.content;
+    
+    console.log("Analyst Agent raw response:", responseContent);
 
     let analysisResult;
     try {
-      analysisResult = JSON.parse(data.choices[0].message.content);
+      // Validate JSON response before parsing
+      if (!responseContent || responseContent.trim() === '') {
+        throw new Error('Empty response from GPT');
+      }
+      
+      analysisResult = JSON.parse(responseContent);
+      
+      // Validate required structure
+      if (!analysisResult || !analysisResult.subQuestions || !Array.isArray(analysisResult.subQuestions)) {
+        throw new Error('Invalid response structure from GPT');
+      }
+      
     } catch (parseError) {
       console.error("Failed to parse Analyst Agent response:", parseError);
-      return createFallbackPlan(message, userTimezone);
-    }
-
-    if (!analysisResult || !analysisResult.subQuestions) {
-      console.error("Invalid Analyst Agent response structure");
+      console.error("Raw response:", responseContent);
       return createFallbackPlan(message, userTimezone);
     }
 
