@@ -188,7 +188,8 @@ serve(async (req) => {
         body: {
           originalQuery: message,
           queryPlan: queryPlan,
-          searchResults: executionResult,
+          searchResults: executionResult || [],
+          combinedResults: executionResult || [],
           conversationContext: conversationContext,
           userProfile: userProfile,
           timeRange: timeRange,
@@ -226,6 +227,7 @@ serve(async (req) => {
           originalQuery: message,
           queryPlan: { strategy: 'general_response', category: classification.category },
           searchResults: [],
+          combinedResults: [],
           conversationContext: conversationContext,
           userProfile: userProfile,
           userTimezone: userTimezone

@@ -23,26 +23,44 @@ serve(async (req) => {
       throw new Error('OpenAI API key not configured');
     }
 
+    const requestBody = await req.json();
     const { 
       originalQuery, 
-      searchResults, 
-      combinedResults, 
-      queryPlan, 
+      searchResults = [], 
+      combinedResults = [], 
+      queryPlan = {}, 
       conversationContext = [],
       userProfile = {}
-    } = await req.json();
+    } = requestBody;
+
+    // Validate required parameters
+    if (!originalQuery) {
+      throw new Error('originalQuery is required');
+    }
+
+    // Ensure searchResults is an array
+    const safeSearchResults = Array.isArray(searchResults) ? searchResults : [];
+    const safeCombinedResults = Array.isArray(combinedResults) ? combinedResults : [];
+
+    console.log('[Intelligent Response Generator] Request validation passed:', {
+      originalQuery: originalQuery.substring(0, 50) + '...',
+      searchResultsCount: safeSearchResults.length,
+      combinedResultsCount: safeCombinedResults.length,
+      hasQueryPlan: !!queryPlan,
+      contextLength: conversationContext.length
+    });
 
     console.log('[Intelligent Response Generator] Generating response with database schema context for:', originalQuery);
 
     // Generate context-aware system prompt with database schema knowledge
     const systemPrompt = generateIntelligentSystemPrompt(
       queryPlan,
-      searchResults,
+      safeSearchResults,
       userProfile
     );
 
     // Format the combined results for analysis with schema awareness
-    const formattedContext = formatResultsForAnalysis(combinedResults, searchResults);
+    const formattedContext = formatResultsForAnalysis(safeCombinedResults, safeSearchResults);
 
     // Generate the response using GPT with full schema context
     const response = await generateIntelligentResponse(
@@ -56,10 +74,10 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       response,
       metadata: {
-        queryStrategy: queryPlan.strategy,
-        searchMethodsUsed: queryPlan.searchMethods,
-        resultsCount: combinedResults.length,
-        confidence: queryPlan.confidence,
+        queryStrategy: queryPlan.strategy || 'unknown',
+        searchMethodsUsed: queryPlan.searchMethods || [],
+        resultsCount: safeCombinedResults.length,
+        confidence: queryPlan.confidence || 0,
         databaseSchemaUsed: true
       }
     }), {
@@ -108,9 +126,9 @@ ${themeGuidelines}
 CONTEXT: ${contextualInfo}
 
 SEARCH RESULTS:
-${searchResults.map(result => 
-  `- ${result.method}: ${result.results.length} results (${result.confidence}) - ${result.reasoning}`
-).join('\n')}
+${Array.isArray(searchResults) ? searchResults.map(result => 
+  `- ${result.method || 'unknown'}: ${(result.results || []).length} results (${result.confidence || 'unknown'}) - ${result.reasoning || 'no reasoning provided'}`
+).join('\n') : 'No search results available'}
 
 CORE INSTRUCTIONS:
 • Use ONLY provided emotion scores (0.0-1.0) - never infer from text
