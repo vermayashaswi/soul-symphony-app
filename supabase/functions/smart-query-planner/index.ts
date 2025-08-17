@@ -341,15 +341,51 @@ async function executePlan(plan: any, userId: string, supabaseClient: any, reque
         if (step.queryType === 'vector_search') {
           console.log(`[${requestId}] Vector search:`, step.vectorSearch.query);
           stepResult = await executeVectorSearchWithDebug(step, userId, supabaseClient, requestId);
+          
+          // Standardize vector search result format
+          if (Array.isArray(stepResult)) {
+            stepResult = {
+              success: true,
+              data: stepResult,
+              vectorResultCount: stepResult.length,
+              sqlResultCount: 0,
+              hasError: false
+            };
+          }
         } else if (step.queryType === 'sql_analysis' || step.queryType === 'sql_count' || step.queryType === 'sql_calculation') {
           console.log(`[${requestId}] SQL analysis (${step.queryType}):`, step.sqlQuery);
           stepResult = await executeSQLAnalysis(step, userId, supabaseClient, requestId);
+          
+          // Enhance SQL result format for consolidator
+          stepResult = {
+            ...stepResult,
+            vectorResultCount: 0,
+            sqlResultCount: stepResult.rowCount || 0,
+            hasError: !stepResult.success || !!stepResult.error
+          };
         } else if (step.queryType === 'hybrid_search') {
           console.log(`[${requestId}] Hybrid search:`, step.vectorSearch.query, step.sqlQuery);
           stepResult = await executeHybridSearch(step, userId, supabaseClient, requestId);
+          
+          // Format hybrid results properly
+          if (Array.isArray(stepResult)) {
+            stepResult = {
+              success: true,
+              data: stepResult,
+              vectorResultCount: stepResult.length,
+              sqlResultCount: stepResult.length,
+              hasError: false
+            };
+          }
         } else {
-          console.warn(`[${requestId}] Unknown query type:`, step.queryType);
-          stepResult = { error: `Unknown query type: ${step.queryType}` };
+          console.error(`[${requestId}] Unknown query type:`, step.queryType);
+          stepResult = { 
+            success: false,
+            error: `Unknown query type: ${step.queryType}`,
+            vectorResultCount: 0,
+            sqlResultCount: 0,
+            hasError: true
+          };
         }
 
         subResults.push({ 
@@ -364,8 +400,13 @@ async function executePlan(plan: any, userId: string, supabaseClient: any, reque
         subResults.push({ 
           step: step.step, 
           error: stepError.message,
-          queryType: step.queryType,
-          description: step.description
+          result: {
+            success: false,
+            error: stepError.message,
+            vectorResultCount: 0,
+            sqlResultCount: 0,
+            hasError: true
+          }
         });
       }
     }
@@ -378,67 +419,97 @@ async function executePlan(plan: any, userId: string, supabaseClient: any, reque
 }
 
 async function executeSQLAnalysis(step: any, userId: string, supabaseClient: any, requestId: string) {
-  console.log(`[${requestId}] SQL analysis (${step.queryType}):`, step.sqlQuery);
-  console.log(`[${requestId}] ORIGINAL SQL:`, step.sqlQuery);
-
   try {
     if (!step.sqlQuery) {
-      console.error(`[${requestId}] No SQL query provided`);
-      return {
-        success: false,
-        data: [],
-        error: "No SQL query provided",
-        rowCount: 0
-      };
-    }
-
-    // Replace $user_id placeholder with actual user ID
-    let processedSQL = step.sqlQuery.replace(/\$user_id/g, `'${userId}'`);
-    console.log(`[${requestId}] PROCESSED SQL:`, processedSQL);
-
-    // Use execute_dynamic_query function for SQL execution
-    const { data: result, error } = await supabaseClient.rpc('execute_dynamic_query', {
-      query_text: processedSQL
-    });
-
-    if (error) {
-      console.error(`[${requestId}] SQL execution error:`, error);
-      return {
-        success: false,
-        data: [],
-        error: error.message,
+      console.warn(`[${requestId}] No SQL query provided for analysis step`);
+      return { 
+        success: false, 
+        data: [], 
+        error: 'No SQL query provided', 
         rowCount: 0,
-        sqlQuery: processedSQL,
+        sqlQuery: 'N/A',
+        vectorResultCount: 0,
+        sqlResultCount: 0,
         hasError: true
       };
     }
 
-    const sqlData = result?.data || [];
-    console.log(`[${requestId}] SQL analysis results: {
-  success: ${result?.success || false},
-  rowCount: ${sqlData.length},
-  hasData: ${sqlData.length > 0},
-  errorMessage: ${result?.success ? null : (result?.error || 'Unknown error')},
-  sampleData: ${JSON.stringify(sqlData.slice(0, 2), null, 2)}
-}`);
+    let sqlQuery = step.sqlQuery;
+    
+    console.log(`[${requestId}] ORIGINAL SQL:`, sqlQuery);
+    
+    // Enhanced placeholder replacement
+    sqlQuery = sqlQuery.replace(/\$user_id/g, `'${userId}'`);
+    
+    // Handle problematic placeholder patterns
+    if (sqlQuery.includes('/*IDs from vector search step*/') || sqlQuery.includes('$vector_result_ids')) {
+      console.warn(`[${requestId}] SQL contains vector ID placeholders - removing constraints`);
+      
+      // Remove vector ID constraints completely
+      sqlQuery = sqlQuery.replace(/AND id IN \(\/\*IDs from vector search step\*\/\)/gi, '');
+      sqlQuery = sqlQuery.replace(/AND id IN \(\$vector_result_ids\)/gi, '');
+      sqlQuery = sqlQuery.replace(/WHERE.*\/\*IDs from vector search step\*\/.*/gi, 'WHERE user_id = $user_id');
+      sqlQuery = sqlQuery.replace(/WHERE.*\$vector_result_ids.*/gi, 'WHERE user_id = $user_id');
+      
+      // Re-apply user_id replacement after cleanup
+      sqlQuery = sqlQuery.replace(/\$user_id/g, `'${userId}'`);
+    }
 
-    return {
-      success: result?.success || false,
-      data: sqlData,
-      error: result?.success ? null : (result?.error || 'Unknown error'),
-      rowCount: sqlData.length,
-      sqlQuery: processedSQL,
+    // Clean up malformed WHERE clauses
+    sqlQuery = sqlQuery.replace(/WHERE\s+AND/gi, 'WHERE');
+    sqlQuery = sqlQuery.replace(/WHERE\s*$\s*GROUP/gi, 'GROUP');
+    sqlQuery = sqlQuery.replace(/WHERE\s*$\s*ORDER/gi, 'ORDER');
+    sqlQuery = sqlQuery.replace(/WHERE\s*$/gi, '');
+
+    console.log(`[${requestId}] PROCESSED SQL:`, sqlQuery);
+
+    // Execute the SQL query
+    const { data, error } = await supabaseClient.rpc('execute_dynamic_query', {
+      query_text: sqlQuery
+    });
+
+    if (error) {
+      console.error(`[${requestId}] SQL execution error:`, error);
+      return { 
+        success: false, 
+        data: [], 
+        error: error.message, 
+        rowCount: 0,
+        sqlQuery: sqlQuery
+      };
+    }
+
+    // Parse RPC response correctly
+    const isSuccess = data?.success === true;
+    const resultData = isSuccess ? (data?.data || []) : [];
+    const errorMessage = isSuccess ? null : (data?.error || 'Unknown SQL error');
+    const rowCount = Array.isArray(resultData) ? resultData.length : 0;
+    
+    console.log(`[${requestId}] SQL analysis results:`, {
+      success: isSuccess,
+      rowCount,
+      hasData: rowCount > 0,
+      errorMessage,
+      sampleData: rowCount > 0 ? resultData.slice(0, 2) : null
+    });
+
+    return { 
+      success: isSuccess,
+      data: resultData, 
+      error: errorMessage, 
+      rowCount,
+      sqlQuery: sqlQuery,
       vectorResultCount: 0,
-      sqlResultCount: sqlData.length,
-      hasError: !result?.success
+      sqlResultCount: rowCount,
+      hasError: !isSuccess
     };
 
   } catch (error) {
-    console.error(`[${requestId}] Error in SQL analysis:`, error);
-    return {
-      success: false,
-      data: [],
-      error: error.message,
+    console.error(`[${requestId}] Critical error in SQL analysis:`, error);
+    return { 
+      success: false, 
+      data: [], 
+      error: error.message, 
       rowCount: 0,
       sqlQuery: step.sqlQuery,
       vectorResultCount: 0,
@@ -603,16 +674,23 @@ Return ONLY valid JSON with this exact structure:
 - Stages execute in ascending order: stage 1 first, then 2, then 3, etc.
 - Keep stages contiguous (1..N) without gaps
 
-**SQL QUERY GUIDELINES:**
+**SQL QUERY GUIDELINES (CRITICAL - READ CAREFULLY):**
 - ALWAYS include WHERE user_id = $user_id
 - Use proper column names with quotes for spaced names like "refined text"
-- For emotion analysis: use emotions JSONB
-- For theme analysis: use master_themes array and/or entities/text where appropriate (no hardcoded expansions)
+- For emotion analysis: EMOTIONS is JSONB - use jsonb_each(emotions) to extract key-value pairs
+  * CORRECT: SELECT emotion_key, AVG((emotion_value::text)::numeric) FROM "Journal Entries", jsonb_each(emotions) as e(emotion_key, emotion_value) WHERE user_id = $user_id GROUP BY emotion_key
+  * WRONG: SELECT jsonb_array_elements_text(emotions) - emotions is NOT an array!
+- For theme analysis: master_themes is TEXT ARRAY - use unnest(master_themes) or ANY(master_themes)
+  * CORRECT: SELECT theme, COUNT(*) FROM "Journal Entries", unnest(master_themes) as theme WHERE user_id = $user_id GROUP BY theme
+- For entities analysis: entities is JSONB with structure like {"person": ["John", "Mary"], "place": ["Paris"]}
+  * CORRECT: SELECT entity_type, entity_value FROM "Journal Entries", jsonb_each(entities) as et(entity_type, entity_values), jsonb_array_elements_text(entity_values) as entity_value WHERE user_id = $user_id
+- For sentiment: sentiment is REAL (numeric) not text
 - For percentages: alias as percentage
-- For counts: alias as count (or frequency for grouped counts)
+- For counts: alias as count (or frequency for grouped counts)  
 - For averages/scores: alias as avg_score (or score)
 - For date filtering: apply created_at comparisons when time is implied or stated
 - Do NOT call RPCs; generate plain SQL only
+- NEVER use placeholder comments like /*IDs from vector search step*/ - generate actual executable SQL
 
 **SEARCH STRATEGY SELECTION:**
 - sql_primary: statistical analysis, counts, percentages
@@ -621,6 +699,8 @@ Return ONLY valid JSON with this exact structure:
 
 Focus on creating comprehensive, executable analysis plans that will provide meaningful insights.`;
 
+    console.log("[Analyst Agent] Calling OpenAI API with prompt length:", prompt.length);
+    
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -630,50 +710,56 @@ Focus on creating comprehensive, executable analysis plans that will provide mea
       body: JSON.stringify({
         model: 'gpt-4.1-2025-04-14',
         messages: [{ role: 'user', content: prompt }],
-        max_completion_tokens: 2000,
+        max_tokens: 2000,
+        temperature: 0.1
       }),
     });
 
     if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.status}`);
+      const errorText = await response.text();
+      console.error(`[Analyst Agent] OpenAI API error: ${response.status} - ${errorText}`);
+      throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
-    const responseText = data.choices[0].message.content;
-    console.log(`[Analyst Agent] Raw GPT response:`, responseText);
+    const rawResponse = data.choices[0].message.content;
+    console.log("[Analyst Agent] Raw GPT response:", rawResponse);
 
-    // Try to parse JSON directly first
     let analysisResult;
     try {
-      analysisResult = JSON.parse(responseText);
-      console.log(`[Analyst Agent] Successfully parsed JSON:`, analysisResult);
-    } catch (parseError) {
-      console.warn(`[Analyst Agent] Direct JSON parse failed, trying to extract:`, parseError);
-      
-      // Try to extract JSON from code blocks or other formatting
-      const jsonMatch = responseText.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/) || 
-                       responseText.match(/(\{[\s\S]*\})/);
-      
-      if (jsonMatch) {
-        try {
+      // Clean the response before parsing
+      const cleanedResponse = rawResponse.trim();
+      if (cleanedResponse.startsWith('```json')) {
+        const jsonMatch = cleanedResponse.match(/```json\s*([\s\S]*?)\s*```/);
+        if (jsonMatch) {
           analysisResult = JSON.parse(jsonMatch[1]);
-          console.log(`[Analyst Agent] Extracted and parsed JSON:`, analysisResult);
-        } catch (extractError) {
-          console.error(`[Analyst Agent] Failed to parse extracted JSON:`, extractError);
-          // Return fallback plan
-          return createEnhancedFallbackPlan(message, false, null, supabaseClient, userTimezone);
+        } else {
+          throw new Error("Could not extract JSON from code block");
         }
+      } else if (cleanedResponse.startsWith('{')) {
+        analysisResult = JSON.parse(cleanedResponse);
       } else {
-        console.error(`[Analyst Agent] No JSON found in response:`, responseText);
-        // Return fallback plan
-        return createEnhancedFallbackPlan(message, false, null, supabaseClient, userTimezone);
+        throw new Error("Response does not appear to be JSON");
       }
+      
+      console.log("[Analyst Agent] Successfully parsed JSON:", JSON.stringify(analysisResult, null, 2));
+    } catch (parseError) {
+      console.error("[Analyst Agent] Failed to parse GPT response:", parseError);
+      console.error("[Analyst Agent] Raw response was:", rawResponse);
+      return createEnhancedFallbackPlan(message, false, null, supabaseClient, userTimezone);
     }
 
-    // Validate the parsed result has required structure
     if (!analysisResult || !analysisResult.subQuestions || !Array.isArray(analysisResult.subQuestions)) {
-      console.error(`[Analyst Agent] Invalid analysis result structure:`, analysisResult);
+      console.error("[Analyst Agent] Invalid analysis result structure:", analysisResult);
       return createEnhancedFallbackPlan(message, false, null, supabaseClient, userTimezone);
+    }
+
+    // Validate each sub-question has required structure
+    for (const subQuestion of analysisResult.subQuestions) {
+      if (!subQuestion.question || !subQuestion.analysisSteps || !Array.isArray(subQuestion.analysisSteps)) {
+        console.error("[Analyst Agent] Invalid sub-question structure:", subQuestion);
+        return createEnhancedFallbackPlan(message, false, null, supabaseClient, userTimezone);
+      }
     }
 
     // Enhance with detected characteristics and timezone
@@ -741,41 +827,72 @@ function createEnhancedFallbackPlan(originalMessage, unused, inferredTimeContext
 
 async function generateDatabaseSchemaContext(supabaseClient: any): Promise<string> {
   try {
-    const { generateDatabaseSchemaContext: generateContext } = await import('../_shared/databaseSchemaContext.ts');
-    return await generateContext(supabaseClient);
+    const { data: emotions, error: emotionError } = await supabaseClient
+      .from('emotions')
+      .select('name, description');
+
+    if (emotionError) {
+      console.error('Error fetching emotions:', emotionError);
+      throw emotionError;
+    }
+
+    const { data: themes, error: themeError } = await supabaseClient
+      .from('themes')
+      .select('name, description');
+
+    if (themeError) {
+      console.error('Error fetching themes:', themeError);
+      throw themeError;
+    }
+
+    const emotionDescriptions = emotions
+      .map(emotion => `- ${emotion.name}: ${emotion.description}`)
+      .join('\n');
+
+    const themeDescriptions = themes
+      .map(theme => `- ${theme.name}: ${theme.description}`)
+      .join('\n');
+
+    return `
+**COMPLETE DATABASE SCHEMA:**
+
+Table: "Journal Entries"
+Columns:
+- id: bigint (Primary Key)
+- user_id: uuid (NOT NULL, use in WHERE clause)
+- created_at: timestamp with time zone
+- "refined text": text (main content, use quotes!)
+- "transcription text": text (audio transcription, use quotes!)
+- emotions: JSONB (key-value pairs like {"joy": 0.8, "sadness": 0.2})
+- master_themes: text[] (array like ["Family", "Work"])
+- entities: JSONB (nested like {"person": ["John"], "place": ["Paris"]})
+- sentiment: real (numeric score, not text)
+- themes: text[] (legacy field)
+- themeemotion: JSONB
+- entityemotion: JSONB
+
+Available emotions in system:
+${emotionDescriptions}
+
+Available themes in system:
+${themeDescriptions}
+
+**CRITICAL SQL PATTERNS:**
+- emotions analysis: jsonb_each(emotions) as e(emotion_key, emotion_value)
+- themes analysis: unnest(master_themes) as theme
+- entities analysis: jsonb_each(entities) as et(entity_type, entity_values), jsonb_array_elements_text(entity_values) as entity_value
+- Always filter by user_id = $user_id
+- Use quotes around spaced column names like "refined text"
+`;
   } catch (error) {
     console.error('Error generating database schema context:', error);
-    
-    // Fallback comprehensive schema context
     return `
-**DATABASE SCHEMA - "Journal Entries" Table:**
-
-**CRITICAL COLUMNS FOR QUERIES:**
-- id (bigint): Unique entry identifier  
-- user_id (uuid): User ID - MANDATORY in all WHERE clauses
-- created_at (timestamp): Entry creation date - use for time filtering
-- "refined text" (text): Primary content source (cleaned transcription)
-- "transcription text" (text): Raw voice-to-text content
-- emotions (jsonb): AI emotion scores {emotion_name: score} where scores 0.0-1.0
-- master_themes (text[]): Array of theme categories from master themes table
-- sentiment (real): Overall sentiment score (-1.0 to 1.0)
-- entities (jsonb): Named entities {"PERSON": ["names"], "ORG": ["orgs"], "GPE": ["places"]}
-- themeemotion (jsonb): Theme-emotion correlations {theme: {emotion: score}}
-
-**SQL QUERY RULES:**
-- ALWAYS include: WHERE user_id = $user_id  
-- Use quotes for spaced column names: "refined text", "transcription text"
-- For emotion analysis: use emotions JSONB column
-- For theme analysis: use master_themes array column  
-- For sentiment: use sentiment real column
-- For date filtering: use created_at timestamp column
-- Generate standard SQL only, no RPC calls
-
-**AVAILABLE THEMES:**
-Self & Identity, Body & Health, Mental Health, Romantic Relationships, Family, Friendships & Social Circle, Career & Workplace, Money & Finances, Education & Learning, Habits & Routines, Sleep & Rest, Creativity & Hobbies, Spirituality & Beliefs, Technology & Social Media, Environment & Living Space, Time & Productivity, Travel & Movement, Loss & Grief, Purpose & Fulfillment, Conflict & Trauma, Celebration & Achievement
-
-**AVAILABLE EMOTIONS:**
-amusement, anger, anticipation, anxiety, awe, boredom, compassion, concern, confidence, confusion, contentment, curiosity, depression, disappointment, disgust, embarrassment, empathy, enthusiasm, envy, excitement, fear, frustration, gratitude, guilt, hate, hope, hurt, interest, jealousy, joy, loneliness, love, nostalgia, optimism, overwhelm, pessimism, pride, regret, relief, remorse, sadness, satisfaction, serenity, shame, surprise, trust`;
+**FALLBACK DATABASE SCHEMA:**
+Table: "Journal Entries" with emotions (JSONB), master_themes (text[]), entities (JSONB), sentiment (real), "refined text", user_id (uuid)
+- emotions: use jsonb_each(emotions) NOT jsonb_array_elements_text
+- themes: use unnest(master_themes) for arrays
+- Always WHERE user_id = $user_id
+`;
   }
 }
 

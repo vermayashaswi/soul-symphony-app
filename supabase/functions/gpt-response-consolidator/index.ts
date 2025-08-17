@@ -112,31 +112,62 @@ serve(async (req) => {
       timestamp: new Date().toISOString()
     });
 
-    // Data integrity validation - check for stale research results
-    if (researchResults && researchResults.length > 0) {
+    // Enhanced data integrity validation
+    const hasValidData = researchResults && researchResults.length > 0;
+    let totalSqlRows = 0;
+    let totalVectorResults = 0;
+    let hasAnyErrors = false;
+    
+    if (hasValidData) {
       console.log(`[RESEARCH DATA VALIDATION] ${consolidationId}:`, {
         totalResults: researchResults.length,
         resultTypes: researchResults.map((r: any, i: number) => ({
           index: i,
           question: r?.subQuestion?.question?.substring(0, 50) || 'unknown',
-          sqlRowCount: r?.executionResults?.sqlResults?.length || 0,
+          sqlRowCount: r?.executionResults?.sqlResults?.length || r?.executionResults?.sqlRowCount || 0,
           vectorResultCount: r?.executionResults?.vectorResults?.length || 0,
-          hasError: !!r?.executionResults?.error,
+          hasError: !!r?.executionResults?.error || !!r?.executionResults?.sqlError,
+          sqlError: r?.executionResults?.sqlError || null,
           sampleSqlData: r?.executionResults?.sqlResults?.slice(0, 1) || null
         }))
       });
       
-      // Check for potential data contamination indicators
-      const totalSqlRows = researchResults.reduce((sum: number, r: any) => 
-        sum + (r?.executionResults?.sqlResults?.length || 0), 0);
-      const totalVectorResults = researchResults.reduce((sum: number, r: any) => 
+      // Calculate totals and check for errors
+      totalSqlRows = researchResults.reduce((sum: number, r: any) => 
+        sum + (r?.executionResults?.sqlResults?.length || r?.executionResults?.sqlRowCount || 0), 0);
+      totalVectorResults = researchResults.reduce((sum: number, r: any) => 
         sum + (r?.executionResults?.vectorResults?.length || 0), 0);
+      hasAnyErrors = researchResults.some((r: any) => 
+        !!r?.executionResults?.error || !!r?.executionResults?.sqlError);
         
       console.log(`[DATA SUMMARY] ${consolidationId}:`, {
         totalSqlRows,
         totalVectorResults,
+        hasAnyErrors,
         userQuestion: userMessage,
-        potentialStaleDataRisk: totalSqlRows > 0 ? 'check_sql_dates' : 'no_sql_data'
+        dataAvailability: totalSqlRows > 0 || totalVectorResults > 0 ? 'has_data' : 'no_data'
+      });
+    } else {
+      console.warn(`[DATA VALIDATION WARNING] ${consolidationId}: No research results provided`);
+    }
+
+    // CRITICAL FAILSAFE: Prevent fabricated responses when no data exists
+    if (!hasValidData || (totalSqlRows === 0 && totalVectorResults === 0 && !hasAnyErrors)) {
+      console.log(`[CONSOLIDATION FAILSAFE] ${consolidationId}: No analysis data available - returning honest response`);
+      
+      return new Response(JSON.stringify({
+        response: "I wasn't able to analyze your journal data right now. This could be because you don't have enough journal entries yet, or there might be a temporary issue with the analysis system. Please try asking your question again, or consider adding more journal entries first.",
+        metadata: {
+          consolidationId,
+          dataAvailability: "no_data",
+          analysis: null,
+          timestamp: new Date().toISOString(),
+          totalSqlRows: 0,
+          totalVectorResults: 0,
+          hasAnyErrors: false
+        }
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
@@ -200,12 +231,83 @@ serve(async (req) => {
       },
     };
 
-    const consolidationPrompt = `You are Ruh by SOuLO, a wickedly smart, hilariously insightful wellness companion who's basically a data wizard disguised as your most emotionally intelligent friend. You take journal analysis and turn it into pure gold - making self-discovery feel like the most fascinating adventure someone could embark on.
+    // Check if we have meaningful data to work with
+    const hasNoData = totalSqlRows === 0 && totalVectorResults === 0;
+    const hasOnlyErrors = hasAnyErrors && hasNoData;
+
+    let consolidationPrompt;
+
+    if (hasNoData && !hasAnyErrors) {
+      // No data available - be completely honest
+      consolidationPrompt = `You are Ruh by SOuLO, a warm and understanding wellness companion. The user asked: "${userMessage}"
+
+ANALYSIS RESULT: No relevant journal data was found for this question.
+
+Respond warmly and honestly by:
+1. Acknowledging their question with empathy
+2. Clearly stating that no relevant journal data was found
+3. Explaining possible reasons (haven't journaled about this topic, topic not yet covered)
+4. Suggesting they write about this topic to enable future analysis
+5. Offering to help analyze other aspects of their journaling
+
+CRITICAL: Do NOT fabricate any statistics, patterns, or data. Be completely honest about the lack of data.
+
+Your response should be a JSON object with this structure:
+{
+  "userStatusMessage": "No relevant journal data found",
+  "response": "your honest, empathetic response explaining no data was found"
+}`;
+
+    } else if (hasOnlyErrors) {
+      // Technical errors occurred 
+      const errorDetails = analysisSummary.filter(r => r.error).map(r => r.error).join('; ');
+      
+      consolidationPrompt = `You are Ruh by SOuLO, a warm and understanding wellness companion. The user asked: "${userMessage}"
+
+TECHNICAL ISSUE: The analysis encountered errors: ${errorDetails}
+
+Respond warmly and transparently by:
+1. Acknowledging their question
+2. Explaining that technical issues prevented the analysis
+3. Being honest about what went wrong (in simple terms)
+4. Suggesting they try rephrasing the question
+5. Offering alternative ways to help
+
+CRITICAL: Do NOT attempt to provide analysis when technical errors occurred. Be honest about the issues.
+
+Your response should be a JSON object with this structure:
+{
+  "userStatusMessage": "Technical issue during analysis", 
+  "response": "your transparent response about technical issues and alternatives"
+}`;
+
+    } else {
+      // We have data - validate it before analysis
+      const successfulResults = analysisSummary.filter(r => !r.error && (r.sqlRowCount > 0 || r.vectorResultCount > 0));
+      const failedResults = analysisSummary.filter(r => r.error);
+      
+      let dataValidationNote = '';
+      if (successfulResults.length === 0) {
+        dataValidationNote = `\n**CRITICAL DATA VALIDATION**: All ${analysisSummary.length} analysis attempts failed or returned empty results. You MUST acknowledge this and NOT fabricate any statistics or patterns.`;
+      } else if (failedResults.length > 0) {
+        dataValidationNote = `\n**DATA VALIDATION**: ${failedResults.length} of ${analysisSummary.length} analyses failed. Only use data from successful results.`;
+      }
+      
+      consolidationPrompt = `You are Ruh by SOuLO, a wickedly smart, hilariously insightful wellness companion who's basically a data wizard disguised as your most emotionally intelligent friend. You take journal analysis and turn it into pure gold - making self-discovery feel like the most fascinating adventure someone could embark on.
     
     **USER QUESTION:** "${userMessage}"
     
-    **COMPREHENSIVE ANALYSIS RESULTS:**
-    ${JSON.stringify(analysisSummary, null, 2)}
+    **ANALYSIS RESULTS VALIDATION:**
+    - Successful analyses: ${successfulResults.length}
+    - Failed analyses: ${failedResults.length}
+    - Total SQL rows: ${totalSqlRows}
+    - Total vector results: ${totalVectorResults}${dataValidationNote}
+    
+    **SUCCESSFUL ANALYSIS DATA:**
+    ${JSON.stringify(successfulResults, null, 2)}
+    
+    ${failedResults.length > 0 ? `**FAILED ANALYSES (DO NOT USE):**
+    ${JSON.stringify(failedResults.map(f => ({question: f.question, error: f.error})), null, 2)}` : ''}
     
     **CONVERSATION CONTEXT:**
     ${conversationContext ? conversationContext.slice(-6).map((msg)=>`${msg.role || msg.sender || 'user'}: ${msg.content}`).join('\n') : 'No prior context'}
@@ -243,6 +345,14 @@ serve(async (req) => {
     **EMOTIONAL TONE GUIDANCE:**
     Look at the past conversation history provided to you and accordingly frame your response cleverly matching the user's emotional tone that's been running through up until now.
     
+    **CRITICAL DATA VALIDATION REQUIREMENTS:**
+    - NEVER fabricate statistics, percentages, or patterns not present in the successful analysis data
+    - If all analyses failed or returned empty results, acknowledge this honestly and suggest alternative approaches
+    - Only reference specific numbers, percentages, or patterns that exist in the SUCCESSFUL analysis results
+    - When some analyses failed, only use data from successful ones and acknowledge the limitations
+    - If you cannot answer the question due to insufficient data, say so clearly
+    - When data is limited, focus on encouraging more journal writing about the topic
+
     **RESPONSE GUIDELINES:**
     Respond naturally in your authentic voice. Mandatorily use bold headers/words/sentences, paragraphs, structured responses, italics, bullets and compulsorily emojis. Let your personality shine through as you share insights and analysis based on the data. Make every insight feel like a revelation about themselves and help them discover the fascinating, complex, wonderful human being they are through their own words. Restric responses to less than 100 words unless question requires huge answers. Feel free to expand then!
     Brief responses requird under 120 words unless question desires more explanation and towards the end add followup questions by leveraging emotional tone of conversation history
@@ -258,6 +368,7 @@ serve(async (req) => {
     - Keys MUST be exactly: "userStatusMessage" and "response" (case-sensitive).
     - userStatusMessage MUST be exactly 5 words.
     - Do not include trailing explanations or extra fields`;
+    }
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -268,7 +379,12 @@ serve(async (req) => {
         body: JSON.stringify({
           model: 'gpt-4.1-nano',
           messages: [
-            { role: 'system', content: 'You are Ruh by SOuLO, a warm and insightful wellness coach. You analyze ONLY the current research results provided to you. Never reference or use data from previous conversations or responses.' },
+            { 
+              role: 'system', 
+              content: hasNoData ? 
+                'You are Ruh by SOuLO, a warm and understanding wellness coach. When no journal data is available for a query, respond empathetically and offer alternative ways to help.' :
+                'You are Ruh by SOuLO, a warm and insightful wellness coach. You analyze ONLY the current research results provided to you. Never fabricate data or statistics. If data is limited, acknowledge it honestly.'
+            },
             { role: 'user', content: consolidationPrompt }
           ],
           max_completion_tokens: 1500
