@@ -341,8 +341,8 @@ async function executePlan(plan: any, userId: string, supabaseClient: any, reque
         if (step.queryType === 'vector_search') {
           console.log(`[${requestId}] Vector search:`, step.vectorSearch.query);
           stepResult = await executeVectorSearchWithDebug(step, userId, supabaseClient, requestId);
-        } else if (step.queryType === 'sql_analysis') {
-          console.log(`[${requestId}] SQL analysis:`, step.sqlQuery);
+        } else if (step.queryType === 'sql_analysis' || step.queryType === 'sql_count' || step.queryType === 'sql_calculation') {
+          console.log(`[${requestId}] SQL analysis (${step.queryType}):`, step.sqlQuery);
           stepResult = await executeSQLAnalysis(step, userId, supabaseClient, requestId);
         } else if (step.queryType === 'hybrid_search') {
           console.log(`[${requestId}] Hybrid search:`, step.vectorSearch.query, step.sqlQuery);
@@ -352,11 +352,21 @@ async function executePlan(plan: any, userId: string, supabaseClient: any, reque
           stepResult = { error: `Unknown query type: ${step.queryType}` };
         }
 
-        subResults.push({ step: step.step, result: stepResult });
+        subResults.push({ 
+          step: step.step, 
+          result: stepResult,
+          queryType: step.queryType,
+          description: step.description
+        });
 
       } catch (stepError) {
         console.error(`[${requestId}] Error executing step:`, step.step, stepError);
-        subResults.push({ step: step.step, error: stepError.message });
+        subResults.push({ 
+          step: step.step, 
+          error: stepError.message,
+          queryType: step.queryType,
+          description: step.description
+        });
       }
     }
 
@@ -368,24 +378,73 @@ async function executePlan(plan: any, userId: string, supabaseClient: any, reque
 }
 
 async function executeSQLAnalysis(step: any, userId: string, supabaseClient: any, requestId: string) {
-  try {
-    const { data, error } = await supabaseClient
-      .from('Journal Entries')
-      .select('*')
-      .eq('user_id', userId)
-      .limit(10);
+  console.log(`[${requestId}] SQL analysis (${step.queryType}):`, step.sqlQuery);
+  console.log(`[${requestId}] ORIGINAL SQL:`, step.sqlQuery);
 
-    if (error) {
-      console.error(`[${requestId}] SQL analysis error:`, error);
-      throw error;
+  try {
+    if (!step.sqlQuery) {
+      console.error(`[${requestId}] No SQL query provided`);
+      return {
+        success: false,
+        data: [],
+        error: "No SQL query provided",
+        rowCount: 0
+      };
     }
 
-    console.log(`[${requestId}] SQL analysis results:`, data?.length);
-    return data;
+    // Replace $user_id placeholder with actual user ID
+    let processedSQL = step.sqlQuery.replace(/\$user_id/g, `'${userId}'`);
+    console.log(`[${requestId}] PROCESSED SQL:`, processedSQL);
+
+    // Use execute_dynamic_query function for SQL execution
+    const { data: result, error } = await supabaseClient.rpc('execute_dynamic_query', {
+      query_text: processedSQL
+    });
+
+    if (error) {
+      console.error(`[${requestId}] SQL execution error:`, error);
+      return {
+        success: false,
+        data: [],
+        error: error.message,
+        rowCount: 0,
+        sqlQuery: processedSQL,
+        hasError: true
+      };
+    }
+
+    const sqlData = result?.data || [];
+    console.log(`[${requestId}] SQL analysis results: {
+  success: ${result?.success || false},
+  rowCount: ${sqlData.length},
+  hasData: ${sqlData.length > 0},
+  errorMessage: ${result?.success ? null : (result?.error || 'Unknown error')},
+  sampleData: ${JSON.stringify(sqlData.slice(0, 2), null, 2)}
+}`);
+
+    return {
+      success: result?.success || false,
+      data: sqlData,
+      error: result?.success ? null : (result?.error || 'Unknown error'),
+      rowCount: sqlData.length,
+      sqlQuery: processedSQL,
+      vectorResultCount: 0,
+      sqlResultCount: sqlData.length,
+      hasError: !result?.success
+    };
 
   } catch (error) {
     console.error(`[${requestId}] Error in SQL analysis:`, error);
-    throw error;
+    return {
+      success: false,
+      data: [],
+      error: error.message,
+      rowCount: 0,
+      sqlQuery: step.sqlQuery,
+      vectorResultCount: 0,
+      sqlResultCount: 0,
+      hasError: true
+    };
   }
 }
 
@@ -571,8 +630,7 @@ Focus on creating comprehensive, executable analysis plans that will provide mea
       body: JSON.stringify({
         model: 'gpt-4.1-2025-04-14',
         messages: [{ role: 'user', content: prompt }],
-        max_tokens: 2000,
-        temperature: 0.1
+        max_completion_tokens: 2000,
       }),
     });
 
@@ -581,18 +639,40 @@ Focus on creating comprehensive, executable analysis plans that will provide mea
     }
 
     const data = await response.json();
-    console.log("Analyst Agent response:", data.choices[0].message.content);
+    const responseText = data.choices[0].message.content;
+    console.log(`[Analyst Agent] Raw GPT response:`, responseText);
 
+    // Try to parse JSON directly first
     let analysisResult;
     try {
-      analysisResult = JSON.parse(data.choices[0].message.content);
+      analysisResult = JSON.parse(responseText);
+      console.log(`[Analyst Agent] Successfully parsed JSON:`, analysisResult);
     } catch (parseError) {
-      console.error("Failed to parse Analyst Agent response:", parseError);
-      return createEnhancedFallbackPlan(message, false, null, supabaseClient, userTimezone);
+      console.warn(`[Analyst Agent] Direct JSON parse failed, trying to extract:`, parseError);
+      
+      // Try to extract JSON from code blocks or other formatting
+      const jsonMatch = responseText.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/) || 
+                       responseText.match(/(\{[\s\S]*\})/);
+      
+      if (jsonMatch) {
+        try {
+          analysisResult = JSON.parse(jsonMatch[1]);
+          console.log(`[Analyst Agent] Extracted and parsed JSON:`, analysisResult);
+        } catch (extractError) {
+          console.error(`[Analyst Agent] Failed to parse extracted JSON:`, extractError);
+          // Return fallback plan
+          return createEnhancedFallbackPlan(message, false, null, supabaseClient, userTimezone);
+        }
+      } else {
+        console.error(`[Analyst Agent] No JSON found in response:`, responseText);
+        // Return fallback plan
+        return createEnhancedFallbackPlan(message, false, null, supabaseClient, userTimezone);
+      }
     }
 
-    if (!analysisResult || !analysisResult.subQuestions) {
-      console.error("Failed to parse Analyst Agent response, using enhanced fallback");
+    // Validate the parsed result has required structure
+    if (!analysisResult || !analysisResult.subQuestions || !Array.isArray(analysisResult.subQuestions)) {
+      console.error(`[Analyst Agent] Invalid analysis result structure:`, analysisResult);
       return createEnhancedFallbackPlan(message, false, null, supabaseClient, userTimezone);
     }
 
@@ -661,44 +741,41 @@ function createEnhancedFallbackPlan(originalMessage, unused, inferredTimeContext
 
 async function generateDatabaseSchemaContext(supabaseClient: any): Promise<string> {
   try {
-    const { data: emotions, error: emotionError } = await supabaseClient
-      .from('emotions')
-      .select('name, description');
-
-    if (emotionError) {
-      console.error('Error fetching emotions:', emotionError);
-      throw emotionError;
-    }
-
-    const { data: themes, error: themeError } = await supabaseClient
-      .from('themes')
-      .select('name, description');
-
-    if (themeError) {
-      console.error('Error fetching themes:', themeError);
-      throw themeError;
-    }
-
-    const emotionDescriptions = emotions
-      .map(emotion => `- ${emotion.name}: ${emotion.description}`)
-      .join('\n');
-
-    const themeDescriptions = themes
-      .map(theme => `- ${theme.name}: ${theme.description}`)
-      .join('\n');
-
-    return `
-DATABASE CONTEXT:
-- The database contains journal entries with text content, emotions, and themes.
-- Each entry is associated with a user ID.
-- The emotions table contains a list of emotions with descriptions:
-${emotionDescriptions}
-- The themes table contains a list of themes with descriptions:
-${themeDescriptions}
-`;
+    const { generateDatabaseSchemaContext: generateContext } = await import('../_shared/databaseSchemaContext.ts');
+    return await generateContext(supabaseClient);
   } catch (error) {
     console.error('Error generating database schema context:', error);
-    return 'Error generating database schema context. Using limited context.';
+    
+    // Fallback comprehensive schema context
+    return `
+**DATABASE SCHEMA - "Journal Entries" Table:**
+
+**CRITICAL COLUMNS FOR QUERIES:**
+- id (bigint): Unique entry identifier  
+- user_id (uuid): User ID - MANDATORY in all WHERE clauses
+- created_at (timestamp): Entry creation date - use for time filtering
+- "refined text" (text): Primary content source (cleaned transcription)
+- "transcription text" (text): Raw voice-to-text content
+- emotions (jsonb): AI emotion scores {emotion_name: score} where scores 0.0-1.0
+- master_themes (text[]): Array of theme categories from master themes table
+- sentiment (real): Overall sentiment score (-1.0 to 1.0)
+- entities (jsonb): Named entities {"PERSON": ["names"], "ORG": ["orgs"], "GPE": ["places"]}
+- themeemotion (jsonb): Theme-emotion correlations {theme: {emotion: score}}
+
+**SQL QUERY RULES:**
+- ALWAYS include: WHERE user_id = $user_id  
+- Use quotes for spaced column names: "refined text", "transcription text"
+- For emotion analysis: use emotions JSONB column
+- For theme analysis: use master_themes array column  
+- For sentiment: use sentiment real column
+- For date filtering: use created_at timestamp column
+- Generate standard SQL only, no RPC calls
+
+**AVAILABLE THEMES:**
+Self & Identity, Body & Health, Mental Health, Romantic Relationships, Family, Friendships & Social Circle, Career & Workplace, Money & Finances, Education & Learning, Habits & Routines, Sleep & Rest, Creativity & Hobbies, Spirituality & Beliefs, Technology & Social Media, Environment & Living Space, Time & Productivity, Travel & Movement, Loss & Grief, Purpose & Fulfillment, Conflict & Trauma, Celebration & Achievement
+
+**AVAILABLE EMOTIONS:**
+amusement, anger, anticipation, anxiety, awe, boredom, compassion, concern, confidence, confusion, contentment, curiosity, depression, disappointment, disgust, embarrassment, empathy, enthusiasm, envy, excitement, fear, frustration, gratitude, guilt, hate, hope, hurt, interest, jealousy, joy, loneliness, love, nostalgia, optimism, overwhelm, pessimism, pride, regret, relief, remorse, sadness, satisfaction, serenity, shame, surprise, trust`;
   }
 }
 
