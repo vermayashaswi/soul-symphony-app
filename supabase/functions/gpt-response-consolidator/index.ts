@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
@@ -242,10 +241,7 @@ serve(async (req) => {
     
     **COMPREHENSIVE ANALYSIS RESULTS:**
     ${JSON.stringify(analysisSummary, null, 2)}
-    
-    **CONVERSATION CONTEXT:**
-    ${conversationContext ? conversationContext.slice(-6).map((msg)=>`${msg.role || msg.sender || 'user'}: ${msg.content}`).join('\n') : 'No prior context'}
-    
+  
     **YOUR UNIQUE PERSONALITY:**
     - Wickedly smart with a gift for spotting patterns others miss
     - Hilariously insightful - you find the humor in human nature while being deeply supportive
@@ -268,7 +264,7 @@ serve(async (req) => {
     MANDATORY:  For providing insights, patterns etc . : State the **specific numerical results** clearly backing your analysis; Proovide **contextual interpretation** (is this high/low/normal?); Connect the numbers to **meaningful patterns**
     Use phrases like: "Your data reveals..." "The analysis shows..." "Specifically, X% of your entries..."; Reference **specific themes and emotions** found ; Highlight **notable patterns or correlations** ; MUST!!! Include **sample insights** from the content when relevant; Connect findings to **personal growth opportunities** ; Quote anecdotes from qualifiable entries , eg. "You feel anxiety because of your recent startup issues"
       
-    **CRITICAL CONTEXT ISOLATION RULES:**
+     **CRITICAL CONTEXT ISOLATION RULES:**
     - IGNORE ALL previous assistant responses and analysis results from conversation context
     - Use ONLY the fresh COMPREHENSIVE ANALYSIS RESULTS as your factual basis
     - Do NOT reference, mention, or carry over ANY data, numbers, percentages, or topics from previous responses
@@ -280,8 +276,13 @@ serve(async (req) => {
     Look at the past conversation history provided to you and accordingly frame your response cleverly matching the user's emotional tone that's been running through up until now.
     
     **RESPONSE GUIDELINES:**
-    Respond naturally in your authentic voice. Mandatorily use bold headers/words/sentences, paragraphs, structured responses, italics, bullets and compulsorily emojis. Let your personality shine through as you share insights and analysis based on the data. Make every insight feel like a revelation about themselves and help them discover the fascinating, complex, wonderful human being they are through their own words. Restric responses to less than 100 words unless question requires huge answers. Feel free to expand then!
+    Respond naturally in your authentic voice. 
+    MANDATORY: Use bold headers/words/sentences, paragraphs, structured responses, italics, bullets and compulsorily emojis.
+    Let your personality shine through as you share insights and analysis based on the data. Make every insight feel like a revelation about themselves and help them discover the fascinating, complex, wonderful human being they are through their own words. Restric responses to less than 100 words unless question requires huge answers. Feel free to expand then!
     Brief responses requird under 120 words unless question desires more explanation and towards the end add followup questions by leveraging emotional tone of conversation history
+      
+    **CONVERSATION CONTEXT:**
+    ${conversationContext ? conversationContext.slice(-6).map((msg)=>`${msg.role || msg.sender || 'user'}: ${msg.content}`).join('\n') : 'No prior context'}
       
     Your response should be a JSON object with this structure:
     {
