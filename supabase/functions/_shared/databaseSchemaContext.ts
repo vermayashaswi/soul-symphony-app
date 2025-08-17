@@ -514,18 +514,40 @@ ${emotions.map((emotion)=>`• "${emotion.name}": ${emotion.description}`).join(
 - For general emotion queries, use: emotions column with jsonb operators
 - Always include WHERE user_id = $user_id for security
 
-**SQL QUERY PATTERNS FOR THEME-EMOTION ANALYSIS:**
-1. Top emotions for a specific theme:
-   SELECT json_object_keys(themeemotion->'Family') AS emotion, 
-          AVG((themeemotion->'Family'->>json_object_keys(themeemotion->'Family'))::float) AS avg_score
-   FROM "Journal Entries" 
-   WHERE user_id = $user_id AND themeemotion ? 'Family'
-   GROUP BY emotion ORDER BY avg_score DESC LIMIT 3
+**SQL QUERY PATTERNS - CRITICAL CORRECT JSONB SYNTAX:**
 
-2. Entries with theme-emotion combinations:
-   SELECT id, created_at, themeemotion->'Family' as family_emotions
-   FROM "Journal Entries"
-   WHERE user_id = $user_id AND themeemotion ? 'Family'
+**EMOTION ANALYSIS (emotions JSONB column):**
+✅ CORRECT: SELECT emotion_key, AVG((emotion_value::text)::float) as avg_score, COUNT(*) as frequency 
+            FROM "Journal Entries", jsonb_each(emotions) as em(emotion_key, emotion_value) 
+            WHERE user_id = $user_id GROUP BY emotion_key ORDER BY avg_score DESC LIMIT 5;
+
+**THEME ANALYSIS (master_themes array column):**
+✅ CORRECT: SELECT theme, COUNT(*) as frequency FROM "Journal Entries", unnest(master_themes) as theme 
+            WHERE user_id = $user_id GROUP BY theme ORDER BY frequency DESC LIMIT 5;
+
+**THEME-EMOTION ANALYSIS (themeemotion JSONB column):**
+✅ CORRECT: SELECT theme_name, emotion_key, AVG((emotion_value::text)::float) as avg_score
+            FROM "Journal Entries", jsonb_each(themeemotion) as te(theme_name, theme_emotions),
+            jsonb_each(theme_emotions) as em(emotion_key, emotion_value)
+            WHERE user_id = $user_id AND theme_name = 'Family'
+            GROUP BY theme_name, emotion_key ORDER BY avg_score DESC LIMIT 5;
+
+**ENTITY ANALYSIS (entities JSONB column):**
+✅ CORRECT: SELECT entity_type, entity_name, COUNT(*) as frequency 
+            FROM "Journal Entries", jsonb_each(entities) as ent(entity_type, entity_values), 
+            jsonb_array_elements_text(entity_values) as entity_name 
+            WHERE user_id = $user_id GROUP BY entity_type, entity_name ORDER BY frequency DESC;
+
+**TIME-BASED EMOTION ANALYSIS:**
+✅ CORRECT: SELECT DATE_TRUNC('month', created_at) as month, emotion_key,
+            AVG((emotion_value::text)::float) as avg_score
+            FROM "Journal Entries", jsonb_each(emotions) as em(emotion_key, emotion_value)
+            WHERE user_id = $user_id GROUP BY month, emotion_key ORDER BY month, avg_score DESC;
+
+**ENTRIES WITH SPECIFIC THEME-EMOTION COMBINATIONS:**
+✅ CORRECT: SELECT id, created_at, "refined text" as content, te.theme_emotions
+            FROM "Journal Entries", jsonb_each(themeemotion) as te(theme_name, theme_emotions)
+            WHERE user_id = $user_id AND theme_name = 'Family';
 
 **SEARCH CAPABILITIES:**
 ${JOURNAL_ENTRY_SCHEMA.searchCapabilities.map((cap)=>`• ${cap}`).join('\n')}
