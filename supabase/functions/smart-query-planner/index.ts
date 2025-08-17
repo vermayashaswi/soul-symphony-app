@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
@@ -164,11 +165,13 @@ async function generateEmbedding(text: string): Promise<number[]> {
 }
 
 /**
- * Enhanced Analyst Agent - generates comprehensive analysis plans with mandatory vector search for content queries
+ * Enhanced Analyst Agent with timezone-aware date processing
  */
-async function analyzeQueryWithSubQuestions(message, conversationContext, userEntryCount, isFollowUp = false, supabaseClient) {
+async function analyzeQueryWithSubQuestions(message, conversationContext, userEntryCount, isFollowUp = false, supabaseClient, userTimezone = 'UTC') {
   try {
     const last = Array.isArray(conversationContext) ? conversationContext.slice(-5) : [];
+    
+    console.log(`[Analyst Agent] Processing query with user timezone: ${userTimezone}`);
     
     // Enhanced content-seeking detection with comprehensive patterns
     const contentSeekingPatterns = [
@@ -224,9 +227,18 @@ async function analyzeQueryWithSubQuestions(message, conversationContext, userEn
     // Get live database schema with real themes and emotions using the authenticated client
     const databaseSchemaContext = await generateDatabaseSchemaContext(supabaseClient);
 
-    const prompt = `You are SOULo's Enhanced Analyst Agent - an intelligent query planning specialist for journal data analysis with MANDATORY VECTOR SEARCH for content-seeking queries.
+    const prompt = `You are SOULo's Enhanced Analyst Agent - an intelligent query planning specialist for journal data analysis with MANDATORY VECTOR SEARCH for content-seeking queries and TIMEZONE-AWARE date processing.
 
 ${databaseSchemaContext}
+
+**CRITICAL TIMEZONE HANDLING RULES:**
+
+1. **USER TIMEZONE CONTEXT**: User timezone is "${userTimezone}"
+2. **DATABASE STORAGE**: All journal entries are stored in UTC in the database
+3. **TIMEZONE CONVERSION REQUIRED**: When generating date ranges, you MUST account for timezone conversion
+   - User asks about "August 6" in India timezone
+   - Database query needs UTC range that captures all entries made on August 6 India time
+   - Example: August 6 India time = August 5 18:30 UTC to August 6 18:29 UTC
 
 **CRITICAL VECTOR SEARCH RULES - MUST FOLLOW:**
 
@@ -253,15 +265,13 @@ ${databaseSchemaContext}
    - For emotional queries → Vector query: "emotions feelings mood emotional state [specific emotions mentioned]"
    - Preserve user's original language patterns for better semantic matching
 
-4. **CONTENT-SEEKING DETECTION** (These queries REQUIRE vector search):
-   - Direct content: "what did I write", "show me entries", "tell me about"
-   - Emotional: "how was I feeling", "emotional journey", "mood patterns"
-   - Comparative: "similar experiences", "like when I", "patterns in my"
-   - Thematic: "entries about work", "thoughts on relationships", "insights about"
-   - Exploratory: "analyze my", "explore themes", "understand patterns"
-   - Achievement: "progress I made", "accomplishments", "breakthroughs"
+4. **TIMEZONE-AWARE TIME RANGES**:
+   - All timeRange objects MUST include "timezone": "${userTimezone}"
+   - Date processing will handle conversion from user's local time to UTC for database queries
+   - Example timeRange: {"start": "2025-08-06T00:00:00", "end": "2025-08-06T23:59:59", "timezone": "${userTimezone}"}
 
 USER QUERY: "${message}"
+USER TIMEZONE: "${userTimezone}"
 CONTEXT: ${last.length > 0 ? last.map(m => `${m.sender}: ${m.content?.slice(0, 50) || 'N/A'}`).join(' | ') : 'None'}
 
 ANALYSIS REQUIREMENTS:
@@ -270,12 +280,14 @@ ANALYSIS REQUIREMENTS:
 - Has personal pronouns: ${hasPersonalPronouns}
 - Has time reference: ${hasExplicitTimeReference}
 - Is follow-up query: ${isFollowUpContext}
+- User timezone: ${userTimezone}
 
 Generate a comprehensive analysis plan that:
 1. MANDATES vector search for any content-seeking scenario
 2. Uses hybrid approach (SQL + vector) for time-based content queries
 3. Creates semantically rich vector search queries using user's language
-4. Ensures comprehensive coverage of user's intent
+4. INCLUDES proper timezone information in all timeRange objects
+5. Ensures comprehensive coverage of user's intent
 
 Response format:
 {
@@ -299,17 +311,18 @@ Response format:
             "threshold": 0.3,
             "limit": 15
           } or null,
-          "timeRange": {"start": "ISO_DATE", "end": "ISO_DATE"} or null
+          "timeRange": {"start": "ISO_DATE", "end": "ISO_DATE", "timezone": "${userTimezone}"} or null
         }
       ]
     }
   ],
   "confidence": 0.8,
-  "reasoning": "Explanation of strategy with emphasis on vector search usage",
+  "reasoning": "Explanation of strategy with emphasis on vector search usage and timezone handling",
   "useAllEntries": boolean,
   "hasPersonalPronouns": ${hasPersonalPronouns},
   "hasExplicitTimeReference": ${hasExplicitTimeReference},
-  "inferredTimeContext": null or timeframe_object
+  "inferredTimeContext": null or timeframe_object_with_timezone,
+  "userTimezone": "${userTimezone}"
 }`;
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -338,15 +351,15 @@ Response format:
       analysisResult = JSON.parse(data.choices[0].message.content);
     } catch (parseError) {
       console.error("Failed to parse Analyst Agent response:", parseError);
-      return createEnhancedFallbackPlan(message, isContentSeekingQuery || requiresMandatoryVector, null, supabaseClient);
+      return createEnhancedFallbackPlan(message, isContentSeekingQuery || requiresMandatoryVector, null, supabaseClient, userTimezone);
     }
 
     if (!analysisResult || !analysisResult.subQuestions) {
       console.error("Failed to parse Analyst Agent response, using enhanced fallback for content queries");
-      return createEnhancedFallbackPlan(message, isContentSeekingQuery || requiresMandatoryVector, null, supabaseClient);
+      return createEnhancedFallbackPlan(message, isContentSeekingQuery || requiresMandatoryVector, null, supabaseClient, userTimezone);
     }
 
-    // Force vector search for content-seeking queries
+    // Force vector search for content-seeking queries and ensure timezone info
     if (isContentSeekingQuery || requiresMandatoryVector) {
       analysisResult.subQuestions.forEach(subQ => {
         if (subQ.searchStrategy !== 'vector_mandatory' && subQ.searchStrategy !== 'hybrid_parallel') {
@@ -360,33 +373,38 @@ Response format:
               };
               step.queryType = step.queryType === 'sql_analysis' ? 'hybrid_search' : 'vector_search';
             }
+            // Ensure timezone is included in timeRange
+            if (step.timeRange && !step.timeRange.timezone) {
+              step.timeRange.timezone = userTimezone;
+            }
           });
         }
       });
     }
 
-    // Enhance with detected characteristics
+    // Enhance with detected characteristics and timezone
     const finalResult = {
       ...analysisResult,
       useAllEntries: analysisResult.useAllEntries !== false,
       hasPersonalPronouns,
       hasExplicitTimeReference: false, // Override to false to prevent time-only strategies
-      inferredTimeContext: null
+      inferredTimeContext: null,
+      userTimezone
     };
 
-    console.log("Final Analyst Plan:", JSON.stringify(finalResult, null, 2));
+    console.log("Final Analyst Plan with timezone handling:", JSON.stringify(finalResult, null, 2));
     return finalResult;
 
   } catch (error) {
     console.error("Error in Analyst Agent:", error);
-    return createEnhancedFallbackPlan(message, true, null, supabaseClient); // Default to content-seeking
+    return createEnhancedFallbackPlan(message, true, null, supabaseClient, userTimezone); // Default to content-seeking
   }
 }
 
 /**
- * Create enhanced fallback plan with mandatory vector search for content queries
+ * Create enhanced fallback plan with mandatory vector search and timezone handling
  */
-function createEnhancedFallbackPlan(originalMessage, isContentSeekingQuery, inferredTimeContext, supabaseClient) {
+function createEnhancedFallbackPlan(originalMessage, isContentSeekingQuery, inferredTimeContext, supabaseClient, userTimezone = 'UTC') {
   const lowerMessage = originalMessage.toLowerCase();
   const isEmotionQuery = /emotion|feel|mood|happy|sad|anxious|stressed|emotional/.test(lowerMessage);
   const isThemeQuery = /work|relationship|family|health|goal|travel|career|friendship/.test(lowerMessage);
@@ -405,6 +423,11 @@ function createEnhancedFallbackPlan(originalMessage, isContentSeekingQuery, infe
   }
   if (isAchievementQuery) {
     vectorQuery += " achievements success accomplishments progress breakthroughs";
+  }
+
+  // Ensure timezone is included in timeRange if provided
+  if (inferredTimeContext && !inferredTimeContext.timezone) {
+    inferredTimeContext.timezone = userTimezone;
   }
 
   return {
@@ -428,17 +451,18 @@ function createEnhancedFallbackPlan(originalMessage, isContentSeekingQuery, infe
               threshold: 0.3,
               limit: 15
             },
-            timeRange: inferredTimeContext
+            timeRange: inferredTimeContext ? { ...inferredTimeContext, timezone: userTimezone } : null
           }
         ]
       }
     ],
     confidence: 0.7,
-    reasoning: `Enhanced fallback plan using mandatory vector search for content-seeking query: "${originalMessage}". This ensures semantic understanding and comprehensive content retrieval.`,
+    reasoning: `Enhanced fallback plan using mandatory vector search for content-seeking query: "${originalMessage}". This ensures semantic understanding and comprehensive content retrieval with proper timezone handling.`,
     useAllEntries: true,
     hasPersonalPronouns: /\b(i|me|my|mine|myself)\b/i.test(lowerMessage),
     hasExplicitTimeReference: false, // Override to ensure vector search
-    inferredTimeContext: inferredTimeContext
+    inferredTimeContext: inferredTimeContext,
+    userTimezone
   };
 }
 
@@ -501,7 +525,7 @@ serve(async (req) => {
       }
     );
 
-    const { message, userId, execute = true, conversationContext = [], timeRange = null, threadId, messageId, isFollowUp = false } = await req.json();
+    const { message, userId, execute = true, conversationContext = [], timeRange = null, threadId, messageId, isFollowUp = false, userTimezone = 'UTC' } = await req.json();
 
     const requestId = `planner_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
     
@@ -514,7 +538,8 @@ serve(async (req) => {
   timeRange: ${JSON.stringify(timeRange)},
   threadId: "${threadId}",
   messageId: ${messageId},
-  isFollowUp: ${isFollowUp}
+  isFollowUp: ${isFollowUp},
+  userTimezone: "${userTimezone}"
 }`);
 
     // Get user's journal entry count for context
@@ -525,8 +550,8 @@ serve(async (req) => {
     
     const userEntryCount = countData || 0;
 
-    // Generate comprehensive analysis plan - now passing supabaseClient
-    const analysisResult = await analyzeQueryWithSubQuestions(message, conversationContext, userEntryCount, isFollowUp, supabaseClient);
+    // Generate comprehensive analysis plan with timezone support
+    const analysisResult = await analyzeQueryWithSubQuestions(message, conversationContext, userEntryCount, isFollowUp, supabaseClient, userTimezone);
 
     if (!execute) {
       // Return just the plan without execution
@@ -568,10 +593,12 @@ serve(async (req) => {
               query: "personal journal experiences thoughts feelings",
               threshold: 0.3,
               limit: 10
-            }
+            },
+            timeRange: null
           }]
         }],
-        useAllEntries: true
+        useAllEntries: true,
+        userTimezone: 'UTC'
       }
     }), {
       status: 500,
