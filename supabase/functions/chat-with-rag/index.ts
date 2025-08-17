@@ -2,13 +2,101 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
-import { processTimeRange } from '../chat-rag/utils/dateProcessor.ts';
-import { detectTimeframeInQuery } from '../chat-rag/utils/queryClassifier.ts';
+
+// Import date-fns functions directly since we can't import from other edge function files
+import { format, parseISO, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfDay, endOfDay } from 'https://esm.sh/date-fns@4.1.0';
+import { toZonedTime } from 'https://esm.sh/date-fns-tz@3.2.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Copy the essential functions from dateProcessor.ts directly into this file
+function detectTimeframeInQuery(message: string, userTimezone: string = 'UTC'): any {
+  const lowerMessage = message.toLowerCase();
+  
+  // Simple timeframe detection logic
+  if (lowerMessage.includes('this week') || lowerMessage.includes('current week')) {
+    return { type: 'week' };
+  } else if (lowerMessage.includes('last week') || lowerMessage.includes('previous week')) {
+    return { type: 'lastWeek' };
+  } else if (lowerMessage.includes('this month') || lowerMessage.includes('current month')) {
+    return { type: 'month' };
+  } else if (lowerMessage.includes('last month') || lowerMessage.includes('previous month')) {
+    return { type: 'lastMonth' };
+  }
+  
+  // Check for specific month names
+  const months = ['january', 'february', 'march', 'april', 'may', 'june', 
+                  'july', 'august', 'september', 'october', 'november', 'december'];
+  
+  for (const month of months) {
+    if (lowerMessage.includes(month)) {
+      return { type: 'specificMonth', monthName: month };
+    }
+  }
+  
+  return null;
+}
+
+function processTimeRange(timeRange: any, userTimezone: string = 'UTC'): { startDate?: string; endDate?: string } {
+  if (!timeRange) return {};
+  
+  console.log("Processing time range:", timeRange);
+  console.log(`Using user timezone: ${userTimezone}`);
+  
+  const result: { startDate?: string; endDate?: string } = {};
+  
+  try {
+    // Calculate current date in user's timezone
+    const now = userTimezone ? toZonedTime(new Date(), userTimezone) : new Date();
+    console.log(`Current date in timezone ${userTimezone}: ${now.toISOString()}`);
+    
+    // Handle special time range cases
+    if (timeRange.type === 'week') {
+      const weekStart = startOfWeek(now, { weekStartsOn: 1 });
+      const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
+      
+      result.startDate = weekStart.toISOString();
+      result.endDate = weekEnd.toISOString();
+      
+      console.log(`Generated 'this week' date range: ${result.startDate} to ${result.endDate}`);
+    } else if (timeRange.type === 'lastWeek') {
+      const thisWeekMonday = startOfWeek(now, { weekStartsOn: 1 });
+      const lastWeekMonday = subDays(thisWeekMonday, 7);
+      const lastWeekSunday = subDays(thisWeekMonday, 1);
+      
+      result.startDate = lastWeekMonday.toISOString();
+      result.endDate = lastWeekSunday.toISOString();
+      
+      console.log(`Generated 'last week' date range: ${result.startDate} to ${result.endDate}`);
+    } else if (timeRange.type === 'month') {
+      const monthStart = startOfMonth(now);
+      const monthEnd = endOfMonth(now);
+      
+      result.startDate = monthStart.toISOString();
+      result.endDate = monthEnd.toISOString();
+      
+      console.log(`Generated 'this month' date range: ${result.startDate} to ${result.endDate}`);
+    } else if (timeRange.type === 'lastMonth') {
+      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const lastMonthStart = startOfMonth(lastMonth);
+      const lastMonthEnd = endOfMonth(lastMonth);
+      
+      result.startDate = lastMonthStart.toISOString();
+      result.endDate = lastMonthEnd.toISOString();
+      
+      console.log(`Generated 'last month' date range: ${result.startDate} to ${result.endDate}`);
+    }
+    
+    console.log("Final processed time range:", result);
+    return result;
+  } catch (error) {
+    console.error("Error processing time range:", error);
+    return {};
+  }
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
