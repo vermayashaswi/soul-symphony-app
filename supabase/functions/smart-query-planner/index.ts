@@ -780,8 +780,6 @@ WHERE user_id = $user_id
 GROUP BY emotion_key 
 ORDER BY avg_score DESC LIMIT 5;
 \`\`\`
-ORDER BY avg_score DESC LIMIT 5;
-```
 
 **QUERY VALIDATION CHECKLIST - VERIFY EACH SQL QUERY:**
 - Does it use jsonb_each() instead of json_object_keys()?
