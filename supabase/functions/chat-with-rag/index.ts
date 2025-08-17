@@ -85,16 +85,15 @@ serve(async (req) => {
       
       console.log(`[chat-with-rag] GPT query plan:`, queryPlan);
 
-      // Generate response using GPT's plan and results
-      const responseGeneration = await supabaseClient.functions.invoke('intelligent-response-generator', {
+      // Generate response using GPT's plan and results via consolidator
+      const responseGeneration = await supabaseClient.functions.invoke('gpt-response-consolidator', {
         body: {
-          originalQuery: message,
-          queryPlan: queryPlan,
-          searchResults: executionResult || [],
-          combinedResults: executionResult || [],
+          userMessage: message,
+          researchResults: executionResult || [],
           conversationContext: conversationContext,
           userProfile: userProfile,
-          userTimezone: userTimezone
+          threadId: threadId,
+          messageId: messageId
         }
       });
 
