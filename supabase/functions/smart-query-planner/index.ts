@@ -811,33 +811,8 @@ Return ONLY valid JSON with this exact structure:
 - Stages execute in ascending order: stage 1 first, then 2, then 3, etc.
 - Keep stages contiguous (1..N) without gaps
 
-**SQL QUERY GUIDELINES - CRITICAL JSONB PATTERNS:**
-- ALWAYS include WHERE user_id = $user_id
-- Use proper column names with quotes for spaced names like "refined text"
-
-**EMOTION ANALYSIS (emotions JSONB column):**
-✅ CORRECT: SELECT emotion_key, AVG((emotion_value::text)::float) as avg_score, COUNT(*) as frequency 
-            FROM "Journal Entries", jsonb_each(emotions) as em(emotion_key, emotion_value) 
-            WHERE user_id = $user_id GROUP BY emotion_key ORDER BY avg_score DESC LIMIT 5;
-❌ NEVER: SELECT jsonb_object_keys(emotions) AS emotion, AVG((emotions->>jsonb_object_keys(emotions))::float) 
-         (set-returning functions in aggregates cause SQL errors)
-
-**THEME ANALYSIS (master_themes array column):**
-✅ CORRECT: SELECT theme, COUNT(*) as frequency FROM "Journal Entries", unnest(master_themes) as theme 
-            WHERE user_id = $user_id GROUP BY theme ORDER BY frequency DESC LIMIT 5;
-
-**ENTITY ANALYSIS (entities JSONB column):**
-✅ CORRECT: SELECT entity_type, entity_name, COUNT(*) as frequency 
-            FROM "Journal Entries", jsonb_each(entities) as ent(entity_type, entity_values), 
-            jsonb_array_elements_text(entity_values) as entity_name 
-            WHERE user_id = $user_id GROUP BY entity_type, entity_name ORDER BY frequency DESC;
-
-**TIME-BASED EMOTION ANALYSIS (themeemotion JSONB column):**
-✅ CORRECT: SELECT DATE_TRUNC('month', created_at) as month, 
-            AVG((theme_emotions->'anxiety'->>'value')::float) as avg_anxiety
-            FROM "Journal Entries", jsonb_each(themeemotion) as te(theme_name, theme_emotions) 
-            WHERE user_id = $user_id AND theme_name = 'Mental Health' GROUP BY month;
-
+**GENERAL ANALYSIS GUIDELINES:**
+- Use proper column names with quotes for spaced names when needed
 - For percentages: alias as percentage
 - For counts: alias as count (or frequency for grouped counts)  
 - For averages/scores: alias as avg_score (or score)
