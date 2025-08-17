@@ -100,20 +100,53 @@ serve(async (req) => {
       console.log(`[chat-with-rag] GPT query plan:`, JSON.stringify(queryPlan, null, 2));
       console.log(`[chat-with-rag] Execution result:`, JSON.stringify(executionResult, null, 2));
 
-      // Transform execution results into expected consolidator format
-      const transformedResults = (executionResult || []).map((result, index) => ({
-        subQuestion: {
-          question: result.question,
-          searchStrategy: 'hybrid' // Default fallback
-        },
-        executionResults: {
-          sqlResults: result.results?.flatMap(r => r.result?.data || []) || [],
-          sqlRowCount: result.results?.reduce((sum, r) => sum + (r.result?.rowCount || 0), 0) || 0,
-          vectorResults: result.results?.flatMap(r => Array.isArray(r.result) ? r.result : []) || [],
-          error: result.results?.find(r => r.error)?.error || null,
-          sqlError: result.results?.find(r => r.result?.error)?.result?.error || null
+      // Transform execution results into expected consolidator format for new query plan structure
+      const transformedResults = (executionResult || []).map((result, index) => {
+        // Handle new execution stage structure
+        const sqlResults = [];
+        const vectorResults = [];
+        let totalSqlRows = 0;
+        let hasError = false;
+        let errorMessage = null;
+        
+        if (result.results && Array.isArray(result.results)) {
+          for (const stepResult of result.results) {
+            if (stepResult.result) {
+              if (stepResult.queryType === 'vector_search' && Array.isArray(stepResult.result.data)) {
+                vectorResults.push(...stepResult.result.data);
+              } else if ((stepResult.queryType === 'sql_analysis' || stepResult.queryType === 'sql_count' || stepResult.queryType === 'sql_calculation') && Array.isArray(stepResult.result.data)) {
+                sqlResults.push(...stepResult.result.data);
+                totalSqlRows += stepResult.result.rowCount || 0;
+              } else if (stepResult.queryType === 'hybrid_search' && Array.isArray(stepResult.result.data)) {
+                // For hybrid search, add to both
+                vectorResults.push(...stepResult.result.data);
+                sqlResults.push(...stepResult.result.data);
+              }
+              
+              if (stepResult.result.hasError || stepResult.result.error) {
+                hasError = true;
+                errorMessage = stepResult.result.error || stepResult.error;
+              }
+            }
+          }
         }
-      }));
+        
+        return {
+          subQuestion: {
+            question: result.question,
+            searchStrategy: 'hybrid', // Default fallback
+            executionStage: result.executionStage || 1
+          },
+          executionResults: {
+            sqlResults: sqlResults,
+            sqlRowCount: totalSqlRows,
+            vectorResults: vectorResults,
+            error: errorMessage,
+            sqlError: hasError ? errorMessage : null,
+            hasError: hasError
+          }
+        };
+      });
 
       console.log(`[chat-with-rag] Transformed ${transformedResults.length} results for consolidator:`, 
         transformedResults.map(r => ({

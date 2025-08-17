@@ -13,16 +13,35 @@ const corsHeaders = {
 };
 
 interface QueryPlan {
+  queryType: string;
   strategy: string;
-  searchMethods: string[];
-  filters: any;
-  emotionFocus?: string;
-  timeRange?: any;
-  subQueries?: string[];
-  expectedResponseType: string;
+  userStatusMessage: string;
+  subQuestions: Array<{
+    question: string;
+    purpose: string;
+    searchStrategy: string;
+    executionStage: number;
+    analysisSteps: Array<{
+      step: number;
+      description: string;
+      queryType: string;
+      sqlQuery?: string;
+      vectorSearch?: {
+        query: string;
+        threshold: number;
+        limit: number;
+      };
+      timeRange?: {
+        start?: string;
+        end?: string;
+      };
+    }>;
+  }>;
   confidence: number;
   reasoning: string;
-  databaseContext: string;
+  useAllEntries: boolean;
+  hasPersonalPronouns: boolean;
+  hasExplicitTimeReference: boolean;
 }
 
 // Enhanced vector search debugging function
@@ -329,89 +348,112 @@ async function executePlan(plan: any, userId: string, supabaseClient: any, reque
 
   const results = [];
 
+  // Group sub-questions by execution stage
+  const subQuestionsByStage = new Map();
   for (const subQuestion of plan.subQuestions) {
-    console.log(`[${requestId}] Executing sub-question:`, subQuestion.question);
-
-    let subResults = [];
-    for (const step of subQuestion.analysisSteps) {
-      console.log(`[${requestId}] Executing analysis step:`, step.step, step.description);
-
-      try {
-        let stepResult;
-        if (step.queryType === 'vector_search') {
-          console.log(`[${requestId}] Vector search:`, step.vectorSearch.query);
-          stepResult = await executeVectorSearchWithDebug(step, userId, supabaseClient, requestId);
-          
-          // Standardize vector search result format
-          if (Array.isArray(stepResult)) {
-            stepResult = {
-              success: true,
-              data: stepResult,
-              vectorResultCount: stepResult.length,
-              sqlResultCount: 0,
-              hasError: false
-            };
-          }
-        } else if (step.queryType === 'sql_analysis' || step.queryType === 'sql_count' || step.queryType === 'sql_calculation') {
-          console.log(`[${requestId}] SQL analysis (${step.queryType}):`, step.sqlQuery);
-          stepResult = await executeSQLAnalysis(step, userId, supabaseClient, requestId);
-          
-          // Enhance SQL result format for consolidator
-          stepResult = {
-            ...stepResult,
-            vectorResultCount: 0,
-            sqlResultCount: stepResult.rowCount || 0,
-            hasError: !stepResult.success || !!stepResult.error
-          };
-        } else if (step.queryType === 'hybrid_search') {
-          console.log(`[${requestId}] Hybrid search:`, step.vectorSearch.query, step.sqlQuery);
-          stepResult = await executeHybridSearch(step, userId, supabaseClient, requestId);
-          
-          // Format hybrid results properly
-          if (Array.isArray(stepResult)) {
-            stepResult = {
-              success: true,
-              data: stepResult,
-              vectorResultCount: stepResult.length,
-              sqlResultCount: stepResult.length,
-              hasError: false
-            };
-          }
-        } else {
-          console.error(`[${requestId}] Unknown query type:`, step.queryType);
-          stepResult = { 
-            success: false,
-            error: `Unknown query type: ${step.queryType}`,
-            vectorResultCount: 0,
-            sqlResultCount: 0,
-            hasError: true
-          };
-        }
-
-        subResults.push({ 
-          step: step.step, 
-          result: stepResult,
-          queryType: step.queryType,
-          description: step.description
-        });
-
-      } catch (stepError) {
-        console.error(`[${requestId}] Error executing step:`, step.step, stepError);
-        subResults.push({ 
-          step: step.step, 
-          error: stepError.message,
-          result: {
-            success: false,
-            error: stepError.message,
-            vectorResultCount: 0,
-            sqlResultCount: 0,
-            hasError: true
-          }
-        });
-      }
+    const stage = subQuestion.executionStage || 1;
+    if (!subQuestionsByStage.has(stage)) {
+      subQuestionsByStage.set(stage, []);
     }
+    subQuestionsByStage.get(stage).push(subQuestion);
+  }
 
-    results.push({ question: subQuestion.question, results: subResults });
+  // Execute stages in order (1, 2, 3, etc.)
+  const stages = Array.from(subQuestionsByStage.keys()).sort((a, b) => a - b);
+  
+  for (const stage of stages) {
+    const stageQuestions = subQuestionsByStage.get(stage);
+    console.log(`[${requestId}] Executing stage ${stage} with ${stageQuestions.length} sub-questions`);
+
+    // Execute all sub-questions in this stage in parallel
+    const stagePromises = stageQuestions.map(async (subQuestion) => {
+      console.log(`[${requestId}] Executing sub-question:`, subQuestion.question);
+
+      let subResults = [];
+      for (const step of subQuestion.analysisSteps) {
+        console.log(`[${requestId}] Executing analysis step:`, step.step, step.description);
+
+        try {
+          let stepResult;
+          if (step.queryType === 'vector_search') {
+            console.log(`[${requestId}] Vector search:`, step.vectorSearch.query);
+            stepResult = await executeVectorSearchWithDebug(step, userId, supabaseClient, requestId);
+            
+            // Standardize vector search result format
+            if (Array.isArray(stepResult)) {
+              stepResult = {
+                success: true,
+                data: stepResult,
+                vectorResultCount: stepResult.length,
+                sqlResultCount: 0,
+                hasError: false
+              };
+            }
+          } else if (step.queryType === 'sql_analysis' || step.queryType === 'sql_count' || step.queryType === 'sql_calculation') {
+            console.log(`[${requestId}] SQL analysis (${step.queryType}):`, step.sqlQuery);
+            stepResult = await executeSQLAnalysis(step, userId, supabaseClient, requestId);
+            
+            // Enhance SQL result format for consolidator
+            stepResult = {
+              ...stepResult,
+              vectorResultCount: 0,
+              sqlResultCount: stepResult.rowCount || 0,
+              hasError: !stepResult.success || !!stepResult.error
+            };
+          } else if (step.queryType === 'hybrid_search') {
+            console.log(`[${requestId}] Hybrid search:`, step.vectorSearch.query, step.sqlQuery);
+            stepResult = await executeHybridSearch(step, userId, supabaseClient, requestId);
+            
+            // Format hybrid results properly
+            if (Array.isArray(stepResult)) {
+              stepResult = {
+                success: true,
+                data: stepResult,
+                vectorResultCount: stepResult.length,
+                sqlResultCount: stepResult.length,
+                hasError: false
+              };
+            }
+          } else {
+            console.error(`[${requestId}] Unknown query type:`, step.queryType);
+            stepResult = { 
+              success: false,
+              error: `Unknown query type: ${step.queryType}`,
+              vectorResultCount: 0,
+              sqlResultCount: 0,
+              hasError: true
+            };
+          }
+
+          subResults.push({ 
+            step: step.step, 
+            result: stepResult,
+            queryType: step.queryType,
+            description: step.description
+          });
+
+        } catch (stepError) {
+          console.error(`[${requestId}] Error executing step:`, step.step, stepError);
+          subResults.push({ 
+            step: step.step, 
+            error: stepError.message,
+            result: {
+              success: false,
+              error: stepError.message,
+              vectorResultCount: 0,
+              sqlResultCount: 0,
+              hasError: true
+            }
+          });
+        }
+      }
+
+      return { question: subQuestion.question, results: subResults, executionStage: stage };
+    });
+
+    // Wait for all sub-questions in this stage to complete
+    const stageResults = await Promise.all(stagePromises);
+    results.push(...stageResults);
   }
 
   console.log(`[${requestId}] Execution complete. Results:`, JSON.stringify(results, null, 2));
@@ -624,12 +666,19 @@ ${databaseSchemaContext}
 4. Dynamic Query Generation: produce executable SQL for our schema and/or vector queries
 5. Hybrid Analysis: combine SQL stats with semantic vector results when helpful
 
-**ANALYSIS APPROACH:**
-   - Simple greetings or acknowledgments: Create conversational plans without complex analysis
-   - Journal-specific queries: Determine if SQL, vector search, or hybrid approach is needed based on the actual query
-   - Let the content and intent of the query guide the analysis strategy
-   - Only create complex analysis plans when the user explicitly asks for journal analysis
-   - **MANDATORY**: If no specific time range is mentioned in the query, ALWAYS consider ALL time range - this means include ALL journal entries across ALL time periods to provide comprehensive analysis
+**MANDATORY VECTOR SEARCH SCENARIOS** (Always include vector search regardless of time constraints):
+   - ANY query asking for "content", "what I wrote", "what I said", "entries about", "show me", "find"
+   - Questions seeking emotional context, feelings, moods, or mental states
+   - Requests for examples, patterns, insights, or thematic analysis  
+   - Queries about achievements, progress, breakthroughs, or personal growth
+   - Comparative analysis ("similar to", "like when", "reminds me of")
+   - Reflective queries ("how was I feeling", "what was going through my mind")
+   - Follow-up questions referencing previous context
+   - Use the user's EXACT words and emotional context in vector searches
+   - For "What did I journal in August" → Vector query: "journal entries personal thoughts feelings experiences august"
+   - For achievement queries → Vector query: "achievement success accomplishment progress breakthrough proud"
+   - For emotional queries → Vector query: "emotions feelings mood emotional state [specific emotions mentioned]"
+   - Preserve user's original language patterns for better semantic matching
 
 
 
@@ -651,11 +700,11 @@ Return ONLY valid JSON with this exact structure:
           "description": "Clear description of what this step accomplishes",
           "queryType": "sql_analysis" | "vector_search" | "sql_count" | "sql_calculation",
           "sqlQuery": "SELECT ... FROM \\"Journal Entries\\" WHERE user_id = $user_id AND ..." | null,
-           "vectorSearch": {
-             "query": "optimized search query",
-             "threshold": 0.3,
-             "limit": 10
-           } | null,
+          "vectorSearch": {
+            "query": "optimized search query",
+            "threshold": 0.7,
+            "limit": 10
+          } | null,
           "timeRange": { "start": "ISO string or null", "end": "ISO string or null" } | null
         }
       ]
@@ -674,23 +723,16 @@ Return ONLY valid JSON with this exact structure:
 - Stages execute in ascending order: stage 1 first, then 2, then 3, etc.
 - Keep stages contiguous (1..N) without gaps
 
-**SQL QUERY GUIDELINES (CRITICAL - READ CAREFULLY):**
+**SQL QUERY GUIDELINES:**
 - ALWAYS include WHERE user_id = $user_id
 - Use proper column names with quotes for spaced names like "refined text"
-- For emotion analysis: EMOTIONS is JSONB - use jsonb_each(emotions) to extract key-value pairs
-  * CORRECT: SELECT emotion_key, AVG((emotion_value::text)::numeric) FROM "Journal Entries", jsonb_each(emotions) as e(emotion_key, emotion_value) WHERE user_id = $user_id GROUP BY emotion_key
-  * WRONG: SELECT jsonb_array_elements_text(emotions) - emotions is NOT an array!
-- For theme analysis: master_themes is TEXT ARRAY - use unnest(master_themes) or ANY(master_themes)
-  * CORRECT: SELECT theme, COUNT(*) FROM "Journal Entries", unnest(master_themes) as theme WHERE user_id = $user_id GROUP BY theme
-- For entities analysis: entities is JSONB with structure like {"person": ["John", "Mary"], "place": ["Paris"]}
-  * CORRECT: SELECT entity_type, entity_value FROM "Journal Entries", jsonb_each(entities) as et(entity_type, entity_values), jsonb_array_elements_text(entity_values) as entity_value WHERE user_id = $user_id
-- For sentiment: sentiment is REAL (numeric) not text
+- For emotion analysis: use emotions JSONB
+- For theme analysis: use master_themes array and/or entities/text where appropriate (no hardcoded expansions)
 - For percentages: alias as percentage
-- For counts: alias as count (or frequency for grouped counts)  
+- For counts: alias as count (or frequency for grouped counts)
 - For averages/scores: alias as avg_score (or score)
 - For date filtering: apply created_at comparisons when time is implied or stated
 - Do NOT call RPCs; generate plain SQL only
-- NEVER use placeholder comments like /*IDs from vector search step*/ - generate actual executable SQL
 
 **SEARCH STRATEGY SELECTION:**
 - sql_primary: statistical analysis, counts, percentages
@@ -710,7 +752,7 @@ Focus on creating comprehensive, executable analysis plans that will provide mea
       body: JSON.stringify({
         model: 'gpt-4.1-2025-04-14',
         messages: [{ role: 'user', content: prompt }],
-        max_tokens: 2000,
+        max_completion_tokens: 2000,
         temperature: 0.1
       }),
     });
