@@ -632,17 +632,21 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
         };
         
       } else {
-        // CONVERSATIONAL - use smart-chat for general conversation
-        debugLog.addEvent("Routing", "Using smart-chat for conversational query", "info");
+        // CONVERSATIONAL - use chat-with-rag for all queries
+        debugLog.addEvent("Routing", "Using chat-with-rag for query", "info");
         
-        const { data, error } = await supabase.functions.invoke('smart-chat', {
+        const { data, error } = await supabase.functions.invoke('chat-with-rag', {
           body: {
             message,
-            conversationContext
+            userId: effectiveUserId,
+            threadId: threadId,
+            messageId: null,
+            conversationContext: conversationContext,
+            userProfile: null
           }
         });
         
-        debugLog.addEvent("Edge Function Response", `Smart-chat response: ${JSON.stringify({
+        debugLog.addEvent("Edge Function Response", `Chat-with-rag response: ${JSON.stringify({
           hasData: !!data,
           hasError: !!error,
           errorMessage: error?.message,
@@ -651,13 +655,13 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
         })}`, data ? "success" : "error");
         
         if (error) {
-          throw new Error(`Smart chat error: ${error.message}`);
+          throw new Error(`Chat-with-rag error: ${error.message}`);
         }
         
         const text = data?.response ?? data?.data ?? data?.message ?? (typeof data === 'string' ? data : null);
         if (!text) {
-          debugLog.addEvent("Edge Function Response", "Smart-chat returned no usable response payload", "error");
-          throw new Error("No response received from smart-chat function");
+          debugLog.addEvent("Edge Function Response", "Chat-with-rag returned no usable response payload", "error");
+          throw new Error("No response received from chat-with-rag function");
         }
         
         response = {

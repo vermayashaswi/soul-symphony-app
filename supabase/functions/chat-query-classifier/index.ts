@@ -68,14 +68,7 @@ async function gptClassifyMessage(
   apiKey
 ) {
   
-  // Short-circuit acknowledgements to avoid unnecessary analysis
-  const trimmed = (message || '').trim();
-  const ackRegex = /^(ok(?:ay)?|k|kk|thanks|thank you|thx|cool|got it|sounds good|roger|understood|yep|yup|sure|👌|👍)[.!]?$/i;
-  if (ackRegex.test(trimmed)) {
-    return {
-      category: 'GENERAL_MENTAL_HEALTH'
-    };
-  }
+  // Let GPT decide everything - no hardcoded patterns
 
   const contextString = conversationContext.length > 0 
     ? `\nConversation context: ${conversationContext.slice(-6).map(msg => `${(msg.role || msg.sender || 'user')}: ${msg.content}`).join('\n')}`

@@ -204,11 +204,11 @@ export default function MobileChatInput({
           data-testid="mobile-chat-input"
         />
         
-        {/* Voice Recorder Overlay - positioned absolutely within input */}
+        {/* Voice Recorder - positioned to only overlay when recording */}
         <VoiceChatRecorder
           onTranscriptionComplete={handleVoiceTranscription}
           isDisabled={isSubmitting || isLoading}
-          className="absolute inset-0"
+          className="absolute inset-0 pointer-events-none [&>*]:pointer-events-auto"
         />
       </div>
       

@@ -102,6 +102,26 @@ function generateIntelligentSystemPrompt(
   userProfile: any
 ): string {
   const currentDate = new Date().toISOString();
+  
+  // Handle conversational responses differently
+  if (queryPlan.strategy === 'conversational') {
+    return `You are Ruh by SOuLO, a warm and engaging wellness companion. 
+
+You're having a natural conversation with someone who uses a journaling app. Keep things simple, warm, and conversational.
+
+For greetings, acknowledgments, and general questions:
+- Respond naturally and warmly
+- Keep it brief (1-2 sentences)
+- Ask a gentle follow-up question about their wellbeing
+- Use emojis for warmth 😊
+
+Current date: ${currentDate}
+Timezone: ${userProfile.timezone || 'UTC'}
+
+Be genuinely helpful, warm, and conversational. No need for complex analysis - just be a friendly wellness companion.`;
+  }
+  
+  // Complex analysis system prompt for journal-specific queries
   const databaseContext = generateDatabaseSchemaContext();
   const emotionGuidelines = getEmotionAnalysisGuidelines();
   const themeGuidelines = getThemeAnalysisGuidelines();
