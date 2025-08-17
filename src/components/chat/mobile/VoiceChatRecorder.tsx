@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Mic, ArrowUp, X, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -250,15 +249,15 @@ export function VoiceChatRecorder({
   const isError = recordingState === 'error';
 
   return (
-    <div className={cn("relative w-full h-full", className)}>
-      {/* Recording Overlay - Replaces the entire input */}
+    <div className={cn("relative", className)}>
+      {/* Recording Overlay - Covers the entire input area when recording */}
       <AnimatePresence>
         {isRecording && (
           <motion.div
             initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.98 }}
-            className="absolute inset-0 bg-background border border-input rounded-md flex items-center px-3 z-20"
+            className="fixed inset-x-3 top-1/2 transform -translate-y-1/2 bg-background border border-input rounded-md flex items-center px-3 z-50 h-10"
           >
             {/* Cancel Button (X) */}
             <Button
@@ -295,7 +294,7 @@ export function VoiceChatRecorder({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 bg-background border border-input rounded-md flex items-center justify-center z-20"
+            className="fixed inset-x-3 top-1/2 transform -translate-y-1/2 bg-background border border-input rounded-md flex items-center justify-center z-50 h-10"
           >
             <div className="flex items-center space-x-2 text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -313,7 +312,7 @@ export function VoiceChatRecorder({
           size="sm"
           onClick={handleStartRecording}
           disabled={isDisabled}
-          className="absolute right-2 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0 text-muted-foreground hover:text-foreground z-10"
+          className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
         >
           <Mic className="h-4 w-4" />
         </Button>
