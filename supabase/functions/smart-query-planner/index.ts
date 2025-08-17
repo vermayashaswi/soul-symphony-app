@@ -784,11 +784,11 @@ ORDER BY avg_score DESC LIMIT 5;
 ```
 
 **QUERY VALIDATION CHECKLIST - VERIFY EACH SQL QUERY:**
-□ Does it use jsonb_each() instead of json_object_keys()?
-□ Are JSONB values cast properly with (value::text)::float?
-□ Is user_id = $user_id included for security?
-□ Does the query follow the exact patterns from databaseSchemaContext?
-□ No json_object_keys() in SELECT, GROUP BY, or aggregate functions?
+- Does it use jsonb_each() instead of json_object_keys()?
+- Are JSONB values cast properly with (value::text)::float?
+- Is user_id = $user_id included for security?
+- Does the query follow the exact patterns from databaseSchemaContext?
+- No json_object_keys() in SELECT, GROUP BY, or aggregate functions?
 
 **YOUR RESPONSIBILITIES AS ANALYST AGENT:**
 1. Smart Hypothesis Formation: infer what the user truly wants to know, then deduce focused sub-questions to answer it comprehensively
