@@ -26,6 +26,90 @@ interface QueryPlan {
   databaseContext: string;
 }
 
+function isValidUUID(uuid: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(uuid);
+}
+
+function sanitizeUserIdInQuery(query: string, userId: string, requestId: string): string {
+  if (!isValidUUID(userId)) {
+    console.error(`[${requestId}] Invalid UUID format for userId: ${userId}`);
+    throw new Error('Invalid user ID format');
+  }
+
+  console.log(`[${requestId}] Sanitizing SQL query with userId: ${userId}`);
+  
+  // Replace auth.uid() with properly quoted UUID
+  let sanitizedQuery = query.replace(/auth\.uid\(\)/g, `'${userId}'`);
+  
+  // Also handle any direct user_id references that might need quotes
+  sanitizedQuery = sanitizedQuery.replace(/user_id\s*=\s*([a-f0-9-]{36})/gi, `user_id = '${userId}'`);
+  
+  console.log(`[${requestId}] Original query: ${query}`);
+  console.log(`[${requestId}] Sanitized query: ${sanitizedQuery}`);
+  
+  return sanitizedQuery;
+}
+
+function validateSQLQuery(query: string, requestId: string): { isValid: boolean; error?: string } {
+  try {
+    const upperQuery = query.toUpperCase().trim();
+    
+    console.log(`[${requestId}] Validating SQL query: ${query.substring(0, 100)}...`);
+    
+    // Check for dangerous operations
+    const dangerousKeywords = ['DROP', 'DELETE FROM', 'INSERT INTO', 'UPDATE SET', 'CREATE', 'ALTER', 'TRUNCATE'];
+    for (const keyword of dangerousKeywords) {
+      if (upperQuery.includes(keyword)) {
+        const error = `Dangerous SQL keyword detected: ${keyword}`;
+        console.error(`[${requestId}] ${error}`);
+        return { isValid: false, error };
+      }
+    }
+    
+    // Ensure it's a SELECT query
+    if (!upperQuery.startsWith('SELECT')) {
+      const error = 'Only SELECT queries are allowed';
+      console.error(`[${requestId}] ${error}`);
+      return { isValid: false, error };
+    }
+    
+    // More flexible table reference check - allow various forms
+    const hasJournalReference = upperQuery.includes('JOURNAL ENTRIES') || 
+                               upperQuery.includes('"JOURNAL ENTRIES"') ||
+                               upperQuery.includes('`JOURNAL ENTRIES`') ||
+                               upperQuery.includes('ENTRIES');
+    
+    if (!hasJournalReference) {
+      const error = 'Query must reference Journal Entries table';
+      console.error(`[${requestId}] ${error}`);
+      return { isValid: false, error };
+    }
+    
+    // Check for basic SQL injection patterns
+    const injectionPatterns = [
+      /;\s*(DROP|DELETE|INSERT|UPDATE|CREATE|ALTER)/i,
+      /UNION\s+SELECT/i,
+      /--\s*$/m,
+      /\/\*.*\*\//s
+    ];
+    
+    for (const pattern of injectionPatterns) {
+      if (pattern.test(query)) {
+        const error = 'Potential SQL injection pattern detected';
+        console.error(`[${requestId}] ${error}`);
+        return { isValid: false, error };
+      }
+    }
+    
+    console.log(`[${requestId}] SQL query validation passed`);
+    return { isValid: true };
+  } catch (error) {
+    console.error(`[${requestId}] SQL validation error:`, error);
+    return { isValid: false, error: `Validation error: ${error.message}` };
+  }
+}
+
 async function executePlan(plan: any, userId: string, supabaseClient: any, requestId: string) {
   console.log(`[${requestId}] Executing plan:`, JSON.stringify(plan, null, 2));
 
@@ -40,7 +124,14 @@ async function executePlan(plan: any, userId: string, supabaseClient: any, reque
       executionResults: {
         sqlResults: [],
         vectorResults: [],
-        error: null
+        error: null,
+        sqlExecutionDetails: {
+          originalQuery: null,
+          sanitizedQuery: null,
+          validationResult: null,
+          executionError: null,
+          fallbackUsed: false
+        }
       }
     };
 
@@ -54,11 +145,11 @@ async function executePlan(plan: any, userId: string, supabaseClient: any, reque
           subResults.executionResults.vectorResults = vectorResult || [];
         } else if (step.queryType === 'sql_analysis') {
           console.log(`[${requestId}] SQL analysis:`, step.sqlQuery);
-          const sqlResult = await executeSQLAnalysis(step, userId, supabaseClient, requestId);
+          const sqlResult = await executeSQLAnalysis(step, userId, supabaseClient, requestId, subResults.executionResults.sqlExecutionDetails);
           subResults.executionResults.sqlResults = sqlResult || [];
         } else if (step.queryType === 'hybrid_search') {
           console.log(`[${requestId}] Hybrid search:`, step.vectorSearch.query, step.sqlQuery);
-          const hybridResult = await executeHybridSearch(step, userId, supabaseClient, requestId);
+          const hybridResult = await executeHybridSearch(step, userId, supabaseClient, requestId, subResults.executionResults.sqlExecutionDetails);
           subResults.executionResults.vectorResults = hybridResult?.vectorResults || [];
           subResults.executionResults.sqlResults = hybridResult?.sqlResults || [];
         }
@@ -121,89 +212,90 @@ async function executeVectorSearch(step: any, userId: string, supabaseClient: an
   }
 }
 
-async function executeSQLAnalysis(step: any, userId: string, supabaseClient: any, requestId: string) {
+async function executeSQLAnalysis(step: any, userId: string, supabaseClient: any, requestId: string, executionDetails: any) {
   try {
     console.log(`[${requestId}] Executing SQL query:`, step.sqlQuery);
     
-    if (step.sqlQuery && step.sqlQuery.trim()) {
-      // Enhanced SQL validation and execution
-      const cleanedQuery = step.sqlQuery.trim();
-      console.log(`[${requestId}] Cleaned SQL query:`, cleanedQuery);
-      
-      // Validate that the query is safe and follows our patterns
-      if (!validateSQLQuery(cleanedQuery, requestId)) {
-        console.error(`[${requestId}] SQL query validation failed`);
-        return await executeBasicSQLQuery(userId, supabaseClient, requestId);
-      }
-      
-      // Replace auth.uid() with actual user ID for RPC functions
-      const queryWithUserId = cleanedQuery.replace(/auth\.uid\(\)/g, `'${userId}'`);
-      console.log(`[${requestId}] Query with user ID:`, queryWithUserId);
-      
-      // Use the execute_dynamic_query function to safely run GPT-generated SQL
-      const { data, error } = await supabaseClient.rpc('execute_dynamic_query', {
-        query_text: queryWithUserId
-      });
+    if (!step.sqlQuery || !step.sqlQuery.trim()) {
+      console.log(`[${requestId}] No SQL query provided, using fallback`);
+      executionDetails.fallbackUsed = true;
+      return await executeBasicSQLQuery(userId, supabaseClient, requestId);
+    }
 
-      if (error) {
-        console.error(`[${requestId}] SQL execution error:`, error);
-        console.error(`[${requestId}] Failed query:`, queryWithUserId);
-        // Fallback to basic query if dynamic execution fails
-        return await executeBasicSQLQuery(userId, supabaseClient, requestId);
-      }
+    const originalQuery = step.sqlQuery.trim();
+    executionDetails.originalQuery = originalQuery;
+    
+    // Validate the SQL query
+    const validationResult = validateSQLQuery(originalQuery, requestId);
+    executionDetails.validationResult = validationResult;
+    
+    if (!validationResult.isValid) {
+      console.error(`[${requestId}] SQL query validation failed: ${validationResult.error}`);
+      executionDetails.fallbackUsed = true;
+      return await executeBasicSQLQuery(userId, supabaseClient, requestId);
+    }
+    
+    // Sanitize user ID in the query
+    let sanitizedQuery;
+    try {
+      sanitizedQuery = sanitizeUserIdInQuery(originalQuery, userId, requestId);
+      executionDetails.sanitizedQuery = sanitizedQuery;
+    } catch (sanitizeError) {
+      console.error(`[${requestId}] Query sanitization failed:`, sanitizeError);
+      executionDetails.executionError = sanitizeError.message;
+      executionDetails.fallbackUsed = true;
+      return await executeBasicSQLQuery(userId, supabaseClient, requestId);
+    }
+    
+    // Use the execute_dynamic_query function to safely run GPT-generated SQL
+    console.log(`[${requestId}] Executing sanitized query via RPC:`, sanitizedQuery.substring(0, 200) + '...');
+    
+    const { data, error } = await supabaseClient.rpc('execute_dynamic_query', {
+      query_text: sanitizedQuery
+    });
 
-      if (data && data.success && data.data) {
-        console.log(`[${requestId}] SQL query executed successfully, rows:`, data.data.length);
-        return data.data;
-      } else {
-        console.warn(`[${requestId}] SQL query returned no results:`, data);
-        return [];
+    if (error) {
+      console.error(`[${requestId}] SQL execution error:`, error);
+      console.error(`[${requestId}] Failed query:`, sanitizedQuery);
+      executionDetails.executionError = error.message;
+      executionDetails.fallbackUsed = true;
+      
+      // Enhanced error logging for debugging
+      if (error.code) {
+        console.error(`[${requestId}] PostgreSQL error code: ${error.code}`);
       }
+      if (error.details) {
+        console.error(`[${requestId}] PostgreSQL error details: ${error.details}`);
+      }
+      if (error.hint) {
+        console.error(`[${requestId}] PostgreSQL error hint: ${error.hint}`);
+      }
+      
+      // Fallback to basic query if dynamic execution fails
+      return await executeBasicSQLQuery(userId, supabaseClient, requestId);
+    }
+
+    if (data && data.success && data.data) {
+      console.log(`[${requestId}] SQL query executed successfully, rows:`, data.data.length);
+      return data.data;
     } else {
-      // Fallback to basic query if no SQL provided
+      console.warn(`[${requestId}] SQL query returned no results or failed:`, data);
+      executionDetails.fallbackUsed = true;
       return await executeBasicSQLQuery(userId, supabaseClient, requestId);
     }
 
   } catch (error) {
     console.error(`[${requestId}] Error in SQL analysis:`, error);
+    executionDetails.executionError = error.message;
+    executionDetails.fallbackUsed = true;
     // Fallback to basic query on error
     return await executeBasicSQLQuery(userId, supabaseClient, requestId);
   }
 }
 
-function validateSQLQuery(query: string, requestId: string): boolean {
-  try {
-    const upperQuery = query.toUpperCase();
-    
-    // Check for dangerous operations
-    const dangerousKeywords = ['DROP', 'DELETE', 'INSERT', 'UPDATE', 'CREATE', 'ALTER', 'TRUNCATE'];
-    for (const keyword of dangerousKeywords) {
-      if (upperQuery.includes(keyword) && !upperQuery.includes('DELETE FROM') && !upperQuery.includes('INSERT INTO')) {
-        console.error(`[${requestId}] Dangerous SQL keyword detected: ${keyword}`);
-        return false;
-      }
-    }
-    
-    // Ensure it's a SELECT query
-    if (!upperQuery.trim().startsWith('SELECT')) {
-      console.error(`[${requestId}] Only SELECT queries are allowed`);
-      return false;
-    }
-    
-    // Check for required table reference
-    if (!upperQuery.includes('"JOURNAL ENTRIES"')) {
-      console.error(`[${requestId}] Query must reference Journal Entries table`);
-      return false;
-    }
-    
-    return true;
-  } catch (error) {
-    console.error(`[${requestId}] SQL validation error:`, error);
-    return false;
-  }
-}
-
 async function executeBasicSQLQuery(userId: string, supabaseClient: any, requestId: string) {
+  console.log(`[${requestId}] Executing basic fallback SQL query`);
+  
   const { data, error } = await supabaseClient
     .from('Journal Entries')
     .select('*')
@@ -220,12 +312,12 @@ async function executeBasicSQLQuery(userId: string, supabaseClient: any, request
   return data || [];
 }
 
-async function executeHybridSearch(step: any, userId: string, supabaseClient: any, requestId: string) {
+async function executeHybridSearch(step: any, userId: string, supabaseClient: any, requestId: string, executionDetails: any) {
   try {
     // Execute both vector and SQL searches in parallel
     const [vectorResults, sqlResults] = await Promise.all([
       executeVectorSearch(step, userId, supabaseClient, requestId),
-      executeSQLAnalysis(step, userId, supabaseClient, requestId)
+      executeSQLAnalysis(step, userId, supabaseClient, requestId, executionDetails)
     ]);
 
     console.log(`[${requestId}] Hybrid search results - Vector: ${vectorResults?.length || 0}, SQL: ${sqlResults?.length || 0}`);
@@ -268,7 +360,7 @@ async function generateEmbedding(text: string): Promise<number[]> {
 }
 
 /**
- * Enhanced Analyst Agent with improved error handling and mandatory database context adherence
+ * Enhanced Analyst Agent with improved SQL generation and error handling
  */
 async function analyzeQueryWithSubQuestions(message, conversationContext, userEntryCount, isFollowUp = false, supabaseClient, userTimezone = 'UTC') {
   try {
@@ -339,38 +431,74 @@ ${databaseSchemaContext}
 - STICK STRICTLY to the provided database schema context
 - If uncertain about a database structure, use basic select queries instead of complex ones
 
-**MANDATORY SQL QUERY EXAMPLES FOR OUR POSTGRESQL DATABASE:**
+**ENHANCED SQL QUERY GENERATION GUIDELINES:**
 
-1. **Basic Journal Entry Query (ALWAYS WORKS):**
-\`\`\`sql
-SELECT id, "refined text", "transcription text", created_at, emotions, master_themes 
-FROM "Journal Entries" 
-WHERE user_id = '${message.includes('user_id') ? 'USER_ID_PLACEHOLDER' : 'auth.uid()'}' 
-ORDER BY created_at DESC LIMIT 10;
-\`\`\`
+1. **UUID and User ID Requirements:**
+   - ALWAYS use auth.uid() for user filtering (it will be replaced with the actual UUID)
+   - NEVER hardcode user IDs or generate fake UUIDs
+   - Example: WHERE user_id = auth.uid()
 
-2. **Emotion Analysis Query (SAFE PATTERN):**
+2. **Table and Column References:**
+   - Use "Journal Entries" (with quotes) for the table name
+   - Valid columns: id, user_id, created_at, "refined text", "transcription text", emotions, master_themes, entities, sentiment
+   - Use COALESCE for text fields: COALESCE("refined text", "transcription text")
+
+3. **JSON Operations on emotions/entities columns:**
+   - For emotions: jsonb_each(emotions) to expand, emotions->>'emotion_name' for specific values
+   - For entities: jsonb_each(entities) for types, jsonb_array_elements_text() for values
+   - Example: SELECT emotion_key, AVG((emotion_value::text)::numeric) FROM "Journal Entries", jsonb_each(emotions) WHERE user_id = auth.uid() GROUP BY emotion_key
+
+4. **Safe Query Patterns:**
+   - Always include user_id = auth.uid() in WHERE clause
+   - Use proper PostgreSQL syntax with double quotes for table/column names with spaces
+   - Avoid complex nested queries - keep it simple and working
+   - Use standard aggregation functions: COUNT, AVG, MAX, MIN, SUM
+
+**WORKING SQL EXAMPLES FOR REFERENCE:**
+
+1. **Basic Entry Query:**
 \`\`\`sql
-SELECT 
-  json_object_keys(emotions) as emotion_name,
-  AVG((emotions->>json_object_keys(emotions))::float) as avg_score
+SELECT id, COALESCE("refined text", "transcription text") as content, created_at, emotions, master_themes 
 FROM "Journal Entries" 
 WHERE user_id = auth.uid() 
-  AND emotions IS NOT NULL
-GROUP BY json_object_keys(emotions)
-ORDER BY avg_score DESC 
-LIMIT 3;
+ORDER BY created_at DESC 
+LIMIT 10;
 \`\`\`
 
-3. **Theme-based Query (WORKING PATTERN):**
+2. **Emotion Analysis:**
 \`\`\`sql
-SELECT id, "refined text", created_at, master_themes
+SELECT 
+  emotion_key,
+  AVG((emotion_value::text)::numeric) as avg_score,
+  COUNT(*) as frequency
+FROM "Journal Entries", 
+     jsonb_each(emotions) as e(emotion_key, emotion_value)
+WHERE user_id = auth.uid() 
+  AND emotions IS NOT NULL
+GROUP BY emotion_key
+ORDER BY avg_score DESC
+LIMIT 5;
+\`\`\`
+
+3. **Theme-based Query:**
+\`\`\`sql
+SELECT id, COALESCE("refined text", "transcription text") as content, created_at, master_themes
 FROM "Journal Entries" 
 WHERE user_id = auth.uid() 
   AND master_themes IS NOT NULL 
   AND 'Work' = ANY(master_themes)
 ORDER BY created_at DESC 
 LIMIT 5;
+\`\`\`
+
+4. **Date Range Query:**
+\`\`\`sql
+SELECT COUNT(*) as entry_count,
+       AVG(CASE WHEN sentiment = 'positive' THEN 1 WHEN sentiment = 'negative' THEN -1 ELSE 0 END) as avg_sentiment
+FROM "Journal Entries" 
+WHERE user_id = auth.uid() 
+  AND created_at >= '2024-01-01'::timestamp 
+  AND created_at <= '2024-12-31'::timestamp;
 \`\`\`
 
 **CRITICAL TIMEZONE HANDLING RULES:**
@@ -412,15 +540,6 @@ LIMIT 5;
    - Date processing will handle conversion from user's local time to UTC for database queries
    - Example timeRange: {"start": "2025-08-06T00:00:00", "end": "2025-08-06T23:59:59", "timezone": "${userTimezone}"}
 
-5. **SQL QUERY GENERATION REQUIREMENTS:**
-   - Generate COMPLETE, EXECUTABLE SQL queries that will run against the PostgreSQL database
-   - Use proper table names in quotes: "Journal Entries"
-   - Include proper WHERE clauses for user_id filtering (use auth.uid() for current user)
-   - Use appropriate aggregation functions, JOINs, and filtering
-   - Ensure queries return meaningful data for analysis
-   - DO NOT use table or column names not present in the database schema
-   - TEST YOUR SQL LOGIC - ensure it will actually work with our schema
-
 USER QUERY: "${message}"
 USER TIMEZONE: "${userTimezone}"
 CONTEXT: ${last.length > 0 ? last.map(m => `${m.sender}: ${m.content?.slice(0, 50) || 'N/A'}`).join(' | ') : 'None'}
@@ -438,7 +557,7 @@ Generate a comprehensive analysis plan that:
 2. Uses hybrid approach (SQL + vector) for time-based content queries
 3. Creates semantically rich vector search queries using user's language
 4. INCLUDES proper timezone information in all timeRange objects
-5. Generates COMPLETE, EXECUTABLE SQL queries for database analysis that ONLY use existing database schema
+5. Generates COMPLETE, SAFE, EXECUTABLE SQL queries using ONLY the provided database schema and working patterns above
 6. Ensures comprehensive coverage of user's intent
 
 Response format (MUST be valid JSON):
@@ -457,7 +576,7 @@ Response format (MUST be valid JSON):
           "step": 1,
           "description": "What this step does",
           "queryType": "vector_search|sql_analysis|hybrid_search",
-          "sqlQuery": "COMPLETE EXECUTABLE SQL QUERY using only existing database schema" or null,
+          "sqlQuery": "COMPLETE EXECUTABLE SQL QUERY using only existing database schema and working patterns" or null,
           "vectorSearch": {
             "query": "Semantically rich search query using user's words",
             "threshold": 0.3,
@@ -489,7 +608,7 @@ Response format (MUST be valid JSON):
         model: 'gpt-4.1-2025-04-14', // Using gpt-4.1 for better JSON parsing reliability
         messages: [{ role: 'user', content: prompt }],
         max_tokens: 2000,
-        temperature: 0.3 // Lower temperature for more consistent JSON output
+        temperature: 0.1 // Lower temperature for more consistent JSON output and better SQL generation
       }),
     });
 
@@ -565,7 +684,7 @@ Response format (MUST be valid JSON):
       userTimezone
     };
 
-    console.log("Final Analyst Plan with timezone handling:", JSON.stringify(finalResult, null, 2));
+    console.log("Final Analyst Plan with enhanced SQL generation:", JSON.stringify(finalResult, null, 2));
     return finalResult;
 
   } catch (error) {
@@ -672,6 +791,11 @@ serve(async (req) => {
   userTimezone: "${userTimezone}"
 }`);
 
+    // Validate userId format
+    if (!isValidUUID(userId)) {
+      throw new Error(`Invalid user ID format: ${userId}`);
+    }
+
     // Get user's journal entry count for context
     const { count: countData } = await supabaseClient
       .from('Journal Entries')
@@ -681,7 +805,7 @@ serve(async (req) => {
     const userEntryCount = countData || 0;
     console.log(`[${requestId}] User has ${userEntryCount} journal entries`);
 
-    // Generate comprehensive analysis plan with timezone support
+    // Generate comprehensive analysis plan with enhanced SQL generation
     const analysisResult = await analyzeQueryWithSubQuestions(message, conversationContext, userEntryCount, isFollowUp, supabaseClient, userTimezone);
 
     if (!execute) {
