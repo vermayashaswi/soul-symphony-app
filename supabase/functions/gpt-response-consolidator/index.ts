@@ -54,6 +54,7 @@ function sanitizeConsolidatorOutput(raw: string): { responseText: string; status
   const meta: Record<string, any> = { hadCodeFence: /```/i.test(raw || '') };
   try {
     if (!raw) {
+      console.error('[CONSOLIDATOR] Empty response from OpenAI API');
       return { responseText: 'I ran into a formatting issue preparing your insights. Let\'s try again.', statusMsg: null, meta };
     }
     let s = stripCodeFences(raw);
@@ -70,7 +71,7 @@ function sanitizeConsolidatorOutput(raw: string): { responseText: string; status
             parsed = JSON.parse(jsonStr);
             meta.parsedExtracted = true;
           } catch {
-            // silently fall back to raw text if JSON parsing fails
+            console.error('[CONSOLIDATOR] Failed to parse extracted JSON:', jsonStr);
           }
         }
       }
@@ -81,7 +82,7 @@ function sanitizeConsolidatorOutput(raw: string): { responseText: string; status
     }
     return { responseText: s, statusMsg: null, meta };
   } catch (e) {
-    console.log('Sanitization error:', e);
+    console.error('[CONSOLIDATOR] Sanitization error:', e);
     return { responseText: raw, statusMsg: null, meta };
   }
 }
@@ -113,6 +114,23 @@ serve(async (req) => {
       timestamp: new Date().toISOString()
     });
 
+    // Enhanced data validation - check for empty research results
+    if (!researchResults || researchResults.length === 0) {
+      console.error(`[${consolidationId}] No research results provided to consolidator`);
+      return new Response(JSON.stringify({
+        success: true,
+        response: "I couldn't find any relevant information in your journal entries for this query. Could you try rephrasing your question or check if you have entries related to this topic?",
+        userStatusMessage: "No matching entries found",
+        analysisMetadata: {
+          totalSubQuestions: 0,
+          strategiesUsed: [],
+          dataSourcesUsed: { vectorSearch: false, sqlQueries: false, errors: true }
+        }
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // Data integrity validation - check for stale research results
     if (researchResults && researchResults.length > 0) {
       console.log(`[RESEARCH DATA VALIDATION] ${consolidationId}:`, {
@@ -139,6 +157,23 @@ serve(async (req) => {
         userQuestion: userMessage,
         potentialStaleDataRisk: totalSqlRows > 0 ? 'check_sql_dates' : 'no_sql_data'
       });
+
+      // If no results found in any method, provide informative response
+      if (totalSqlRows === 0 && totalVectorResults === 0) {
+        console.warn(`[${consolidationId}] No SQL or vector results found despite research execution`);
+        return new Response(JSON.stringify({
+          success: true,
+          response: "I searched through your journal entries but couldn't find specific content that matches your question. This might be because you haven't written about this topic yet, or the topic might be phrased differently in your entries. Could you try asking about it in a different way?",
+          userStatusMessage: "Search completed, no matches",
+          analysisMetadata: {
+            totalSubQuestions: researchResults.length,
+            strategiesUsed: [],
+            dataSourcesUsed: { vectorSearch: false, sqlQueries: false, errors: false }
+          }
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
     }
 
     // Permissive pass-through of Researcher results (no restrictive parsing)
@@ -260,8 +295,9 @@ serve(async (req) => {
     - userStatusMessage MUST be exactly 5 words.
     - Do not include trailing explanations or extra fields`;
 
-    console.log(`[CONSOLIDATION] ${consolidationId}: Calling OpenAI API with model gpt-5-2025-08-07`);
+    console.log(`[CONSOLIDATION] ${consolidationId}: Calling OpenAI API with model gpt-4.1-nano`);
 
+    // Enhanced OpenAI API call with better error handling
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -269,25 +305,31 @@ serve(async (req) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-5-2025-08-07',
+          model: 'gpt-4.1-nano', // Changed from gpt-5-2025-08-07 to gpt-4.1-nano
           messages: [
             { role: 'system', content: 'You are Ruh by SOuLO, a warm and insightful wellness coach. You analyze ONLY the current research results provided to you. Never reference or use data from previous conversations or responses.' },
             { role: 'user', content: consolidationPrompt }
           ],
-          max_completion_tokens: 1500
-          // Note: temperature parameter removed for GPT-5
+          max_tokens: 1500, // Using max_tokens for gpt-4.1-nano
+          temperature: 0.8 // Temperature is supported by gpt-4.1-nano
         }),
     });
 
-    // Handle non-OK responses gracefully
+    // Enhanced error handling for OpenAI API responses
     if (!response.ok) {
       const errText = await response.text();
-      console.error(`[${consolidationId}] OpenAI API error:`, response.status, errText);
-      const fallbackText = "I couldn't finalize your insight right now. Let's try again in a moment.";
+      console.error(`[${consolidationId}] OpenAI API error:`, {
+        status: response.status,
+        statusText: response.statusText,
+        errorBody: errText,
+        headers: Object.fromEntries(response.headers.entries())
+      });
+      
+      const fallbackText = "I couldn't finalize your insight right now due to an API issue. Let's try again in a moment.";
       return new Response(JSON.stringify({
         success: true,
         response: fallbackText,
-        userStatusMessage: null,
+        userStatusMessage: "API issue encountered temporarily",
         analysisMetadata: {
           totalSubQuestions: researchResults.length,
           strategiesUsed: [],
@@ -306,6 +348,29 @@ serve(async (req) => {
     const rawResponse = data?.choices?.[0]?.message?.content || '';
     
     console.log(`[${consolidationId}] OpenAI raw response length:`, rawResponse.length);
+    console.log(`[${consolidationId}] OpenAI raw response preview:`, rawResponse.substring(0, 200));
+    
+    // Enhanced validation for empty responses
+    if (!rawResponse || rawResponse.trim().length === 0) {
+      console.error(`[${consolidationId}] Empty response from OpenAI API despite successful HTTP status`);
+      const fallbackText = "I processed your request but encountered an issue generating the response. Could you try rephrasing your question?";
+      return new Response(JSON.stringify({
+        success: true,
+        response: fallbackText,
+        userStatusMessage: "Processing issue, please retry",
+        analysisMetadata: {
+          totalSubQuestions: researchResults.length,
+          strategiesUsed: [],
+          dataSourcesUsed: {
+            vectorSearch: researchResults.some((r: any) => r.executionResults?.vectorResults),
+            sqlQueries: researchResults.some((r: any) => r.executionResults?.sqlResults),
+            errors: false
+          }
+        }
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
     
     // Sanitize and extract consolidated response
     const sanitized = sanitizeConsolidatorOutput(rawResponse);
@@ -332,14 +397,16 @@ serve(async (req) => {
           }
         );
 
-        await supabaseClient
+        const updateResult = await supabaseClient
           .from('chat_messages')
           .update({
             analysis_data: {
               consolidationId,
               totalResults: researchResults.length,
               userStatusMessage,
-              timestamp: new Date().toISOString()
+              timestamp: new Date().toISOString(),
+              modelUsed: 'gpt-4.1-nano',
+              processingSuccess: true
             },
             sub_query_responses: analysisSummary,
             reference_entries: researchResults.flatMap((r: any) => [
@@ -358,9 +425,13 @@ serve(async (req) => {
           })
           .eq('id', messageId);
 
-        console.log(`[${consolidationId}] Stored analysis data in chat_messages`);
+        if (updateResult.error) {
+          console.error(`[${consolidationId}] Error storing analysis data:`, updateResult.error);
+        } else {
+          console.log(`[${consolidationId}] Successfully stored analysis data in chat_messages`);
+        }
       } catch (dbError) {
-        console.error(`[${consolidationId}] Error storing analysis data:`, dbError);
+        console.error(`[${consolidationId}] Exception storing analysis data:`, dbError);
       }
     }
 
@@ -389,7 +460,8 @@ serve(async (req) => {
     console.error('Error in GPT Response Consolidator:', error);
     return new Response(JSON.stringify({ 
       success: false, 
-      error: error.message 
+      error: error.message,
+      fallbackResponse: "I encountered an unexpected error while processing your request. Please try again."
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
@@ -18,7 +19,7 @@ interface QueryPlan {
   filters: any;
   emotionFocus?: string;
   timeRange?: any;
-  subQueries?: string[];
+  subQuestions?: string[];
   expectedResponseType: string;
   confidence: number;
   reasoning: string;
@@ -221,7 +222,7 @@ async function generateEmbedding(text: string): Promise<number[]> {
 }
 
 /**
- * Enhanced Analyst Agent with timezone-aware date processing
+ * Enhanced Analyst Agent with improved error handling and mandatory database context adherence
  */
 async function analyzeQueryWithSubQuestions(message, conversationContext, userEntryCount, isFollowUp = false, supabaseClient, userTimezone = 'UTC') {
   try {
@@ -286,6 +287,42 @@ async function analyzeQueryWithSubQuestions(message, conversationContext, userEn
 
 ${databaseSchemaContext}
 
+**CRITICAL DATABASE CONTEXT ADHERENCE:**
+- You MUST ONLY use table names, column names, and data types that exist in the database schema above
+- DO NOT hallucinate or invent table structures, column names, or data types
+- STICK STRICTLY to the provided database schema context
+- If uncertain about a database structure, use basic select queries instead of complex ones
+
+**MANDATORY SQL QUERY EXAMPLES FOR OUR POSTGRESQL DATABASE:**
+
+1. **Basic Journal Entry Query:**
+\`\`\`sql
+SELECT id, "refined text", "transcription text", created_at, emotions, master_themes 
+FROM "Journal Entries" 
+WHERE user_id = '${message.includes('user_id') ? 'USER_ID_PLACEHOLDER' : 'auth.uid()'}' 
+ORDER BY created_at DESC LIMIT 10;
+\`\`\`
+
+2. **Emotion-based Query:**
+\`\`\`sql
+SELECT id, "refined text", created_at, emotions
+FROM "Journal Entries" 
+WHERE user_id = auth.uid() 
+AND emotions IS NOT NULL 
+AND emotions ? 'happiness'
+ORDER BY created_at DESC;
+\`\`\`
+
+3. **Theme-based Query:**
+\`\`\`sql
+SELECT id, "refined text", created_at, master_themes
+FROM "Journal Entries" 
+WHERE user_id = auth.uid() 
+AND master_themes IS NOT NULL 
+AND 'Work' = ANY(master_themes)
+ORDER BY created_at DESC;
+\`\`\`
+
 **CRITICAL TIMEZONE HANDLING RULES:**
 
 1. **USER TIMEZONE CONTEXT**: User timezone is "${userTimezone}"
@@ -325,12 +362,13 @@ ${databaseSchemaContext}
    - Date processing will handle conversion from user's local time to UTC for database queries
    - Example timeRange: {"start": "2025-08-06T00:00:00", "end": "2025-08-06T23:59:59", "timezone": "${userTimezone}"}
 
-5. **SQL QUERY GENERATION**:
+5. **SQL QUERY GENERATION REQUIREMENTS:**
    - Generate COMPLETE, EXECUTABLE SQL queries that will run against the PostgreSQL database
    - Use proper table names in quotes: "Journal Entries"
-   - Include proper WHERE clauses for user_id filtering
+   - Include proper WHERE clauses for user_id filtering (use auth.uid() for current user)
    - Use appropriate aggregation functions, JOINs, and filtering
    - Ensure queries return meaningful data for analysis
+   - DO NOT use table or column names not present in the database schema
 
 USER QUERY: "${message}"
 USER TIMEZONE: "${userTimezone}"
@@ -349,10 +387,10 @@ Generate a comprehensive analysis plan that:
 2. Uses hybrid approach (SQL + vector) for time-based content queries
 3. Creates semantically rich vector search queries using user's language
 4. INCLUDES proper timezone information in all timeRange objects
-5. Generates COMPLETE, EXECUTABLE SQL queries for database analysis
+5. Generates COMPLETE, EXECUTABLE SQL queries for database analysis that ONLY use existing database schema
 6. Ensures comprehensive coverage of user's intent
 
-Response format:
+Response format (MUST be valid JSON):
 {
   "queryType": "journal_specific|general_inquiry|mental_health",
   "strategy": "intelligent_sub_query|comprehensive_hybrid|vector_mandatory",
@@ -368,7 +406,7 @@ Response format:
           "step": 1,
           "description": "What this step does",
           "queryType": "vector_search|sql_analysis|hybrid_search",
-          "sqlQuery": "COMPLETE EXECUTABLE SQL QUERY" or null,
+          "sqlQuery": "COMPLETE EXECUTABLE SQL QUERY using only existing database schema" or null,
           "vectorSearch": {
             "query": "Semantically rich search query using user's words",
             "threshold": 0.3,
@@ -388,6 +426,8 @@ Response format:
   "userTimezone": "${userTimezone}"
 }`;
 
+    console.log(`[Analyst Agent] Calling OpenAI API with enhanced prompt`);
+
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -395,30 +435,49 @@ Response format:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-5-2025-08-07',
+        model: 'gpt-4.1-2025-04-14', // Using gpt-4.1 for better JSON parsing reliability
         messages: [{ role: 'user', content: prompt }],
-        max_completion_tokens: 2000,
-        // Note: temperature parameter removed for GPT-5
+        max_tokens: 2000,
+        temperature: 0.3 // Lower temperature for more consistent JSON output
       }),
     });
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[Analyst Agent] OpenAI API error: ${response.status} - ${errorText}`);
       throw new Error(`OpenAI API error: ${response.status}`);
     }
 
     const data = await response.json();
-    console.log("Analyst Agent response:", data.choices[0].message.content);
+    const rawResponse = data.choices[0].message.content;
+    console.log("Analyst Agent raw response:", rawResponse?.substring(0, 500) || 'empty');
 
     let analysisResult;
     try {
-      analysisResult = JSON.parse(data.choices[0].message.content);
+      // Enhanced JSON parsing with better error handling
+      if (!rawResponse || rawResponse.trim().length === 0) {
+        console.error("[Analyst Agent] Empty response from OpenAI");
+        return createEnhancedFallbackPlan(message, isContentSeekingQuery || requiresMandatoryVector, null, supabaseClient, userTimezone);
+      }
+
+      // Try to extract JSON from response if wrapped in markdown
+      let jsonString = rawResponse.trim();
+      if (jsonString.startsWith('```json')) {
+        jsonString = jsonString.replace(/```json\n?/, '').replace(/\n?```$/, '');
+      } else if (jsonString.startsWith('```')) {
+        jsonString = jsonString.replace(/```\n?/, '').replace(/\n?```$/, '');
+      }
+
+      analysisResult = JSON.parse(jsonString);
+      console.log("[Analyst Agent] Successfully parsed JSON response");
     } catch (parseError) {
       console.error("Failed to parse Analyst Agent response:", parseError);
+      console.error("Raw response:", rawResponse);
       return createEnhancedFallbackPlan(message, isContentSeekingQuery || requiresMandatoryVector, null, supabaseClient, userTimezone);
     }
 
     if (!analysisResult || !analysisResult.subQuestions) {
-      console.error("Failed to parse Analyst Agent response, using enhanced fallback for content queries");
+      console.error("Analyst Agent response missing subQuestions, using enhanced fallback");
       return createEnhancedFallbackPlan(message, isContentSeekingQuery || requiresMandatoryVector, null, supabaseClient, userTimezone);
     }
 
@@ -569,6 +628,7 @@ serve(async (req) => {
       .eq('user_id', userId);
     
     const userEntryCount = countData || 0;
+    console.log(`[${requestId}] User has ${userEntryCount} journal entries`);
 
     // Generate comprehensive analysis plan with timezone support
     const analysisResult = await analyzeQueryWithSubQuestions(message, conversationContext, userEntryCount, isFollowUp, supabaseClient, userTimezone);
