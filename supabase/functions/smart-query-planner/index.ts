@@ -106,7 +106,7 @@ async function executeVectorSearchWithDebug(step: any, userId: string, supabaseC
     console.log(`[${requestId}] - Has infinite values: ${embedding.some(n => !isFinite(n)) ? '❌ YES' : '✅ NO'}`);
     
     // Enhanced database call with optimized threshold
-    const debugThreshold = 0.6; // Updated threshold as requested
+    const debugThreshold = 0.3; // Updated threshold to 0.3 as requested
     const debugLimit = 20; // More results for analysis
     
     console.log(`[${requestId}] Calling match_journal_entries with ENHANCED debugging:`);
@@ -499,6 +499,7 @@ ${databaseSchemaContext}
    - Journal-specific queries: Determine if SQL, vector search, or hybrid approach is needed based on the actual query
    - Let the content and intent of the query guide the analysis strategy
    - Only create complex analysis plans when the user explicitly asks for journal analysis
+   - **MANDATORY**: If no specific time range is mentioned in the query, ALWAYS consider ALL time range - this means include ALL journal entries across ALL time periods to provide comprehensive analysis
 
 
 
@@ -520,11 +521,11 @@ Return ONLY valid JSON with this exact structure:
           "description": "Clear description of what this step accomplishes",
           "queryType": "sql_analysis" | "vector_search" | "sql_count" | "sql_calculation",
           "sqlQuery": "SELECT ... FROM \\"Journal Entries\\" WHERE user_id = $user_id AND ..." | null,
-          "vectorSearch": {
-            "query": "optimized search query",
-            "threshold": 0.7,
-            "limit": 10
-          } | null,
+           "vectorSearch": {
+             "query": "optimized search query",
+             "threshold": 0.3,
+             "limit": 10
+           } | null,
           "timeRange": { "start": "ISO string or null", "end": "ISO string or null" } | null
         }
       ]
@@ -640,7 +641,7 @@ function createEnhancedFallbackPlan(originalMessage, unused, inferredTimeContext
             sqlQuery: `SELECT * FROM "Journal Entries" WHERE user_id = $user_id ORDER BY created_at DESC LIMIT 10`,
             vectorSearch: {
               query: originalMessage,
-              threshold: 0.7,
+              threshold: 0.3,
               limit: 10
             },
             timeRange: inferredTimeContext
