@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
@@ -259,6 +260,8 @@ serve(async (req) => {
     - userStatusMessage MUST be exactly 5 words.
     - Do not include trailing explanations or extra fields`;
 
+    console.log(`[CONSOLIDATION] ${consolidationId}: Calling OpenAI API with model gpt-5-2025-08-07`);
+
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -266,19 +269,20 @@ serve(async (req) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-4.1-nano',
+          model: 'gpt-5-2025-08-07',
           messages: [
             { role: 'system', content: 'You are Ruh by SOuLO, a warm and insightful wellness coach. You analyze ONLY the current research results provided to you. Never reference or use data from previous conversations or responses.' },
             { role: 'user', content: consolidationPrompt }
           ],
           max_completion_tokens: 1500
+          // Note: temperature parameter removed for GPT-5
         }),
     });
 
     // Handle non-OK responses gracefully
     if (!response.ok) {
       const errText = await response.text();
-      console.error('OpenAI Responses API error:', response.status, errText);
+      console.error(`[${consolidationId}] OpenAI API error:`, response.status, errText);
       const fallbackText = "I couldn't finalize your insight right now. Let's try again in a moment.";
       return new Response(JSON.stringify({
         success: true,
@@ -300,6 +304,9 @@ serve(async (req) => {
 
     const data = await response.json();
     const rawResponse = data?.choices?.[0]?.message?.content || '';
+    
+    console.log(`[${consolidationId}] OpenAI raw response length:`, rawResponse.length);
+    
     // Sanitize and extract consolidated response
     const sanitized = sanitizeConsolidatorOutput(rawResponse);
     console.log(`[CONSOLIDATION SUCCESS] ${consolidationId}:`, {
@@ -311,6 +318,51 @@ serve(async (req) => {
 
     const consolidatedResponse = sanitized.responseText;
     const userStatusMessage = sanitized.statusMsg ?? null;
+
+    // Store analysis data in chat_messages if messageId provided
+    if (messageId) {
+      try {
+        const supabaseClient = createClient(
+          Deno.env.get('SUPABASE_URL') ?? '',
+          Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+          {
+            global: {
+              headers: { Authorization: req.headers.get('Authorization')! },
+            },
+          }
+        );
+
+        await supabaseClient
+          .from('chat_messages')
+          .update({
+            analysis_data: {
+              consolidationId,
+              totalResults: researchResults.length,
+              userStatusMessage,
+              timestamp: new Date().toISOString()
+            },
+            sub_query_responses: analysisSummary,
+            reference_entries: researchResults.flatMap((r: any) => [
+              ...(r?.executionResults?.vectorResults || []).map((v: any) => ({
+                id: v.id,
+                content: v.content?.substring(0, 200),
+                similarity: v.similarity,
+                source: 'vector'
+              })),
+              ...(r?.executionResults?.sqlResults || []).map((s: any) => ({
+                id: s.id,
+                content: s.content?.substring(0, 200) || 'SQL result',
+                source: 'sql'
+              }))
+            ]).slice(0, 10) // Limit reference entries
+          })
+          .eq('id', messageId);
+
+        console.log(`[${consolidationId}] Stored analysis data in chat_messages`);
+      } catch (dbError) {
+        console.error(`[${consolidationId}] Error storing analysis data:`, dbError);
+      }
+    }
 
     return new Response(JSON.stringify({
       success: true,

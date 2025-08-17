@@ -91,7 +91,13 @@ serve(async (req) => {
       }
 
       const queryPlan = queryPlanResponse.data.queryPlan;
+      const executionResult = queryPlanResponse.data.executionResult;
+      
       console.log(`[chat-with-rag] Query plan strategy: ${queryPlan.strategy}, complexity: ${queryPlan.queryComplexity}`);
+      console.log(`[chat-with-rag] Execution result summary:`, {
+        resultCount: executionResult?.length || 0,
+        hasResults: !!executionResult && executionResult.length > 0
+      });
 
       // Enhanced timeframe detection with timezone support
       let timeRange = null;
@@ -104,43 +110,31 @@ serve(async (req) => {
         console.log(`[chat-with-rag] Processed time range (converted to UTC):`, JSON.stringify(timeRange, null, 2));
       }
 
-      console.log(`[chat-with-rag] Using GPT-generated query plan:`, {
-        queryType: queryPlan.queryType,
-        strategy: queryPlan.strategy,
-        userStatusMessage: queryPlan.userStatusMessage,
-        subQuestions: queryPlan.subQuestions,
-        confidence: queryPlan.confidence,
-        reasoning: queryPlan.reasoning,
-        useAllEntries: queryPlan.useAllEntries,
-        hasPersonalPronouns: queryPlan.hasPersonalPronouns,
-        hasExplicitTimeReference: queryPlan.hasExplicitTimeReference,
-        inferredTimeContext: queryPlan.inferredTimeContext
-      });
-
-      // Step 3: Execute the plan with timezone-aware processing
-      const executionResult = queryPlanResponse.data.executionResult;
-
-      // Step 4: Generate enhanced response with timezone context
-      const responseGeneration = await supabaseClient.functions.invoke('intelligent-response-generator', {
+      // Step 3: Generate consolidated response using gpt-response-consolidator
+      console.log("[chat-with-rag] Step 3: Calling gpt-response-consolidator");
+      
+      const consolidationResponse = await supabaseClient.functions.invoke('gpt-response-consolidator', {
         body: {
-          originalQuery: message,
-          queryPlan: queryPlan,
-          searchResults: executionResult,
+          userMessage: message,
+          researchResults: executionResult || [], // Map executionResult to researchResults
           conversationContext: conversationContext,
           userProfile: userProfile,
-          timeRange: timeRange,
-          userTimezone: userTimezone // Pass timezone to response generator
+          streamingMode: false,
+          messageId: messageId,
+          threadId: threadId
         }
       });
 
-      if (responseGeneration.error) {
-        throw new Error(`Response generation failed: ${responseGeneration.error.message}`);
+      if (consolidationResponse.error) {
+        console.error("[chat-with-rag] Consolidation error:", consolidationResponse.error);
+        throw new Error(`Response consolidation failed: ${consolidationResponse.error.message}`);
       }
 
-      console.log("[chat-with-rag] Successfully completed GPT-driven analysis pipeline");
+      console.log("[chat-with-rag] Successfully completed RAG pipeline with consolidation");
 
       return new Response(JSON.stringify({
-        response: responseGeneration.data.response,
+        response: consolidationResponse.data.response,
+        userStatusMessage: consolidationResponse.data.userStatusMessage,
         metadata: {
           classification: classification,
           queryPlan: queryPlan,
@@ -148,24 +142,26 @@ serve(async (req) => {
           timeRange: timeRange,
           userTimezone: userTimezone,
           strategy: queryPlan.strategy,
-          confidence: queryPlan.confidence
+          confidence: queryPlan.confidence,
+          analysisMetadata: consolidationResponse.data.analysisMetadata
         }
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
 
     } else {
-      // Handle non-journal queries (general mental health, unrelated, etc.) with timezone awareness
+      // Handle non-journal queries using gpt-response-consolidator with empty results
       console.log(`[chat-with-rag] EXECUTING: ${classification.category} pipeline - general response`);
       
-      const generalResponse = await supabaseClient.functions.invoke('intelligent-response-generator', {
+      const generalResponse = await supabaseClient.functions.invoke('gpt-response-consolidator', {
         body: {
-          originalQuery: message,
-          queryPlan: { strategy: 'general_response', category: classification.category },
-          searchResults: [],
+          userMessage: message,
+          researchResults: [], // Empty results for general queries
           conversationContext: conversationContext,
           userProfile: userProfile,
-          userTimezone: userTimezone
+          streamingMode: false,
+          messageId: messageId,
+          threadId: threadId
         }
       });
 
@@ -175,6 +171,7 @@ serve(async (req) => {
 
       return new Response(JSON.stringify({
         response: generalResponse.data.response,
+        userStatusMessage: generalResponse.data.userStatusMessage,
         metadata: {
           classification: classification,
           strategy: 'general_response',
