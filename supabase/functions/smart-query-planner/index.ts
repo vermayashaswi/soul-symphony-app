@@ -811,13 +811,35 @@ Return ONLY valid JSON with this exact structure:
 - Stages execute in ascending order: stage 1 first, then 2, then 3, etc.
 - Keep stages contiguous (1..N) without gaps
 
-**SQL QUERY GUIDELINES:**
+**SQL QUERY GUIDELINES - CRITICAL JSONB PATTERNS:**
 - ALWAYS include WHERE user_id = $user_id
 - Use proper column names with quotes for spaced names like "refined text"
-- For emotion analysis: use emotions JSONB
-- For theme analysis: use master_themes array and/or entities/text where appropriate (no hardcoded expansions)
+
+**EMOTION ANALYSIS (emotions JSONB column):**
+✅ CORRECT: SELECT emotion_key, AVG((emotion_value::text)::float) as avg_score, COUNT(*) as frequency 
+            FROM "Journal Entries", jsonb_each(emotions) as em(emotion_key, emotion_value) 
+            WHERE user_id = $user_id GROUP BY emotion_key ORDER BY avg_score DESC LIMIT 5;
+❌ NEVER: SELECT jsonb_object_keys(emotions) AS emotion, AVG((emotions->>jsonb_object_keys(emotions))::float) 
+         (set-returning functions in aggregates cause SQL errors)
+
+**THEME ANALYSIS (master_themes array column):**
+✅ CORRECT: SELECT theme, COUNT(*) as frequency FROM "Journal Entries", unnest(master_themes) as theme 
+            WHERE user_id = $user_id GROUP BY theme ORDER BY frequency DESC LIMIT 5;
+
+**ENTITY ANALYSIS (entities JSONB column):**
+✅ CORRECT: SELECT entity_type, entity_name, COUNT(*) as frequency 
+            FROM "Journal Entries", jsonb_each(entities) as ent(entity_type, entity_values), 
+            jsonb_array_elements_text(entity_values) as entity_name 
+            WHERE user_id = $user_id GROUP BY entity_type, entity_name ORDER BY frequency DESC;
+
+**TIME-BASED EMOTION ANALYSIS (themeemotion JSONB column):**
+✅ CORRECT: SELECT DATE_TRUNC('month', created_at) as month, 
+            AVG((theme_emotions->'anxiety'->>'value')::float) as avg_anxiety
+            FROM "Journal Entries", jsonb_each(themeemotion) as te(theme_name, theme_emotions) 
+            WHERE user_id = $user_id AND theme_name = 'Mental Health' GROUP BY month;
+
 - For percentages: alias as percentage
-- For counts: alias as count (or frequency for grouped counts)
+- For counts: alias as count (or frequency for grouped counts)  
 - For averages/scores: alias as avg_score (or score)
 - For date filtering: apply created_at comparisons when time is implied or stated
 - Do NOT call RPCs; generate plain SQL only
@@ -840,8 +862,7 @@ Focus on creating comprehensive, executable analysis plans that will provide mea
       body: JSON.stringify({
         model: 'gpt-4.1-2025-04-14',
         messages: [{ role: 'user', content: prompt }],
-        max_completion_tokens: 2000,
-        temperature: 0.1
+        max_completion_tokens: 2000
       }),
     });
 
