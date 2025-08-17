@@ -134,10 +134,47 @@ serve(async (req) => {
       classification.category = hintCategory;
     }
 
-    // ALL QUERIES NOW GO THROUGH SMART QUERY PLANNER - NO CLASSIFICATION FILTERING
-    console.log(`[chat-with-rag] EXECUTING: ${classification.category} pipeline - ALL queries go through full RAG processing`);
+    // Route based on classification - let GPT decide complexity
+    if (classification.category === 'GENERAL_MENTAL_HEALTH' || classification.category === 'UNRELATED') {
+      console.log(`[chat-with-rag] Using simple conversational response for: ${classification.category}`);
+      
+      // Simple conversational response without RAG
+      const responseGeneration = await supabaseClient.functions.invoke('intelligent-response-generator', {
+        body: {
+          originalQuery: message,
+          queryPlan: { strategy: 'conversational', expectedResponseType: 'simple' },
+          searchResults: [],
+          combinedResults: [],
+          conversationContext: conversationContext,
+          userProfile: userProfile,
+          timeRange: null,
+          userTimezone: userTimezone
+        }
+      });
+
+      if (responseGeneration.error) {
+        throw new Error(`Response generation failed: ${responseGeneration.error.message}`);
+      }
+
+      return new Response(JSON.stringify({
+        response: responseGeneration.data.response,
+        metadata: {
+          classification: classification,
+          queryPlan: { strategy: 'conversational' },
+          searchResults: [],
+          timeRange: null,
+          userTimezone: userTimezone,
+          strategy: 'conversational',
+          confidence: classification.confidence
+        }
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
     
-    // Step 2: Enhanced Query Planning with timezone support (for ALL queries)
+    console.log(`[chat-with-rag] Using RAG analysis for: ${classification.category}`);
+    
+    // Step 2: Enhanced Query Planning with timezone support (for JOURNAL_SPECIFIC queries only)
     const queryPlanResponse = await supabaseClient.functions.invoke('smart-query-planner', {
       body: { 
         message, 

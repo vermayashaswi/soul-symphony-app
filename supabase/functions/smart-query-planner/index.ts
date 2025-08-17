@@ -494,19 +494,11 @@ ${databaseSchemaContext}
 4. Dynamic Query Generation: produce executable SQL for our schema and/or vector queries
 5. Hybrid Analysis: combine SQL stats with semantic vector results when helpful
 
-**MANDATORY VECTOR SEARCH SCENARIOS** (Always include vector search regardless of time constraints):
-   - ANY query asking for "content", "what I wrote", "what I said", "entries about", "show me", "find"
-   - Questions seeking emotional context, feelings, moods, or mental states
-   - Requests for examples, patterns, insights, or thematic analysis  
-   - Queries about achievements, progress, breakthroughs, or personal growth
-   - Comparative analysis ("similar to", "like when", "reminds me of")
-   - Reflective queries ("how was I feeling", "what was going through my mind")
-   - Follow-up questions referencing previous context
-   - Use the user's EXACT words and emotional context in vector searches
-   - For "What did I journal in August" → Vector query: "journal entries personal thoughts feelings experiences august"
-   - For achievement queries → Vector query: "achievement success accomplishment progress breakthrough proud"
-   - For emotional queries → Vector query: "emotions feelings mood emotional state [specific emotions mentioned]"
-   - Preserve user's original language patterns for better semantic matching
+**ANALYSIS APPROACH:**
+   - Simple greetings or acknowledgments: Create conversational plans without complex analysis
+   - Journal-specific queries: Determine if SQL, vector search, or hybrid approach is needed based on the actual query
+   - Let the content and intent of the query guide the analysis strategy
+   - Only create complex analysis plans when the user explicitly asks for journal analysis
 
 
 
