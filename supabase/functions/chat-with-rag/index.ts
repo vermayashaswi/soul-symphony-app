@@ -134,121 +134,89 @@ serve(async (req) => {
       classification.category = hintCategory;
     }
 
-    if (classification.category === 'JOURNAL_SPECIFIC') {
-      console.log("[chat-with-rag] EXECUTING: JOURNAL_SPECIFIC pipeline - full RAG processing");
-      
-      // Step 2: Enhanced Query Planning with timezone support
-      const queryPlanResponse = await supabaseClient.functions.invoke('smart-query-planner', {
-        body: { 
-          message, 
-          userId, 
-          conversationContext,
-          threadId,
-          messageId,
-          userTimezone // Pass user timezone to planner
-        }
-      });
-
-      if (queryPlanResponse.error) {
-        throw new Error(`Query planning failed: ${queryPlanResponse.error.message}`);
+    // ALL QUERIES NOW GO THROUGH SMART QUERY PLANNER - NO CLASSIFICATION FILTERING
+    console.log(`[chat-with-rag] EXECUTING: ${classification.category} pipeline - ALL queries go through full RAG processing`);
+    
+    // Step 2: Enhanced Query Planning with timezone support (for ALL queries)
+    const queryPlanResponse = await supabaseClient.functions.invoke('smart-query-planner', {
+      body: { 
+        message, 
+        userId, 
+        conversationContext,
+        threadId,
+        messageId,
+        userTimezone // Pass user timezone to planner
       }
+    });
 
-      const queryPlan = queryPlanResponse.data.queryPlan;
-      console.log(`[chat-with-rag] Query plan strategy: ${queryPlan.strategy}, complexity: ${queryPlan.queryComplexity}`);
-
-      // Enhanced timeframe detection with timezone support
-      let timeRange = null;
-      const detectedTimeframe = detectTimeframeInQuery(message, userTimezone);
-      
-      if (detectedTimeframe) {
-        console.log(`[chat-with-rag] Detected timeframe with timezone ${userTimezone}:`, JSON.stringify(detectedTimeframe, null, 2));
-        // Process timeframe with user's timezone for proper UTC conversion
-        timeRange = processTimeRange(detectedTimeframe, userTimezone);
-        console.log(`[chat-with-rag] Processed time range (converted to UTC):`, JSON.stringify(timeRange, null, 2));
-      }
-
-      console.log(`[chat-with-rag] Using GPT-generated query plan:`, {
-        queryType: queryPlan.queryType,
-        strategy: queryPlan.strategy,
-        userStatusMessage: queryPlan.userStatusMessage,
-        subQuestions: queryPlan.subQuestions,
-        confidence: queryPlan.confidence,
-        reasoning: queryPlan.reasoning,
-        useAllEntries: queryPlan.useAllEntries,
-        hasPersonalPronouns: queryPlan.hasPersonalPronouns,
-        hasExplicitTimeReference: queryPlan.hasExplicitTimeReference,
-        inferredTimeContext: queryPlan.inferredTimeContext
-      });
-
-      // Step 3: Execute the plan with timezone-aware processing
-      const executionResult = queryPlanResponse.data.executionResult;
-
-      // Step 4: Generate enhanced response with timezone context
-      const responseGeneration = await supabaseClient.functions.invoke('intelligent-response-generator', {
-        body: {
-          originalQuery: message,
-          queryPlan: queryPlan,
-          searchResults: executionResult || [],
-          combinedResults: executionResult || [],
-          conversationContext: conversationContext,
-          userProfile: userProfile,
-          timeRange: timeRange,
-          userTimezone: userTimezone // Pass timezone to response generator
-        }
-      });
-
-      if (responseGeneration.error) {
-        throw new Error(`Response generation failed: ${responseGeneration.error.message}`);
-      }
-
-      console.log("[chat-with-rag] Successfully completed GPT-driven analysis pipeline");
-
-      return new Response(JSON.stringify({
-        response: responseGeneration.data.response,
-        metadata: {
-          classification: classification,
-          queryPlan: queryPlan,
-          searchResults: executionResult,
-          timeRange: timeRange,
-          userTimezone: userTimezone,
-          strategy: queryPlan.strategy,
-          confidence: queryPlan.confidence
-        }
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-
-    } else {
-      // Handle non-journal queries (general mental health, unrelated, etc.) with timezone awareness
-      console.log(`[chat-with-rag] EXECUTING: ${classification.category} pipeline - general response`);
-      
-      const generalResponse = await supabaseClient.functions.invoke('intelligent-response-generator', {
-        body: {
-          originalQuery: message,
-          queryPlan: { strategy: 'general_response', category: classification.category },
-          searchResults: [],
-          combinedResults: [],
-          conversationContext: conversationContext,
-          userProfile: userProfile,
-          userTimezone: userTimezone
-        }
-      });
-
-      if (generalResponse.error) {
-        throw new Error(`General response generation failed: ${generalResponse.error.message}`);
-      }
-
-      return new Response(JSON.stringify({
-        response: generalResponse.data.response,
-        metadata: {
-          classification: classification,
-          strategy: 'general_response',
-          userTimezone: userTimezone
-        }
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    if (queryPlanResponse.error) {
+      throw new Error(`Query planning failed: ${queryPlanResponse.error.message}`);
     }
+
+    const queryPlan = queryPlanResponse.data.queryPlan;
+    console.log(`[chat-with-rag] Query plan strategy: ${queryPlan.strategy}, complexity: ${queryPlan.queryComplexity}`);
+
+    // Enhanced timeframe detection with timezone support
+    let timeRange = null;
+    const detectedTimeframe = detectTimeframeInQuery(message, userTimezone);
+    
+    if (detectedTimeframe) {
+      console.log(`[chat-with-rag] Detected timeframe with timezone ${userTimezone}:`, JSON.stringify(detectedTimeframe, null, 2));
+      // Process timeframe with user's timezone for proper UTC conversion
+      timeRange = processTimeRange(detectedTimeframe, userTimezone);
+      console.log(`[chat-with-rag] Processed time range (converted to UTC):`, JSON.stringify(timeRange, null, 2));
+    }
+
+    console.log(`[chat-with-rag] Using GPT-generated query plan:`, {
+      queryType: queryPlan.queryType,
+      strategy: queryPlan.strategy,
+      userStatusMessage: queryPlan.userStatusMessage,
+      subQuestions: queryPlan.subQuestions,
+      confidence: queryPlan.confidence,
+      reasoning: queryPlan.reasoning,
+      useAllEntries: queryPlan.useAllEntries,
+      hasPersonalPronouns: queryPlan.hasPersonalPronouns,
+      hasExplicitTimeReference: queryPlan.hasExplicitTimeReference,
+      inferredTimeContext: queryPlan.inferredTimeContext
+    });
+
+    // Step 3: Execute the plan with timezone-aware processing
+    const executionResult = queryPlanResponse.data.executionResult;
+
+    // Step 4: Generate enhanced response with timezone context
+    const responseGeneration = await supabaseClient.functions.invoke('intelligent-response-generator', {
+      body: {
+        originalQuery: message,
+        queryPlan: queryPlan,
+        searchResults: executionResult || [],
+        combinedResults: executionResult || [],
+        conversationContext: conversationContext,
+        userProfile: userProfile,
+        timeRange: timeRange,
+        userTimezone: userTimezone // Pass timezone to response generator
+      }
+    });
+
+    if (responseGeneration.error) {
+      throw new Error(`Response generation failed: ${responseGeneration.error.message}`);
+    }
+
+    console.log("[chat-with-rag] Successfully completed GPT-driven analysis pipeline for ALL query types");
+
+    return new Response(JSON.stringify({
+      response: responseGeneration.data.response,
+      metadata: {
+        classification: classification,
+        queryPlan: queryPlan,
+        searchResults: executionResult,
+        timeRange: timeRange,
+        userTimezone: userTimezone,
+        strategy: queryPlan.strategy,
+        confidence: queryPlan.confidence
+      }
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
 
   } catch (error) {
     console.error('[chat-with-rag] Error:', error);
