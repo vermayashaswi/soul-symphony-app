@@ -113,18 +113,56 @@ serve(async (req) => {
       };
 
     } else if (classification === 'GENERAL_MENTAL_HEALTH') {
-      // General mental health queries get conversational responses
-      console.log("[chat-with-rag] Providing general mental health response");
+      // General mental health queries get GPT conversational responses
+      console.log("[chat-with-rag] Providing GPT-powered general mental health response");
       
-      const conversationalResponses = [
-        "Hello! I'm here to help you with your mental health journey. Feel free to share your thoughts or ask any questions.",
-        "Hi there! How are you feeling today? I'm here to listen and support you.",
-        "Hey! It's great to connect with you. I'm here to provide support and insights about your mental health.",
-        "Hello! I'm glad you're here. Whether you want to chat or explore your thoughts, I'm here to help.",
-        "Hi! Thanks for reaching out. I'm here to support your mental health and well-being."
-      ];
+      const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+      if (!openaiApiKey) {
+        throw new Error('OpenAI API key not configured');
+      }
+
+      const conversationalResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openaiApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4.1-2025-04-14',
+          messages: [
+            {
+              role: 'system',
+              content: `You are SOULo, a warm and empathetic mental health companion. You provide supportive, encouraging responses that help users feel heard and understood. Keep responses conversational, warm, and focused on mental wellness. Always encourage self-reflection and journaling as tools for growth.
+
+Key traits:
+- Warm, empathetic, and supportive
+- Encouraging of self-reflection and journaling
+- Brief but meaningful responses (2-3 sentences)
+- Focus on mental wellness and emotional support
+- Use a friendly, approachable tone`
+            },
+            ...conversationContext.slice(-3).map(msg => ({
+              role: msg.role,
+              content: msg.content
+            })),
+            {
+              role: 'user',
+              content: message
+            }
+          ],
+          max_completion_tokens: 150,
+        }),
+      });
+
+      if (!conversationalResponse.ok) {
+        const errorData = await conversationalResponse.text();
+        console.error('[chat-with-rag] OpenAI API error:', errorData);
+        throw new Error(`OpenAI API error: ${conversationalResponse.status}`);
+      }
+
+      const conversationalData = await conversationalResponse.json();
+      response = conversationalData.choices[0].message.content.trim();
       
-      response = conversationalResponses[Math.floor(Math.random() * conversationalResponses.length)];
       metadata = {
         classification: classification,
         userTimezone: userTimezone,
