@@ -402,12 +402,13 @@ async function executePlan(plan: any, userId: string, supabaseClient: any, reque
           // CRITICAL: Pass vector result IDs to SQL analysis for proper placeholder replacement
           stepResult = await executeSQLAnalysis(step, userId, supabaseClient, requestId, vectorResultIds);
           
-          // Enhance SQL result format for consolidator with proper error detection
+          // ENHANCED SQL result format for consolidator with PROPER error detection
           stepResult = {
             ...stepResult,
             vectorResultCount: vectorResultIds.length,
             sqlResultCount: stepResult.rowCount || 0,
-            hasError: !stepResult.success || !!stepResult.errorMessage || stepResult.rowCount === 0
+            // FIX: Only mark as error if there's an actual error, not just empty results
+            hasError: stepResult.hasError || (!stepResult.success && !!stepResult.error)
           };
           } else if (step.queryType === 'hybrid_search') {
             console.log(`[${requestId}] Hybrid search:`, step.vectorSearch.query, step.sqlQuery);
@@ -490,74 +491,127 @@ async function executeSQLAnalysis(step: any, userId: string, supabaseClient: any
     console.log(`[${requestId}] ORIGINAL SQL:`, sqlQuery);
     console.log(`[${requestId}] Vector Result IDs:`, vectorResultIds);
     
-    // Replace user ID placeholder
+    // PHASE 1: PRECISE SQL PLACEHOLDER REPLACEMENT
+    // Replace user ID placeholder first
     sqlQuery = sqlQuery.replace(/\$user_id/g, `'${userId}'`);
     
-    // Handle vector matched IDs placeholder
+    // PHASE 2: ENHANCED VECTOR ID PLACEHOLDER HANDLING
     if (sqlQuery.includes('[vector_matched_ids]')) {
       if (vectorResultIds && vectorResultIds.length > 0) {
         const idList = vectorResultIds.join(',');
         sqlQuery = sqlQuery.replace(/\[vector_matched_ids\]/g, idList);
-        console.log(`[${requestId}] Replaced [vector_matched_ids] with: ${idList}`);
+        console.log(`[${requestId}] ✅ Replaced [vector_matched_ids] with: ${idList}`);
       } else {
-        console.warn(`[${requestId}] No vector results available for SQL analysis - using fallback`);
-        // Remove the vector ID constraint entirely and add a LIMIT to prevent huge result sets
-        sqlQuery = sqlQuery.replace(/AND id IN \(\[vector_matched_ids\]\)/gi, '');
-        sqlQuery = sqlQuery.replace(/WHERE.*\[vector_matched_ids\].*/gi, `WHERE user_id = '${userId}'`);
+        console.warn(`[${requestId}] ⚠️ No vector results - implementing fallback strategy`);
         
-        // Add LIMIT if not present to prevent large result sets
-        if (!sqlQuery.toLowerCase().includes('limit')) {
-          sqlQuery += ' LIMIT 100';
-        }
+        // SMART FALLBACK: Remove vector constraints but preserve query logic
+        // Pattern 1: AND id IN ([vector_matched_ids])
+        sqlQuery = sqlQuery.replace(/\s+AND\s+id\s+IN\s*\(\[vector_matched_ids\]\)/gi, '');
+        
+        // Pattern 2: WHERE ... AND id IN ([vector_matched_ids])
+        sqlQuery = sqlQuery.replace(/WHERE\s+(.+?)\s+AND\s+id\s+IN\s*\(\[vector_matched_ids\]\)/gi, 'WHERE $1');
+        
+        // Pattern 3: WHERE id IN ([vector_matched_ids]) AND ...
+        sqlQuery = sqlQuery.replace(/WHERE\s+id\s+IN\s*\(\[vector_matched_ids\]\)\s+AND\s+(.+)/gi, 'WHERE $1');
+        
+        // Pattern 4: WHERE id IN ([vector_matched_ids]) only
+        sqlQuery = sqlQuery.replace(/WHERE\s+id\s+IN\s*\(\[vector_matched_ids\]\)/gi, `WHERE user_id = '${userId}'`);
+        
+        // Pattern 5: Any remaining [vector_matched_ids] occurrences
+        sqlQuery = sqlQuery.replace(/\[vector_matched_ids\]/g, 'NULL');
+        
+        console.log(`[${requestId}] 🔧 Applied fallback strategy`);
       }
     }
     
-    // Handle other problematic placeholder patterns for backward compatibility
-    if (sqlQuery.includes('/*IDs from vector search step*/') || sqlQuery.includes('$vector_result_ids')) {
-      console.warn(`[${requestId}] SQL contains legacy vector ID placeholders - removing constraints`);
-      
-      // Remove vector ID constraints completely
-      sqlQuery = sqlQuery.replace(/AND id IN \(\/\*IDs from vector search step\*\/\)/gi, '');
-      sqlQuery = sqlQuery.replace(/AND id IN \(\$vector_result_ids\)/gi, '');
-      sqlQuery = sqlQuery.replace(/WHERE.*\/\*IDs from vector search step\*\/.*/gi, `WHERE user_id = '${userId}'`);
-      sqlQuery = sqlQuery.replace(/WHERE.*\$vector_result_ids.*/gi, `WHERE user_id = '${userId}'`);
+    // PHASE 3: LEGACY PLACEHOLDER CLEANUP
+    const legacyPatterns = [
+      { pattern: /\/\*IDs from vector search step\*\//, replacement: 'NULL' },
+      { pattern: /\$vector_result_ids/, replacement: 'NULL' },
+      { pattern: /AND id IN \(NULL\)/gi, replacement: '' },
+      { pattern: /WHERE id IN \(NULL\)/gi, replacement: `WHERE user_id = '${userId}'` }
+    ];
+    
+    for (const { pattern, replacement } of legacyPatterns) {
+      if (pattern.test(sqlQuery)) {
+        console.warn(`[${requestId}] 🧹 Cleaning legacy pattern: ${pattern}`);
+        sqlQuery = sqlQuery.replace(pattern, replacement);
+      }
     }
 
-    // Clean up malformed WHERE clauses
+    // PHASE 4: SQL SYNTAX VALIDATION AND CLEANUP
+    // Fix malformed WHERE clauses
     sqlQuery = sqlQuery.replace(/WHERE\s+AND/gi, 'WHERE');
     sqlQuery = sqlQuery.replace(/WHERE\s*$\s*GROUP/gi, 'GROUP');
     sqlQuery = sqlQuery.replace(/WHERE\s*$\s*ORDER/gi, 'ORDER');
     sqlQuery = sqlQuery.replace(/WHERE\s*$/gi, '');
+    
+    // Ensure there's always a valid WHERE clause for user filtering
+    if (!sqlQuery.toLowerCase().includes('where')) {
+      // Find the FROM clause and add WHERE after the table name
+      sqlQuery = sqlQuery.replace(/(FROM\s+"Journal Entries")/gi, `$1 WHERE user_id = '${userId}'`);
+    }
+    
+    // Add safety LIMIT if not present to prevent massive result sets
+    if (!sqlQuery.toLowerCase().includes('limit') && sqlQuery.toLowerCase().includes('select')) {
+      sqlQuery += ' LIMIT 1000';
+    }
 
-    console.log(`[${requestId}] PROCESSED SQL:`, sqlQuery);
+    console.log(`[${requestId}] 🎯 PROCESSED SQL:`, sqlQuery);
 
-    // Execute the SQL query
+    // PHASE 5: SQL VALIDATION BEFORE EXECUTION
+    if (!sqlQuery.toLowerCase().includes('select')) {
+      throw new Error('Invalid SQL: Must be a SELECT query');
+    }
+    
+    if (!sqlQuery.toLowerCase().includes('user_id')) {
+      console.warn(`[${requestId}] ⚠️ SQL query missing user_id filter - security risk!`);
+    }
+
+    // PHASE 6: ENHANCED SQL EXECUTION
     const { data, error } = await supabaseClient.rpc('execute_dynamic_query', {
       query_text: sqlQuery
     });
 
+    // PHASE 7: COMPREHENSIVE ERROR DETECTION
     if (error) {
-      console.error(`[${requestId}] SQL execution error:`, error);
+      console.error(`[${requestId}] ❌ SQL execution error:`, {
+        code: error.code,
+        message: error.message,
+        hint: error.hint,
+        details: error.details,
+        sqlQuery: sqlQuery
+      });
+      
       return { 
         success: false, 
         data: [], 
-        error: error.message, 
+        error: `SQL Error: ${error.message}`, 
         rowCount: 0,
-        sqlQuery: sqlQuery
+        sqlQuery: sqlQuery,
+        vectorResultCount: vectorResultIds.length,
+        sqlResultCount: 0,
+        hasError: true,
+        errorType: 'sql_execution'
       };
     }
 
-    // Parse RPC response correctly
+    // PHASE 8: RESULT VALIDATION AND PARSING
     const isSuccess = data?.success === true;
     const resultData = isSuccess ? (data?.data || []) : [];
     const errorMessage = isSuccess ? null : (data?.error || 'Unknown SQL error');
     const rowCount = Array.isArray(resultData) ? resultData.length : 0;
     
-    console.log(`[${requestId}] SQL analysis results:`, {
+    // Distinguish between errors and legitimate empty results
+    const hasActualError = !isSuccess && errorMessage && errorMessage !== 'No results found';
+    
+    console.log(`[${requestId}] 📊 SQL analysis results:`, {
       success: isSuccess,
       rowCount,
       hasData: rowCount > 0,
       errorMessage,
+      hasActualError,
+      vectorInputCount: vectorResultIds.length,
       sampleData: rowCount > 0 ? resultData.slice(0, 2) : null
     });
 
@@ -567,22 +621,30 @@ async function executeSQLAnalysis(step: any, userId: string, supabaseClient: any
       error: errorMessage, 
       rowCount,
       sqlQuery: sqlQuery,
-      vectorResultCount: 0,
+      vectorResultCount: vectorResultIds.length,
       sqlResultCount: rowCount,
-      hasError: !isSuccess
+      hasError: hasActualError,
+      errorType: hasActualError ? 'data_processing' : null
     };
 
   } catch (error) {
-    console.error(`[${requestId}] Critical error in SQL analysis:`, error);
+    console.error(`[${requestId}] 💥 CRITICAL ERROR in SQL analysis:`, {
+      error: error.message,
+      stack: error.stack,
+      sqlQuery: step.sqlQuery,
+      vectorResultIds: vectorResultIds
+    });
+    
     return { 
       success: false, 
       data: [], 
-      error: error.message, 
+      error: `Critical SQL Error: ${error.message}`, 
       rowCount: 0,
       sqlQuery: step.sqlQuery,
-      vectorResultCount: 0,
+      vectorResultCount: vectorResultIds.length,
       sqlResultCount: 0,
-      hasError: true
+      hasError: true,
+      errorType: 'critical_failure'
     };
   }
 }
