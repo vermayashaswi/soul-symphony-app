@@ -742,6 +742,52 @@ async function analyzeQueryWithSubQuestions(message, conversationContext, userEn
 
 ${databaseSchemaContext}
 
+**🚨 CRITICAL POSTGRESQL QUERY RULES - ABSOLUTE REQUIREMENTS:**
+
+1. **NEVER use json_object_keys() in these contexts:**
+   ❌ FORBIDDEN: SELECT json_object_keys(emotions) AS emotion, AVG((emotions->>json_object_keys(emotions))::float)
+   ❌ FORBIDDEN: json_object_keys(emotions) in GROUP BY clauses
+   ❌ FORBIDDEN: json_object_keys() within aggregate functions like AVG(), COUNT()
+
+2. **ALWAYS use jsonb_each() for JSONB object operations:**
+   ✅ REQUIRED: SELECT emotion_key, AVG((emotion_value::text)::float) FROM jsonb_each(emotions) as em(emotion_key, emotion_value)
+   ✅ REQUIRED: SELECT theme_name, emotion_key FROM jsonb_each(themeemotion) as te(theme_name, theme_emotions), jsonb_each(theme_emotions) as em(emotion_key, emotion_value)
+
+3. **MANDATORY JSONB query construction steps:**
+   Step 1: Use jsonb_each(column_name) to unpack JSONB objects
+   Step 2: Alias with AS alias(key_name, value_name) 
+   Step 3: Cast values: (value_name::text)::float for numbers
+   Step 4: Always include WHERE user_id = $user_id
+
+**❌ WRONG PATTERNS (THESE CAUSE ERRORS):**
+```sql
+-- NEVER DO THIS - causes PostgreSQL errors:
+SELECT json_object_keys(emotions) AS emotion, 
+       AVG((emotions->>json_object_keys(emotions))::float) AS avg_score 
+FROM "Journal Entries" 
+WHERE user_id = $user_id 
+GROUP BY emotion;
+```
+
+**✅ CORRECT PATTERNS (ALWAYS USE THESE):**
+```sql
+-- ALWAYS DO THIS - follows PostgreSQL standards:
+SELECT emotion_key AS emotion, 
+       AVG((emotion_value::text)::float) AS avg_score,
+       COUNT(*) AS frequency
+FROM "Journal Entries", jsonb_each(emotions) as em(emotion_key, emotion_value)
+WHERE user_id = $user_id 
+GROUP BY emotion_key 
+ORDER BY avg_score DESC LIMIT 5;
+```
+
+**QUERY VALIDATION CHECKLIST - VERIFY EACH SQL QUERY:**
+□ Does it use jsonb_each() instead of json_object_keys()?
+□ Are JSONB values cast properly with (value::text)::float?
+□ Is user_id = $user_id included for security?
+□ Does the query follow the exact patterns from databaseSchemaContext?
+□ No json_object_keys() in SELECT, GROUP BY, or aggregate functions?
+
 **YOUR RESPONSIBILITIES AS ANALYST AGENT:**
 1. Smart Hypothesis Formation: infer what the user truly wants to know, then deduce focused sub-questions to answer it comprehensively
 2. Sub-Question Generation: break down the query (or previous conversational context's ask) into 1-3 precise sub-questions (no hardcoded keyword lists). For complex queries generate sub-questions in such a way that all sub-question's query when anlalyzed together give the answer to the core usr's query
