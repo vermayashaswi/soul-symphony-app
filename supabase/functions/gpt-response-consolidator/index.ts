@@ -151,6 +151,26 @@ serve(async (req) => {
       console.warn(`[DATA VALIDATION WARNING] ${consolidationId}: No research results provided`);
     }
 
+    // CRITICAL FAILSAFE: Prevent fabricated responses when no data exists
+    if (!hasValidData || (totalSqlRows === 0 && totalVectorResults === 0 && !hasAnyErrors)) {
+      console.log(`[CONSOLIDATION FAILSAFE] ${consolidationId}: No analysis data available - returning honest response`);
+      
+      return new Response(JSON.stringify({
+        response: "I wasn't able to analyze your journal data right now. This could be because you don't have enough journal entries yet, or there might be a temporary issue with the analysis system. Please try asking your question again, or consider adding more journal entries first.",
+        metadata: {
+          consolidationId,
+          dataAvailability: "no_data",
+          analysis: null,
+          timestamp: new Date().toISOString(),
+          totalSqlRows: 0,
+          totalVectorResults: 0,
+          hasAnyErrors: false
+        }
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
     // Permissive pass-through of Researcher results (no restrictive parsing)
     const MAX_SQL_ROWS = 200;
     const MAX_VECTOR_ITEMS = 20;

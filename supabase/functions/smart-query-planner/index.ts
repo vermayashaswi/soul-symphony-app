@@ -422,7 +422,16 @@ async function executeSQLAnalysis(step: any, userId: string, supabaseClient: any
   try {
     if (!step.sqlQuery) {
       console.warn(`[${requestId}] No SQL query provided for analysis step`);
-      return { success: false, data: [], error: 'No SQL query provided', rowCount: 0 };
+      return { 
+        success: false, 
+        data: [], 
+        error: 'No SQL query provided', 
+        rowCount: 0,
+        sqlQuery: 'N/A',
+        vectorResultCount: 0,
+        sqlResultCount: 0,
+        hasError: true
+      };
     }
 
     let sqlQuery = step.sqlQuery;
@@ -489,7 +498,10 @@ async function executeSQLAnalysis(step: any, userId: string, supabaseClient: any
       data: resultData, 
       error: errorMessage, 
       rowCount,
-      sqlQuery: sqlQuery
+      sqlQuery: sqlQuery,
+      vectorResultCount: 0,
+      sqlResultCount: rowCount,
+      hasError: !isSuccess
     };
 
   } catch (error) {
@@ -499,7 +511,10 @@ async function executeSQLAnalysis(step: any, userId: string, supabaseClient: any
       data: [], 
       error: error.message, 
       rowCount: 0,
-      sqlQuery: step.sqlQuery
+      sqlQuery: step.sqlQuery,
+      vectorResultCount: 0,
+      sqlResultCount: 0,
+      hasError: true
     };
   }
 }
@@ -684,6 +699,8 @@ Return ONLY valid JSON with this exact structure:
 
 Focus on creating comprehensive, executable analysis plans that will provide meaningful insights.`;
 
+    console.log("[Analyst Agent] Calling OpenAI API with prompt length:", prompt.length);
+    
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -699,23 +716,50 @@ Focus on creating comprehensive, executable analysis plans that will provide mea
     });
 
     if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.status}`);
+      const errorText = await response.text();
+      console.error(`[Analyst Agent] OpenAI API error: ${response.status} - ${errorText}`);
+      throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
-    console.log("Analyst Agent response:", data.choices[0].message.content);
+    const rawResponse = data.choices[0].message.content;
+    console.log("[Analyst Agent] Raw GPT response:", rawResponse);
 
     let analysisResult;
     try {
-      analysisResult = JSON.parse(data.choices[0].message.content);
+      // Clean the response before parsing
+      const cleanedResponse = rawResponse.trim();
+      if (cleanedResponse.startsWith('```json')) {
+        const jsonMatch = cleanedResponse.match(/```json\s*([\s\S]*?)\s*```/);
+        if (jsonMatch) {
+          analysisResult = JSON.parse(jsonMatch[1]);
+        } else {
+          throw new Error("Could not extract JSON from code block");
+        }
+      } else if (cleanedResponse.startsWith('{')) {
+        analysisResult = JSON.parse(cleanedResponse);
+      } else {
+        throw new Error("Response does not appear to be JSON");
+      }
+      
+      console.log("[Analyst Agent] Successfully parsed JSON:", JSON.stringify(analysisResult, null, 2));
     } catch (parseError) {
-      console.error("Failed to parse Analyst Agent response:", parseError);
+      console.error("[Analyst Agent] Failed to parse GPT response:", parseError);
+      console.error("[Analyst Agent] Raw response was:", rawResponse);
       return createEnhancedFallbackPlan(message, false, null, supabaseClient, userTimezone);
     }
 
-    if (!analysisResult || !analysisResult.subQuestions) {
-      console.error("Failed to parse Analyst Agent response, using enhanced fallback");
+    if (!analysisResult || !analysisResult.subQuestions || !Array.isArray(analysisResult.subQuestions)) {
+      console.error("[Analyst Agent] Invalid analysis result structure:", analysisResult);
       return createEnhancedFallbackPlan(message, false, null, supabaseClient, userTimezone);
+    }
+
+    // Validate each sub-question has required structure
+    for (const subQuestion of analysisResult.subQuestions) {
+      if (!subQuestion.question || !subQuestion.analysisSteps || !Array.isArray(subQuestion.analysisSteps)) {
+        console.error("[Analyst Agent] Invalid sub-question structure:", subQuestion);
+        return createEnhancedFallbackPlan(message, false, null, supabaseClient, userTimezone);
+      }
     }
 
     // Enhance with detected characteristics and timezone

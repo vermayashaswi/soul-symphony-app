@@ -72,18 +72,33 @@ serve(async (req) => {
           conversationContext,
           threadId,
           messageId,
-          userTimezone
+          userTimezone,
+          execute: true
         }
       });
 
+      console.log("[chat-with-rag] Smart query planner response:", {
+        hasError: !!queryPlanResponse.error,
+        hasData: !!queryPlanResponse.data,
+        errorMessage: queryPlanResponse.error?.message,
+        dataKeys: queryPlanResponse.data ? Object.keys(queryPlanResponse.data) : []
+      });
+
       if (queryPlanResponse.error) {
+        console.error("[chat-with-rag] Query planning failed:", queryPlanResponse.error);
         throw new Error(`Query planning failed: ${queryPlanResponse.error.message}`);
+      }
+
+      if (!queryPlanResponse.data || !queryPlanResponse.data.queryPlan) {
+        console.error("[chat-with-rag] No query plan returned from smart-query-planner");
+        throw new Error("No query plan returned from smart-query-planner");
       }
 
       const queryPlan = queryPlanResponse.data.queryPlan;
       const executionResult = queryPlanResponse.data.executionResult;
       
-      console.log(`[chat-with-rag] GPT query plan:`, queryPlan);
+      console.log(`[chat-with-rag] GPT query plan:`, JSON.stringify(queryPlan, null, 2));
+      console.log(`[chat-with-rag] Execution result:`, JSON.stringify(executionResult, null, 2));
 
       // Transform execution results into expected consolidator format
       const transformedResults = (executionResult || []).map((result, index) => ({
