@@ -23,44 +23,26 @@ serve(async (req) => {
       throw new Error('OpenAI API key not configured');
     }
 
-    const requestBody = await req.json();
     const { 
       originalQuery, 
-      searchResults = [], 
-      combinedResults = [], 
-      queryPlan = {}, 
+      searchResults, 
+      combinedResults, 
+      queryPlan, 
       conversationContext = [],
       userProfile = {}
-    } = requestBody;
-
-    // Validate required parameters
-    if (!originalQuery) {
-      throw new Error('originalQuery is required');
-    }
-
-    // Ensure searchResults is an array
-    const safeSearchResults = Array.isArray(searchResults) ? searchResults : [];
-    const safeCombinedResults = Array.isArray(combinedResults) ? combinedResults : [];
-
-    console.log('[Intelligent Response Generator] Request validation passed:', {
-      originalQuery: originalQuery.substring(0, 50) + '...',
-      searchResultsCount: safeSearchResults.length,
-      combinedResultsCount: safeCombinedResults.length,
-      hasQueryPlan: !!queryPlan,
-      contextLength: conversationContext.length
-    });
+    } = await req.json();
 
     console.log('[Intelligent Response Generator] Generating response with database schema context for:', originalQuery);
 
     // Generate context-aware system prompt with database schema knowledge
     const systemPrompt = generateIntelligentSystemPrompt(
       queryPlan,
-      safeSearchResults,
+      searchResults,
       userProfile
     );
 
     // Format the combined results for analysis with schema awareness
-    const formattedContext = formatResultsForAnalysis(safeCombinedResults, safeSearchResults);
+    const formattedContext = formatResultsForAnalysis(combinedResults, searchResults);
 
     // Generate the response using GPT with full schema context
     const response = await generateIntelligentResponse(
@@ -74,10 +56,10 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       response,
       metadata: {
-        queryStrategy: queryPlan.strategy || 'unknown',
-        searchMethodsUsed: queryPlan.searchMethods || [],
-        resultsCount: safeCombinedResults.length,
-        confidence: queryPlan.confidence || 0,
+        queryStrategy: queryPlan.strategy,
+        searchMethodsUsed: queryPlan.searchMethods,
+        resultsCount: combinedResults.length,
+        confidence: queryPlan.confidence,
         databaseSchemaUsed: true
       }
     }), {
@@ -102,32 +84,12 @@ function generateIntelligentSystemPrompt(
   userProfile: any
 ): string {
   const currentDate = new Date().toISOString();
-  
-  // Handle conversational responses differently
-  if (queryPlan.strategy === 'conversational') {
-    return `You are Ruh by SOuLO, a warm and engaging wellness companion. 
-
-You're having a natural conversation with someone who uses a journaling app. Keep things simple, warm, and conversational.
-
-For greetings, acknowledgments, and general questions:
-- Respond naturally and warmly
-- Keep it brief (1-2 sentences)
-- Ask a gentle follow-up question about their wellbeing
-- Use emojis for warmth 😊
-
-Current date: ${currentDate}
-Timezone: ${userProfile.timezone || 'UTC'}
-
-Be genuinely helpful, warm, and conversational. No need for complex analysis - just be a friendly wellness companion.`;
-  }
-  
-  // Complex analysis system prompt for journal-specific queries
   const databaseContext = generateDatabaseSchemaContext();
   const emotionGuidelines = getEmotionAnalysisGuidelines();
   const themeGuidelines = getThemeAnalysisGuidelines();
   
   let contextualInfo = `Date: ${currentDate}, Timezone: ${userProfile.timezone || 'UTC'}
-Strategy: ${queryPlan.strategy}, Methods: ${queryPlan.searchMethods ? queryPlan.searchMethods.join(', ') : 'unknown'}`;
+Strategy: ${queryPlan.strategy}, Methods: ${queryPlan.searchMethods.join(', ')}`;
 
   if (queryPlan.filters?.timeRange) {
     const startStr = new Date(queryPlan.filters.timeRange.startDate).toLocaleDateString();
@@ -146,9 +108,9 @@ ${themeGuidelines}
 CONTEXT: ${contextualInfo}
 
 SEARCH RESULTS:
-${Array.isArray(searchResults) ? searchResults.map(result => 
-  `- ${result.method || 'unknown'}: ${(result.results || []).length} results (${result.confidence || 'unknown'}) - ${result.reasoning || 'no reasoning provided'}`
-).join('\n') : 'No search results available'}
+${searchResults.map(result => 
+  `- ${result.method}: ${result.results.length} results (${result.confidence}) - ${result.reasoning}`
+).join('\n')}
 
 CORE INSTRUCTIONS:
 • Use ONLY provided emotion scores (0.0-1.0) - never infer from text

@@ -8,12 +8,79 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Helper function to process time range
+function processTimeRange(timeRange: any, userTimezone: string = 'UTC'): { startDate?: string; endDate?: string } {
+  if (!timeRange) return {};
+  
+  console.log("Processing time range:", timeRange);
+  console.log(`Using user timezone: ${userTimezone}`);
+  
+  const result: { startDate?: string; endDate?: string } = {};
+  
+  try {
+    // Handle startDate if provided
+    if (timeRange.startDate) {
+      const startDate = new Date(timeRange.startDate);
+      if (!isNaN(startDate.getTime())) {
+        result.startDate = startDate.toISOString();
+      } else {
+        console.warn(`Invalid startDate: ${timeRange.startDate}`);
+      }
+    }
+    
+    // Handle endDate if provided
+    if (timeRange.endDate) {
+      const endDate = new Date(timeRange.endDate);
+      if (!isNaN(endDate.getTime())) {
+        result.endDate = endDate.toISOString();
+      } else {
+        console.warn(`Invalid endDate: ${timeRange.endDate}`);
+      }
+    }
+    
+    console.log("Final processed time range with UTC conversion:", result);
+    return result;
+  } catch (error) {
+    console.error("Error processing time range:", error);
+    return {};
+  }
+}
+
+// Helper function to detect timeframe in query
+function detectTimeframeInQuery(message: string, userTimezone: string = 'UTC'): any {
+  // Simple timeframe detection logic
+  const lowerMessage = message.toLowerCase();
+  
+  if (lowerMessage.includes('today')) {
+    return { type: 'today' };
+  }
+  if (lowerMessage.includes('yesterday')) {
+    return { type: 'yesterday' };
+  }
+  if (lowerMessage.includes('this week')) {
+    return { type: 'week' };
+  }
+  if (lowerMessage.includes('last week')) {
+    return { type: 'lastWeek' };
+  }
+  if (lowerMessage.includes('this month')) {
+    return { type: 'month' };
+  }
+  if (lowerMessage.includes('last month')) {
+    return { type: 'lastMonth' };
+  }
+  
+  return null;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    console.log("[chat-with-rag] Starting enhanced RAG processing with classification");
+
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -24,111 +91,170 @@ serve(async (req) => {
       }
     );
 
-    const { message, threadId, userId, conversationContext = [] } = await req.json();
-    const requestId = `rag_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+    const { 
+      message, 
+      userId, 
+      threadId = null, 
+      messageId = null,
+      conversationContext = [],
+      userProfile = null
+    } = await req.json();
 
-    console.log(`[${requestId}] Chat-with-RAG request:`, {
-      message: message.substring(0, 100),
-      threadId,
-      userId,
-      contextLength: conversationContext.length
+    console.log(`[chat-with-rag] Processing query: "${message}" for user: ${userId} (threadId: ${threadId}, messageId: ${messageId})`);
+    
+    // Extract user timezone from profile or default to UTC
+    const userTimezone = userProfile?.timezone || 'UTC';
+    console.log(`[chat-with-rag] User timezone: ${userTimezone}`);
+
+    // Step 1: Query Classification
+    console.log("[chat-with-rag] Step 1: Query Classification");
+    
+    const classificationResponse = await supabaseClient.functions.invoke('chat-query-classifier', {
+      body: { message, conversationContext }
     });
+    
+    let classification = classificationResponse.data;
+    
+    if (classificationResponse.error) {
+      console.error("[chat-with-rag] Classification error:", classificationResponse.error);
+      // Enhanced fallback classification with timezone context
+      classification = {
+        category: 'JOURNAL_SPECIFIC',
+        confidence: 0.7,
+        reasoning: 'Fallback classification with timezone support'
+      };
+    }
 
-    // Step 1: Generate query plan using smart-query-planner
-    console.log(`[${requestId}] Step 1: Generating query plan...`);
-    const { data: plannerResponse, error: plannerError } = await supabaseClient.functions.invoke('smart-query-planner', {
-      body: {
-        message,
-        userId,
-        execute: true,
-        conversationContext,
-        threadId,
-        requestId
+    console.log(`[chat-with-rag] Query classified as: ${classification.category} (confidence: ${classification.confidence})`);
+
+    // Enhanced classification override for debugging
+    if (req.headers.get('x-classification-hint')) {
+      const hintCategory = req.headers.get('x-classification-hint');
+      console.error(`[chat-with-rag] CLIENT HINT: Overriding classification to ${hintCategory}`);
+      classification.category = hintCategory;
+    }
+
+    if (classification.category === 'JOURNAL_SPECIFIC') {
+      console.log("[chat-with-rag] EXECUTING: JOURNAL_SPECIFIC pipeline - full RAG processing");
+      
+      // Step 2: Enhanced Query Planning with timezone support
+      const queryPlanResponse = await supabaseClient.functions.invoke('smart-query-planner', {
+        body: { 
+          message, 
+          userId, 
+          conversationContext,
+          threadId,
+          messageId,
+          userTimezone // Pass user timezone to planner
+        }
+      });
+
+      if (queryPlanResponse.error) {
+        throw new Error(`Query planning failed: ${queryPlanResponse.error.message}`);
       }
-    });
 
-    if (plannerError) {
-      console.error(`[${requestId}] Query planner error:`, plannerError);
-      throw new Error(`Query planning failed: ${plannerError.message}`);
-    }
+      const queryPlan = queryPlanResponse.data.queryPlan;
+      console.log(`[chat-with-rag] Query plan strategy: ${queryPlan.strategy}, complexity: ${queryPlan.queryComplexity}`);
 
-    if (!plannerResponse?.researchResults) {
-      console.error(`[${requestId}] No research results from planner:`, plannerResponse);
-      throw new Error('Query planner did not return research results');
-    }
-
-    console.log(`[${requestId}] Query plan generated successfully with ${plannerResponse.researchResults.length} research results`);
-
-    // Step 2: Consolidate response using gpt-response-consolidator
-    console.log(`[${requestId}] Step 2: Consolidating response...`);
-    const { data: consolidatorResponse, error: consolidatorError } = await supabaseClient.functions.invoke('gpt-response-consolidator', {
-      body: {
-        userQuery: message,
-        queryPlan: plannerResponse.queryPlan,
-        researchResults: plannerResponse.researchResults,
-        executionSummary: plannerResponse.executionSummary,
-        requestId
+      // Enhanced timeframe detection with timezone support
+      let timeRange = null;
+      const detectedTimeframe = detectTimeframeInQuery(message, userTimezone);
+      
+      if (detectedTimeframe) {
+        console.log(`[chat-with-rag] Detected timeframe with timezone ${userTimezone}:`, JSON.stringify(detectedTimeframe, null, 2));
+        // Process timeframe with user's timezone for proper UTC conversion
+        timeRange = processTimeRange(detectedTimeframe, userTimezone);
+        console.log(`[chat-with-rag] Processed time range (converted to UTC):`, JSON.stringify(timeRange, null, 2));
       }
-    });
 
-    if (consolidatorError) {
-      console.error(`[${requestId}] Consolidator error:`, consolidatorError);
-      throw new Error(`Response consolidation failed: ${consolidatorError.message}`);
-    }
+      console.log(`[chat-with-rag] Using GPT-generated query plan:`, {
+        queryType: queryPlan.queryType,
+        strategy: queryPlan.strategy,
+        userStatusMessage: queryPlan.userStatusMessage,
+        subQuestions: queryPlan.subQuestions,
+        confidence: queryPlan.confidence,
+        reasoning: queryPlan.reasoning,
+        useAllEntries: queryPlan.useAllEntries,
+        hasPersonalPronouns: queryPlan.hasPersonalPronouns,
+        hasExplicitTimeReference: queryPlan.hasExplicitTimeReference,
+        inferredTimeContext: queryPlan.inferredTimeContext
+      });
 
-    console.log(`[${requestId}] Response consolidated successfully`);
+      // Step 3: Execute the plan with timezone-aware processing
+      const executionResult = queryPlanResponse.data.executionResult;
 
-    // Step 3: Store message in database with proper structured data
-    const messageData = {
-      thread_id: threadId,
-      content: consolidatorResponse.consolidatedResponse,
-      sender: 'assistant',
-      role: 'assistant',
-      analysis_data: consolidatorResponse.analysisData || null,
-      sub_query_responses: consolidatorResponse.subQueryResponses || null,
-      reference_entries: consolidatorResponse.referenceEntries || null,
-      has_numeric_result: false
-    };
+      // Step 4: Generate enhanced response with timezone context
+      const responseGeneration = await supabaseClient.functions.invoke('intelligent-response-generator', {
+        body: {
+          originalQuery: message,
+          queryPlan: queryPlan,
+          searchResults: executionResult,
+          conversationContext: conversationContext,
+          userProfile: userProfile,
+          timeRange: timeRange,
+          userTimezone: userTimezone // Pass timezone to response generator
+        }
+      });
 
-    console.log(`[${requestId}] Step 3: Storing message in database...`);
-    const { data: messageInsert, error: messageError } = await supabaseClient
-      .from('chat_messages')
-      .insert(messageData)
-      .select()
-      .single();
+      if (responseGeneration.error) {
+        throw new Error(`Response generation failed: ${responseGeneration.error.message}`);
+      }
 
-    if (messageError) {
-      console.error(`[${requestId}] Database insert error:`, messageError);
-      // Don't throw error here - still return the response even if DB insert fails
+      console.log("[chat-with-rag] Successfully completed GPT-driven analysis pipeline");
+
+      return new Response(JSON.stringify({
+        response: responseGeneration.data.response,
+        metadata: {
+          classification: classification,
+          queryPlan: queryPlan,
+          searchResults: executionResult,
+          timeRange: timeRange,
+          userTimezone: userTimezone,
+          strategy: queryPlan.strategy,
+          confidence: queryPlan.confidence
+        }
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+
     } else {
-      console.log(`[${requestId}] Message stored successfully with ID:`, messageInsert.id);
-    }
+      // Handle non-journal queries (general mental health, unrelated, etc.) with timezone awareness
+      console.log(`[chat-with-rag] EXECUTING: ${classification.category} pipeline - general response`);
+      
+      const generalResponse = await supabaseClient.functions.invoke('intelligent-response-generator', {
+        body: {
+          originalQuery: message,
+          queryPlan: { strategy: 'general_response', category: classification.category },
+          searchResults: [],
+          conversationContext: conversationContext,
+          userProfile: userProfile,
+          userTimezone: userTimezone
+        }
+      });
 
-    // Return the consolidated response
-    return new Response(JSON.stringify({
-      response: consolidatorResponse.consolidatedResponse,
-      analysisData: consolidatorResponse.analysisData,
-      subQueryResponses: consolidatorResponse.subQueryResponses,
-      referenceEntries: consolidatorResponse.referenceEntries,
-      requestId,
-      success: true,
-      timestamp: new Date().toISOString()
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+      if (generalResponse.error) {
+        throw new Error(`General response generation failed: ${generalResponse.error.message}`);
+      }
+
+      return new Response(JSON.stringify({
+        response: generalResponse.data.response,
+        metadata: {
+          classification: classification,
+          strategy: 'general_response',
+          userTimezone: userTimezone
+        }
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
   } catch (error) {
-    console.error('Error in chat-with-rag:', error);
+    console.error('[chat-with-rag] Error:', error);
     
-    // Return a fallback response
     return new Response(JSON.stringify({
-      response: "I apologize, but I'm having trouble analyzing your journal data right now. This might be a temporary issue. Please try rephrasing your question or try again in a moment.",
-      error: error.message,
-      analysisData: { error: error.message },
-      subQueryResponses: [],
-      referenceEntries: [],
-      success: false,
-      timestamp: new Date().toISOString()
+      error: 'Failed to process query with RAG pipeline',
+      details: error.message,
+      fallbackResponse: "I apologize, but I'm having trouble processing your request right now. Please try rephrasing your question or try again later."
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

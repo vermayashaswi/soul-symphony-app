@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
@@ -16,330 +15,631 @@ const corsHeaders = {
 interface QueryPlan {
   strategy: string;
   searchMethods: string[];
-  subQuestions: Array<{
-    question: string;
-    purpose: string;
-    searchStrategy: string;
-    executionStage: number;
-    analysisSteps: Array<{
-      step: number;
-      description: string;
-      queryType: string;
-      sqlQuery?: string;
-      vectorSearch?: {
-        query: string;
-        threshold: number;
-        limit: number;
-      };
-      timeRange?: {
-        start: string | null;
-        end: string | null;
-      };
-    }>;
-  }>;
+  filters: any;
+  emotionFocus?: string;
+  timeRange?: any;
+  subQueries?: string[];
+  expectedResponseType: string;
   confidence: number;
   reasoning: string;
   databaseContext: string;
 }
 
-async function generateIntelligentQueryPlan(
-  message: string,
-  conversationContext: any[],
-  userPatterns: any,
-  userProfile: any,
-  databaseContext: string,
-  emotionGuidelines: string,
-  themeGuidelines: string,
-  openaiApiKey: string,
-  userEntryCount: number
-): Promise<QueryPlan> {
-  const systemPrompt = `You are SOULo's Analyst Agent - an intelligent query planning specialist for journal data analysis. Your role is to break down user queries into comprehensive, actionable analysis plans.
+// Enhanced vector search debugging function
+async function debugVectorSearch(supabaseClient: any, userId: string, requestId: string) {
+  console.log(`[${requestId}] Starting vector search debugging for user: ${userId}`);
+  
+  try {
+    // Check if user has any journal entries
+    const { data: entries, error: entriesError } = await supabaseClient
+      .from('Journal Entries')
+      .select('id, created_at, user_id')
+      .eq('user_id', userId)
+      .limit(5);
+    
+    if (entriesError) {
+      console.error(`[${requestId}] Error fetching entries:`, entriesError);
+      return { hasEntries: false, error: entriesError.message };
+    }
+    
+    console.log(`[${requestId}] Found ${entries?.length || 0} journal entries for user`);
+    
+    if (!entries || entries.length === 0) {
+      return { hasEntries: false, message: 'No journal entries found' };
+    }
+    
+    // Check if user has any embeddings
+    const { data: embeddings, error: embeddingsError } = await supabaseClient
+      .from('journal_embeddings')
+      .select('id, journal_entry_id, created_at')
+      .in('journal_entry_id', entries.map(e => e.id))
+      .limit(5);
+    
+    if (embeddingsError) {
+      console.error(`[${requestId}] Error fetching embeddings:`, embeddingsError);
+      return { hasEntries: true, hasEmbeddings: false, error: embeddingsError.message };
+    }
+    
+    console.log(`[${requestId}] Found ${embeddings?.length || 0} embeddings for user entries`);
+    
+    return {
+      hasEntries: true,
+      entriesCount: entries.length,
+      hasEmbeddings: embeddings && embeddings.length > 0,
+      embeddingsCount: embeddings?.length || 0,
+      sampleEntryIds: entries.slice(0, 3).map(e => e.id)
+    };
+    
+  } catch (error) {
+    console.error(`[${requestId}] Debug vector search error:`, error);
+    return { hasEntries: false, error: error.message };
+  }
+}
 
-${databaseContext}
+// Enhanced vector search execution with detailed logging
+async function executeVectorSearchWithDebug(step: any, userId: string, supabaseClient: any, requestId: string) {
+  console.log(`[${requestId}] ================ VECTOR SEARCH DEBUG START ================`);
+  
+  try {
+    const queryText = step.vectorSearch.query;
+    console.log(`[${requestId}] Query text: "${queryText}"`);
+    
+    // Generate embedding with detailed logging
+    console.log(`[${requestId}] Generating embedding for query...`);
+    const embedding = await generateEmbedding(queryText);
+    
+    if (!embedding || !Array.isArray(embedding)) {
+      console.error(`[${requestId}] Invalid embedding generated:`, typeof embedding);
+      throw new Error('Failed to generate valid embedding');
+    }
+    
+    console.log(`[${requestId}] Embedding generated successfully:`);
+    console.log(`[${requestId}] - Dimensions: ${embedding.length}`);
+    console.log(`[${requestId}] - Sample values: [${embedding.slice(0, 5).map(n => n.toFixed(4)).join(', ')}...]`);
+    console.log(`[${requestId}] - All values are numbers: ${embedding.every(n => typeof n === 'number' && !isNaN(n))}`);
+    
+    // Enhanced database call with lower threshold for testing
+    const testThreshold = 0.1; // Lower threshold for debugging
+    const testLimit = 15; // More results for debugging
+    
+    console.log(`[${requestId}] Calling match_journal_entries with parameters:`);
+    console.log(`[${requestId}] - query_embedding: [${embedding.length} dimensional vector]`);
+    console.log(`[${requestId}] - match_threshold: ${testThreshold}`);
+    console.log(`[${requestId}] - match_count: ${testLimit}`);
+    console.log(`[${requestId}] - user_id_filter: ${userId}`);
+    
+    const { data, error } = await supabaseClient.rpc('match_journal_entries', {
+      query_embedding: embedding,
+      match_threshold: testThreshold,
+      match_count: testLimit,
+      user_id_filter: userId
+    });
+    
+    if (error) {
+      console.error(`[${requestId}] Vector search RPC error:`, error);
+      console.error(`[${requestId}] Error code: ${error.code}`);
+      console.error(`[${requestId}] Error message: ${error.message}`);
+      console.error(`[${requestId}] Error details:`, JSON.stringify(error.details || {}));
+      throw error;
+    }
+    
+    console.log(`[${requestId}] Vector search completed successfully:`);
+    console.log(`[${requestId}] - Results count: ${data?.length || 0}`);
+    
+    if (data && data.length > 0) {
+      console.log(`[${requestId}] Sample results:`);
+      data.slice(0, 3).forEach((result, idx) => {
+        console.log(`[${requestId}]   Result ${idx + 1}:`);
+        console.log(`[${requestId}]     - Entry ID: ${result.id}`);
+        console.log(`[${requestId}]     - Similarity: ${result.similarity}`);
+        console.log(`[${requestId}]     - Created: ${result.created_at}`);
+        console.log(`[${requestId}]     - Content preview: "${(result.content || '').substring(0, 100)}..."`);
+      });
+    } else {
+      console.warn(`[${requestId}] No vector search results found - this indicates potential issues:`);
+      console.warn(`[${requestId}] - User may have no journal entries with embeddings`);
+      console.warn(`[${requestId}] - Query embedding may not match any stored embeddings`);
+      console.warn(`[${requestId}] - Similarity threshold (${testThreshold}) may still be too high`);
+      
+      // Run debug check
+      const debugInfo = await debugVectorSearch(supabaseClient, userId, requestId);
+      console.log(`[${requestId}] Debug info:`, JSON.stringify(debugInfo, null, 2));
+    }
+    
+    console.log(`[${requestId}] ================ VECTOR SEARCH DEBUG END ================`);
+    return data || [];
 
-${emotionGuidelines}
+  } catch (error) {
+    console.error(`[${requestId}] ================ VECTOR SEARCH ERROR ================`);
+    console.error(`[${requestId}] Vector search execution failed:`, error);
+    console.error(`[${requestId}] Error type:`, error.constructor.name);
+    console.error(`[${requestId}] Error message:`, error.message);
+    if (error.stack) {
+      console.error(`[${requestId}] Stack trace:`, error.stack);
+    }
+    console.error(`[${requestId}] ================ VECTOR SEARCH ERROR END ================`);
+    throw error;
+  }
+}
 
-${themeGuidelines}
+async function executePlan(plan: any, userId: string, supabaseClient: any, requestId: string) {
+  console.log(`[${requestId}] Executing plan:`, JSON.stringify(plan, null, 2));
 
-**CURRENT CONTEXT:**
-- Today's date: ${new Date().toISOString()}
-- Current year: ${new Date().getFullYear()}
-- User query: "${message}"
-- User has ${userEntryCount} journal entries
-- Recent conversation context: ${conversationContext.slice(-5).map(c => `${c.sender}: ${c.content?.slice(0, 50) || 'N/A'}`).join(' | ')}
+  const results = [];
 
-**YOUR RESPONSIBILITIES AS ANALYST AGENT:**
-1. Smart Hypothesis Formation: infer what the user truly wants to know, then deduce focused sub-questions to answer it comprehensively
-2. Sub-Question Generation: break down the query into 1-3 precise sub-questions. For complex queries generate sub-questions in such a way that all sub-question's query when analyzed together give the answer to the core user's query
-3. Search Strategy: pick sql_primary, vector_primary, or hybrid based on the sub-question
-4. Dynamic Query Generation: produce executable SQL for our schema and/or vector queries
-5. Hybrid Analysis: combine SQL stats with semantic vector results when helpful
+  for (const subQuestion of plan.subQuestions) {
+    console.log(`[${requestId}] Executing sub-question:`, subQuestion.question);
 
-**ANALYSIS APPROACH:**
-- Simple greetings or acknowledgments: Create conversational plans without complex analysis
-- Journal-specific queries: Determine if SQL, vector search, or hybrid approach is needed based on the actual query
-- Let the content and intent of the query guide the analysis strategy
-- Only create complex analysis plans when the user explicitly asks for journal analysis
-- **MANDATORY**: If no specific time range is mentioned in the query, ALWAYS consider ALL time range - this means include ALL journal entries across ALL time periods to provide comprehensive analysis
+    let subResults = [];
+    for (const step of subQuestion.analysisSteps) {
+      console.log(`[${requestId}] Executing analysis step:`, step.step, step.description);
 
-**SQL QUERY GUIDELINES:**
-- ALWAYS include WHERE user_id = '{user_id}' (this will be replaced with actual user_id)
-- Use proper column names with quotes for spaced names like "refined text"
-- For emotion analysis: use emotions JSONB column
-- For theme analysis: use master_themes array and/or entities/text where appropriate
-- For percentages: alias as percentage
-- For counts: alias as count (or frequency for grouped counts)
-- For averages/scores: alias as avg_score (or score)
-- For date filtering: apply created_at comparisons when time is implied or stated
-- Do NOT call RPCs; generate plain SQL only
+      try {
+        let stepResult;
+        if (step.queryType === 'vector_search') {
+          console.log(`[${requestId}] Vector search:`, step.vectorSearch.query);
+          stepResult = await executeVectorSearchWithDebug(step, userId, supabaseClient, requestId);
+        } else if (step.queryType === 'sql_analysis') {
+          console.log(`[${requestId}] SQL analysis:`, step.sqlQuery);
+          stepResult = await executeSQLAnalysis(step, userId, supabaseClient, requestId);
+        } else if (step.queryType === 'hybrid_search') {
+          console.log(`[${requestId}] Hybrid search:`, step.vectorSearch.query, step.sqlQuery);
+          stepResult = await executeHybridSearch(step, userId, supabaseClient, requestId);
+        } else {
+          console.warn(`[${requestId}] Unknown query type:`, step.queryType);
+          stepResult = { error: `Unknown query type: ${step.queryType}` };
+        }
 
-**SEARCH STRATEGY SELECTION:**
-- sql_primary: statistical analysis, counts, percentages, aggregations
-- vector_primary: semantic content analysis, similar entries, meaning-based searches
-- hybrid: combine both when you need both statistics and semantic understanding
+        subResults.push({ step: step.step, result: stepResult });
 
-**MANDATORY OUTPUT STRUCTURE:**
-Return ONLY valid JSON with this exact structure:
+      } catch (stepError) {
+        console.error(`[${requestId}] Error executing step:`, step.step, stepError);
+        subResults.push({ step: step.step, error: stepError.message });
+      }
+    }
+
+    results.push({ question: subQuestion.question, results: subResults });
+  }
+
+  console.log(`[${requestId}] Execution complete. Results:`, JSON.stringify(results, null, 2));
+  return results;
+}
+
+async function executeSQLAnalysis(step: any, userId: string, supabaseClient: any, requestId: string) {
+  try {
+    const { data, error } = await supabaseClient
+      .from('Journal Entries')
+      .select('*')
+      .eq('user_id', userId)
+      .limit(10);
+
+    if (error) {
+      console.error(`[${requestId}] SQL analysis error:`, error);
+      throw error;
+    }
+
+    console.log(`[${requestId}] SQL analysis results:`, data?.length);
+    return data;
+
+  } catch (error) {
+    console.error(`[${requestId}] Error in SQL analysis:`, error);
+    throw error;
+  }
+}
+
+async function executeHybridSearch(step: any, userId: string, supabaseClient: any, requestId: string) {
+  try {
+    // Execute both vector and SQL searches in parallel
+    const [vectorResults, sqlResults] = await Promise.all([
+      executeVectorSearchWithDebug(step, userId, supabaseClient, requestId),
+      executeSQLAnalysis(step, userId, supabaseClient, requestId)
+    ]);
+
+    // Combine and process results (example: deduplication)
+    const combinedResults = [...(vectorResults || []), ...(sqlResults || [])];
+    const uniqueResults = Array.from(new Set(combinedResults.map(a => a.id)))
+      .map(id => {
+        return combinedResults.find(a => a.id === id)
+      });
+
+    console.log(`[${requestId}] Hybrid search combined results:`, uniqueResults?.length);
+    return uniqueResults;
+
+  } catch (error) {
+    console.error(`[${requestId}] Error in hybrid search:`, error);
+    throw error;
+  }
+}
+
+async function generateEmbedding(text: string): Promise<number[]> {
+  const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+  if (!openaiApiKey) {
+    throw new Error('OpenAI API key not configured');
+  }
+
+  console.log(`[Embedding] Generating embedding for text length: ${text.length}`);
+
+  const response = await fetch('https://api.openai.com/v1/embeddings', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${openaiApiKey}`,
+    },
+    body: JSON.stringify({
+      model: 'text-embedding-3-small',
+      input: text.substring(0, 8000), // Limit to prevent API errors
+      encoding_format: 'float'
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('[Embedding] OpenAI API error:', errorText);
+    throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
+  }
+
+  const data = await response.json();
+  
+  if (!data.data || data.data.length === 0) {
+    throw new Error('Empty embedding data received from OpenAI');
+  }
+
+  const embedding = data.data[0].embedding;
+  
+  if (!Array.isArray(embedding) || embedding.length !== 1536) {
+    throw new Error(`Invalid embedding dimensions: expected 1536, got ${embedding?.length}`);
+  }
+
+  console.log(`[Embedding] Successfully generated embedding with ${embedding.length} dimensions`);
+  return embedding;
+}
+
+/**
+ * Enhanced Analyst Agent with timezone-aware date processing
+ */
+async function analyzeQueryWithSubQuestions(message, conversationContext, userEntryCount, isFollowUp = false, supabaseClient, userTimezone = 'UTC') {
+  try {
+    const last = Array.isArray(conversationContext) ? conversationContext.slice(-5) : [];
+    
+    console.log(`[Analyst Agent] Processing query with user timezone: ${userTimezone}`);
+    
+    // Enhanced content-seeking detection with comprehensive patterns
+    const contentSeekingPatterns = [
+      // Direct content queries
+      /\b(what did i write|what did i say|what did i journal|show me|tell me about|find|entries about)\b/i,
+      /\b(content|text|wrote|said|mentioned|discussed|talked about)\b/i,
+      
+      // Emotional and reflective queries
+      /\b(how (was|am) i feeling|what was going through my mind|emotional state|mood)\b/i,
+      /\b(reflect|reflection|introspect|self-awareness|personal growth)\b/i,
+      
+      // Comparative and similarity queries
+      /\b(similar to|like when i|reminds me of|compare|comparison|patterns like)\b/i,
+      /\b(times when|occasions|moments|experiences like)\b/i,
+      
+      // Thematic and exploratory queries  
+      /\b(themes around|insights about|patterns in|explore|analyze|analysis)\b/i,
+      /\b(thoughts on|feelings about|perspective on|views on)\b/i,
+      
+      // Example and sample seeking
+      /\b(examples|instances|cases|samples|excerpts|quotes)\b/i,
+      /\b(give me|show me|find me|list)\b/i,
+      
+      // Achievement and progress queries
+      /\b(achievement|progress|accomplishment|success|breakthrough|milestone)\b/i,
+      /\b(what i achieved|how i grew|what i learned|realizations)\b/i
+    ];
+
+    const isContentSeekingQuery = contentSeekingPatterns.some(pattern => pattern.test(message.toLowerCase()));
+
+    // Enhanced patterns for queries that MANDATE vector search regardless of time components
+    const mandatoryVectorPatterns = [
+      /\b(exactly|specifically|precisely|detailed|in-depth)\b/i,
+      /\b(achievement|reflection|insights?|realizations?|breakthroughs?)\b/i,
+      /\b(how do i feel|what emotions|emotional journey|mental state)\b/i,
+      /\b(creative|inspirational|meaningful|significant|important)\b/i,
+      /\b(personal growth|self-discovery|learning|wisdom|understanding)\b/i
+    ];
+
+    const requiresMandatoryVector = mandatoryVectorPatterns.some(pattern => pattern.test(message.toLowerCase()));
+
+    // Detect personal pronouns for personalized queries
+    const hasPersonalPronouns = /\b(i|me|my|mine|myself)\b/i.test(message.toLowerCase());
+
+    // Enhanced time reference detection
+    const hasExplicitTimeReference = /\b(last week|yesterday|this week|last month|today|recently|lately|this morning|last night|august|january|february|march|april|may|june|july|september|october|november|december)\b/i.test(message.toLowerCase());
+
+    // Detect follow-up context queries
+    const isFollowUpContext = isFollowUp || /\b(that|those|it|this|these|above|mentioned|said|talked about)\b/i.test(message.toLowerCase());
+    
+    console.log(`[Analyst Agent] Enhanced analysis - Content-seeking: ${isContentSeekingQuery}, Mandatory vector: ${requiresMandatoryVector}, Personal: ${hasPersonalPronouns}, Time ref: ${hasExplicitTimeReference}, Follow-up: ${isFollowUpContext}`);
+
+    // Get live database schema with real themes and emotions using the authenticated client
+    const databaseSchemaContext = await generateDatabaseSchemaContext(supabaseClient);
+
+    const prompt = `You are SOULo's Enhanced Analyst Agent - an intelligent query planning specialist for journal data analysis with MANDATORY VECTOR SEARCH for content-seeking queries and TIMEZONE-AWARE date processing.
+
+${databaseSchemaContext}
+
+**CRITICAL TIMEZONE HANDLING RULES:**
+
+1. **USER TIMEZONE CONTEXT**: User timezone is "${userTimezone}"
+2. **DATABASE STORAGE**: All journal entries are stored in UTC in the database
+3. **TIMEZONE CONVERSION REQUIRED**: When generating date ranges, you MUST account for timezone conversion
+   - User asks about "August 6" in India timezone
+   - Database query needs UTC range that captures all entries made on August 6 India time
+   - Example: August 6 India time = August 5 18:30 UTC to August 6 18:29 UTC
+
+**CRITICAL VECTOR SEARCH RULES - MUST FOLLOW:**
+
+1. **MANDATORY VECTOR SEARCH SCENARIOS** (Always include vector search regardless of time constraints):
+   - ANY query asking for "content", "what I wrote", "what I said", "entries about", "show me", "find"
+   - Questions seeking emotional context, feelings, moods, or mental states
+   - Requests for examples, patterns, insights, or thematic analysis  
+   - Queries about achievements, progress, breakthroughs, or personal growth
+   - Comparative analysis ("similar to", "like when", "reminds me of")
+   - Reflective queries ("how was I feeling", "what was going through my mind")
+   - Follow-up questions referencing previous context
+   - Any query with words: "exactly", "specifically", "precisely", "detailed", "in-depth"
+
+2. **HYBRID SEARCH STRATEGY** (SQL + Vector for optimal results):
+   - Time-based content queries: Use SQL for date filtering AND vector for semantic content
+   - Statistical queries needing examples: SQL for stats AND vector for relevant samples
+   - Thematic queries: SQL theme analysis AND vector semantic search
+   - Achievement/progress tracking: SQL for metrics AND vector for meaningful content
+
+3. **ENHANCED VECTOR QUERY GENERATION**:
+   - Use the user's EXACT words and emotional context in vector searches
+   - For "What did I journal in August" → Vector query: "journal entries personal thoughts feelings experiences august"
+   - For achievement queries → Vector query: "achievement success accomplishment progress breakthrough proud"
+   - For emotional queries → Vector query: "emotions feelings mood emotional state [specific emotions mentioned]"
+   - Preserve user's original language patterns for better semantic matching
+
+4. **TIMEZONE-AWARE TIME RANGES**:
+   - All timeRange objects MUST include "timezone": "${userTimezone}"
+   - Date processing will handle conversion from user's local time to UTC for database queries
+   - Example timeRange: {"start": "2025-08-06T00:00:00", "end": "2025-08-06T23:59:59", "timezone": "${userTimezone}"}
+
+USER QUERY: "${message}"
+USER TIMEZONE: "${userTimezone}"
+CONTEXT: ${last.length > 0 ? last.map(m => `${m.sender}: ${m.content?.slice(0, 50) || 'N/A'}`).join(' | ') : 'None'}
+
+ANALYSIS REQUIREMENTS:
+- Content-seeking detected: ${isContentSeekingQuery}
+- Mandatory vector required: ${requiresMandatoryVector}  
+- Has personal pronouns: ${hasPersonalPronouns}
+- Has time reference: ${hasExplicitTimeReference}
+- Is follow-up query: ${isFollowUpContext}
+- User timezone: ${userTimezone}
+
+Generate a comprehensive analysis plan that:
+1. MANDATES vector search for any content-seeking scenario
+2. Uses hybrid approach (SQL + vector) for time-based content queries
+3. Creates semantically rich vector search queries using user's language
+4. INCLUDES proper timezone information in all timeRange objects
+5. Ensures comprehensive coverage of user's intent
+
+Response format:
 {
-  "queryType": "journal_specific",
-  "strategy": "intelligent_sub_query",
-  "userStatusMessage": "exactly 5 words describing analysis approach",
+  "queryType": "journal_specific|general_inquiry|mental_health",
+  "strategy": "intelligent_sub_query|comprehensive_hybrid|vector_mandatory",
+  "userStatusMessage": "Brief status for user",
   "subQuestions": [
     {
-      "question": "Specific focused sub-question",
-      "purpose": "How this helps answer the main query",
-      "searchStrategy": "sql_primary" | "vector_primary" | "hybrid",
+      "question": "Specific sub-question",
+      "purpose": "Why this question is needed",
+      "searchStrategy": "vector_mandatory|sql_primary|hybrid_parallel",
       "executionStage": 1,
       "analysisSteps": [
         {
           "step": 1,
-          "description": "Clear description of what this step accomplishes",
-          "queryType": "sql_analysis" | "vector_search" | "hybrid_search",
-          "sqlQuery": "SELECT ... FROM \\"Journal Entries\\" WHERE user_id = '{user_id}' AND ..." | null,
+          "description": "What this step does",
+          "queryType": "vector_search|sql_analysis|hybrid_search",
+          "sqlQuery": "SQL query if needed" or null,
           "vectorSearch": {
-            "query": "optimized search query",
-            "threshold": 0.3,
-            "limit": 10
-          } | null,
-          "timeRange": { "start": "ISO string or null", "end": "ISO string or null" } | null
+            "query": "Semantically rich search query using user's words",
+            "threshold": 0.1,
+            "limit": 15
+          } or null,
+          "timeRange": {"start": "ISO_DATE", "end": "ISO_DATE", "timezone": "${userTimezone}"} or null
         }
       ]
     }
   ],
   "confidence": 0.8,
-  "reasoning": "Brief explanation of the analysis strategy",
+  "reasoning": "Explanation of strategy with emphasis on vector search usage and timezone handling",
   "useAllEntries": boolean,
-  "hasPersonalPronouns": boolean,
-  "hasExplicitTimeReference": boolean
-}
+  "hasPersonalPronouns": ${hasPersonalPronouns},
+  "hasExplicitTimeReference": ${hasExplicitTimeReference},
+  "inferredTimeContext": null or timeframe_object_with_timezone,
+  "userTimezone": "${userTimezone}"
+}`;
 
-Focus on creating comprehensive, executable analysis plans that will provide meaningful insights.`;
-
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${openaiApiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'gpt-4.1-2025-04-14',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: message }
-      ],
-      max_completion_tokens: 2000,
-      response_format: { type: 'json_object' }
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`OpenAI API error: ${response.status}`);
-  }
-
-  const data = await response.json();
-  const planText = data.choices[0].message.content;
-
-  try {
-    const plan = JSON.parse(planText);
-    plan.databaseContext = plan.databaseContext || "Query plan generated with advanced analysis capabilities";
-    return plan;
-  } catch (parseError) {
-    console.error('Failed to parse GPT response:', parseError);
-    throw new Error('Failed to generate valid query plan');
-  }
-}
-
-async function executeDynamicQuery(sqlQuery: string, userId: string, supabaseClient: any, requestId: string) {
-  console.log(`[${requestId}] Executing dynamic SQL query:`, sqlQuery);
-  
-  // Replace user_id placeholder with actual user ID
-  const finalQuery = sqlQuery.replace(/\{user_id\}/g, `'${userId}'`);
-  
-  try {
-    const { data, error } = await supabaseClient.rpc('execute_dynamic_query', {
-      query_text: finalQuery
-    });
-
-    if (error) {
-      console.error(`[${requestId}] SQL execution error:`, error);
-      throw error;
-    }
-
-    console.log(`[${requestId}] SQL execution successful:`, data?.data?.length || 0, 'results');
-    return data?.data || [];
-  } catch (error) {
-    console.error(`[${requestId}] Error in dynamic query execution:`, error);
-    throw error;
-  }
-}
-
-async function executeVectorSearch(vectorConfig: any, userId: string, supabaseClient: any, requestId: string) {
-  console.log(`[${requestId}] Executing vector search:`, vectorConfig.query);
-  
-  try {
-    // Generate embedding
-    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
-    const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
+        'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${openaiApiKey}`,
       },
       body: JSON.stringify({
-        model: 'text-embedding-3-small',
-        input: vectorConfig.query.substring(0, 8000),
-        encoding_format: 'float'
+        model: 'gpt-4.1-2025-04-14',
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 2000,
+        temperature: 0.1
       }),
     });
 
-    if (!embeddingResponse.ok) {
-      throw new Error(`Embedding API error: ${embeddingResponse.status}`);
+    if (!response.ok) {
+      throw new Error(`OpenAI API error: ${response.status}`);
     }
 
-    const embeddingData = await embeddingResponse.json();
-    const embedding = embeddingData.data[0].embedding;
+    const data = await response.json();
+    console.log("Analyst Agent response:", data.choices[0].message.content);
 
-    // Execute vector search using RPC
-    const { data, error } = await supabaseClient.rpc('match_journal_entries', {
-      query_embedding: embedding,
-      match_threshold: vectorConfig.threshold || 0.3,
-      match_count: vectorConfig.limit || 10,
-      user_id_filter: userId
-    });
-
-    if (error) {
-      console.error(`[${requestId}] Vector search error:`, error);
-      throw error;
+    let analysisResult;
+    try {
+      analysisResult = JSON.parse(data.choices[0].message.content);
+    } catch (parseError) {
+      console.error("Failed to parse Analyst Agent response:", parseError);
+      return createEnhancedFallbackPlan(message, isContentSeekingQuery || requiresMandatoryVector, null, supabaseClient, userTimezone);
     }
 
-    console.log(`[${requestId}] Vector search successful:`, data?.length || 0, 'results');
-    return data || [];
+    if (!analysisResult || !analysisResult.subQuestions) {
+      console.error("Failed to parse Analyst Agent response, using enhanced fallback for content queries");
+      return createEnhancedFallbackPlan(message, isContentSeekingQuery || requiresMandatoryVector, null, supabaseClient, userTimezone);
+    }
+
+    // Force vector search for content-seeking queries and ensure timezone info
+    if (isContentSeekingQuery || requiresMandatoryVector) {
+      analysisResult.subQuestions.forEach(subQ => {
+        if (subQ.searchStrategy !== 'vector_mandatory' && subQ.searchStrategy !== 'hybrid_parallel') {
+          subQ.searchStrategy = 'vector_mandatory';
+          subQ.analysisSteps.forEach(step => {
+            if (!step.vectorSearch) {
+              step.vectorSearch = {
+                query: `${message} personal journal content experiences thoughts feelings`,
+                threshold: 0.1, // Lower threshold for better results
+                limit: 15
+              };
+              step.queryType = step.queryType === 'sql_analysis' ? 'hybrid_search' : 'vector_search';
+            } else {
+              // Ensure lower threshold for existing vector searches
+              step.vectorSearch.threshold = 0.1;
+            }
+            // Ensure timezone is included in timeRange
+            if (step.timeRange && !step.timeRange.timezone) {
+              step.timeRange.timezone = userTimezone;
+            }
+          });
+        }
+      });
+    }
+
+    // Enhance with detected characteristics and timezone
+    const finalResult = {
+      ...analysisResult,
+      useAllEntries: analysisResult.useAllEntries !== false,
+      hasPersonalPronouns,
+      hasExplicitTimeReference: false, // Override to false to prevent time-only strategies
+      inferredTimeContext: null,
+      userTimezone
+    };
+
+    console.log("Final Analyst Plan with timezone handling:", JSON.stringify(finalResult, null, 2));
+    return finalResult;
+
   } catch (error) {
-    console.error(`[${requestId}] Error in vector search:`, error);
-    throw error;
+    console.error("Error in Analyst Agent:", error);
+    return createEnhancedFallbackPlan(message, true, null, supabaseClient, userTimezone); // Default to content-seeking
   }
 }
 
-async function executePlan(plan: QueryPlan, userId: string, supabaseClient: any, requestId: string) {
-  console.log(`[${requestId}] Executing analysis plan with ${plan.subQuestions.length} sub-questions`);
+/**
+ * Create enhanced fallback plan with mandatory vector search and timezone handling
+ */
+function createEnhancedFallbackPlan(originalMessage, isContentSeekingQuery, inferredTimeContext, supabaseClient, userTimezone = 'UTC') {
+  const lowerMessage = originalMessage.toLowerCase();
+  const isEmotionQuery = /emotion|feel|mood|happy|sad|anxious|stressed|emotional/.test(lowerMessage);
+  const isThemeQuery = /work|relationship|family|health|goal|travel|career|friendship/.test(lowerMessage);
+  const isAchievementQuery = /achievement|progress|accomplishment|success|breakthrough|growth|proud/.test(lowerMessage);
 
-  const researchResults = [];
+  // Always use vector search for content-seeking queries
+  const searchStrategy = isContentSeekingQuery ? 'vector_mandatory' : 'hybrid_parallel';
+  
+  // Create semantically rich vector query
+  let vectorQuery = originalMessage;
+  if (isEmotionQuery) {
+    vectorQuery += " emotions feelings emotional state mood mental health";
+  }
+  if (isThemeQuery) {
+    vectorQuery += " themes life experiences personal growth";
+  }
+  if (isAchievementQuery) {
+    vectorQuery += " achievements success accomplishments progress breakthroughs";
+  }
 
-  for (const subQuestion of plan.subQuestions) {
-    console.log(`[${requestId}] Processing sub-question:`, subQuestion.question);
-
-    const subQuestionResults = {
-      subQuestion: subQuestion.question,
-      purpose: subQuestion.purpose,
-      searchStrategy: subQuestion.searchStrategy,
-      executionResults: {
-        sqlResults: [],
-        vectorResults: [],
-        hybridResults: []
-      }
-    };
-
-    for (const step of subQuestion.analysisSteps) {
-      console.log(`[${requestId}] Executing step ${step.step}:`, step.description);
-
-      try {
-        if (step.queryType === 'sql_analysis' && step.sqlQuery) {
-          const sqlResults = await executeDynamicQuery(step.sqlQuery, userId, supabaseClient, requestId);
-          subQuestionResults.executionResults.sqlResults.push({
-            step: step.step,
-            description: step.description,
-            results: sqlResults
-          });
-        }
-        
-        if (step.queryType === 'vector_search' && step.vectorSearch) {
-          const vectorResults = await executeVectorSearch(step.vectorSearch, userId, supabaseClient, requestId);
-          subQuestionResults.executionResults.vectorResults.push({
-            step: step.step,
-            description: step.description,
-            results: vectorResults
-          });
-        }
-        
-        if (step.queryType === 'hybrid_search') {
-          // Execute both SQL and vector search for hybrid
-          const hybridResults = { sqlData: [], vectorData: [] };
-          
-          if (step.sqlQuery) {
-            hybridResults.sqlData = await executeDynamicQuery(step.sqlQuery, userId, supabaseClient, requestId);
-          }
-          
-          if (step.vectorSearch) {
-            hybridResults.vectorData = await executeVectorSearch(step.vectorSearch, userId, supabaseClient, requestId);
-          }
-          
-          subQuestionResults.executionResults.hybridResults.push({
-            step: step.step,
-            description: step.description,
-            results: hybridResults
-          });
-        }
-      } catch (stepError) {
-        console.error(`[${requestId}] Error executing step ${step.step}:`, stepError);
-        // Add error information but continue with other steps
-        subQuestionResults.executionResults[`step_${step.step}_error`] = stepError.message;
-      }
-    }
-
-    researchResults.push(subQuestionResults);
+  // Ensure timezone is included in timeRange if provided
+  if (inferredTimeContext && !inferredTimeContext.timezone) {
+    inferredTimeContext.timezone = userTimezone;
   }
 
   return {
-    queryPlan: plan,
-    researchResults,
-    executionSummary: {
-      totalSubQuestions: plan.subQuestions.length,
-      totalSteps: plan.subQuestions.reduce((sum, sq) => sum + sq.analysisSteps.length, 0),
-      strategy: plan.strategy,
-      confidence: plan.confidence
-    }
+    queryType: "journal_specific",
+    strategy: "enhanced_fallback_with_vector",
+    userStatusMessage: isContentSeekingQuery ? "Semantic content search with enhanced vector analysis" : "Intelligent hybrid search strategy",
+    subQuestions: [
+      {
+        question: `Enhanced analysis for: ${originalMessage}`,
+        purpose: "Comprehensive content retrieval using vector semantic search for accurate results",
+        searchStrategy: searchStrategy,
+        executionStage: 1,
+        analysisSteps: [
+          {
+            step: 1,
+            description: "Enhanced vector semantic search with user's exact query context",
+            queryType: "vector_search",
+            sqlQuery: null,
+            vectorSearch: {
+              query: vectorQuery,
+              threshold: 0.1, // Lower threshold for better results
+              limit: 15
+            },
+            timeRange: inferredTimeContext ? { ...inferredTimeContext, timezone: userTimezone } : null
+          }
+        ]
+      }
+    ],
+    confidence: 0.7,
+    reasoning: `Enhanced fallback plan using mandatory vector search for content-seeking query: "${originalMessage}". This ensures semantic understanding and comprehensive content retrieval with proper timezone handling.`,
+    useAllEntries: true,
+    hasPersonalPronouns: /\b(i|me|my|mine|myself)\b/i.test(lowerMessage),
+    hasExplicitTimeReference: false, // Override to ensure vector search
+    inferredTimeContext: inferredTimeContext,
+    userTimezone
   };
 }
 
-async function analyzeUserPatterns(entries: any[], supabaseClient: any, userId: string) {
-  const patterns = {
-    avgEntriesPerWeek: 0,
-    commonEmotions: [] as string[],
-    commonThemes: [] as string[],
-    commonEntities:[] as string[],
-    lastEntryDate: null as string | null,
-    dominantSentiment: null as string | null
-  };
+async function generateDatabaseSchemaContext(supabaseClient: any): Promise<string> {
+  try {
+    const { data: emotions, error: emotionError } = await supabaseClient
+      .from('emotions')
+      .select('name, description');
 
-  if (entries.length === 0) return patterns;
+    if (emotionError) {
+      console.error('Error fetching emotions:', emotionError);
+      throw emotionError;
+    }
 
-  // Calculate basic patterns from recent entries
-  const dateRange = new Date(entries[0].created_at).getTime() - new Date(entries[entries.length - 1].created_at).getTime();
-  const weeks = dateRange / (1000 * 60 * 60 * 24 * 7);
-  patterns.avgEntriesPerWeek = Math.round(entries.length / Math.max(weeks, 1));
-  patterns.lastEntryDate = entries[0]?.created_at || null;
+    const { data: themes, error: themeError } = await supabaseClient
+      .from('themes')
+      .select('name, description');
 
-  return patterns;
+    if (themeError) {
+      console.error('Error fetching themes:', themeError);
+      throw themeError;
+    }
+
+    const emotionDescriptions = emotions
+      .map(emotion => `- ${emotion.name}: ${emotion.description}`)
+      .join('\n');
+
+    const themeDescriptions = themes
+      .map(theme => `- ${theme.name}: ${theme.description}`)
+      .join('\n');
+
+    return `
+DATABASE CONTEXT:
+- The database contains journal entries with text content, emotions, and themes.
+- Each entry is associated with a user ID.
+- The emotions table contains a list of emotions with descriptions:
+${emotionDescriptions}
+- The themes table contains a list of themes with descriptions:
+${themeDescriptions}
+`;
+  } catch (error) {
+    console.error('Error generating database schema context:', error);
+    return 'Error generating database schema context. Using limited context.';
+  }
 }
 
 serve(async (req) => {
@@ -358,30 +658,22 @@ serve(async (req) => {
       }
     );
 
-    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
-    if (!openaiApiKey) {
-      throw new Error('OpenAI API key not configured');
-    }
-
-    const { 
-      message, 
-      userId, 
-      execute = true, 
-      conversationContext = [], 
-      threadId, 
-      messageId, 
-      isFollowUp = false, 
-      userTimezone = 'UTC' 
-    } = await req.json();
+    const { message, userId, execute = true, conversationContext = [], timeRange = null, threadId, messageId, isFollowUp = false, userTimezone = 'UTC' } = await req.json();
 
     const requestId = `planner_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
     
-    console.log(`[${requestId}] Smart Query Planner Request:`, {
-      message: message.substring(0, 100),
-      userId,
-      execute,
-      contextLength: conversationContext?.length || 0
-    });
+    console.log(`[REQUEST START] ${requestId}: {
+  message: "${message}",
+  userId: "${userId}",
+  execute: ${execute},
+  timestamp: "${new Date().toISOString()}",
+  contextLength: ${conversationContext?.length || 0},
+  timeRange: ${JSON.stringify(timeRange)},
+  threadId: "${threadId}",
+  messageId: ${messageId},
+  isFollowUp: ${isFollowUp},
+  userTimezone: "${userTimezone}"
+}`);
 
     // Get user's journal entry count for context
     const { count: countData } = await supabaseClient
@@ -392,40 +684,18 @@ serve(async (req) => {
     const userEntryCount = countData || 0;
     console.log(`[${requestId}] User has ${userEntryCount} journal entries`);
 
-    // Get recent entries for pattern analysis
-    const { data: recentEntries } = await supabaseClient
-      .from('Journal Entries')
-      .select('created_at, emotions, master_themes, entities, sentiment')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(20);
+    // Run vector search debugging first
+    const debugInfo = await debugVectorSearch(supabaseClient, userId, requestId);
+    console.log(`[${requestId}] Debug info:`, JSON.stringify(debugInfo, null, 2));
 
-    const userPatterns = await analyzeUserPatterns(recentEntries || [], supabaseClient, userId);
-
-    // Generate database schema context
-    const databaseContext = generateDatabaseSchemaContext();
-    const emotionGuidelines = getEmotionAnalysisGuidelines();
-    const themeGuidelines = getThemeAnalysisGuidelines();
-
-    // Generate intelligent query plan using GPT
-    const queryPlan = await generateIntelligentQueryPlan(
-      message,
-      conversationContext,
-      userPatterns,
-      {},
-      databaseContext,
-      emotionGuidelines,
-      themeGuidelines,
-      openaiApiKey,
-      userEntryCount
-    );
+    // Generate comprehensive analysis plan with timezone support
+    const analysisResult = await analyzeQueryWithSubQuestions(message, conversationContext, userEntryCount, isFollowUp, supabaseClient, userTimezone);
 
     if (!execute) {
       // Return just the plan without execution
       return new Response(JSON.stringify({
-        queryPlan,
-        userPatterns,
-        databaseContext,
+        queryPlan: analysisResult,
+        debugInfo,
         timestamp: new Date().toISOString(),
         requestId
       }), {
@@ -433,15 +703,13 @@ serve(async (req) => {
       });
     }
 
-    // Execute the plan and return structured results
-    const executionResult = await executePlan(queryPlan, userId, supabaseClient, requestId);
-    
-    console.log(`[${requestId}] Plan execution completed successfully`);
+    // Execute the plan and return results
+    const executionResult = await executePlan(analysisResult, userId, supabaseClient, requestId);
     
     return new Response(JSON.stringify({
-      ...executionResult,
-      userPatterns,
-      databaseContext,
+      queryPlan: analysisResult,
+      executionResult,
+      debugInfo,
       timestamp: new Date().toISOString(),
       requestId
     }), {
@@ -454,18 +722,19 @@ serve(async (req) => {
       error: error.message,
       fallbackPlan: {
         queryType: "error_fallback",
-        strategy: "simple_vector_search",
+        strategy: "vector_mandatory",
         subQuestions: [{
-          question: "General journal search",
-          searchStrategy: "vector_primary",
+          question: "Enhanced vector search fallback",
+          searchStrategy: "vector_mandatory",
           analysisSteps: [{
             step: 1,
             queryType: "vector_search",
             vectorSearch: {
               query: "personal journal experiences thoughts feelings",
-              threshold: 0.3,
+              threshold: 0.1,
               limit: 10
-            }
+            },
+            timeRange: null
           }]
         }],
         useAllEntries: true,

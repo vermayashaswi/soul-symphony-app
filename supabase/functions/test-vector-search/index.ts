@@ -64,15 +64,14 @@ serve(async (req) => {
 
     const { userId, testQuery = "parenting thoughts feelings" } = await req.json();
     
-    console.log(`[Test] Starting comprehensive vector search test for user: ${userId}`);
+    console.log(`[Test] Starting vector search test for user: ${userId}`);
     console.log(`[Test] Test query: "${testQuery}"`);
 
-    // Step 1: Check user's journal entries with detailed analysis
+    // Step 1: Check user's journal entries
     const { data: entries, error: entriesError } = await supabaseClient
       .from('Journal Entries')
-      .select('id, created_at, "refined text", "transcription text", user_id')
+      .select('id, created_at, "refined text", "transcription text"')
       .eq('user_id', userId)
-      .order('created_at', { ascending: false })
       .limit(10);
 
     if (entriesError) {
@@ -80,20 +79,13 @@ serve(async (req) => {
     }
 
     console.log(`[Test] Found ${entries?.length || 0} journal entries`);
-    if (entries && entries.length > 0) {
-      console.log(`[Test] Sample entries:`, entries.slice(0, 3).map(e => ({
-        id: e.id,
-        created_at: e.created_at,
-        content_length: (e['refined text'] || e['transcription text'] || '').length
-      })));
-    }
 
-    // Step 2: Check embeddings for these entries with detailed analysis
+    // Step 2: Check embeddings for these entries
     const entryIds = entries?.map(e => e.id) || [];
     
     const { data: embeddings, error: embeddingsError } = await supabaseClient
       .from('journal_embeddings')
-      .select('id, journal_entry_id, created_at, embedding')
+      .select('id, journal_entry_id, created_at')
       .in('journal_entry_id', entryIds);
 
     if (embeddingsError) {
@@ -101,125 +93,79 @@ serve(async (req) => {
     }
 
     console.log(`[Test] Found ${embeddings?.length || 0} embeddings`);
-    
-    // Analyze embedding quality
-    if (embeddings && embeddings.length > 0) {
-      const firstEmbedding = embeddings[0].embedding;
-      console.log(`[Test] First embedding analysis:`);
-      console.log(`[Test] - Type: ${typeof firstEmbedding}`);
-      console.log(`[Test] - Is array: ${Array.isArray(firstEmbedding)}`);
-      
-      if (Array.isArray(firstEmbedding)) {
-        console.log(`[Test] - Dimensions: ${firstEmbedding.length}`);
-        console.log(`[Test] - Sample values: [${firstEmbedding.slice(0, 5).map(n => n.toFixed(4)).join(', ')}...]`);
-        console.log(`[Test] - All numbers: ${firstEmbedding.every(n => typeof n === 'number' && !isNaN(n))}`);
-      }
-    }
 
-    // Step 3: Generate embedding for test query with validation
+    // Step 3: Generate embedding for test query
     const queryEmbedding = await generateEmbedding(testQuery);
-    console.log(`[Test] Query embedding validation:`);
-    console.log(`[Test] - Dimensions: ${queryEmbedding.length}`);
-    console.log(`[Test] - Expected: 1536`);
-    console.log(`[Test] - Match: ${queryEmbedding.length === 1536}`);
-    console.log(`[Test] - Sample: [${queryEmbedding.slice(0, 5).map(n => n.toFixed(4)).join(', ')}...]`);
+    console.log(`[Test] Query embedding dimensions: ${queryEmbedding.length}`);
 
-    // Step 4: Test vector search with multiple thresholds
-    const testResults = [];
-    const thresholds = [0.01, 0.1, 0.3, 0.5];
-    
-    for (const threshold of thresholds) {
-      console.log(`[Test] Testing threshold: ${threshold}`);
-      
-      const { data: vectorResults, error: vectorError } = await supabaseClient
-        .rpc('match_journal_entries', {
-          query_embedding: queryEmbedding,
-          match_threshold: threshold,
-          match_count: 20,
-          user_id_filter: userId
-        });
+    // Step 4: Test vector search with very low threshold
+    const { data: vectorResults, error: vectorError } = await supabaseClient
+      .rpc('match_journal_entries', {
+        query_embedding: queryEmbedding,
+        match_threshold: 0.05, // Very low threshold
+        match_count: 20,
+        user_id_filter: userId
+      });
 
-      if (vectorError) {
-        console.error(`[Test] Vector search error at threshold ${threshold}:`, vectorError);
-        testResults.push({
-          threshold,
-          error: vectorError.message,
-          results_count: 0
-        });
-      } else {
-        console.log(`[Test] Threshold ${threshold}: ${vectorResults?.length || 0} results`);
-        testResults.push({
-          threshold,
-          results_count: vectorResults?.length || 0,
-          top_similarities: vectorResults?.slice(0, 3).map(r => ({
-            id: r.id,
-            similarity: r.similarity,
-            content_preview: (r.content || '').substring(0, 100)
-          })) || []
-        });
-      }
+    if (vectorError) {
+      console.error('[Test] Vector search error:', vectorError);
+      throw vectorError;
     }
 
-    // Step 5: Test direct embedding lookup
-    let directLookup = null;
-    if (embeddings && embeddings.length > 0) {
+    console.log(`[Test] Vector search returned ${vectorResults?.length || 0} results`);
+
+    // Step 5: Test with known entry ID if no results
+    let directTest = null;
+    if ((!vectorResults || vectorResults.length === 0) && embeddings?.length > 0) {
       const sampleEntryId = embeddings[0].journal_entry_id;
-      console.log(`[Test] Testing direct lookup for entry ID: ${sampleEntryId}`);
+      console.log(`[Test] Testing direct search with entry ID: ${sampleEntryId}`);
       
       const { data: directResults, error: directError } = await supabaseClient
         .from('journal_embeddings')
         .select('*, "Journal Entries"!inner(id, created_at, "refined text", "transcription text")')
         .eq('journal_entry_id', sampleEntryId)
-        .eq('Journal Entries.user_id', userId)
-        .limit(1);
+        .eq('Journal Entries.user_id', userId);
 
-      if (!directError && directResults) {
-        directLookup = {
-          success: true,
-          entry_id: sampleEntryId,
-          has_embedding: !!directResults[0]?.embedding,
-          embedding_dimensions: Array.isArray(directResults[0]?.embedding) ? directResults[0].embedding.length : 0
-        };
-      } else {
-        directLookup = {
-          success: false,
-          error: directError?.message || 'Unknown error'
-        };
+      if (!directError) {
+        directTest = directResults;
+        console.log(`[Test] Direct query returned ${directResults?.length || 0} results`);
       }
     }
 
-    // Step 6: Test database extensions
+    // Step 6: Test pgvector extension
     const { data: extensionTest, error: extensionError } = await supabaseClient
       .rpc('version');
 
     return new Response(JSON.stringify({
       success: true,
-      timestamp: new Date().toISOString(),
-      test_query: testQuery,
-      user_id: userId,
-      results: {
-        journal_entries: {
+      testResults: {
+        journalEntries: {
           count: entries?.length || 0,
-          sample_ids: entries?.slice(0, 3).map(e => e.id) || []
+          sampleIds: entries?.slice(0, 3).map(e => e.id) || []
         },
         embeddings: {
           count: embeddings?.length || 0,
-          sample_analysis: embeddings && embeddings.length > 0 ? {
-            dimensions: Array.isArray(embeddings[0].embedding) ? embeddings[0].embedding.length : 0,
-            type: typeof embeddings[0].embedding,
-            is_valid: Array.isArray(embeddings[0].embedding) && embeddings[0].embedding.length === 1536
-          } : null
+          sampleIds: embeddings?.slice(0, 3).map(e => e.journal_entry_id) || []
         },
-        query_embedding: {
+        queryEmbedding: {
           dimensions: queryEmbedding.length,
-          is_valid: queryEmbedding.length === 1536,
+          isValid: Array.isArray(queryEmbedding) && queryEmbedding.length === 1536,
           sample: queryEmbedding.slice(0, 5)
         },
-        vector_search_tests: testResults,
-        direct_lookup: directLookup,
-        database_extensions: {
-          test: extensionTest || null,
-          error: extensionError?.message || null
+        vectorSearch: {
+          resultsCount: vectorResults?.length || 0,
+          results: vectorResults?.slice(0, 3).map(r => ({
+            id: r.id,
+            similarity: r.similarity,
+            created_at: r.created_at,
+            content_preview: (r.content || '').substring(0, 100)
+          })) || [],
+          error: vectorError?.message || null
+        },
+        directTest,
+        database: {
+          extensionTest: extensionTest || null,
+          extensionError: extensionError?.message || null
         }
       }
     }), {
@@ -231,8 +177,7 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       success: false,
       error: error.message,
-      stack: error.stack,
-      timestamp: new Date().toISOString()
+      stack: error.stack
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
