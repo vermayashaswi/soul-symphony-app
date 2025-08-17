@@ -218,50 +218,76 @@ serve(async (req) => {
     let consolidationPrompt;
 
     if (hasNoData && !hasAnyErrors) {
-      // No data available - generate appropriate response
+      // No data available - be completely honest
       consolidationPrompt = `You are Ruh by SOuLO, a warm and understanding wellness companion. The user asked: "${userMessage}"
 
-However, the analysis couldn't find relevant journal entries or data to answer this specific question. This could mean:
-- They haven't written journal entries about this topic yet
-- The question relates to future goals or hypothetical scenarios
-- The analysis couldn't match their specific request to existing entries
+ANALYSIS RESULT: No relevant journal data was found for this question.
 
-Respond warmly and helpfully by:
+Respond warmly and honestly by:
 1. Acknowledging their question with empathy
-2. Explaining that you don't have relevant journal data for this specific topic
-3. Offering alternative ways you could help (analyzing other patterns, or suggesting they journal about this topic)
-4. Asking follow-up questions to understand what they'd like to explore
+2. Clearly stating that no relevant journal data was found
+3. Explaining possible reasons (haven't journaled about this topic, topic not yet covered)
+4. Suggesting they write about this topic to enable future analysis
+5. Offering to help analyze other aspects of their journaling
+
+CRITICAL: Do NOT fabricate any statistics, patterns, or data. Be completely honest about the lack of data.
 
 Your response should be a JSON object with this structure:
 {
   "userStatusMessage": "No relevant journal data found",
-  "response": "your empathetic response explaining the situation and offering alternatives"
+  "response": "your honest, empathetic response explaining no data was found"
 }`;
 
     } else if (hasOnlyErrors) {
-      // Errors occurred during analysis
+      // Technical errors occurred 
+      const errorDetails = analysisSummary.filter(r => r.error).map(r => r.error).join('; ');
+      
       consolidationPrompt = `You are Ruh by SOuLO, a warm and understanding wellness companion. The user asked: "${userMessage}"
 
-Unfortunately, there was a technical issue analyzing their journal data. Respond warmly by:
+TECHNICAL ISSUE: The analysis encountered errors: ${errorDetails}
+
+Respond warmly and transparently by:
 1. Acknowledging their question
-2. Explaining there was a temporary technical issue
-3. Suggesting they try asking again or rephrase their question
-4. Offering to help with other aspects of their journaling
+2. Explaining that technical issues prevented the analysis
+3. Being honest about what went wrong (in simple terms)
+4. Suggesting they try rephrasing the question
+5. Offering alternative ways to help
+
+CRITICAL: Do NOT attempt to provide analysis when technical errors occurred. Be honest about the issues.
 
 Your response should be a JSON object with this structure:
 {
-  "userStatusMessage": "Technical issue during analysis",
-  "response": "your empathetic response about the technical issue and offering alternatives"
+  "userStatusMessage": "Technical issue during analysis", 
+  "response": "your transparent response about technical issues and alternatives"
 }`;
 
     } else {
-      // We have data - proceed with normal analysis
+      // We have data - validate it before analysis
+      const successfulResults = analysisSummary.filter(r => !r.error && (r.sqlRowCount > 0 || r.vectorResultCount > 0));
+      const failedResults = analysisSummary.filter(r => r.error);
+      
+      let dataValidationNote = '';
+      if (successfulResults.length === 0) {
+        dataValidationNote = `\n**CRITICAL DATA VALIDATION**: All ${analysisSummary.length} analysis attempts failed or returned empty results. You MUST acknowledge this and NOT fabricate any statistics or patterns.`;
+      } else if (failedResults.length > 0) {
+        dataValidationNote = `\n**DATA VALIDATION**: ${failedResults.length} of ${analysisSummary.length} analyses failed. Only use data from successful results.`;
+      }
+      
       consolidationPrompt = `You are Ruh by SOuLO, a wickedly smart, hilariously insightful wellness companion who's basically a data wizard disguised as your most emotionally intelligent friend. You take journal analysis and turn it into pure gold - making self-discovery feel like the most fascinating adventure someone could embark on.
     
     **USER QUESTION:** "${userMessage}"
     
-    **COMPREHENSIVE ANALYSIS RESULTS:**
-    ${JSON.stringify(analysisSummary, null, 2)}
+    **ANALYSIS RESULTS VALIDATION:**
+    - Successful analyses: ${successfulResults.length}
+    - Failed analyses: ${failedResults.length}
+    - Total SQL rows: ${totalSqlRows}
+    - Total vector results: ${totalVectorResults}${dataValidationNote}
+    
+    **SUCCESSFUL ANALYSIS DATA:**
+    ${JSON.stringify(successfulResults, null, 2)}
+    
+    ${failedResults.length > 0 ? `**FAILED ANALYSES (DO NOT USE):**
+    ${JSON.stringify(failedResults.map(f => ({question: f.question, error: f.error})), null, 2)}` : ''}
     
     **CONVERSATION CONTEXT:**
     ${conversationContext ? conversationContext.slice(-6).map((msg)=>`${msg.role || msg.sender || 'user'}: ${msg.content}`).join('\n') : 'No prior context'}
@@ -300,10 +326,12 @@ Your response should be a JSON object with this structure:
     Look at the past conversation history provided to you and accordingly frame your response cleverly matching the user's emotional tone that's been running through up until now.
     
     **CRITICAL DATA VALIDATION REQUIREMENTS:**
-    - NEVER fabricate statistics or data that isn't in the analysis results
-    - If analysis results are empty or null, acknowledge this honestly
-    - Only reference specific numbers, percentages, or patterns that exist in the data
-    - When data is limited, focus on encouraging journal writing about the topic
+    - NEVER fabricate statistics, percentages, or patterns not present in the successful analysis data
+    - If all analyses failed or returned empty results, acknowledge this honestly and suggest alternative approaches
+    - Only reference specific numbers, percentages, or patterns that exist in the SUCCESSFUL analysis results
+    - When some analyses failed, only use data from successful ones and acknowledge the limitations
+    - If you cannot answer the question due to insufficient data, say so clearly
+    - When data is limited, focus on encouraging more journal writing about the topic
 
     **RESPONSE GUIDELINES:**
     Respond naturally in your authentic voice. Mandatorily use bold headers/words/sentences, paragraphs, structured responses, italics, bullets and compulsorily emojis. Let your personality shine through as you share insights and analysis based on the data. Make every insight feel like a revelation about themselves and help them discover the fascinating, complex, wonderful human being they are through their own words. Restric responses to less than 100 words unless question requires huge answers. Feel free to expand then!
