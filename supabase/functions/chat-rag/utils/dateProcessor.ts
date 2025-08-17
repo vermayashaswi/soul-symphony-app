@@ -6,78 +6,20 @@ import { format, parseISO, subDays, startOfWeek, endOfWeek, startOfMonth, endOfM
 import { toZonedTime } from 'https://esm.sh/date-fns-tz@3.2.0';
 
 /**
- * Convert user's local date range to UTC range for database queries
- * This is crucial because entries are stored in UTC but users query in local time
+ * Process a time range object to ensure dates are in proper format
  */
-function convertLocalDateRangeToUTC(startDate: Date, endDate: Date, userTimezone: string): { startDateUTC: string, endDateUTC: string } {
-  console.log(`[DateProcessor] Converting local date range to UTC:`);
-  console.log(`Input - Start: ${startDate.toISOString()}, End: ${endDate.toISOString()}`);
-  console.log(`User timezone: ${userTimezone}`);
-  
-  // The input dates are already in the user's local time context
-  // We need to find the UTC range that corresponds to the full local day
-  
-  // For start date: get the beginning of the day in user's timezone, then convert to UTC
-  const localStartOfDay = startOfDay(startDate);
-  const utcStartOfDay = new Date(localStartOfDay.getTime() - (getTimezoneOffset(userTimezone) * 60 * 1000));
-  
-  // For end date: get the end of the day in user's timezone, then convert to UTC
-  const localEndOfDay = endOfDay(endDate);
-  const utcEndOfDay = new Date(localEndOfDay.getTime() - (getTimezoneOffset(userTimezone) * 60 * 1000));
-  
-  const result = {
-    startDateUTC: utcStartOfDay.toISOString(),
-    endDateUTC: utcEndOfDay.toISOString()
-  };
-  
-  console.log(`[DateProcessor] UTC conversion result:`);
-  console.log(`UTC Start: ${result.startDateUTC}`);
-  console.log(`UTC End: ${result.endDateUTC}`);
-  
-  return result;
-}
-
-/**
- * Get timezone offset in minutes for a given timezone
- */
-function getTimezoneOffset(timezone: string): number {
-  try {
-    const now = new Date();
-    const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
-    const targetTime = new Date(utcTime + (getTimezoneOffsetMinutes(timezone) * 60000));
-    return targetTime.getTimezoneOffset();
-  } catch (error) {
-    console.error(`Error getting timezone offset for ${timezone}:`, error);
-    return 0; // Default to UTC
-  }
-}
-
-/**
- * Helper to get timezone offset in minutes
- */
-function getTimezoneOffsetMinutes(timezone: string): number {
-  const offsetMap: Record<string, number> = {
-    'Asia/Kolkata': 330,      // +5:30
-    'America/New_York': -300, // -5:00 (EST)
-    'Europe/London': 0,       // GMT
-    'UTC': 0
-  };
-  
-  return offsetMap[timezone] || 0;
-}
-
-/**
- * Process a time range object to ensure dates are in proper format with timezone conversion
- */
-export function processTimeRange(timeRange: any, userTimezone: string = 'UTC'): { startDate?: string; endDate?: string } {
+export function processTimeRange(timeRange: any): { startDate?: string; endDate?: string } {
   if (!timeRange) return {};
   
   console.log("Processing time range:", timeRange);
-  console.log(`Using user timezone: ${userTimezone}`);
   
   const result: { startDate?: string; endDate?: string } = {};
   
   try {
+    // Use timezone from the timeRange object if available
+    const timezone = timeRange.timezone || 'UTC';
+    console.log(`Using timezone for date processing: ${timezone}`);
+    
     // Handle startDate if provided
     if (timeRange.startDate) {
       // Ensure it's a valid date
@@ -101,22 +43,16 @@ export function processTimeRange(timeRange: any, userTimezone: string = 'UTC'): 
     }
     
     // Calculate current date in user's timezone
-    const now = userTimezone ? toZonedTime(new Date(), userTimezone) : new Date();
-    console.log(`Current date in timezone ${userTimezone}: ${now.toISOString()}`);
+    const now = timezone ? toZonedTime(new Date(), timezone) : new Date();
+    console.log(`Current date in timezone ${timezone}: ${now.toISOString()}`);
     
-    // Handle special time range cases with proper timezone conversion
+    // Handle special time range cases
     if (timeRange.type === 'week') {
-      const weekStart = startOfWeek(now, { weekStartsOn: 1 }); // Week starts on Monday
-      const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
-      
-      // Convert to UTC for database query
-      const { startDateUTC, endDateUTC } = convertLocalDateRangeToUTC(weekStart, weekEnd, userTimezone);
-      result.startDate = startDateUTC;
-      result.endDate = endDateUTC;
-      
+      result.startDate = startOfWeek(now, { weekStartsOn: 1 }).toISOString(); // Week starts on Monday
+      result.endDate = endOfWeek(now, { weekStartsOn: 1 }).toISOString();
       console.log(`Generated 'this week' date range: ${result.startDate} to ${result.endDate}`);
     } else if (timeRange.type === 'lastWeek') {
-      console.log("CALCULATING LAST WEEK WITH TIMEZONE CONVERSION");
+      console.log("CALCULATING LAST WEEK");
       // Get this week's Monday in user timezone
       const thisWeekMonday = startOfWeek(now, { weekStartsOn: 1 });
       
@@ -126,39 +62,32 @@ export function processTimeRange(timeRange: any, userTimezone: string = 'UTC'): 
       // Last week's Sunday is 1 day before this week's Monday
       const lastWeekSunday = subDays(thisWeekMonday, 1);
       
-      // Convert to UTC for database query
-      const { startDateUTC, endDateUTC } = convertLocalDateRangeToUTC(lastWeekMonday, lastWeekSunday, userTimezone);
-      result.startDate = startDateUTC;
-      result.endDate = endDateUTC;
+      // Log detailed calculation for debugging
+      console.log("LAST WEEK CALCULATION DETAILED DEBUG:");
+      console.log(`Current date in timezone ${timezone}: ${now.toISOString()}`);
+      console.log(`This week's Monday: ${thisWeekMonday.toISOString()}`);
+      console.log(`Last week's Monday: ${lastWeekMonday.toISOString()}`);
+      console.log(`Last week's Sunday: ${lastWeekSunday.toISOString()}`);
       
-      console.log(`Generated 'last week' date range (UTC): ${result.startDate} to ${result.endDate}`);
+      result.startDate = startOfDay(lastWeekMonday).toISOString();
+      result.endDate = endOfDay(lastWeekSunday).toISOString();
+      console.log(`Generated 'last week' date range: ${result.startDate} to ${result.endDate}`);
     } else if (timeRange.type === 'month') {
-      const monthStart = startOfMonth(now);
-      const monthEnd = endOfMonth(now);
-      
-      // Convert to UTC for database query
-      const { startDateUTC, endDateUTC } = convertLocalDateRangeToUTC(monthStart, monthEnd, userTimezone);
-      result.startDate = startDateUTC;
-      result.endDate = endDateUTC;
-      
-      console.log(`Generated 'this month' date range (UTC): ${result.startDate} to ${result.endDate}`);
+      result.startDate = startOfMonth(now).toISOString();
+      result.endDate = endOfMonth(now).toISOString();
+      console.log(`Generated 'this month' date range: ${result.startDate} to ${result.endDate}`);
     } else if (timeRange.type === 'lastMonth') {
       const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const lastMonthStart = startOfMonth(lastMonth);
-      const lastMonthEnd = endOfMonth(lastMonth);
-      
-      // Convert to UTC for database query
-      const { startDateUTC, endDateUTC } = convertLocalDateRangeToUTC(lastMonthStart, lastMonthEnd, userTimezone);
-      result.startDate = startDateUTC;
-      result.endDate = endDateUTC;
-      
-      console.log(`Generated 'last month' date range (UTC): ${result.startDate} to ${result.endDate}`);
+      result.startDate = startOfMonth(lastMonth).toISOString();
+      result.endDate = endOfMonth(lastMonth).toISOString();
+      console.log(`Generated 'last month' date range: ${result.startDate} to ${result.endDate}`);
     } else if (timeRange.type === 'specificMonth' && timeRange.monthName) {
-      // Handle specific month by name with timezone conversion
+      // Handle specific month by name and add detailed logs
       console.log(`Processing specific month: ${timeRange.monthName}`);
-      processSpecificMonthByName(timeRange.monthName, result, timeRange.year, userTimezone);
+      processSpecificMonthByName(timeRange.monthName, result, timeRange.year, timezone);
       
-      console.log(`Processed specific month name "${timeRange.monthName}" to UTC range: ${result.startDate} to ${result.endDate}`);
+      // Add additional logging for month name processing
+      console.log(`Processed specific month name "${timeRange.monthName}" to date range: ${result.startDate} to ${result.endDate}`);
     }
     
     // Validate the resulting dates
@@ -175,7 +104,7 @@ export function processTimeRange(timeRange: any, userTimezone: string = 'UTC'): 
       }
     }
     
-    console.log("Final processed time range with UTC conversion:", result);
+    console.log("Processed time range:", result);
     return result;
   } catch (error) {
     console.error("Error processing time range:", error);
@@ -184,10 +113,9 @@ export function processTimeRange(timeRange: any, userTimezone: string = 'UTC'): 
 }
 
 /**
- * Process a specific month by name with timezone conversion
+ * Process a specific month by name
  */
-function processSpecificMonthByName(monthName: string, result: { startDate?: string; endDate?: string }, year?: number, userTimezone?: string) {
-  const timezone = userTimezone || 'UTC';
+function processSpecificMonthByName(monthName: string, result: { startDate?: string; endDate?: string }, year?: number, timezone?: string) {
   const now = timezone ? toZonedTime(new Date(), timezone) : new Date();
   const currentYear = now.getFullYear();
   const targetYear = year || currentYear;
@@ -210,28 +138,57 @@ function processSpecificMonthByName(monthName: string, result: { startDate?: str
     'december': 11, 'dec': 11
   };
   
+  // Special handling for "may" which can be ambiguous
   const normalizedMonthName = monthName.toLowerCase().trim();
   let monthIndex: number | undefined = undefined;
   
-  // Find exact match for month name
+  // First look for exact matches
   if (monthMap.hasOwnProperty(normalizedMonthName)) {
     monthIndex = monthMap[normalizedMonthName];
     console.log(`Found exact match for month name "${monthName}" -> index ${monthIndex}`);
   }
   
+  // If we still don't have a valid month index, look for partial matches
+  if (monthIndex === undefined) {
+    // This should never happen with our current implementation, but adding as a fallback
+    for (const [key, index] of Object.entries(monthMap)) {
+      if (key.includes(normalizedMonthName) || normalizedMonthName.includes(key)) {
+        console.log(`Found partial match for month "${monthName}" with "${key}"`);
+        monthIndex = index;
+        break;
+      }
+    }
+  }
+  
   if (monthIndex !== undefined) {
-    // Create start and end dates for the specified month in user's timezone
-    const monthStart = new Date(targetYear, monthIndex, 1);
-    const monthEnd = new Date(targetYear, monthIndex + 1, 0, 23, 59, 59, 999);
+    // Create start and end dates for the specified month
+    let startDate: Date;
+    let endDate: Date;
     
-    console.log(`Month range in local time: ${monthStart.toISOString()} to ${monthEnd.toISOString()}`);
+    if (timezone) {
+      // Use timezone-aware date object
+      const timezonedDate = toZonedTime(new Date(targetYear, monthIndex, 1), timezone);
+      startDate = startOfMonth(timezonedDate);
+      endDate = endOfMonth(timezonedDate);
+    } else {
+      startDate = startOfMonth(new Date(targetYear, monthIndex, 1));
+      endDate = endOfMonth(new Date(targetYear, monthIndex, 1));
+    }
     
-    // Convert to UTC for database query
-    const { startDateUTC, endDateUTC } = convertLocalDateRangeToUTC(monthStart, monthEnd, timezone);
-    result.startDate = startDateUTC;
-    result.endDate = endDateUTC;
+    result.startDate = startOfDay(startDate).toISOString();
+    result.endDate = endOfDay(endDate).toISOString();
     
-    console.log(`Generated UTC date range for ${monthName} ${targetYear}: ${result.startDate} to ${result.endDate}`);
+    console.log(`Generated date range for ${monthName} ${targetYear}: ${result.startDate} to ${result.endDate}`);
+    console.log(`Month calculation details:`, {
+      monthName,
+      monthIndex,
+      year: targetYear,
+      timezone,
+      startDateISO: result.startDate,
+      endDateISO: result.endDate,
+      startDateLocal: new Date(result.startDate).toString(),
+      endDateLocal: new Date(result.endDate).toString()
+    });
   } else {
     console.warn(`Unknown month name: "${monthName}"`);
   }

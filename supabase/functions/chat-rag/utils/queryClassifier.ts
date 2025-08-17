@@ -1,4 +1,3 @@
-
 // Mental health and wellbeing term dictionary for domain recognition
 const MENTAL_HEALTH_TERMS = [
   // Emotional states
@@ -173,11 +172,9 @@ export function isMonthSpecificQuery(message: string): boolean {
   return false;
 }
 
-// Enhanced timeframe detection with proper timezone handling
-export function detectTimeframeInQuery(message: string, userTimezone: string = 'UTC'): any {
+// Detect time frame in the query
+export function detectTimeframeInQuery(message: string): any {
   const lowerQuery = message.toLowerCase();
-  
-  console.log(`[QueryClassifier] Detecting timeframe with user timezone: ${userTimezone}`);
   
   // Enhanced detection for month-specific queries
   const monthName = detectMonthInQuery(message);
@@ -221,12 +218,12 @@ export function detectTimeframeInQuery(message: string, userTimezone: string = '
     }
     
     if (monthIndex >= 0) {
-      // Generate the timeframe object with the user's timezone
+      // Generate the timeframe object with the calculated dates
       const timeframe = {
         type: 'specificMonth',
         monthName: monthName,
         year: year,
-        timezone: userTimezone, // Use actual user timezone instead of hardcoded UTC
+        timezone: 'UTC', // Assuming UTC; this should be overridden with user timezone
         description: `${monthName} ${year}`
       };
       
@@ -241,7 +238,7 @@ export function detectTimeframeInQuery(message: string, userTimezone: string = '
     return {
       type: 'lastWeek',
       description: 'last week',
-      timezone: userTimezone // Use actual user timezone
+      timezone: 'UTC' // Will be overridden with user timezone
     };
   }
   
@@ -250,7 +247,7 @@ export function detectTimeframeInQuery(message: string, userTimezone: string = '
     return {
       type: 'week',
       description: 'this week',
-      timezone: userTimezone // Use actual user timezone
+      timezone: 'UTC'
     };
   }
   
@@ -259,7 +256,7 @@ export function detectTimeframeInQuery(message: string, userTimezone: string = '
     return {
       type: 'month',
       description: 'this month',
-      timezone: userTimezone // Use actual user timezone
+      timezone: 'UTC'
     };
   }
   
@@ -268,7 +265,7 @@ export function detectTimeframeInQuery(message: string, userTimezone: string = '
     return {
       type: 'lastMonth',
       description: 'last month',
-      timezone: userTimezone // Use actual user timezone
+      timezone: 'UTC'
     };
   }
   
