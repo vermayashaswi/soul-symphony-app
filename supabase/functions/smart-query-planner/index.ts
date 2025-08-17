@@ -341,14 +341,14 @@ async function executePlan(plan: any, userId: string, supabaseClient: any, reque
         if (step.queryType === 'vector_search') {
           console.log(`[${requestId}] Vector search:`, step.vectorSearch.query);
           stepResult = await executeVectorSearchWithDebug(step, userId, supabaseClient, requestId);
-        } else if (step.queryType === 'sql_analysis') {
-          console.log(`[${requestId}] SQL analysis:`, step.sqlQuery);
+        } else if (step.queryType === 'sql_analysis' || step.queryType === 'sql_count' || step.queryType === 'sql_calculation') {
+          console.log(`[${requestId}] SQL analysis (${step.queryType}):`, step.sqlQuery);
           stepResult = await executeSQLAnalysis(step, userId, supabaseClient, requestId);
         } else if (step.queryType === 'hybrid_search') {
           console.log(`[${requestId}] Hybrid search:`, step.vectorSearch.query, step.sqlQuery);
           stepResult = await executeHybridSearch(step, userId, supabaseClient, requestId);
         } else {
-          console.warn(`[${requestId}] Unknown query type:`, step.queryType);
+          console.error(`[${requestId}] Unknown query type:`, step.queryType);
           stepResult = { error: `Unknown query type: ${step.queryType}` };
         }
 
@@ -371,22 +371,29 @@ async function executeSQLAnalysis(step: any, userId: string, supabaseClient: any
   try {
     if (!step.sqlQuery) {
       console.warn(`[${requestId}] No SQL query provided for analysis step`);
-      return [];
+      return { data: [], error: 'No SQL query provided', rowCount: 0 };
     }
 
     // Replace placeholders in the SQL query
     let sqlQuery = step.sqlQuery;
+    
+    // Handle user_id placeholder
     sqlQuery = sqlQuery.replace(/\$user_id/g, `'${userId}'`);
     
-    // Handle vector result IDs if present (for hybrid queries)
-    if (sqlQuery.includes('$vector_result_ids')) {
-      // For now, execute without vector result IDs filtering
-      // This would be enhanced in a full implementation with actual vector results
-      sqlQuery = sqlQuery.replace(/AND id IN \(\$vector_result_ids\)/g, '');
-      sqlQuery = sqlQuery.replace(/WHERE.*\$vector_result_ids.*AND/g, 'WHERE');
-      sqlQuery = sqlQuery.replace(/WHERE.*\$vector_result_ids.*/g, 'WHERE user_id = $user_id');
+    // Handle vector result IDs placeholder more comprehensively
+    if (sqlQuery.includes('$vector_result_ids') || sqlQuery.includes('/*IDs from vector search step*/')) {
+      // Remove vector ID constraints since we don't have them in this context
+      sqlQuery = sqlQuery.replace(/AND id IN \(\$vector_result_ids\)/gi, '');
+      sqlQuery = sqlQuery.replace(/WHERE.*\$vector_result_ids.*AND/gi, 'WHERE');
+      sqlQuery = sqlQuery.replace(/WHERE.*\$vector_result_ids.*/gi, 'WHERE user_id = $user_id');
+      sqlQuery = sqlQuery.replace(/AND id IN \(\/\*IDs from vector search step\*\/\)/gi, '');
+      sqlQuery = sqlQuery.replace(/WHERE.*\/\*IDs from vector search step\*\/.*/gi, 'WHERE user_id = $user_id');
       sqlQuery = sqlQuery.replace(/\$user_id/g, `'${userId}'`);
     }
+
+    // Clean up any malformed WHERE clauses
+    sqlQuery = sqlQuery.replace(/WHERE\s+AND/gi, 'WHERE');
+    sqlQuery = sqlQuery.replace(/WHERE\s*$/gi, '');
 
     console.log(`[${requestId}] Executing SQL query:`, sqlQuery);
 
@@ -397,15 +404,30 @@ async function executeSQLAnalysis(step: any, userId: string, supabaseClient: any
 
     if (error) {
       console.error(`[${requestId}] SQL analysis error:`, error);
-      throw error;
+      return { data: [], error: error.message, rowCount: 0 };
     }
 
-    console.log(`[${requestId}] SQL analysis results:`, data?.data?.length || 0);
-    return data?.data || [];
+    // Handle RPC response structure correctly
+    const resultData = data?.success ? (data?.data || []) : [];
+    const rowCount = Array.isArray(resultData) ? resultData.length : 0;
+    
+    console.log(`[${requestId}] SQL analysis results:`, {
+      success: data?.success || false,
+      rowCount,
+      hasData: rowCount > 0,
+      sampleData: rowCount > 0 ? resultData.slice(0, 2) : null
+    });
+
+    return { 
+      data: resultData, 
+      error: data?.success === false ? data?.error : null, 
+      rowCount,
+      sqlQuery: sqlQuery // Include for debugging
+    };
 
   } catch (error) {
     console.error(`[${requestId}] Error in SQL analysis:`, error);
-    throw error;
+    return { data: [], error: error.message, rowCount: 0 };
   }
 }
 

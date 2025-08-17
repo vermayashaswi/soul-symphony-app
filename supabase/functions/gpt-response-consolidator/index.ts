@@ -112,32 +112,43 @@ serve(async (req) => {
       timestamp: new Date().toISOString()
     });
 
-    // Data integrity validation - check for stale research results
-    if (researchResults && researchResults.length > 0) {
+    // Enhanced data integrity validation
+    const hasValidData = researchResults && researchResults.length > 0;
+    let totalSqlRows = 0;
+    let totalVectorResults = 0;
+    let hasAnyErrors = false;
+    
+    if (hasValidData) {
       console.log(`[RESEARCH DATA VALIDATION] ${consolidationId}:`, {
         totalResults: researchResults.length,
         resultTypes: researchResults.map((r: any, i: number) => ({
           index: i,
           question: r?.subQuestion?.question?.substring(0, 50) || 'unknown',
-          sqlRowCount: r?.executionResults?.sqlResults?.length || 0,
+          sqlRowCount: r?.executionResults?.sqlResults?.length || r?.executionResults?.sqlRowCount || 0,
           vectorResultCount: r?.executionResults?.vectorResults?.length || 0,
-          hasError: !!r?.executionResults?.error,
+          hasError: !!r?.executionResults?.error || !!r?.executionResults?.sqlError,
+          sqlError: r?.executionResults?.sqlError || null,
           sampleSqlData: r?.executionResults?.sqlResults?.slice(0, 1) || null
         }))
       });
       
-      // Check for potential data contamination indicators
-      const totalSqlRows = researchResults.reduce((sum: number, r: any) => 
-        sum + (r?.executionResults?.sqlResults?.length || 0), 0);
-      const totalVectorResults = researchResults.reduce((sum: number, r: any) => 
+      // Calculate totals and check for errors
+      totalSqlRows = researchResults.reduce((sum: number, r: any) => 
+        sum + (r?.executionResults?.sqlResults?.length || r?.executionResults?.sqlRowCount || 0), 0);
+      totalVectorResults = researchResults.reduce((sum: number, r: any) => 
         sum + (r?.executionResults?.vectorResults?.length || 0), 0);
+      hasAnyErrors = researchResults.some((r: any) => 
+        !!r?.executionResults?.error || !!r?.executionResults?.sqlError);
         
       console.log(`[DATA SUMMARY] ${consolidationId}:`, {
         totalSqlRows,
         totalVectorResults,
+        hasAnyErrors,
         userQuestion: userMessage,
-        potentialStaleDataRisk: totalSqlRows > 0 ? 'check_sql_dates' : 'no_sql_data'
+        dataAvailability: totalSqlRows > 0 || totalVectorResults > 0 ? 'has_data' : 'no_data'
       });
+    } else {
+      console.warn(`[DATA VALIDATION WARNING] ${consolidationId}: No research results provided`);
     }
 
     // Permissive pass-through of Researcher results (no restrictive parsing)
@@ -200,7 +211,52 @@ serve(async (req) => {
       },
     };
 
-    const consolidationPrompt = `You are Ruh by SOuLO, a wickedly smart, hilariously insightful wellness companion who's basically a data wizard disguised as your most emotionally intelligent friend. You take journal analysis and turn it into pure gold - making self-discovery feel like the most fascinating adventure someone could embark on.
+    // Check if we have meaningful data to work with
+    const hasNoData = totalSqlRows === 0 && totalVectorResults === 0;
+    const hasOnlyErrors = hasAnyErrors && hasNoData;
+
+    let consolidationPrompt;
+
+    if (hasNoData && !hasAnyErrors) {
+      // No data available - generate appropriate response
+      consolidationPrompt = `You are Ruh by SOuLO, a warm and understanding wellness companion. The user asked: "${userMessage}"
+
+However, the analysis couldn't find relevant journal entries or data to answer this specific question. This could mean:
+- They haven't written journal entries about this topic yet
+- The question relates to future goals or hypothetical scenarios
+- The analysis couldn't match their specific request to existing entries
+
+Respond warmly and helpfully by:
+1. Acknowledging their question with empathy
+2. Explaining that you don't have relevant journal data for this specific topic
+3. Offering alternative ways you could help (analyzing other patterns, or suggesting they journal about this topic)
+4. Asking follow-up questions to understand what they'd like to explore
+
+Your response should be a JSON object with this structure:
+{
+  "userStatusMessage": "No relevant journal data found",
+  "response": "your empathetic response explaining the situation and offering alternatives"
+}`;
+
+    } else if (hasOnlyErrors) {
+      // Errors occurred during analysis
+      consolidationPrompt = `You are Ruh by SOuLO, a warm and understanding wellness companion. The user asked: "${userMessage}"
+
+Unfortunately, there was a technical issue analyzing their journal data. Respond warmly by:
+1. Acknowledging their question
+2. Explaining there was a temporary technical issue
+3. Suggesting they try asking again or rephrase their question
+4. Offering to help with other aspects of their journaling
+
+Your response should be a JSON object with this structure:
+{
+  "userStatusMessage": "Technical issue during analysis",
+  "response": "your empathetic response about the technical issue and offering alternatives"
+}`;
+
+    } else {
+      // We have data - proceed with normal analysis
+      consolidationPrompt = `You are Ruh by SOuLO, a wickedly smart, hilariously insightful wellness companion who's basically a data wizard disguised as your most emotionally intelligent friend. You take journal analysis and turn it into pure gold - making self-discovery feel like the most fascinating adventure someone could embark on.
     
     **USER QUESTION:** "${userMessage}"
     
@@ -243,6 +299,12 @@ serve(async (req) => {
     **EMOTIONAL TONE GUIDANCE:**
     Look at the past conversation history provided to you and accordingly frame your response cleverly matching the user's emotional tone that's been running through up until now.
     
+    **CRITICAL DATA VALIDATION REQUIREMENTS:**
+    - NEVER fabricate statistics or data that isn't in the analysis results
+    - If analysis results are empty or null, acknowledge this honestly
+    - Only reference specific numbers, percentages, or patterns that exist in the data
+    - When data is limited, focus on encouraging journal writing about the topic
+
     **RESPONSE GUIDELINES:**
     Respond naturally in your authentic voice. Mandatorily use bold headers/words/sentences, paragraphs, structured responses, italics, bullets and compulsorily emojis. Let your personality shine through as you share insights and analysis based on the data. Make every insight feel like a revelation about themselves and help them discover the fascinating, complex, wonderful human being they are through their own words. Restric responses to less than 100 words unless question requires huge answers. Feel free to expand then!
     Brief responses requird under 120 words unless question desires more explanation and towards the end add followup questions by leveraging emotional tone of conversation history
@@ -258,6 +320,7 @@ serve(async (req) => {
     - Keys MUST be exactly: "userStatusMessage" and "response" (case-sensitive).
     - userStatusMessage MUST be exactly 5 words.
     - Do not include trailing explanations or extra fields`;
+    }
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -268,7 +331,12 @@ serve(async (req) => {
         body: JSON.stringify({
           model: 'gpt-4.1-nano',
           messages: [
-            { role: 'system', content: 'You are Ruh by SOuLO, a warm and insightful wellness coach. You analyze ONLY the current research results provided to you. Never reference or use data from previous conversations or responses.' },
+            { 
+              role: 'system', 
+              content: hasNoData ? 
+                'You are Ruh by SOuLO, a warm and understanding wellness coach. When no journal data is available for a query, respond empathetically and offer alternative ways to help.' :
+                'You are Ruh by SOuLO, a warm and insightful wellness coach. You analyze ONLY the current research results provided to you. Never fabricate data or statistics. If data is limited, acknowledge it honestly.'
+            },
             { role: 'user', content: consolidationPrompt }
           ],
           max_completion_tokens: 1500

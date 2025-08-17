@@ -85,11 +85,35 @@ serve(async (req) => {
       
       console.log(`[chat-with-rag] GPT query plan:`, queryPlan);
 
+      // Transform execution results into expected consolidator format
+      const transformedResults = (executionResult || []).map((result, index) => ({
+        subQuestion: {
+          question: result.question,
+          searchStrategy: 'hybrid' // Default fallback
+        },
+        executionResults: {
+          sqlResults: result.results?.flatMap(r => r.result?.data || []) || [],
+          sqlRowCount: result.results?.reduce((sum, r) => sum + (r.result?.rowCount || 0), 0) || 0,
+          vectorResults: result.results?.flatMap(r => Array.isArray(r.result) ? r.result : []) || [],
+          error: result.results?.find(r => r.error)?.error || null,
+          sqlError: result.results?.find(r => r.result?.error)?.result?.error || null
+        }
+      }));
+
+      console.log(`[chat-with-rag] Transformed ${transformedResults.length} results for consolidator:`, 
+        transformedResults.map(r => ({
+          question: r.subQuestion.question,
+          sqlRowCount: r.executionResults.sqlRowCount,
+          vectorResultCount: r.executionResults.vectorResults?.length || 0,
+          hasError: !!r.executionResults.error || !!r.executionResults.sqlError
+        }))
+      );
+
       // Generate response using GPT's plan and results via consolidator
       const responseGeneration = await supabaseClient.functions.invoke('gpt-response-consolidator', {
         body: {
           userMessage: message,
-          researchResults: executionResult || [],
+          researchResults: transformedResults,
           conversationContext: conversationContext,
           userProfile: userProfile,
           threadId: threadId,
