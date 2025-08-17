@@ -250,8 +250,8 @@ export function VoiceChatRecorder({
   const isError = recordingState === 'error';
 
   return (
-    <div className={cn("relative w-full h-full", className)}>
-      {/* Recording Overlay - Replaces the entire input */}
+    <div className={cn("relative", className)}>
+      {/* Recording Overlay - Only shows when recording */}
       <AnimatePresence>
         {isRecording && (
           <motion.div
@@ -305,7 +305,7 @@ export function VoiceChatRecorder({
         )}
       </AnimatePresence>
 
-      {/* Microphone Button - Only visible when idle */}
+      {/* Microphone Button - Only visible when idle, positioned to not block input */}
       {recordingState === 'idle' && (
         <Button
           type="button"
@@ -313,7 +313,7 @@ export function VoiceChatRecorder({
           size="sm"
           onClick={handleStartRecording}
           disabled={isDisabled}
-          className="absolute right-2 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0 text-muted-foreground hover:text-foreground z-10"
+          className="absolute right-2 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0 text-muted-foreground hover:text-foreground z-10 pointer-events-auto"
         >
           <Mic className="h-4 w-4" />
         </Button>
