@@ -760,24 +760,26 @@ ${databaseSchemaContext}
    Step 4: Always include WHERE user_id = $user_id
 
 **❌ WRONG PATTERNS (THESE CAUSE ERRORS):**
-```sql
--- NEVER DO THIS - causes PostgreSQL errors:
+\`\`\`sql
+/* NEVER DO THIS - causes PostgreSQL errors */
 SELECT json_object_keys(emotions) AS emotion, 
        AVG((emotions->>json_object_keys(emotions))::float) AS avg_score 
 FROM "Journal Entries" 
 WHERE user_id = $user_id 
 GROUP BY emotion;
-```
+\`\`\`
 
 **✅ CORRECT PATTERNS (ALWAYS USE THESE):**
-```sql
--- ALWAYS DO THIS - follows PostgreSQL standards:
+\`\`\`sql
+/* ALWAYS DO THIS - follows PostgreSQL standards */
 SELECT emotion_key AS emotion, 
        AVG((emotion_value::text)::float) AS avg_score,
        COUNT(*) AS frequency
 FROM "Journal Entries", jsonb_each(emotions) as em(emotion_key, emotion_value)
 WHERE user_id = $user_id 
 GROUP BY emotion_key 
+ORDER BY avg_score DESC LIMIT 5;
+\`\`\`
 ORDER BY avg_score DESC LIMIT 5;
 ```
 
