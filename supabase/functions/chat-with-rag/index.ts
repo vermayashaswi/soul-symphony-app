@@ -8,70 +8,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Helper function to process time range
-function processTimeRange(timeRange: any, userTimezone: string = 'UTC'): { startDate?: string; endDate?: string } {
-  if (!timeRange) return {};
-  
-  console.log("Processing time range:", timeRange);
-  console.log(`Using user timezone: ${userTimezone}`);
-  
-  const result: { startDate?: string; endDate?: string } = {};
-  
-  try {
-    // Handle startDate if provided
-    if (timeRange.startDate) {
-      const startDate = new Date(timeRange.startDate);
-      if (!isNaN(startDate.getTime())) {
-        result.startDate = startDate.toISOString();
-      } else {
-        console.warn(`Invalid startDate: ${timeRange.startDate}`);
-      }
-    }
-    
-    // Handle endDate if provided
-    if (timeRange.endDate) {
-      const endDate = new Date(timeRange.endDate);
-      if (!isNaN(endDate.getTime())) {
-        result.endDate = endDate.toISOString();
-      } else {
-        console.warn(`Invalid endDate: ${timeRange.endDate}`);
-      }
-    }
-    
-    console.log("Final processed time range with UTC conversion:", result);
-    return result;
-  } catch (error) {
-    console.error("Error processing time range:", error);
-    return {};
-  }
-}
-
-// Helper function to detect timeframe in query
-function detectTimeframeInQuery(message: string, userTimezone: string = 'UTC'): any {
-  // Simple timeframe detection logic
-  const lowerMessage = message.toLowerCase();
-  
-  if (lowerMessage.includes('today')) {
-    return { type: 'today' };
-  }
-  if (lowerMessage.includes('yesterday')) {
-    return { type: 'yesterday' };
-  }
-  if (lowerMessage.includes('this week')) {
-    return { type: 'week' };
-  }
-  if (lowerMessage.includes('last week')) {
-    return { type: 'lastWeek' };
-  }
-  if (lowerMessage.includes('this month')) {
-    return { type: 'month' };
-  }
-  if (lowerMessage.includes('last month')) {
-    return { type: 'lastMonth' };
-  }
-  
-  return null;
-}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -79,7 +15,7 @@ serve(async (req) => {
   }
 
   try {
-    console.log("[chat-with-rag] Starting enhanced RAG processing with classification");
+    console.log("[chat-with-rag] Starting GPT-driven RAG processing");
 
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -106,10 +42,9 @@ serve(async (req) => {
     const userTimezone = userProfile?.timezone || 'UTC';
     console.log(`[chat-with-rag] User timezone: ${userTimezone}`);
 
-    // Step 1: Query Planning with timezone support
-    console.log("[chat-with-rag] Step 1: Query Planning");
+    // Direct to smart query planner - GPT decides everything
+    console.log("[chat-with-rag] Invoking smart query planner");
     
-    // Go directly to smart query planner - let GPT decide everything
     const queryPlanResponse = await supabaseClient.functions.invoke('smart-query-planner', {
       body: { 
         message, 
@@ -117,7 +52,7 @@ serve(async (req) => {
         conversationContext,
         threadId,
         messageId,
-        userTimezone // Pass user timezone to planner
+        userTimezone
       }
     });
 
@@ -126,36 +61,11 @@ serve(async (req) => {
     }
 
     const queryPlan = queryPlanResponse.data.queryPlan;
-    console.log(`[chat-with-rag] Query plan strategy: ${queryPlan.strategy}, complexity: ${queryPlan.queryComplexity}`);
-
-    // Enhanced timeframe detection with timezone support
-    let timeRange = null;
-    const detectedTimeframe = detectTimeframeInQuery(message, userTimezone);
-    
-    if (detectedTimeframe) {
-      console.log(`[chat-with-rag] Detected timeframe with timezone ${userTimezone}:`, JSON.stringify(detectedTimeframe, null, 2));
-      // Process timeframe with user's timezone for proper UTC conversion
-      timeRange = processTimeRange(detectedTimeframe, userTimezone);
-      console.log(`[chat-with-rag] Processed time range (converted to UTC):`, JSON.stringify(timeRange, null, 2));
-    }
-
-    console.log(`[chat-with-rag] Using GPT-generated query plan:`, {
-      queryType: queryPlan.queryType,
-      strategy: queryPlan.strategy,
-      userStatusMessage: queryPlan.userStatusMessage,
-      subQuestions: queryPlan.subQuestions,
-      confidence: queryPlan.confidence,
-      reasoning: queryPlan.reasoning,
-      useAllEntries: queryPlan.useAllEntries,
-      hasPersonalPronouns: queryPlan.hasPersonalPronouns,
-      hasExplicitTimeReference: queryPlan.hasExplicitTimeReference,
-      inferredTimeContext: queryPlan.inferredTimeContext
-    });
-
-    // Step 3: Execute the plan with timezone-aware processing
     const executionResult = queryPlanResponse.data.executionResult;
+    
+    console.log(`[chat-with-rag] GPT query plan:`, queryPlan);
 
-    // Step 4: Generate enhanced response with timezone context
+    // Generate response using GPT's plan and results
     const responseGeneration = await supabaseClient.functions.invoke('intelligent-response-generator', {
       body: {
         originalQuery: message,
@@ -164,8 +74,7 @@ serve(async (req) => {
         combinedResults: executionResult || [],
         conversationContext: conversationContext,
         userProfile: userProfile,
-        timeRange: timeRange,
-        userTimezone: userTimezone // Pass timezone to response generator
+        userTimezone: userTimezone
       }
     });
 
@@ -173,14 +82,13 @@ serve(async (req) => {
       throw new Error(`Response generation failed: ${responseGeneration.error.message}`);
     }
 
-    console.log("[chat-with-rag] Successfully completed GPT-driven analysis pipeline for ALL query types");
+    console.log("[chat-with-rag] GPT-driven pipeline completed");
 
     return new Response(JSON.stringify({
       response: responseGeneration.data.response,
       metadata: {
         queryPlan: queryPlan,
         searchResults: executionResult,
-        timeRange: timeRange,
         userTimezone: userTimezone,
         strategy: queryPlan.strategy,
         confidence: queryPlan.confidence
