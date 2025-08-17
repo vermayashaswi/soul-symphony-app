@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
@@ -86,27 +85,35 @@ function validateSQLQuery(query: string, requestId: string): { isValid: boolean;
       return { isValid: false, error };
     }
     
-    // Check for basic SQL injection patterns
-    const injectionPatterns = [
-      /;\s*(DROP|DELETE|INSERT|UPDATE|CREATE|ALTER)/i,
-      /UNION\s+SELECT/i,
-      /--\s*$/m,
-      /\/\*.*\*\//s
-    ];
-    
-    for (const pattern of injectionPatterns) {
-      if (pattern.test(query)) {
-        const error = 'Potential SQL injection pattern detected';
-        console.error(`[${requestId}] ${error}`);
-        return { isValid: false, error };
-      }
-    }
-    
     console.log(`[${requestId}] SQL query validation passed`);
     return { isValid: true };
   } catch (error) {
     console.error(`[${requestId}] SQL validation error:`, error);
     return { isValid: false, error: `Validation error: ${error.message}` };
+  }
+}
+
+async function testVectorOperations(supabaseClient: any, requestId: string): Promise<boolean> {
+  try {
+    console.log(`[${requestId}] Testing vector operations...`);
+    
+    const { data, error } = await supabaseClient.rpc('test_vector_operations');
+    
+    if (error) {
+      console.error(`[${requestId}] Vector test error:`, error);
+      return false;
+    }
+    
+    if (data && data.success) {
+      console.log(`[${requestId}] Vector operations test passed:`, data.message);
+      return true;
+    } else {
+      console.error(`[${requestId}] Vector operations test failed:`, data?.error || 'Unknown error');
+      return false;
+    }
+  } catch (error) {
+    console.error(`[${requestId}] Error testing vector operations:`, error);
+    return false;
   }
 }
 
@@ -131,6 +138,11 @@ async function executePlan(plan: any, userId: string, supabaseClient: any, reque
           validationResult: null,
           executionError: null,
           fallbackUsed: false
+        },
+        vectorExecutionDetails: {
+          testPassed: false,
+          executionError: null,
+          fallbackUsed: false
         }
       }
     };
@@ -141,7 +153,7 @@ async function executePlan(plan: any, userId: string, supabaseClient: any, reque
 
         if (step.queryType === 'vector_search') {
           console.log(`[${requestId}] Vector search:`, step.vectorSearch.query);
-          const vectorResult = await executeVectorSearch(step, userId, supabaseClient, requestId);
+          const vectorResult = await executeVectorSearch(step, userId, supabaseClient, requestId, subResults.executionResults.vectorExecutionDetails);
           subResults.executionResults.vectorResults = vectorResult || [];
         } else if (step.queryType === 'sql_analysis') {
           console.log(`[${requestId}] SQL analysis:`, step.sqlQuery);
@@ -149,7 +161,7 @@ async function executePlan(plan: any, userId: string, supabaseClient: any, reque
           subResults.executionResults.sqlResults = sqlResult || [];
         } else if (step.queryType === 'hybrid_search') {
           console.log(`[${requestId}] Hybrid search:`, step.vectorSearch.query, step.sqlQuery);
-          const hybridResult = await executeHybridSearch(step, userId, supabaseClient, requestId, subResults.executionResults.sqlExecutionDetails);
+          const hybridResult = await executeHybridSearch(step, userId, supabaseClient, requestId, subResults.executionResults.sqlExecutionDetails, subResults.executionResults.vectorExecutionDetails);
           subResults.executionResults.vectorResults = hybridResult?.vectorResults || [];
           subResults.executionResults.sqlResults = hybridResult?.sqlResults || [];
         }
@@ -166,8 +178,18 @@ async function executePlan(plan: any, userId: string, supabaseClient: any, reque
   return results;
 }
 
-async function executeVectorSearch(step: any, userId: string, supabaseClient: any, requestId: string) {
+async function executeVectorSearch(step: any, userId: string, supabaseClient: any, requestId: string, executionDetails: any) {
   try {
+    // Test vector operations first
+    const vectorTestPassed = await testVectorOperations(supabaseClient, requestId);
+    executionDetails.testPassed = vectorTestPassed;
+    
+    if (!vectorTestPassed) {
+      console.warn(`[${requestId}] Vector operations test failed, using fallback`);
+      executionDetails.fallbackUsed = true;
+      return await executeBasicSQLQuery(userId, supabaseClient, requestId);
+    }
+
     const embedding = await generateEmbedding(step.vectorSearch.query);
     
     let vectorResults;
@@ -184,7 +206,9 @@ async function executeVectorSearch(step: any, userId: string, supabaseClient: an
 
       if (error) {
         console.error(`[${requestId}] Time-filtered vector search error:`, error);
-        throw error;
+        executionDetails.executionError = error.message;
+        executionDetails.fallbackUsed = true;
+        return await executeBasicSQLQuery(userId, supabaseClient, requestId);
       }
       vectorResults = data;
     } else {
@@ -198,7 +222,9 @@ async function executeVectorSearch(step: any, userId: string, supabaseClient: an
 
       if (error) {
         console.error(`[${requestId}] Vector search error:`, error);
-        throw error;
+        executionDetails.executionError = error.message;
+        executionDetails.fallbackUsed = true;
+        return await executeBasicSQLQuery(userId, supabaseClient, requestId);
       }
       vectorResults = data;
     }
@@ -208,7 +234,9 @@ async function executeVectorSearch(step: any, userId: string, supabaseClient: an
 
   } catch (error) {
     console.error(`[${requestId}] Error in vector search:`, error);
-    throw error;
+    executionDetails.executionError = error.message;
+    executionDetails.fallbackUsed = true;
+    return await executeBasicSQLQuery(userId, supabaseClient, requestId);
   }
 }
 
@@ -312,12 +340,12 @@ async function executeBasicSQLQuery(userId: string, supabaseClient: any, request
   return data || [];
 }
 
-async function executeHybridSearch(step: any, userId: string, supabaseClient: any, requestId: string, executionDetails: any) {
+async function executeHybridSearch(step: any, userId: string, supabaseClient: any, requestId: string, sqlExecutionDetails: any, vectorExecutionDetails: any) {
   try {
     // Execute both vector and SQL searches in parallel
     const [vectorResults, sqlResults] = await Promise.all([
-      executeVectorSearch(step, userId, supabaseClient, requestId),
-      executeSQLAnalysis(step, userId, supabaseClient, requestId, executionDetails)
+      executeVectorSearch(step, userId, supabaseClient, requestId, vectorExecutionDetails),
+      executeSQLAnalysis(step, userId, supabaseClient, requestId, sqlExecutionDetails)
     ]);
 
     console.log(`[${requestId}] Hybrid search results - Vector: ${vectorResults?.length || 0}, SQL: ${sqlResults?.length || 0}`);

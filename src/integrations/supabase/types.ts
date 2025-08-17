@@ -1211,6 +1211,10 @@ export type Database = {
         Args: { test_user_id: string }
         Returns: Json
       }
+      test_vector_operations: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       update_session_activity: {
         Args: { p_language?: string; p_page?: string; p_session_id: string }
         Returns: undefined
