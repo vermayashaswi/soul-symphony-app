@@ -369,19 +369,39 @@ async function executePlan(plan: any, userId: string, supabaseClient: any, reque
 
 async function executeSQLAnalysis(step: any, userId: string, supabaseClient: any, requestId: string) {
   try {
-    const { data, error } = await supabaseClient
-      .from('Journal Entries')
-      .select('*')
-      .eq('user_id', userId)
-      .limit(10);
+    if (!step.sqlQuery) {
+      console.warn(`[${requestId}] No SQL query provided for analysis step`);
+      return [];
+    }
+
+    // Replace placeholders in the SQL query
+    let sqlQuery = step.sqlQuery;
+    sqlQuery = sqlQuery.replace(/\$user_id/g, `'${userId}'`);
+    
+    // Handle vector result IDs if present (for hybrid queries)
+    if (sqlQuery.includes('$vector_result_ids')) {
+      // For now, execute without vector result IDs filtering
+      // This would be enhanced in a full implementation with actual vector results
+      sqlQuery = sqlQuery.replace(/AND id IN \(\$vector_result_ids\)/g, '');
+      sqlQuery = sqlQuery.replace(/WHERE.*\$vector_result_ids.*AND/g, 'WHERE');
+      sqlQuery = sqlQuery.replace(/WHERE.*\$vector_result_ids.*/g, 'WHERE user_id = $user_id');
+      sqlQuery = sqlQuery.replace(/\$user_id/g, `'${userId}'`);
+    }
+
+    console.log(`[${requestId}] Executing SQL query:`, sqlQuery);
+
+    // Use the execute_dynamic_query function to safely execute the SQL
+    const { data, error } = await supabaseClient.rpc('execute_dynamic_query', {
+      query_text: sqlQuery
+    });
 
     if (error) {
       console.error(`[${requestId}] SQL analysis error:`, error);
       throw error;
     }
 
-    console.log(`[${requestId}] SQL analysis results:`, data?.length);
-    return data;
+    console.log(`[${requestId}] SQL analysis results:`, data?.data?.length || 0);
+    return data?.data || [];
 
   } catch (error) {
     console.error(`[${requestId}] Error in SQL analysis:`, error);
