@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Send, Loader2 } from "lucide-react";
@@ -27,7 +26,7 @@ export default function MobileChatInput({
   const inputRef = useRef<HTMLInputElement>(null);
   const inputContainerRef = useRef<HTMLDivElement>(null);
   const chatDebug = useDebugLog();
-  const { isActive, isInStep, tutorialCompleted } = useTutorial();
+  const { isActive, isInStep } = useTutorial();
   const { translate, currentLanguage } = useTranslation();
   
   const { 
@@ -40,18 +39,7 @@ export default function MobileChatInput({
     hideKeyboard 
   } = useUnifiedKeyboard();
 
-  // FIXED: Only hide when tutorial is actively showing step 5
-  const shouldHideInput = isActive && isInStep(5);
-
-  // Debug tutorial state
-  useEffect(() => {
-    console.log('[MobileChatInput] Tutorial state debug:', {
-      isActive,
-      isInStep5: isInStep(5),
-      tutorialCompleted,
-      shouldHideInput
-    });
-  }, [isActive, isInStep, tutorialCompleted, shouldHideInput]);
+  const isInChatTutorialStep = isActive && isInStep(5);
 
   // Translate placeholder
   useEffect(() => {
@@ -103,9 +91,8 @@ export default function MobileChatInput({
     }
   }, [isKeyboardVisible, keyboardHeight, platform, isNative, isMobileBrowser, isCapacitorWebView]);
 
-  // FIXED: Only return null when actively hiding input
-  if (shouldHideInput) {
-    console.log('[MobileChatInput] Returning null - tutorial step 5 active');
+  // Don't render during tutorial step 5
+  if (isInChatTutorialStep) {
     return null;
   }
 
