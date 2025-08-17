@@ -341,73 +341,22 @@ async function executePlan(plan: any, userId: string, supabaseClient: any, reque
         if (step.queryType === 'vector_search') {
           console.log(`[${requestId}] Vector search:`, step.vectorSearch.query);
           stepResult = await executeVectorSearchWithDebug(step, userId, supabaseClient, requestId);
-          
-          // Standardize vector search result format
-          if (Array.isArray(stepResult)) {
-            stepResult = {
-              success: true,
-              data: stepResult,
-              vectorResultCount: stepResult.length,
-              sqlResultCount: 0,
-              hasError: false
-            };
-          }
-        } else if (step.queryType === 'sql_analysis' || step.queryType === 'sql_count' || step.queryType === 'sql_calculation') {
-          console.log(`[${requestId}] SQL analysis (${step.queryType}):`, step.sqlQuery);
+        } else if (step.queryType === 'sql_analysis') {
+          console.log(`[${requestId}] SQL analysis:`, step.sqlQuery);
           stepResult = await executeSQLAnalysis(step, userId, supabaseClient, requestId);
-          
-          // Enhance SQL result format for consolidator
-          stepResult = {
-            ...stepResult,
-            vectorResultCount: 0,
-            sqlResultCount: stepResult.rowCount || 0,
-            hasError: !stepResult.success || !!stepResult.error
-          };
         } else if (step.queryType === 'hybrid_search') {
           console.log(`[${requestId}] Hybrid search:`, step.vectorSearch.query, step.sqlQuery);
           stepResult = await executeHybridSearch(step, userId, supabaseClient, requestId);
-          
-          // Format hybrid results properly
-          if (Array.isArray(stepResult)) {
-            stepResult = {
-              success: true,
-              data: stepResult,
-              vectorResultCount: stepResult.length,
-              sqlResultCount: stepResult.length,
-              hasError: false
-            };
-          }
         } else {
-          console.error(`[${requestId}] Unknown query type:`, step.queryType);
-          stepResult = { 
-            success: false,
-            error: `Unknown query type: ${step.queryType}`,
-            vectorResultCount: 0,
-            sqlResultCount: 0,
-            hasError: true
-          };
+          console.warn(`[${requestId}] Unknown query type:`, step.queryType);
+          stepResult = { error: `Unknown query type: ${step.queryType}` };
         }
 
-        subResults.push({ 
-          step: step.step, 
-          result: stepResult,
-          queryType: step.queryType,
-          description: step.description
-        });
+        subResults.push({ step: step.step, result: stepResult });
 
       } catch (stepError) {
         console.error(`[${requestId}] Error executing step:`, step.step, stepError);
-        subResults.push({ 
-          step: step.step, 
-          error: stepError.message,
-          result: {
-            success: false,
-            error: stepError.message,
-            vectorResultCount: 0,
-            sqlResultCount: 0,
-            hasError: true
-          }
-        });
+        subResults.push({ step: step.step, error: stepError.message });
       }
     }
 
@@ -420,102 +369,23 @@ async function executePlan(plan: any, userId: string, supabaseClient: any, reque
 
 async function executeSQLAnalysis(step: any, userId: string, supabaseClient: any, requestId: string) {
   try {
-    if (!step.sqlQuery) {
-      console.warn(`[${requestId}] No SQL query provided for analysis step`);
-      return { 
-        success: false, 
-        data: [], 
-        error: 'No SQL query provided', 
-        rowCount: 0,
-        sqlQuery: 'N/A',
-        vectorResultCount: 0,
-        sqlResultCount: 0,
-        hasError: true
-      };
-    }
-
-    let sqlQuery = step.sqlQuery;
-    
-    console.log(`[${requestId}] ORIGINAL SQL:`, sqlQuery);
-    
-    // Enhanced placeholder replacement
-    sqlQuery = sqlQuery.replace(/\$user_id/g, `'${userId}'`);
-    
-    // Handle problematic placeholder patterns
-    if (sqlQuery.includes('/*IDs from vector search step*/') || sqlQuery.includes('$vector_result_ids')) {
-      console.warn(`[${requestId}] SQL contains vector ID placeholders - removing constraints`);
-      
-      // Remove vector ID constraints completely
-      sqlQuery = sqlQuery.replace(/AND id IN \(\/\*IDs from vector search step\*\/\)/gi, '');
-      sqlQuery = sqlQuery.replace(/AND id IN \(\$vector_result_ids\)/gi, '');
-      sqlQuery = sqlQuery.replace(/WHERE.*\/\*IDs from vector search step\*\/.*/gi, 'WHERE user_id = $user_id');
-      sqlQuery = sqlQuery.replace(/WHERE.*\$vector_result_ids.*/gi, 'WHERE user_id = $user_id');
-      
-      // Re-apply user_id replacement after cleanup
-      sqlQuery = sqlQuery.replace(/\$user_id/g, `'${userId}'`);
-    }
-
-    // Clean up malformed WHERE clauses
-    sqlQuery = sqlQuery.replace(/WHERE\s+AND/gi, 'WHERE');
-    sqlQuery = sqlQuery.replace(/WHERE\s*$\s*GROUP/gi, 'GROUP');
-    sqlQuery = sqlQuery.replace(/WHERE\s*$\s*ORDER/gi, 'ORDER');
-    sqlQuery = sqlQuery.replace(/WHERE\s*$/gi, '');
-
-    console.log(`[${requestId}] PROCESSED SQL:`, sqlQuery);
-
-    // Execute the SQL query
-    const { data, error } = await supabaseClient.rpc('execute_dynamic_query', {
-      query_text: sqlQuery
-    });
+    const { data, error } = await supabaseClient
+      .from('Journal Entries')
+      .select('*')
+      .eq('user_id', userId)
+      .limit(10);
 
     if (error) {
-      console.error(`[${requestId}] SQL execution error:`, error);
-      return { 
-        success: false, 
-        data: [], 
-        error: error.message, 
-        rowCount: 0,
-        sqlQuery: sqlQuery
-      };
+      console.error(`[${requestId}] SQL analysis error:`, error);
+      throw error;
     }
 
-    // Parse RPC response correctly
-    const isSuccess = data?.success === true;
-    const resultData = isSuccess ? (data?.data || []) : [];
-    const errorMessage = isSuccess ? null : (data?.error || 'Unknown SQL error');
-    const rowCount = Array.isArray(resultData) ? resultData.length : 0;
-    
-    console.log(`[${requestId}] SQL analysis results:`, {
-      success: isSuccess,
-      rowCount,
-      hasData: rowCount > 0,
-      errorMessage,
-      sampleData: rowCount > 0 ? resultData.slice(0, 2) : null
-    });
-
-    return { 
-      success: isSuccess,
-      data: resultData, 
-      error: errorMessage, 
-      rowCount,
-      sqlQuery: sqlQuery,
-      vectorResultCount: 0,
-      sqlResultCount: rowCount,
-      hasError: !isSuccess
-    };
+    console.log(`[${requestId}] SQL analysis results:`, data?.length);
+    return data;
 
   } catch (error) {
-    console.error(`[${requestId}] Critical error in SQL analysis:`, error);
-    return { 
-      success: false, 
-      data: [], 
-      error: error.message, 
-      rowCount: 0,
-      sqlQuery: step.sqlQuery,
-      vectorResultCount: 0,
-      sqlResultCount: 0,
-      hasError: true
-    };
+    console.error(`[${requestId}] Error in SQL analysis:`, error);
+    throw error;
   }
 }
 
@@ -674,23 +544,16 @@ Return ONLY valid JSON with this exact structure:
 - Stages execute in ascending order: stage 1 first, then 2, then 3, etc.
 - Keep stages contiguous (1..N) without gaps
 
-**SQL QUERY GUIDELINES (CRITICAL - READ CAREFULLY):**
+**SQL QUERY GUIDELINES:**
 - ALWAYS include WHERE user_id = $user_id
 - Use proper column names with quotes for spaced names like "refined text"
-- For emotion analysis: EMOTIONS is JSONB - use jsonb_each(emotions) to extract key-value pairs
-  * CORRECT: SELECT emotion_key, AVG((emotion_value::text)::numeric) FROM "Journal Entries", jsonb_each(emotions) as e(emotion_key, emotion_value) WHERE user_id = $user_id GROUP BY emotion_key
-  * WRONG: SELECT jsonb_array_elements_text(emotions) - emotions is NOT an array!
-- For theme analysis: master_themes is TEXT ARRAY - use unnest(master_themes) or ANY(master_themes)
-  * CORRECT: SELECT theme, COUNT(*) FROM "Journal Entries", unnest(master_themes) as theme WHERE user_id = $user_id GROUP BY theme
-- For entities analysis: entities is JSONB with structure like {"person": ["John", "Mary"], "place": ["Paris"]}
-  * CORRECT: SELECT entity_type, entity_value FROM "Journal Entries", jsonb_each(entities) as et(entity_type, entity_values), jsonb_array_elements_text(entity_values) as entity_value WHERE user_id = $user_id
-- For sentiment: sentiment is REAL (numeric) not text
+- For emotion analysis: use emotions JSONB
+- For theme analysis: use master_themes array and/or entities/text where appropriate (no hardcoded expansions)
 - For percentages: alias as percentage
-- For counts: alias as count (or frequency for grouped counts)  
+- For counts: alias as count (or frequency for grouped counts)
 - For averages/scores: alias as avg_score (or score)
 - For date filtering: apply created_at comparisons when time is implied or stated
 - Do NOT call RPCs; generate plain SQL only
-- NEVER use placeholder comments like /*IDs from vector search step*/ - generate actual executable SQL
 
 **SEARCH STRATEGY SELECTION:**
 - sql_primary: statistical analysis, counts, percentages
@@ -699,8 +562,6 @@ Return ONLY valid JSON with this exact structure:
 
 Focus on creating comprehensive, executable analysis plans that will provide meaningful insights.`;
 
-    console.log("[Analyst Agent] Calling OpenAI API with prompt length:", prompt.length);
-    
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -716,50 +577,23 @@ Focus on creating comprehensive, executable analysis plans that will provide mea
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`[Analyst Agent] OpenAI API error: ${response.status} - ${errorText}`);
-      throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
+      throw new Error(`OpenAI API error: ${response.status}`);
     }
 
     const data = await response.json();
-    const rawResponse = data.choices[0].message.content;
-    console.log("[Analyst Agent] Raw GPT response:", rawResponse);
+    console.log("Analyst Agent response:", data.choices[0].message.content);
 
     let analysisResult;
     try {
-      // Clean the response before parsing
-      const cleanedResponse = rawResponse.trim();
-      if (cleanedResponse.startsWith('```json')) {
-        const jsonMatch = cleanedResponse.match(/```json\s*([\s\S]*?)\s*```/);
-        if (jsonMatch) {
-          analysisResult = JSON.parse(jsonMatch[1]);
-        } else {
-          throw new Error("Could not extract JSON from code block");
-        }
-      } else if (cleanedResponse.startsWith('{')) {
-        analysisResult = JSON.parse(cleanedResponse);
-      } else {
-        throw new Error("Response does not appear to be JSON");
-      }
-      
-      console.log("[Analyst Agent] Successfully parsed JSON:", JSON.stringify(analysisResult, null, 2));
+      analysisResult = JSON.parse(data.choices[0].message.content);
     } catch (parseError) {
-      console.error("[Analyst Agent] Failed to parse GPT response:", parseError);
-      console.error("[Analyst Agent] Raw response was:", rawResponse);
+      console.error("Failed to parse Analyst Agent response:", parseError);
       return createEnhancedFallbackPlan(message, false, null, supabaseClient, userTimezone);
     }
 
-    if (!analysisResult || !analysisResult.subQuestions || !Array.isArray(analysisResult.subQuestions)) {
-      console.error("[Analyst Agent] Invalid analysis result structure:", analysisResult);
+    if (!analysisResult || !analysisResult.subQuestions) {
+      console.error("Failed to parse Analyst Agent response, using enhanced fallback");
       return createEnhancedFallbackPlan(message, false, null, supabaseClient, userTimezone);
-    }
-
-    // Validate each sub-question has required structure
-    for (const subQuestion of analysisResult.subQuestions) {
-      if (!subQuestion.question || !subQuestion.analysisSteps || !Array.isArray(subQuestion.analysisSteps)) {
-        console.error("[Analyst Agent] Invalid sub-question structure:", subQuestion);
-        return createEnhancedFallbackPlan(message, false, null, supabaseClient, userTimezone);
-      }
     }
 
     // Enhance with detected characteristics and timezone
@@ -854,45 +688,17 @@ async function generateDatabaseSchemaContext(supabaseClient: any): Promise<strin
       .join('\n');
 
     return `
-**COMPLETE DATABASE SCHEMA:**
-
-Table: "Journal Entries"
-Columns:
-- id: bigint (Primary Key)
-- user_id: uuid (NOT NULL, use in WHERE clause)
-- created_at: timestamp with time zone
-- "refined text": text (main content, use quotes!)
-- "transcription text": text (audio transcription, use quotes!)
-- emotions: JSONB (key-value pairs like {"joy": 0.8, "sadness": 0.2})
-- master_themes: text[] (array like ["Family", "Work"])
-- entities: JSONB (nested like {"person": ["John"], "place": ["Paris"]})
-- sentiment: real (numeric score, not text)
-- themes: text[] (legacy field)
-- themeemotion: JSONB
-- entityemotion: JSONB
-
-Available emotions in system:
+DATABASE CONTEXT:
+- The database contains journal entries with text content, emotions, and themes.
+- Each entry is associated with a user ID.
+- The emotions table contains a list of emotions with descriptions:
 ${emotionDescriptions}
-
-Available themes in system:
+- The themes table contains a list of themes with descriptions:
 ${themeDescriptions}
-
-**CRITICAL SQL PATTERNS:**
-- emotions analysis: jsonb_each(emotions) as e(emotion_key, emotion_value)
-- themes analysis: unnest(master_themes) as theme
-- entities analysis: jsonb_each(entities) as et(entity_type, entity_values), jsonb_array_elements_text(entity_values) as entity_value
-- Always filter by user_id = $user_id
-- Use quotes around spaced column names like "refined text"
 `;
   } catch (error) {
     console.error('Error generating database schema context:', error);
-    return `
-**FALLBACK DATABASE SCHEMA:**
-Table: "Journal Entries" with emotions (JSONB), master_themes (text[]), entities (JSONB), sentiment (real), "refined text", user_id (uuid)
-- emotions: use jsonb_each(emotions) NOT jsonb_array_elements_text
-- themes: use unnest(master_themes) for arrays
-- Always WHERE user_id = $user_id
-`;
+    return 'Error generating database schema context. Using limited context.';
   }
 }
 
