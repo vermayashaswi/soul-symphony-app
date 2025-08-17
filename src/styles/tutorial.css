@@ -270,7 +270,7 @@ body.tutorial-active[data-current-step="5"] .empty-chat-suggestion {
   touch-action: none !important;
 }
 
-/* Step 5 input hiding - GLOBAL but less aggressive */
+/* FIXED: Step 5 input hiding - ONLY when tutorial overlay is actually showing */
 body.tutorial-active[data-current-step="5"] .p-2.border-t.border-border,
 body.tutorial-active[data-current-step="5"] form,
 body.tutorial-active[data-current-step="5"] input,
@@ -326,6 +326,16 @@ body.tutorial-active[data-current-step="5"] .p-2.border-t.border-border {
   background-color: transparent !important;
   border: none !important;
   box-shadow: none !important;
+}
+
+/* FIXED: Ensure chat input is always visible when NOT in tutorial */
+body:not(.tutorial-active) .chat-input-container,
+body:not(.tutorial-active) .mobile-chat-input-container {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  visibility: visible !important;
+  height: auto !important;
+  overflow: visible !important;
 }
 
 /* Animation keyframes - GLOBAL animations */

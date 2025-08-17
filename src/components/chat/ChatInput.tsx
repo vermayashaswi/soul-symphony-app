@@ -27,8 +27,18 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const { isActive, isInStep, tutorialCompleted } = useTutorial();
   const { translate, currentLanguage } = useTranslation();
   
-  // Check if we're in the chat tutorial step
-  const isInTutorial = isActive && isInStep(5);
+  // Debug tutorial state
+  useEffect(() => {
+    console.log('[ChatInput] Tutorial state debug:', {
+      isActive,
+      isInStep5: isInStep(5),
+      tutorialCompleted,
+      shouldHideInput: isActive && isInStep(5)
+    });
+  }, [isActive, isInStep, tutorialCompleted]);
+  
+  // FIXED: Only hide input when tutorial is actively showing step 5
+  const shouldHideInput = isActive && isInStep(5);
 
   // Translate placeholder text when language changes
   useEffect(() => {
@@ -49,54 +59,37 @@ const ChatInput: React.FC<ChatInputProps> = ({
     translatePlaceholder();
   }, [currentLanguage, translate]);
 
-  // Effect to manage visibility during and after tutorial
+  // FIXED: Simplified visibility management - only hide during active tutorial step 5
   useEffect(() => {
-    const ensureInputVisibility = () => {
-      if (inputContainerRef.current) {
-        if (isInTutorial) {
-          // Completely hide input during tutorial step 5
-          inputContainerRef.current.style.opacity = '0';
-          inputContainerRef.current.style.pointerEvents = 'none';
-          inputContainerRef.current.style.height = '0';
-          inputContainerRef.current.style.visibility = 'hidden';
-          inputContainerRef.current.style.overflow = 'hidden';
-          inputContainerRef.current.style.margin = '0';
-          inputContainerRef.current.style.padding = '0';
-          inputContainerRef.current.style.backgroundColor = 'transparent';
-          inputContainerRef.current.style.border = 'none';
-          inputContainerRef.current.style.boxShadow = 'none';
-        } else {
-          // Show normally when not in tutorial or when tutorial completed
-          inputContainerRef.current.style.opacity = '1';
-          inputContainerRef.current.style.pointerEvents = 'auto';
-          inputContainerRef.current.style.cursor = 'text';
-          inputContainerRef.current.style.display = 'block';
-          inputContainerRef.current.style.visibility = 'visible';
-          inputContainerRef.current.style.height = 'auto';
-          inputContainerRef.current.style.zIndex = '20';
-          inputContainerRef.current.style.margin = '';
-          inputContainerRef.current.style.padding = '';
-          inputContainerRef.current.style.backgroundColor = '';
-          inputContainerRef.current.style.border = '';
-          inputContainerRef.current.style.boxShadow = '';
-        }
+    if (inputContainerRef.current) {
+      if (shouldHideInput) {
+        console.log('[ChatInput] Hiding input for tutorial step 5');
+        // Hide input during tutorial step 5
+        inputContainerRef.current.style.opacity = '0';
+        inputContainerRef.current.style.pointerEvents = 'none';
+        inputContainerRef.current.style.height = '0';
+        inputContainerRef.current.style.visibility = 'hidden';
+        inputContainerRef.current.style.overflow = 'hidden';
+        inputContainerRef.current.style.margin = '0';
+        inputContainerRef.current.style.padding = '0';
+      } else {
+        console.log('[ChatInput] Showing input - tutorial not active or not in step 5');
+        // Show input normally
+        inputContainerRef.current.style.opacity = '1';
+        inputContainerRef.current.style.pointerEvents = 'auto';
+        inputContainerRef.current.style.visibility = 'visible';
+        inputContainerRef.current.style.height = 'auto';
+        inputContainerRef.current.style.overflow = 'visible';
+        inputContainerRef.current.style.margin = '';
+        inputContainerRef.current.style.padding = '';
       }
-    };
+    }
+  }, [shouldHideInput]);
 
-    // Run on initial render and whenever relevant states change
-    ensureInputVisibility();
-    
-    // Recheck visibility after a delay to handle any DOM updates
-    const visibilityTimeout = setTimeout(ensureInputVisibility, 300);
-    
-    return () => {
-      clearTimeout(visibilityTimeout);
-    };
-  }, [isLoading, isInTutorial, tutorialCompleted]);
-
-  // If completely hidden during step 5, return an empty div with height 0 (not 40px)
-  if (isInTutorial) {
-    return <div ref={inputContainerRef} className="chat-input-container opacity-0 h-0 overflow-hidden" style={{ height: '0', padding: 0, margin: 0, border: 'none', backgroundColor: 'transparent' }}></div>;
+  // FIXED: Return null only when actively hiding, not just checking step
+  if (shouldHideInput) {
+    console.log('[ChatInput] Returning null - tutorial step 5 active');
+    return null;
   }
 
   const handleSubmit = (e: React.FormEvent) => {

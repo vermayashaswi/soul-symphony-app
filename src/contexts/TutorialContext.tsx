@@ -16,6 +16,7 @@ import {
 import { performComprehensiveCleanup, performStaggeredCleanup, performNavigationCleanup } from '@/utils/tutorial/tutorial-cleanup-enhanced';
 import { navigationManager } from '@/utils/tutorial/navigation-state-manager';
 import { highlightingManager } from '@/utils/tutorial/tutorial-highlighting-manager';
+import { TutorialStateRecovery } from '@/utils/tutorial/tutorial-state-recovery';
 import { InfographicType } from '@/components/tutorial/TutorialInfographic';
 
 // Define the interface for a tutorial step
@@ -51,7 +52,8 @@ interface TutorialContextType {
     inProgress: boolean;
     targetRoute: string | null;
   };
-  isInitialized: boolean; // NEW: Track initialization state
+  isInitialized: boolean;
+  forceCompleteTutorial: () => void; // NEW: Force complete for stuck users
 }
 
 // Create the context with a default undefined value
@@ -172,8 +174,8 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
   });
   const [tutorialCompleted, setTutorialCompleted] = useState(false);
   const [pendingTutorialStart, setPendingTutorialStart] = useState(false);
-  const [isInitialized, setIsInitialized] = useState(false); // NEW: Track initialization
-  
+  const [isInitialized, setIsInitialized] = useState(false);
+
   // Enhanced logging for debugging
   useEffect(() => {
     console.log('[TutorialContext] Current state:', {
@@ -184,12 +186,12 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       navigationState,
       pendingTutorialStart,
       tutorialChecked,
-      isInitialized, // NEW: Log initialization state
+      isInitialized,
       navigationManagerState: navigationManager.getState(),
       highlightingManagerState: highlightingManager.getState()
     });
   }, [isActive, currentStep, steps, location.pathname, navigationState, pendingTutorialStart, tutorialChecked, isInitialized]);
-  
+
   // NEW: Initialize the tutorial system
   useEffect(() => {
     console.log('[TutorialContext] Initializing tutorial system');
@@ -204,7 +206,36 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       clearTimeout(initTimeout);
     };
   }, []);
-  
+
+  // NEW: Force complete tutorial function for stuck users
+  const forceCompleteTutorial = async () => {
+    if (!user) return;
+    
+    try {
+      console.log('[TutorialContext] Force completing tutorial for stuck user');
+      
+      const success = await TutorialStateRecovery.forceCompleteTutorial(user.id);
+      
+      if (success) {
+        setIsActive(false);
+        setPendingTutorialStart(false);
+        setTutorialCompleted(true);
+        navigationManager.forceReset();
+        highlightingManager.reset();
+        
+        // Clean up any lingering tutorial classes
+        performStaggeredCleanup();
+        
+        console.log('[TutorialContext] Tutorial force completed successfully');
+        
+        // Navigate to home after force completion
+        navigate('/app/home', { replace: true });
+      }
+    } catch (error) {
+      console.error('[TutorialContext] Error force completing tutorial:', error);
+    }
+  };
+
   // Subscribe to navigation manager state changes
   useEffect(() => {
     const unsubscribe = navigationManager.subscribe((navState) => {
@@ -216,7 +247,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     
     return unsubscribe;
   }, []);
-  
+
   // Function to manually start the tutorial with proper navigation
   const startTutorial = () => {
     console.log('[TutorialContext] Starting tutorial manually');
@@ -241,7 +272,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       setPendingTutorialStart(false);
     }
   };
-  
+
   // Enhanced navigation completion handler with timeout protection
   useEffect(() => {
     if (!isInitialized) return; // NEW: Don't process navigation until initialized
@@ -271,7 +302,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       }
     }
   }, [location.pathname, pendingTutorialStart, currentStep, steps, isInitialized]);
-  
+
   // Check if tutorial should be active based on user's profile and current route
   useEffect(() => {
     if (!isInitialized) return; // NEW: Don't check tutorial until initialized
@@ -281,6 +312,21 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       
       try {
         console.log('[TutorialContext] Checking tutorial status for user:', user.id);
+        
+        // NEW: Check for stuck tutorial state
+        const stateInfo = await TutorialStateRecovery.checkTutorialState(user.id);
+        
+        if (stateInfo.isStuck) {
+          console.warn('[TutorialContext] Detected stuck tutorial state:', stateInfo);
+          
+          // Auto-recovery for stuck users - force complete
+          if (stateInfo.currentStep === 5 || stateInfo.currentStep >= 8) {
+            console.log('[TutorialContext] Auto-recovering from stuck tutorial state');
+            await forceCompleteTutorial();
+            setTutorialChecked(true);
+            return;
+          }
+        }
         
         const { data, error } = await supabase
           .from('profiles')
@@ -334,7 +380,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     
     checkTutorialStatus();
   }, [user, location.pathname, tutorialChecked, navigate, isInitialized]);
-  
+
   // ENHANCED: Helper function to check for target elements using new highlighting system
   const checkForTargetElementEnhanced = (stepData: TutorialStep) => {
     const selectors = [
@@ -376,7 +422,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       }
     }
   };
-  
+
   // Function to update the tutorial step in the database
   const updateTutorialStep = async (step: number) => {
     if (!user) return;
@@ -396,7 +442,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       console.error('[TutorialContext] Error updating tutorial step:', error);
     }
   };
-  
+
   // Enhanced function to mark tutorial as completed with better cleanup
   const completeTutorial = async () => {
     if (!user) return;
@@ -446,7 +492,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       console.error('[TutorialContext] Error completing tutorial:', error);
     }
   };
-  
+
   // ENHANCED: Next step function with improved navigation handling and enhanced highlighting
   const nextStep = () => {
     if (currentStep < steps.length - 1) {
@@ -488,7 +534,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       completeTutorial();
     }
   };
-  
+
   // ENHANCED: Prev step function with improved navigation handling and enhanced highlighting
   const prevStep = () => {
     if (currentStep > 0) {
@@ -526,7 +572,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       }
     }
   };
-  
+
   // Enhanced skip tutorial function with navigation to home
   const skipTutorial = async () => {
     if (!user) return;
@@ -590,7 +636,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       console.error('[TutorialContext] Error skipping tutorial:', error);
     }
   };
-  
+
   // Enhanced reset tutorial function
   const resetTutorial = async () => {
     if (!user) return;
@@ -643,7 +689,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       console.error('[TutorialContext] Error resetting tutorial:', error);
     }
   };
-  
+
   // Provide the context value with the updated navigationState property and initialization state
   const contextValue: TutorialContextType = {
     isActive,
@@ -659,9 +705,10 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     tutorialCompleted,
     isInStep: (stepId: number) => isActive && steps[currentStep]?.id === stepId,
     navigationState,
-    isInitialized // NEW: Include initialization state
+    isInitialized,
+    forceCompleteTutorial
   };
-  
+
   return (
     <TutorialContext.Provider value={contextValue}>
       {children}
@@ -692,7 +739,8 @@ export const useTutorial = () => {
       tutorialCompleted: false,
       isInStep: () => false,
       navigationState: { inProgress: false, targetRoute: null },
-      isInitialized: false
+      isInitialized: false,
+      forceCompleteTutorial: () => console.warn('[useTutorial] forceCompleteTutorial called before provider ready')
     };
   }
   
