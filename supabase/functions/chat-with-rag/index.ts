@@ -113,56 +113,21 @@ serve(async (req) => {
       };
 
     } else if (classification === 'GENERAL_MENTAL_HEALTH') {
-      // General mental health queries get GPT conversational responses
-      console.log("[chat-with-rag] Providing GPT-powered general mental health response");
+      // General mental health queries get routed to dedicated edge function
+      console.log("[chat-with-rag] Routing to general-mental-health-chat");
       
-      const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
-      if (!openaiApiKey) {
-        throw new Error('OpenAI API key not configured');
-      }
-
-      const conversationalResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${openaiApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gpt-4.1-2025-04-14',
-          messages: [
-            {
-              role: 'system',
-              content: `You are SOULo, a warm and empathetic mental health companion. You provide supportive, encouraging responses that help users feel heard and understood. Keep responses conversational, warm, and focused on mental wellness. Always encourage self-reflection and journaling as tools for growth.
-
-Key traits:
-- Warm, empathetic, and supportive
-- Encouraging of self-reflection and journaling
-- Brief but meaningful responses (2-3 sentences)
-- Focus on mental wellness and emotional support
-- Use a friendly, approachable tone`
-            },
-            ...conversationContext.slice(-3).map(msg => ({
-              role: msg.role,
-              content: msg.content
-            })),
-            {
-              role: 'user',
-              content: message
-            }
-          ],
-          max_completion_tokens: 150,
-        }),
+      const generalHealthResponse = await supabaseClient.functions.invoke('general-mental-health-chat', {
+        body: {
+          message: message,
+          conversationContext: conversationContext
+        }
       });
 
-      if (!conversationalResponse.ok) {
-        const errorData = await conversationalResponse.text();
-        console.error('[chat-with-rag] OpenAI API error:', errorData);
-        throw new Error(`OpenAI API error: ${conversationalResponse.status}`);
+      if (generalHealthResponse.error) {
+        throw new Error(`General mental health response failed: ${generalHealthResponse.error.message}`);
       }
 
-      const conversationalData = await conversationalResponse.json();
-      response = conversationalData.choices[0].message.content.trim();
-      
+      response = generalHealthResponse.data.response;
       metadata = {
         classification: classification,
         userTimezone: userTimezone,
@@ -181,14 +146,27 @@ Key traits:
       };
 
     } else {
-      // Journal-specific needs clarification
-      console.log("[chat-with-rag] Requesting clarification for journal query");
+      // Journal-specific needs clarification - route to clarification generator
+      console.log("[chat-with-rag] Routing to gpt-clarification-generator");
       
-      response = "I'd love to help you explore your journal entries! Could you be more specific about what you'd like to know? For example, you could ask about patterns in your mood, specific themes, or insights from particular time periods.";
+      const clarificationResponse = await supabaseClient.functions.invoke('gpt-clarification-generator', {
+        body: {
+          userMessage: message,
+          conversationContext: conversationContext,
+          userProfile: userProfile
+        }
+      });
+
+      if (clarificationResponse.error) {
+        throw new Error(`Clarification generation failed: ${clarificationResponse.error.message}`);
+      }
+
+      response = clarificationResponse.data.response;
       metadata = {
         classification: classification,
         userTimezone: userTimezone,
-        responseType: 'clarification'
+        responseType: 'clarification',
+        userStatusMessage: clarificationResponse.data.userStatusMessage
       };
     }
 
