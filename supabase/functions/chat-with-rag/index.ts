@@ -8,7 +8,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -72,7 +71,8 @@ serve(async (req) => {
           conversationContext,
           threadId,
           messageId,
-          userTimezone
+          userTimezone,
+          execute: true
         }
       });
 
@@ -83,17 +83,20 @@ serve(async (req) => {
       const queryPlan = queryPlanResponse.data.queryPlan;
       const executionResult = queryPlanResponse.data.executionResult;
       
-      console.log(`[chat-with-rag] GPT query plan:`, queryPlan);
+      console.log(`[chat-with-rag] GPT query plan:`, queryPlan?.strategy);
+      console.log(`[chat-with-rag] Execution results:`, executionResult?.length || 0, 'sub-questions');
 
       // Generate response using GPT's plan and results via consolidator
+      // Note: Using 'researchResults' parameter name as expected by gpt-response-consolidator
       const responseGeneration = await supabaseClient.functions.invoke('gpt-response-consolidator', {
         body: {
           userMessage: message,
-          researchResults: executionResult || [],
+          researchResults: executionResult || [], // Correct parameter name
           conversationContext: conversationContext,
           userProfile: userProfile,
           threadId: threadId,
-          messageId: messageId
+          messageId: messageId,
+          queryPlan: queryPlan
         }
       });
 
@@ -107,8 +110,9 @@ serve(async (req) => {
         queryPlan: queryPlan,
         searchResults: executionResult,
         userTimezone: userTimezone,
-        strategy: queryPlan.strategy,
-        confidence: queryPlan.confidence
+        strategy: queryPlan?.strategy,
+        confidence: queryPlan?.confidence,
+        subQuestionsProcessed: executionResult?.length || 0
       };
 
     } else if (classification === 'GENERAL_MENTAL_HEALTH') {
@@ -144,7 +148,7 @@ serve(async (req) => {
         responseType: 'redirect'
       };
 
-    } else {
+    } else if (classification === 'JOURNAL_SPECIFIC_NEEDS_CLARIFICATION') {
       // Journal-specific needs clarification - route to clarification generator
       console.log("[chat-with-rag] Routing to gpt-clarification-generator");
       
@@ -166,6 +170,17 @@ serve(async (req) => {
         userTimezone: userTimezone,
         responseType: 'clarification',
         userStatusMessage: clarificationResponse.data.userStatusMessage
+      };
+
+    } else {
+      // Fallback for unknown classifications
+      console.log("[chat-with-rag] Unknown classification, using fallback");
+      
+      response = "I'm here to help with your mental health and journal analysis. Could you please clarify what you'd like to explore or analyze from your journal entries?";
+      metadata = {
+        classification: 'unknown',
+        userTimezone: userTimezone,
+        responseType: 'fallback'
       };
     }
 
