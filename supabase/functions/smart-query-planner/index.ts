@@ -737,15 +737,10 @@ async function analyzeQueryWithSubQuestions(message, conversationContext, userEn
     const contextString = last.length > 0 ? `
 - Recent conversation context: ${last.map(m => `${m.sender}: ${m.content?.slice(0, 50) || 'N/A'}`).join(' | ')}` : '';
 
-    const prompt = `You are SOULo's Analyst Agent - an intelligent query planning specialist for journal data analysis. Your role is to break down user queries into comprehensive, actionable analysis plans.
+    // Create system prompt with database schema and instructions
+    const systemPrompt = `You are SOULo's Analyst Agent - an intelligent query planning specialist for journal data analysis. Your role is to break down user queries into comprehensive, actionable analysis plans.
 
 ${databaseSchemaContext}
-
-**CURRENT CONTEXT:**
-- Today's date: ${new Date().toISOString()}
-- Current year: ${new Date().getFullYear()}
-- User query: "${message}"
-- User has ${userEntryCount} journal entries${contextString}
 
 **YOUR RESPONSIBILITIES AS ANALYST AGENT:**
 1. Smart Hypothesis Formation: infer what the user truly wants to know, then deduce focused sub-questions to answer it comprehensively
@@ -767,8 +762,6 @@ ${databaseSchemaContext}
    - For achievement queries → Vector query: "achievement success accomplishment progress breakthrough proud"
    - For emotional queries → Vector query: "emotions feelings mood emotional state [specific emotions mentioned]"
    - Preserve user's original language patterns for better semantic matching
-
-
 
 **MANDATORY OUTPUT STRUCTURE:**
 Return ONLY valid JSON with this exact structure:
@@ -826,7 +819,20 @@ Return ONLY valid JSON with this exact structure:
 
 Focus on creating comprehensive, executable analysis plans that will provide meaningful insights.`;
 
-    console.log("[Analyst Agent] Calling OpenAI API with prompt length:", prompt.length);
+    // Create user message with query context  
+    const userMessage = `**CURRENT CONTEXT:**
+- Today's date: ${new Date().toISOString()}
+- Current year: ${new Date().getFullYear()}
+- User has ${userEntryCount} journal entries${contextString}
+
+**USER QUERY TO ANALYZE:**
+"${message}"
+
+Please analyze this query and create a comprehensive analysis plan following the system instructions.`;
+
+    console.log("[Analyst Agent] Calling OpenAI API with system/user message structure");
+    console.log("[Analyst Agent] System prompt length:", systemPrompt.length);
+    console.log("[Analyst Agent] User message length:", userMessage.length);
     
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -836,7 +842,10 @@ Focus on creating comprehensive, executable analysis plans that will provide mea
       },
       body: JSON.stringify({
         model: 'gpt-4.1-2025-04-14',
-        messages: [{ role: 'user', content: prompt }],
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userMessage }
+        ],
         max_completion_tokens: 2000
       }),
     });
