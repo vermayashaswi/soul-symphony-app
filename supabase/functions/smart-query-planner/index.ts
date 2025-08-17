@@ -370,6 +370,8 @@ async function executePlan(plan: any, userId: string, supabaseClient: any, reque
       console.log(`[${requestId}] Executing sub-question:`, subQuestion.question);
 
       let subResults = [];
+      let vectorResultIds: number[] = []; // Track vector result IDs for SQL analysis
+      
       for (const step of subQuestion.analysisSteps) {
         console.log(`[${requestId}] Executing analysis step:`, step.step, step.description);
 
@@ -378,6 +380,12 @@ async function executePlan(plan: any, userId: string, supabaseClient: any, reque
           if (step.queryType === 'vector_search') {
             console.log(`[${requestId}] Vector search:`, step.vectorSearch.query);
             stepResult = await executeVectorSearchWithDebug(step, userId, supabaseClient, requestId);
+            
+            // Extract vector result IDs for subsequent SQL steps
+            if (Array.isArray(stepResult) && stepResult.length > 0) {
+              vectorResultIds = stepResult.map(result => result.id).filter(id => id != null);
+              console.log(`[${requestId}] Collected ${vectorResultIds.length} vector result IDs for SQL analysis`);
+            }
             
             // Standardize vector search result format
             if (Array.isArray(stepResult)) {
@@ -391,12 +399,13 @@ async function executePlan(plan: any, userId: string, supabaseClient: any, reque
             }
           } else if (step.queryType === 'sql_analysis' || step.queryType === 'sql_count' || step.queryType === 'sql_calculation') {
             console.log(`[${requestId}] SQL analysis (${step.queryType}):`, step.sqlQuery);
-            stepResult = await executeSQLAnalysis(step, userId, supabaseClient, requestId);
+            // Pass vector result IDs to SQL analysis for proper placeholder replacement
+            stepResult = await executeSQLAnalysis(step, userId, supabaseClient, requestId, vectorResultIds);
             
             // Enhance SQL result format for consolidator
             stepResult = {
               ...stepResult,
-              vectorResultCount: 0,
+              vectorResultCount: vectorResultIds.length,
               sqlResultCount: stepResult.rowCount || 0,
               hasError: !stepResult.success || !!stepResult.error
             };
@@ -460,7 +469,7 @@ async function executePlan(plan: any, userId: string, supabaseClient: any, reque
   return results;
 }
 
-async function executeSQLAnalysis(step: any, userId: string, supabaseClient: any, requestId: string) {
+async function executeSQLAnalysis(step: any, userId: string, supabaseClient: any, requestId: string, vectorResultIds: number[] = []) {
   try {
     if (!step.sqlQuery) {
       console.warn(`[${requestId}] No SQL query provided for analysis step`);
@@ -479,22 +488,39 @@ async function executeSQLAnalysis(step: any, userId: string, supabaseClient: any
     let sqlQuery = step.sqlQuery;
     
     console.log(`[${requestId}] ORIGINAL SQL:`, sqlQuery);
+    console.log(`[${requestId}] Vector Result IDs:`, vectorResultIds);
     
-    // Enhanced placeholder replacement
+    // Replace user ID placeholder
     sqlQuery = sqlQuery.replace(/\$user_id/g, `'${userId}'`);
     
-    // Handle problematic placeholder patterns
+    // Handle vector matched IDs placeholder
+    if (sqlQuery.includes('[vector_matched_ids]')) {
+      if (vectorResultIds && vectorResultIds.length > 0) {
+        const idList = vectorResultIds.join(',');
+        sqlQuery = sqlQuery.replace(/\[vector_matched_ids\]/g, idList);
+        console.log(`[${requestId}] Replaced [vector_matched_ids] with: ${idList}`);
+      } else {
+        console.warn(`[${requestId}] No vector results available for SQL analysis - using fallback`);
+        // Remove the vector ID constraint entirely and add a LIMIT to prevent huge result sets
+        sqlQuery = sqlQuery.replace(/AND id IN \(\[vector_matched_ids\]\)/gi, '');
+        sqlQuery = sqlQuery.replace(/WHERE.*\[vector_matched_ids\].*/gi, `WHERE user_id = '${userId}'`);
+        
+        // Add LIMIT if not present to prevent large result sets
+        if (!sqlQuery.toLowerCase().includes('limit')) {
+          sqlQuery += ' LIMIT 100';
+        }
+      }
+    }
+    
+    // Handle other problematic placeholder patterns for backward compatibility
     if (sqlQuery.includes('/*IDs from vector search step*/') || sqlQuery.includes('$vector_result_ids')) {
-      console.warn(`[${requestId}] SQL contains vector ID placeholders - removing constraints`);
+      console.warn(`[${requestId}] SQL contains legacy vector ID placeholders - removing constraints`);
       
       // Remove vector ID constraints completely
       sqlQuery = sqlQuery.replace(/AND id IN \(\/\*IDs from vector search step\*\/\)/gi, '');
       sqlQuery = sqlQuery.replace(/AND id IN \(\$vector_result_ids\)/gi, '');
-      sqlQuery = sqlQuery.replace(/WHERE.*\/\*IDs from vector search step\*\/.*/gi, 'WHERE user_id = $user_id');
-      sqlQuery = sqlQuery.replace(/WHERE.*\$vector_result_ids.*/gi, 'WHERE user_id = $user_id');
-      
-      // Re-apply user_id replacement after cleanup
-      sqlQuery = sqlQuery.replace(/\$user_id/g, `'${userId}'`);
+      sqlQuery = sqlQuery.replace(/WHERE.*\/\*IDs from vector search step\*\/.*/gi, `WHERE user_id = '${userId}'`);
+      sqlQuery = sqlQuery.replace(/WHERE.*\$vector_result_ids.*/gi, `WHERE user_id = '${userId}'`);
     }
 
     // Clean up malformed WHERE clauses
