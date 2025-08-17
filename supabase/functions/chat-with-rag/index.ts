@@ -8,15 +8,12 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    console.log("[chat-with-rag] Starting GPT-driven RAG processing");
-
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -27,164 +24,111 @@ serve(async (req) => {
       }
     );
 
-    const { 
-      message, 
-      userId, 
-      threadId = null, 
-      messageId = null,
-      conversationContext = [],
-      userProfile = null
-    } = await req.json();
+    const { message, threadId, userId, conversationContext = [] } = await req.json();
+    const requestId = `rag_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
 
-    console.log(`[chat-with-rag] Processing query: "${message}" for user: ${userId} (threadId: ${threadId}, messageId: ${messageId})`);
-    
-    // Extract user timezone from profile or default to UTC
-    const userTimezone = userProfile?.timezone || 'UTC';
-    console.log(`[chat-with-rag] User timezone: ${userTimezone}`);
+    console.log(`[${requestId}] Chat-with-RAG request:`, {
+      message: message.substring(0, 100),
+      threadId,
+      userId,
+      contextLength: conversationContext.length
+    });
 
-    // First classify the message to determine routing
-    console.log("[chat-with-rag] Classifying message");
-    
-    const classificationResponse = await supabaseClient.functions.invoke('chat-query-classifier', {
-      body: { 
-        message, 
-        conversationContext
+    // Step 1: Generate query plan using smart-query-planner
+    console.log(`[${requestId}] Step 1: Generating query plan...`);
+    const { data: plannerResponse, error: plannerError } = await supabaseClient.functions.invoke('smart-query-planner', {
+      body: {
+        message,
+        userId,
+        execute: true,
+        conversationContext,
+        threadId,
+        requestId
       }
     });
 
-    if (classificationResponse.error) {
-      throw new Error(`Classification failed: ${classificationResponse.error.message}`);
+    if (plannerError) {
+      console.error(`[${requestId}] Query planner error:`, plannerError);
+      throw new Error(`Query planning failed: ${plannerError.message}`);
     }
 
-    const classification = classificationResponse.data.category;
-    console.log(`[chat-with-rag] Message classified as: ${classification}`);
+    if (!plannerResponse?.researchResults) {
+      console.error(`[${requestId}] No research results from planner:`, plannerResponse);
+      throw new Error('Query planner did not return research results');
+    }
 
-    let response, metadata;
+    console.log(`[${requestId}] Query plan generated successfully with ${plannerResponse.researchResults.length} research results`);
 
-    if (classification === 'JOURNAL_SPECIFIC') {
-      // Journal-specific queries go through full RAG pipeline
-      console.log("[chat-with-rag] Routing to smart-query-planner for journal analysis");
-      
-      const queryPlanResponse = await supabaseClient.functions.invoke('smart-query-planner', {
-        body: { 
-          message, 
-          userId, 
-          conversationContext,
-          threadId,
-          messageId,
-          userTimezone
-        }
-      });
-
-      if (queryPlanResponse.error) {
-        throw new Error(`Query planning failed: ${queryPlanResponse.error.message}`);
+    // Step 2: Consolidate response using gpt-response-consolidator
+    console.log(`[${requestId}] Step 2: Consolidating response...`);
+    const { data: consolidatorResponse, error: consolidatorError } = await supabaseClient.functions.invoke('gpt-response-consolidator', {
+      body: {
+        userQuery: message,
+        queryPlan: plannerResponse.queryPlan,
+        researchResults: plannerResponse.researchResults,
+        executionSummary: plannerResponse.executionSummary,
+        requestId
       }
+    });
 
-      const queryPlan = queryPlanResponse.data.queryPlan;
-      const executionResult = queryPlanResponse.data.executionResult;
-      
-      console.log(`[chat-with-rag] GPT query plan:`, queryPlan);
+    if (consolidatorError) {
+      console.error(`[${requestId}] Consolidator error:`, consolidatorError);
+      throw new Error(`Response consolidation failed: ${consolidatorError.message}`);
+    }
 
-      // Generate response using GPT's plan and results via consolidator
-      const responseGeneration = await supabaseClient.functions.invoke('gpt-response-consolidator', {
-        body: {
-          userMessage: message,
-          researchResults: executionResult || [],
-          conversationContext: conversationContext,
-          userProfile: userProfile,
-          threadId: threadId,
-          messageId: messageId
-        }
-      });
+    console.log(`[${requestId}] Response consolidated successfully`);
 
-      if (responseGeneration.error) {
-        throw new Error(`Response generation failed: ${responseGeneration.error.message}`);
-      }
+    // Step 3: Store message in database with proper structured data
+    const messageData = {
+      thread_id: threadId,
+      content: consolidatorResponse.consolidatedResponse,
+      sender: 'assistant',
+      role: 'assistant',
+      analysis_data: consolidatorResponse.analysisData || null,
+      sub_query_responses: consolidatorResponse.subQueryResponses || null,
+      reference_entries: consolidatorResponse.referenceEntries || null,
+      has_numeric_result: false
+    };
 
-      response = responseGeneration.data.response;
-      metadata = {
-        classification: classification,
-        queryPlan: queryPlan,
-        searchResults: executionResult,
-        userTimezone: userTimezone,
-        strategy: queryPlan.strategy,
-        confidence: queryPlan.confidence
-      };
+    console.log(`[${requestId}] Step 3: Storing message in database...`);
+    const { data: messageInsert, error: messageError } = await supabaseClient
+      .from('chat_messages')
+      .insert(messageData)
+      .select()
+      .single();
 
-    } else if (classification === 'GENERAL_MENTAL_HEALTH') {
-      // General mental health queries get routed to dedicated edge function
-      console.log("[chat-with-rag] Routing to general-mental-health-chat");
-      
-      const generalHealthResponse = await supabaseClient.functions.invoke('general-mental-health-chat', {
-        body: {
-          message: message,
-          conversationContext: conversationContext
-        }
-      });
-
-      if (generalHealthResponse.error) {
-        throw new Error(`General mental health response failed: ${generalHealthResponse.error.message}`);
-      }
-
-      response = generalHealthResponse.data.response;
-      metadata = {
-        classification: classification,
-        userTimezone: userTimezone,
-        responseType: 'conversational'
-      };
-
-    } else if (classification === 'UNRELATED') {
-      // Unrelated queries get polite redirect
-      console.log("[chat-with-rag] Redirecting unrelated query");
-      
-      response = "I'm designed to help with mental health and personal reflection through journal analysis. I'd be happy to help you explore your thoughts, feelings, or analyze patterns in your journaling. What would you like to discuss about your mental health or journal entries?";
-      metadata = {
-        classification: classification,
-        userTimezone: userTimezone,
-        responseType: 'redirect'
-      };
-
+    if (messageError) {
+      console.error(`[${requestId}] Database insert error:`, messageError);
+      // Don't throw error here - still return the response even if DB insert fails
     } else {
-      // Journal-specific needs clarification - route to clarification generator
-      console.log("[chat-with-rag] Routing to gpt-clarification-generator");
-      
-      const clarificationResponse = await supabaseClient.functions.invoke('gpt-clarification-generator', {
-        body: {
-          userMessage: message,
-          conversationContext: conversationContext,
-          userProfile: userProfile
-        }
-      });
-
-      if (clarificationResponse.error) {
-        throw new Error(`Clarification generation failed: ${clarificationResponse.error.message}`);
-      }
-
-      response = clarificationResponse.data.response;
-      metadata = {
-        classification: classification,
-        userTimezone: userTimezone,
-        responseType: 'clarification',
-        userStatusMessage: clarificationResponse.data.userStatusMessage
-      };
+      console.log(`[${requestId}] Message stored successfully with ID:`, messageInsert.id);
     }
 
-    console.log("[chat-with-rag] Response generation completed");
-
+    // Return the consolidated response
     return new Response(JSON.stringify({
-      response: response,
-      metadata: metadata
+      response: consolidatorResponse.consolidatedResponse,
+      analysisData: consolidatorResponse.analysisData,
+      subQueryResponses: consolidatorResponse.subQueryResponses,
+      referenceEntries: consolidatorResponse.referenceEntries,
+      requestId,
+      success: true,
+      timestamp: new Date().toISOString()
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
-    console.error('[chat-with-rag] Error:', error);
+    console.error('Error in chat-with-rag:', error);
     
+    // Return a fallback response
     return new Response(JSON.stringify({
-      error: 'Failed to process query with RAG pipeline',
-      details: error.message,
-      fallbackResponse: "I apologize, but I'm having trouble processing your request right now. Please try rephrasing your question or try again later."
+      response: "I apologize, but I'm having trouble analyzing your journal data right now. This might be a temporary issue. Please try rephrasing your question or try again in a moment.",
+      error: error.message,
+      analysisData: { error: error.message },
+      subQueryResponses: [],
+      referenceEntries: [],
+      success: false,
+      timestamp: new Date().toISOString()
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
