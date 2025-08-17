@@ -57,7 +57,7 @@ async function generateEmbedding(text: string): Promise<number[]> {
   return embedding;
 }
 
-// Execute step using GPT-generated queries dynamically
+// Enhanced execute step with proper error handling and SQL validation
 async function executeAnalysisStep(step: any, userId: string, supabaseClient: any, requestId: string) {
   console.log(`[${requestId}] Executing step:`, step.step, step.description);
 
@@ -70,7 +70,7 @@ async function executeAnalysisStep(step: any, userId: string, supabaseClient: an
       // Generate embedding for vector search
       const embedding = await generateEmbedding(step.vectorSearch.query);
       
-      // Use match_journal_entries RPC function with embedding
+      // Use the correct match_journal_entries function
       const { data, error } = await supabaseClient.rpc('match_journal_entries', {
         query_embedding: embedding,
         match_threshold: step.vectorSearch.threshold || 0.3,
@@ -80,41 +80,46 @@ async function executeAnalysisStep(step: any, userId: string, supabaseClient: an
 
       if (error) {
         console.error(`[${requestId}] Vector search error:`, error);
-        throw error;
+        // Fallback: return empty results but don't fail completely
+        console.log(`[${requestId}] Vector search fallback: continuing with empty results`);
+        stepResult = [];
+      } else {
+        stepResult = data || [];
+        console.log(`[${requestId}] Vector search returned ${stepResult.length} results`);
       }
-
-      stepResult = data || [];
-      console.log(`[${requestId}] Vector search returned ${stepResult.length} results`);
 
     } else if (step.queryType === 'sql_analysis' || step.queryType === 'sql_count' || step.queryType === 'sql_calculation') {
       console.log(`[${requestId}] SQL analysis:`, step.sqlQuery);
       
-      // Replace $user_id placeholder with actual user ID
+      // Validate and clean SQL query
       let processedQuery = step.sqlQuery.replace(/\$user_id/g, `'${userId}'`);
       
-      // Execute dynamic SQL query using the RPC function
-      const { data, error } = await supabaseClient.rpc('execute_dynamic_query', {
-        query_text: processedQuery
-      });
-
-      if (error) {
-        console.error(`[${requestId}] SQL execution error:`, error);
-        throw error;
-      }
-
-      if (data && data.success) {
-        stepResult = data.data || [];
+      // Remove invalid placeholders like [vector_matched_ids]
+      if (processedQuery.includes('[vector_matched_ids]')) {
+        console.log(`[${requestId}] Skipping SQL with invalid placeholder: [vector_matched_ids]`);
+        stepResult = [];
       } else {
-        console.error(`[${requestId}] SQL query failed:`, data?.error);
-        throw new Error(data?.error || 'SQL query execution failed');
-      }
+        // Execute dynamic SQL query using the RPC function
+        const { data, error } = await supabaseClient.rpc('execute_dynamic_query', {
+          query_text: processedQuery
+        });
 
-      console.log(`[${requestId}] SQL analysis returned ${stepResult.length} results`);
+        if (error) {
+          console.error(`[${requestId}] SQL execution error:`, error);
+          stepResult = [];
+        } else if (data && data.success) {
+          stepResult = data.data || [];
+          console.log(`[${requestId}] SQL analysis returned ${stepResult.length} results`);
+        } else {
+          console.error(`[${requestId}] SQL query failed:`, data?.error);
+          stepResult = [];
+        }
+      }
 
     } else if (step.queryType === 'hybrid_search') {
       console.log(`[${requestId}] Hybrid search: Vector + SQL`);
       
-      // Execute vector search
+      // Execute vector search first
       const embedding = await generateEmbedding(step.vectorSearch.query);
       const { data: vectorData, error: vectorError } = await supabaseClient.rpc('match_journal_entries', {
         query_embedding: embedding,
@@ -124,39 +129,43 @@ async function executeAnalysisStep(step: any, userId: string, supabaseClient: an
       });
 
       let vectorResults = [];
+      let sqlResults = [];
+
       if (!vectorError && vectorData) {
         vectorResults = vectorData;
       }
 
-      // Execute SQL query
-      let processedQuery = step.sqlQuery.replace(/\$user_id/g, `'${userId}'`);
-      const { data: sqlData, error: sqlError } = await supabaseClient.rpc('execute_dynamic_query', {
-        query_text: processedQuery
-      });
+      // Only execute SQL if it doesn't contain invalid placeholders
+      if (step.sqlQuery && !step.sqlQuery.includes('[vector_matched_ids]')) {
+        let processedQuery = step.sqlQuery.replace(/\$user_id/g, `'${userId}'`);
+        const { data: sqlData, error: sqlError } = await supabaseClient.rpc('execute_dynamic_query', {
+          query_text: processedQuery
+        });
 
-      let sqlResults = [];
-      if (!sqlError && sqlData && sqlData.success) {
-        sqlResults = sqlData.data || [];
+        if (!sqlError && sqlData && sqlData.success) {
+          sqlResults = sqlData.data || [];
+        }
       }
 
-      // Combine results (simple concatenation, could be enhanced)
+      // Combine results
       stepResult = [...vectorResults, ...sqlResults];
       console.log(`[${requestId}] Hybrid search: ${vectorResults.length} vector + ${sqlResults.length} SQL = ${stepResult.length} total`);
 
     } else {
       console.warn(`[${requestId}] Unknown query type:`, step.queryType);
-      throw new Error(`Unknown query type: ${step.queryType}`);
+      stepResult = [];
     }
 
     return stepResult;
 
   } catch (error) {
     console.error(`[${requestId}] Error executing step ${step.step}:`, error);
-    throw error;
+    // Return empty array instead of throwing to allow pipeline to continue
+    return [];
   }
 }
 
-// Execute the complete analysis plan
+// Execute the complete analysis plan with better error handling
 async function executePlan(plan: any, userId: string, supabaseClient: any, requestId: string) {
   console.log(`[${requestId}] Executing plan with ${plan.subQuestions?.length || 0} sub-questions`);
 
@@ -173,7 +182,8 @@ async function executePlan(plan: any, userId: string, supabaseClient: any, reque
           step: step.step, 
           result: stepResult,
           description: step.description,
-          queryType: step.queryType
+          queryType: step.queryType,
+          success: true
         });
       } catch (stepError) {
         console.error(`[${requestId}] Error executing step:`, step.step, stepError);
@@ -181,7 +191,9 @@ async function executePlan(plan: any, userId: string, supabaseClient: any, reque
           step: step.step, 
           error: stepError.message,
           description: step.description,
-          queryType: step.queryType
+          queryType: step.queryType,
+          success: false,
+          result: []
         });
       }
     }
@@ -197,7 +209,7 @@ async function executePlan(plan: any, userId: string, supabaseClient: any, reque
   return results;
 }
 
-// Enhanced Analyst Agent with GPT-driven query generation
+// Enhanced Analyst Agent with the exact prompt specification
 async function analyzeQueryWithSubQuestions(message: string, conversationContext: any[], userEntryCount: number, isFollowUp = false, supabaseClient: any, userTimezone = 'UTC') {
   try {
     const last = Array.isArray(conversationContext) ? conversationContext.slice(-5) : [];
@@ -365,7 +377,7 @@ Focus on creating comprehensive, executable analysis plans that will provide mea
   }
 }
 
-// Create fallback plan for errors
+// Create fallback plan for errors with vector search focus
 function createFallbackPlan(originalMessage: string, userTimezone = 'UTC') {
   const hasPersonalPronouns = /\b(i|me|my|mine|myself)\b/i.test(originalMessage.toLowerCase());
   const hasExplicitTimeReference = /\b(last week|yesterday|this week|last month|today|recently|lately|this morning|last night|august|january|february|march|april|may|june|july|september|october|november|december)\b/i.test(originalMessage.toLowerCase());

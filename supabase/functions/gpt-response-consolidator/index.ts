@@ -43,7 +43,7 @@ serve(async (req) => {
     // Ensure researchResults is an array
     const safeResearchResults = Array.isArray(researchResults) ? researchResults : [];
 
-    // Format research results for GPT analysis
+    // Format research results for GPT analysis with better error handling
     const formattedResults = formatResearchResults(safeResearchResults);
 
     // Generate comprehensive system prompt
@@ -75,7 +75,7 @@ Please provide a thoughtful, therapeutically informed response based on the anal
 
     messages.push({ role: 'user', content: userPrompt });
 
-    // Generate response using GPT-4.1
+    // Generate response using GPT-4.1 with proper parameters
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -91,7 +91,9 @@ Please provide a thoughtful, therapeutically informed response based on the anal
     });
 
     if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.status}`);
+      const errorText = await response.text();
+      console.error('OpenAI API error:', errorText);
+      throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
@@ -146,20 +148,22 @@ function formatResearchResults(researchResults: any[]): string {
       subQuestion.results.forEach((stepResult: any, stepIndex: number) => {
         formattedText += `  **Step ${stepResult.step}**: ${stepResult.description}\n`;
         formattedText += `  Query Type: ${stepResult.queryType}\n`;
+        formattedText += `  Success: ${stepResult.success !== false ? 'Yes' : 'No'}\n`;
 
         if (stepResult.error) {
           formattedText += `  ⚠️ Error: ${stepResult.error}\n`;
-        } else if (stepResult.result && Array.isArray(stepResult.result)) {
+        } else if (stepResult.result && Array.isArray(stepResult.result) && stepResult.result.length > 0) {
           formattedText += `  Results: ${stepResult.result.length} entries found\n`;
           
-          // Show sample results
+          // Show sample results with better formatting
           stepResult.result.slice(0, 3).forEach((entry: any, entryIndex: number) => {
             formattedText += `    Entry ${entryIndex + 1}:\n`;
             
-            // Format entry content
+            // Format entry content with multiple possible sources
             const content = entry.content || 
                            entry["refined text"] || 
                            entry["transcription text"] || 
+                           entry.text ||
                            "No content available";
             formattedText += `    Content: ${content.substring(0, 150)}${content.length > 150 ? '...' : ''}\n`;
             
@@ -185,6 +189,8 @@ function formatResearchResults(researchResults: any[]): string {
             // Add themes if available
             if (entry.master_themes && Array.isArray(entry.master_themes)) {
               formattedText += `    **Themes**: ${entry.master_themes.slice(0, 3).join(', ')}\n`;
+            } else if (entry.themes && Array.isArray(entry.themes)) {
+              formattedText += `    **Themes**: ${entry.themes.slice(0, 3).join(', ')}\n`;
             }
 
             // Add similarity score if available
@@ -198,8 +204,8 @@ function formatResearchResults(researchResults: any[]): string {
           if (stepResult.result.length > 3) {
             formattedText += `    ... and ${stepResult.result.length - 3} more entries\n`;
           }
-        } else if (stepResult.result) {
-          formattedText += `  Result: ${JSON.stringify(stepResult.result)}\n`;
+        } else {
+          formattedText += `  Result: No data found or empty result set\n`;
         }
         
         formattedText += '\n';
@@ -252,6 +258,11 @@ function generateSystemPrompt(userProfile: any, queryPlan: any): string {
 - Offer gentle insights without being prescriptive
 - Create a safe space for self-reflection and growth
 - Balance professional expertise with genuine human warmth
+
+**ERROR HANDLING:**
+- If no journal data is available, acknowledge this and ask for clarification
+- If analysis shows errors, focus on what data is available
+- Always provide some value even with limited information
 
 You provide real therapeutic support through intelligent journal analysis while maintaining the perfect blend of clinical insight and compassionate care.`;
 }
