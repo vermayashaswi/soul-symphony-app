@@ -106,75 +106,10 @@ serve(async (req) => {
     const userTimezone = userProfile?.timezone || 'UTC';
     console.log(`[chat-with-rag] User timezone: ${userTimezone}`);
 
-    // Step 1: Query Classification
-    console.log("[chat-with-rag] Step 1: Query Classification");
+    // Step 1: Query Planning with timezone support
+    console.log("[chat-with-rag] Step 1: Query Planning");
     
-    const classificationResponse = await supabaseClient.functions.invoke('chat-query-classifier', {
-      body: { message, conversationContext }
-    });
-    
-    let classification = classificationResponse.data;
-    
-    if (classificationResponse.error) {
-      console.error("[chat-with-rag] Classification error:", classificationResponse.error);
-      // Enhanced fallback classification with timezone context
-      classification = {
-        category: 'JOURNAL_SPECIFIC',
-        confidence: 0.7,
-        reasoning: 'Fallback classification with timezone support'
-      };
-    }
-
-    console.log(`[chat-with-rag] Query classified as: ${classification.category} (confidence: ${classification.confidence})`);
-
-    // Enhanced classification override for debugging
-    if (req.headers.get('x-classification-hint')) {
-      const hintCategory = req.headers.get('x-classification-hint');
-      console.error(`[chat-with-rag] CLIENT HINT: Overriding classification to ${hintCategory}`);
-      classification.category = hintCategory;
-    }
-
-    // Route based on classification - let GPT decide complexity
-    if (classification.category === 'GENERAL_MENTAL_HEALTH' || classification.category === 'UNRELATED') {
-      console.log(`[chat-with-rag] Using simple conversational response for: ${classification.category}`);
-      
-      // Simple conversational response without RAG
-      const responseGeneration = await supabaseClient.functions.invoke('intelligent-response-generator', {
-        body: {
-          originalQuery: message,
-          queryPlan: { strategy: 'conversational', expectedResponseType: 'simple' },
-          searchResults: [],
-          combinedResults: [],
-          conversationContext: conversationContext,
-          userProfile: userProfile,
-          timeRange: null,
-          userTimezone: userTimezone
-        }
-      });
-
-      if (responseGeneration.error) {
-        throw new Error(`Response generation failed: ${responseGeneration.error.message}`);
-      }
-
-      return new Response(JSON.stringify({
-        response: responseGeneration.data.response,
-        metadata: {
-          classification: classification,
-          queryPlan: { strategy: 'conversational' },
-          searchResults: [],
-          timeRange: null,
-          userTimezone: userTimezone,
-          strategy: 'conversational',
-          confidence: classification.confidence
-        }
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-    
-    console.log(`[chat-with-rag] Using RAG analysis for: ${classification.category}`);
-    
-    // Step 2: Enhanced Query Planning with timezone support (for JOURNAL_SPECIFIC queries only)
+    // Go directly to smart query planner - let GPT decide everything
     const queryPlanResponse = await supabaseClient.functions.invoke('smart-query-planner', {
       body: { 
         message, 
@@ -243,7 +178,6 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       response: responseGeneration.data.response,
       metadata: {
-        classification: classification,
         queryPlan: queryPlan,
         searchResults: executionResult,
         timeRange: timeRange,
