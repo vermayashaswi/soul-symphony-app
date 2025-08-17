@@ -49,16 +49,21 @@ export const generateThreadTitle = async (threadId: string, userId: string | und
       return "New Conversation";
     }
     
-    // Use the "chat-with-rag" function to generate a title
+    // Use the "smart-chat" function to generate a title
     try {
-      const response = await supabase.functions.invoke("chat-with-rag", {
+      const response = await supabase.functions.invoke("smart-chat", {
         body: {
-          message: `Create a short, concise title (maximum 5 words) for a conversation about: ${userMessages}`,
+          messages: [
+            {
+              role: "system",
+              content: "You are a helpful assistant that creates short, concise titles (maximum 5 words) for chat conversations. Based on the user's messages, create a title that captures the main topic or theme of the conversation."
+            },
+            {
+              role: "user",
+              content: `Create a short, concise title (maximum 5 words) for a conversation about: ${userMessages}`
+            }
+          ],
           userId: userId,
-          threadId: threadId,
-          messageId: null,
-          conversationContext: [],
-          userProfile: null,
           generateTitleOnly: true
         }
       });
