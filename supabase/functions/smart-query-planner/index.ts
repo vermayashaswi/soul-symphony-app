@@ -397,18 +397,18 @@ async function executePlan(plan: any, userId: string, supabaseClient: any, reque
                 hasError: false
               };
             }
-          } else if (step.queryType === 'sql_analysis' || step.queryType === 'sql_count' || step.queryType === 'sql_calculation') {
-            console.log(`[${requestId}] SQL analysis (${step.queryType}):`, step.sqlQuery);
-            // Pass vector result IDs to SQL analysis for proper placeholder replacement
-            stepResult = await executeSQLAnalysis(step, userId, supabaseClient, requestId, vectorResultIds);
-            
-            // Enhance SQL result format for consolidator
-            stepResult = {
-              ...stepResult,
-              vectorResultCount: vectorResultIds.length,
-              sqlResultCount: stepResult.rowCount || 0,
-              hasError: !stepResult.success || !!stepResult.error
-            };
+        } else if (step.queryType === 'sql_analysis' || step.queryType === 'sql_count' || step.queryType === 'sql_calculation') {
+          console.log(`[${requestId}] SQL analysis (${step.queryType}):`, step.sqlQuery);
+          // CRITICAL: Pass vector result IDs to SQL analysis for proper placeholder replacement
+          stepResult = await executeSQLAnalysis(step, userId, supabaseClient, requestId, vectorResultIds);
+          
+          // Enhance SQL result format for consolidator with proper error detection
+          stepResult = {
+            ...stepResult,
+            vectorResultCount: vectorResultIds.length,
+            sqlResultCount: stepResult.rowCount || 0,
+            hasError: !stepResult.success || !!stepResult.errorMessage || stepResult.rowCount === 0
+          };
           } else if (step.queryType === 'hybrid_search') {
             console.log(`[${requestId}] Hybrid search:`, step.vectorSearch.query, step.sqlQuery);
             stepResult = await executeHybridSearch(step, userId, supabaseClient, requestId);
@@ -893,76 +893,6 @@ function createEnhancedFallbackPlan(originalMessage, unused, inferredTimeContext
   };
 }
 
-async function generateDatabaseSchemaContext(supabaseClient: any): Promise<string> {
-  try {
-    const { data: emotions, error: emotionError } = await supabaseClient
-      .from('emotions')
-      .select('name, description');
-
-    if (emotionError) {
-      console.error('Error fetching emotions:', emotionError);
-      throw emotionError;
-    }
-
-    const { data: themes, error: themeError } = await supabaseClient
-      .from('themes')
-      .select('name, description');
-
-    if (themeError) {
-      console.error('Error fetching themes:', themeError);
-      throw themeError;
-    }
-
-    const emotionDescriptions = emotions
-      .map(emotion => `- ${emotion.name}: ${emotion.description}`)
-      .join('\n');
-
-    const themeDescriptions = themes
-      .map(theme => `- ${theme.name}: ${theme.description}`)
-      .join('\n');
-
-    return `
-**COMPLETE DATABASE SCHEMA:**
-
-Table: "Journal Entries"
-Columns:
-- id: bigint (Primary Key)
-- user_id: uuid (NOT NULL, use in WHERE clause)
-- created_at: timestamp with time zone
-- "refined text": text (main content, use quotes!)
-- "transcription text": text (audio transcription, use quotes!)
-- emotions: JSONB (key-value pairs like {"joy": 0.8, "sadness": 0.2})
-- master_themes: text[] (array like ["Family", "Work"])
-- entities: JSONB (nested like {"person": ["John"], "place": ["Paris"]})
-- sentiment: real (numeric score, not text)
-- themes: text[] (legacy field)
-- themeemotion: JSONB
-- entityemotion: JSONB
-
-Available emotions in system:
-${emotionDescriptions}
-
-Available themes in system:
-${themeDescriptions}
-
-**CRITICAL SQL PATTERNS:**
-- emotions analysis: jsonb_each(emotions) as e(emotion_key, emotion_value)
-- themes analysis: unnest(master_themes) as theme
-- entities analysis: jsonb_each(entities) as et(entity_type, entity_values), jsonb_array_elements_text(entity_values) as entity_value
-- Always filter by user_id = $user_id
-- Use quotes around spaced column names like "refined text"
-`;
-  } catch (error) {
-    console.error('Error generating database schema context:', error);
-    return `
-**FALLBACK DATABASE SCHEMA:**
-Table: "Journal Entries" with emotions (JSONB), master_themes (text[]), entities (JSONB), sentiment (real), "refined text", user_id (uuid)
-- emotions: use jsonb_each(emotions) NOT jsonb_array_elements_text
-- themes: use unnest(master_themes) for arrays
-- Always WHERE user_id = $user_id
-`;
-  }
-}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
