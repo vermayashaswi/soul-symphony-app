@@ -336,6 +336,33 @@ serve(async (req) => {
         throw new Error('Transcription returned empty result');
       }
       
+      // FIXED: Validate and clean transcription quality
+      console.log(`FIXED: Transcription validation - original length: ${transcribedText.length}`);
+      
+      // Check for repetitive patterns and clean if needed
+      const hasRepetition = transcribedText.includes('60 लाक्स पर आनम और मैं एक इंटर्व्यू था');
+      if (hasRepetition || transcribedText.length > 1000) {
+        console.warn('FIXED: Detected potential transcription repetition or excessive length');
+        
+        // Clean up repetitive patterns
+        const sentences = transcribedText.split(/[।.!?\n]+/);
+        const uniqueSentences = [];
+        const seenSentences = new Set();
+        
+        for (const sentence of sentences) {
+          const cleanSentence = sentence.trim();
+          if (cleanSentence.length > 10 && !seenSentences.has(cleanSentence.toLowerCase())) {
+            seenSentences.add(cleanSentence.toLowerCase());
+            uniqueSentences.push(cleanSentence);
+          }
+        }
+        
+        if (uniqueSentences.length > 0) {
+          transcribedText = uniqueSentences.join('. ');
+          console.log(`FIXED: Cleaned transcription - new length: ${transcribedText.length}`);
+        }
+      }
+      
       console.log(`FIXED: Transcription successful: ${transcribedText.length} characters`);
       console.log(`FIXED: Sample: "${transcribedText.slice(0, 100)}${transcribedText.length > 100 ? '...' : ''}"`);
       
@@ -411,19 +438,47 @@ serve(async (req) => {
     processingStage = 'sentiment-analysis';
     console.log('=== FIXED STEP 3: SENTIMENT ANALYSIS ===');
     
-    let sentimentResult = { sentiment: "0" };
+    let sentimentResult = { sentiment: null };
     const googleNLApiKey = Deno.env.get('GOOGLE_API');
     
     if (googleNLApiKey) {
       try {
+        console.log('FIXED: Testing Google NL API before sentiment analysis...');
+        
+        // Test API first with simple request
+        const testResponse = await fetch(`https://language.googleapis.com/v1/documents:analyzeSentiment?key=${googleNLApiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            document: { type: 'PLAIN_TEXT', content: 'test' },
+            encodingType: 'UTF8'
+          })
+        });
+        
+        if (!testResponse.ok) {
+          const errorText = await testResponse.text();
+          console.error('FIXED: Google NL API test failed:', errorText);
+          throw new Error(`Google NL API not working: ${errorText}`);
+        }
+        
+        console.log('FIXED: Google NL API test passed, proceeding with sentiment analysis');
         sentimentResult = await analyzeWithGoogleNL(refinedText, googleNLApiKey);
         console.log(`FIXED: Sentiment analysis result: ${sentimentResult.sentiment}`);
+        
+        // Validate sentiment result
+        if (sentimentResult.sentiment === undefined || sentimentResult.sentiment === null) {
+          console.warn('FIXED: Invalid sentiment result, using null');
+          sentimentResult = { sentiment: null };
+        }
+        
       } catch (sentimentError) {
         console.error('FIXED: Sentiment analysis failed:', sentimentError);
-        console.log('FIXED: Using default sentiment value of 0');
+        console.log('FIXED: Using null sentiment value (no fallback to 0)');
+        sentimentResult = { sentiment: null };
       }
     } else {
       console.log('FIXED: Google NL API key not found, skipping sentiment analysis');
+      sentimentResult = { sentiment: null };
     }
 
     // Step 12: Enhanced emotion analysis

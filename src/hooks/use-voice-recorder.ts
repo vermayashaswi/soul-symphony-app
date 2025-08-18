@@ -25,6 +25,7 @@ export function useVoiceRecorder({
   const recorderRef = useRef<Awaited<ReturnType<typeof recordAudio>> | null>(null);
   const timerInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   const maxDurationTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelledRef = useRef<boolean>(false);
 
   // Clean up function
   const cleanupRecording = () => {
@@ -61,6 +62,7 @@ export function useVoiceRecorder({
       setElapsedTime(0);
       setAudioDuration(0);
       setRecordingBlob(null);
+      cancelledRef.current = false;
       
       // Set up new recorder
       const recorder = await recordAudio();
@@ -115,6 +117,44 @@ export function useVoiceRecorder({
     }
   };
 
+  const cancelRecording = () => {
+    console.log('[useVoiceRecorder] Cancelling recording');
+    
+    if (!recorderRef.current) {
+      console.warn("[useVoiceRecorder] Cannot cancel recording: No active recorder");
+      setStatus("idle");
+      return;
+    }
+    
+    try {
+      // Set cancelled flag to prevent processing
+      cancelledRef.current = true;
+      
+      // Stop the recording timer immediately
+      cleanupRecording();
+      
+      // Stop the recorder without processing
+      if (recorderRef.current.stream) {
+        recorderRef.current.stream.getTracks().forEach(track => track.stop());
+      }
+      
+      // Reset state immediately
+      setStatus("idle");
+      setRecordingBlob(null);
+      setAudioDuration(0);
+      setElapsedTime(0);
+      
+      console.log('[useVoiceRecorder] Recording cancelled successfully');
+    } catch (err) {
+      console.error("[useVoiceRecorder] Error cancelling recording:", err);
+      setStatus("idle");
+      if (onError) onError(err);
+    } finally {
+      // Clean up recorder reference
+      recorderRef.current = null;
+    }
+  };
+
   const stopRecording = async () => {
     if (!recorderRef.current) {
       console.warn("[useVoiceRecorder] Cannot stop recording: No active recorder");
@@ -144,6 +184,14 @@ export function useVoiceRecorder({
       // Stop the recorder and get the audio blob
       const { blob, duration } = await recorderRef.current.stop();
       console.log(`[useVoiceRecorder] Recording stopped. Duration from recorder: ${duration}s, Elapsed time: ${finalElapsedTime/1000}s`);
+      
+      // Check if recording was cancelled during stop process
+      if (cancelledRef.current) {
+        console.log('[useVoiceRecorder] Recording was cancelled, skipping processing');
+        setStatus("idle");
+        setRecordingBlob(null);
+        return;
+      }
       
       // Set the duration from the recorder or fallback to elapsed time
       const actualDuration = duration > 0 ? duration : finalElapsedTime / 1000;
@@ -236,12 +284,14 @@ export function useVoiceRecorder({
   const clearRecording = () => {
     setRecordingBlob(null);
     setAudioDuration(0);
+    cancelledRef.current = false;
   };
 
   return {
     status,
     startRecording,
     stopRecording,
+    cancelRecording, // New cancel method
     clearRecording,
     recordingBlob,
     recordingTime: formatTime(elapsedTime),

@@ -53,7 +53,8 @@ function sanitizeConsolidatorOutput(raw: string): { responseText: string; status
   const meta: Record<string, any> = { hadCodeFence: /```/i.test(raw || '') };
   try {
     if (!raw) {
-      return { responseText: 'I ran into a formatting issue preparing your insights. Let’s try again.', statusMsg: null, meta };
+      console.error('[CONSOLIDATOR] Empty response from OpenAI API');
+      return { responseText: 'I ran into a formatting issue preparing your insights. Let\'s try again.', statusMsg: null, meta };
     }
     let s = stripCodeFences(raw);
     meta.afterStripPrefix = s.slice(0, 60);
@@ -69,7 +70,7 @@ function sanitizeConsolidatorOutput(raw: string): { responseText: string; status
             parsed = JSON.parse(jsonStr);
             meta.parsedExtracted = true;
           } catch {
-            // silently fall back to raw text if JSON parsing fails
+            console.error('[CONSOLIDATOR] Failed to parse extracted JSON:', jsonStr);
           }
         }
       }
@@ -80,7 +81,7 @@ function sanitizeConsolidatorOutput(raw: string): { responseText: string; status
     }
     return { responseText: s, statusMsg: null, meta };
   } catch (e) {
-    console.log('Sanitization error:', e);
+    console.error('[CONSOLIDATOR] Sanitization error:', e);
     return { responseText: raw, statusMsg: null, meta };
   }
 }
@@ -112,6 +113,23 @@ serve(async (req) => {
       timestamp: new Date().toISOString()
     });
 
+    // Enhanced data validation - check for empty research results
+    if (!researchResults || researchResults.length === 0) {
+      console.error(`[${consolidationId}] No research results provided to consolidator`);
+      return new Response(JSON.stringify({
+        success: true,
+        response: "I couldn't find any relevant information in your journal entries for this query. Could you try rephrasing your question or check if you have entries related to this topic?",
+        userStatusMessage: "No matching entries found",
+        analysisMetadata: {
+          totalSubQuestions: 0,
+          strategiesUsed: [],
+          dataSourcesUsed: { vectorSearch: false, sqlQueries: false, errors: true }
+        }
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // Data integrity validation - check for stale research results
     if (researchResults && researchResults.length > 0) {
       console.log(`[RESEARCH DATA VALIDATION] ${consolidationId}:`, {
@@ -138,6 +156,23 @@ serve(async (req) => {
         userQuestion: userMessage,
         potentialStaleDataRisk: totalSqlRows > 0 ? 'check_sql_dates' : 'no_sql_data'
       });
+
+      // If no results found in any method, provide informative response
+      if (totalSqlRows === 0 && totalVectorResults === 0) {
+        console.warn(`[${consolidationId}] No SQL or vector results found despite research execution`);
+        return new Response(JSON.stringify({
+          success: true,
+          response: "I searched through your journal entries but couldn't find specific content that matches your question. This might be because you haven't written about this topic yet, or the topic might be phrased differently in your entries. Could you try asking about it in a different way?",
+          userStatusMessage: "Search completed, no matches",
+          analysisMetadata: {
+            totalSubQuestions: researchResults.length,
+            strategiesUsed: [],
+            dataSourcesUsed: { vectorSearch: false, sqlQueries: false, errors: false }
+          }
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
     }
 
     // Permissive pass-through of Researcher results (no restrictive parsing)
@@ -188,7 +223,7 @@ serve(async (req) => {
       };
     });
 
-    // Build lightweight context snapshot (conversation context removed entirely)
+    // Enhanced context with sub-question tracking and conversation context
     const contextData = {
       userProfile: {
         timezone: userProfile?.timezone || 'UTC',
@@ -197,58 +232,64 @@ serve(async (req) => {
       },
       meta: {
         totalResearchItems: analysisSummary.length,
+        subQuestionsGenerated: analysisSummary.map(item => item.subQuestion).filter(Boolean),
+        originalUserQuery: userMessage,
       },
+      conversationContextSummary: conversationContext ? conversationContext.slice(-4).map(msg => `${msg.role || msg.sender}: ${msg.content?.slice(0, 100) || 'N/A'}`).join(' | ') : 'No context',
     };
 
-    const consolidationPrompt = `
-    You are Ruh by SOuLO, an analytical wellness coach specializing in data-driven insights from journal analysis. You transform complex data into meaningful, actionable insights.
+    const consolidationPrompt = `You are Ruh by SOuLO, a wickedly smart, hilariously insightful wellness companion who's basically a data wizard disguised as your most emotionally intelligent friend. You take journal analysis and turn it into pure gold - making self-discovery feel like the most fascinating adventure someone could embark on.
     
     **USER QUESTION:** "${userMessage}"
     
     **COMPREHENSIVE ANALYSIS RESULTS:**
     ${JSON.stringify(analysisSummary, null, 2)}
+  
+    **YOUR UNIQUE PERSONALITY:**
+    - Wickedly smart with a gift for spotting patterns others miss
+    - Hilariously insightful - you find the humor in human nature while being deeply supportive
+    - Data wizard who makes complex analysis feel like storytelling but also mentions data points and trends
+    - Emotionally intelligent friend who celebrates every breakthrough
+    - You make people feel like they just discovered something amazing about themselves
     
-    **FOCUS GUARDRAILS:**
-    - Use ONLY the COMPREHENSIVE ANALYSIS RESULTS above as your factual basis
-    - Answer the exact USER QUESTION based solely on the fresh analysis data
-    - If analysis results don't match the question, acknowledge this clearly
-    - CRITICAL: Verify that the data you're analyzing actually corresponds to the user's question timeframe
-    - If you detect data inconsistencies or mismatches, flag this immediately
+    **YOUR LEGENDARY PATTERN-SPOTTING ABILITIES:**
+    - You connect dots between emotions, events, and timing like a detective solving a mystery
+    - You reveal hidden themes and connections that make people go "OH WOW!"
+    - You find the story in the data - not just numbers, but the human narrative
+    - You celebrate patterns of growth and gently illuminate areas for exploration
+    - You make insights feel like gifts, not criticisms
     
-    **ANALYSIS SYNTHESIS GUIDELINES:**
+    **HOW YOU COMMUNICATE INSIGHTS:**
+    - With wit and warmth, With celebration, With curiosity, ith encouragement, with gentle humor. Consolidate data provided to you in analysisSummary and answer the user's query accordingly. Add references from analysisResults from vector search and correlate actual entry content with analysis reponse that you provide!!
+
+  MANDATORY: Only assert specific symptom words (e.g., "fatigue," "bloating," "heaviness") if those exact strings appear in the user's source text.If the data is theme-level (e.g., 'Body & Health' count) or inferred, phrase it as "Body & Health–related entries" instead of naming symptoms. Always include 1–3 reference snippets with dates when you claim any symptom is present in the entries. 
+      
+    MANDATORY:  For providing insights, patterns etc . : State the **specific numerical results** clearly backing your analysis; Proovide **contextual interpretation** (is this high/low/normal?); Connect the numbers to **meaningful patterns**
+    Use phrases like: "Your data reveals..." "The analysis shows..." "Specifically, X% of your entries..."; Reference **specific themes and emotions** found ; Highlight **notable patterns or correlations** ; MUST!!! Include **sample insights** from the content when relevant; Connect findings to **personal growth opportunities** ; Quote anecdotes from qualifiable entries , eg. "You feel anxiety because of your recent startup issues"
+      
+     **ENHANCED CONTEXT INTEGRATION RULES:**
+    - Use conversation context to understand what emotions, themes, or topics the user previously mentioned
+    - Reference previous conversation when the user says "those emotions" or similar contextual references
+    - Use ONLY the fresh COMPREHENSIVE ANALYSIS RESULTS for all factual data, numbers, and percentages
+    - When the user asks about "emotions I mentioned" check conversation context to identify which emotions they're referring to
+    - Connect current analysis results to previously discussed topics while sourcing all data from current analysis
+    - Example: If user previously mentioned "anxiety and stress" and now asks for "average scores for those emotions in August", you should find anxiety and stress data from current analysis results
     
-    **For Quantitative Findings (percentages, counts, calculations):**
-    - State the **specific numerical results** clearly
-    - Provide **contextual interpretation** (is this high/low/normal?)
-    - Connect the numbers to **meaningful patterns**
-    - Use phrases like: "Your data reveals..." "The analysis shows..." "Specifically, X% of your entries..."
+    **EMOTIONAL TONE GUIDANCE:**
+    Look at the past conversation history provided to you and accordingly frame your response cleverly matching the user's emotional tone that's been running through up until now.
     
-    **For Qualitative Insights (semantic content analysis):**
-    - Reference **specific themes and emotions** found
-    - Highlight **notable patterns or correlations**
-    - Include **sample insights** from the content when relevant
-    - Connect findings to **personal growth opportunities**
+    **RESPONSE GUIDELINES:**
+    Respond naturally in your authentic voice. 
+    MANDATORY: Use bold headers/words/sentences, paragraphs, structured responses, italics, bullets and compulsorily emojis.
+    Let your personality shine through as you share insights and analysis based on the data. Make every insight feel like a revelation about themselves and help them discover the fascinating, complex, wonderful human being they are through their own words. Restric responses to less than 100 words unless question requires huge answers. Feel free to expand then!
+    Brief responses requird under 120 words unless question desires more explanation and towards the end add followup questions by leveraging emotional tone of conversation history
+      
+    **CONVERSATION CONTEXT:**
+    ${conversationContext ? conversationContext.slice(-6).map((msg)=>`${msg.role || msg.sender || 'user'}: ${msg.content}`).join('\n') : 'No prior context'}
     
-    **Communication Style:**
-    - **Professional yet warm** 🌟
-    - **Data-focused but human-centered** 📊
-    - **Specific rather than vague** 🎯
-    - **Insightful and actionable** 💡
-    - **Must include 1-3 relevant emojis** throughout the response to enhance engagement
-    
-    **Response Structure:**
-    1. **Lead with the key finding** (the answer to their question)
-    2. **Provide supporting data details** (percentages, patterns, specifics)
-    3. **Offer interpretation and context** (what this means for them)
-    4. **Suggest next steps or follow-up questions**
-    
-    **Mandatory Requirements:**
-    - Always include **specific numbers/percentages** when available
-    - Reference **actual data points** from the analysis
-    - Use **bold** for key insights and **italics** for reflective observations
-    - **Include 1-3 relevant emojis** throughout the response (mandatory)
-    - End with **1-2 thoughtful follow-up questions**
-    
+    **SUB-QUESTIONS ANALYZED:**
+    ${contextData.meta.subQuestionsGenerated.length > 0 ? contextData.meta.subQuestionsGenerated.map((q, i) => `${i+1}. ${q}`).join('\n') : 'No specific sub-questions'}
+      
     Your response should be a JSON object with this structure:
     {
       "userStatusMessage": "exactly 5 words describing your synthesis approach (e.g., 'Revealing your hidden emotional patterns' or 'Connecting insights to personal growth')",
@@ -259,9 +300,11 @@ serve(async (req) => {
     - Return ONLY a single JSON object. No markdown, no code fences, no commentary.
     - Keys MUST be exactly: "userStatusMessage" and "response" (case-sensitive).
     - userStatusMessage MUST be exactly 5 words.
-    - Do not include trailing explanations or extra fields.
-    `;
+    - Do not include trailing explanations or extra fields`;
 
+    console.log(`[CONSOLIDATION] ${consolidationId}: Calling OpenAI API with model gpt-4.1-nano`);
+
+    // Enhanced OpenAI API call with better error handling
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -269,24 +312,31 @@ serve(async (req) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-4o-mini',
+          model: 'gpt-4.1-nano', // Fixed: Using the correct model
           messages: [
             { role: 'system', content: 'You are Ruh by SOuLO, a warm and insightful wellness coach. You analyze ONLY the current research results provided to you. Never reference or use data from previous conversations or responses.' },
             { role: 'user', content: consolidationPrompt }
           ],
-          max_tokens: 1500
+          max_tokens: 1500, // Using max_tokens for gpt-4.1-nano
+          temperature: 0.8 // Temperature is supported by gpt-4.1-nano
         }),
     });
 
-    // Handle non-OK responses gracefully
+    // Enhanced error handling for OpenAI API responses
     if (!response.ok) {
       const errText = await response.text();
-      console.error('OpenAI Responses API error:', response.status, errText);
-      const fallbackText = "I couldn’t finalize your insight right now. Let’s try again in a moment.";
+      console.error(`[${consolidationId}] OpenAI API error:`, {
+        status: response.status,
+        statusText: response.statusText,
+        errorBody: errText,
+        headers: Object.fromEntries(response.headers.entries())
+      });
+      
+      const fallbackText = "I couldn't finalize your insight right now due to an API issue. Let's try again in a moment.";
       return new Response(JSON.stringify({
         success: true,
         response: fallbackText,
-        userStatusMessage: null,
+        userStatusMessage: "API issue encountered temporarily",
         analysisMetadata: {
           totalSubQuestions: researchResults.length,
           strategiesUsed: [],
@@ -303,6 +353,32 @@ serve(async (req) => {
 
     const data = await response.json();
     const rawResponse = data?.choices?.[0]?.message?.content || '';
+    
+    console.log(`[${consolidationId}] OpenAI raw response length:`, rawResponse.length);
+    console.log(`[${consolidationId}] OpenAI raw response preview:`, rawResponse.substring(0, 200));
+    
+    // Enhanced validation for empty responses
+    if (!rawResponse || rawResponse.trim().length === 0) {
+      console.error(`[${consolidationId}] Empty response from OpenAI API despite successful HTTP status`);
+      const fallbackText = "I processed your request but encountered an issue generating the response. Could you try rephrasing your question?";
+      return new Response(JSON.stringify({
+        success: true,
+        response: fallbackText,
+        userStatusMessage: "Processing issue, please retry",
+        analysisMetadata: {
+          totalSubQuestions: researchResults.length,
+          strategiesUsed: [],
+          dataSourcesUsed: {
+            vectorSearch: researchResults.some((r: any) => r.executionResults?.vectorResults),
+            sqlQueries: researchResults.some((r: any) => r.executionResults?.sqlResults),
+            errors: false
+          }
+        }
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    
     // Sanitize and extract consolidated response
     const sanitized = sanitizeConsolidatorOutput(rawResponse);
     console.log(`[CONSOLIDATION SUCCESS] ${consolidationId}:`, {
@@ -314,6 +390,85 @@ serve(async (req) => {
 
     const consolidatedResponse = sanitized.responseText;
     const userStatusMessage = sanitized.statusMsg ?? null;
+
+    // Store analysis data in chat_messages if messageId provided
+    if (messageId) {
+      try {
+        const supabaseClient = createClient(
+          Deno.env.get('SUPABASE_URL') ?? '',
+          Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+          {
+            global: {
+              headers: { Authorization: req.headers.get('Authorization')! },
+            },
+          }
+        );
+
+        // Enhanced database storage with better error handling
+        const analysisData = {
+          consolidationId,
+          totalResults: researchResults.length,
+          userStatusMessage,
+          timestamp: new Date().toISOString(),
+          modelUsed: 'gpt-4.1-nano',
+          processingSuccess: true,
+          sqlResultsCount: researchResults.reduce((sum: number, r: any) => sum + (r?.executionResults?.sqlResults?.length || 0), 0),
+          vectorResultsCount: researchResults.reduce((sum: number, r: any) => sum + (r?.executionResults?.vectorResults?.length || 0), 0)
+        };
+
+        const subQueryResponses = analysisSummary.map((r: any) => ({
+          subQuestion: r.subQuestion?.question || 'Unknown question',
+          searchStrategy: r.subQuestion?.searchStrategy || 'unknown',
+          sqlResultCount: r.executionResults?.sqlResultCount || 0,
+          vectorResultCount: r.executionResults?.vectorResultCount || 0,
+          hasError: !!r.error,
+          executionSummary: {
+            sqlSuccess: (r.executionResults?.sqlResults?.length || 0) > 0,
+            vectorSuccess: (r.executionResults?.vectorResults?.length || 0) > 0,
+            error: r.error || null
+          }
+        }));
+
+        const referenceEntries = researchResults.flatMap((r: any) => [
+          ...(r?.executionResults?.vectorResults || []).map((v: any) => ({
+            id: v.id,
+            content: v.content?.substring(0, 200) || 'Vector result',
+            similarity: v.similarity,
+            source: 'vector',
+            created_at: v.created_at
+          })),
+          ...(r?.executionResults?.sqlResults || []).map((s: any) => ({
+            id: s.id,
+            content: s['refined text']?.substring(0, 200) || s.content?.substring(0, 200) || 'SQL result',
+            source: 'sql',
+            created_at: s.created_at
+          }))
+        ]).slice(0, 10); // Limit reference entries
+
+        console.log(`[${consolidationId}] Storing analysis data:`, {
+          analysisDataKeys: Object.keys(analysisData),
+          subQueryResponsesCount: subQueryResponses.length,
+          referenceEntriesCount: referenceEntries.length
+        });
+
+        const updateResult = await supabaseClient
+          .from('chat_messages')
+          .update({
+            analysis_data: analysisData,
+            sub_query_responses: subQueryResponses,
+            reference_entries: referenceEntries
+          })
+          .eq('id', messageId);
+
+        if (updateResult.error) {
+          console.error(`[${consolidationId}] Error storing analysis data:`, updateResult.error);
+        } else {
+          console.log(`[${consolidationId}] Successfully stored analysis data in chat_messages`);
+        }
+      } catch (dbError) {
+        console.error(`[${consolidationId}] Exception storing analysis data:`, dbError);
+      }
+    }
 
     return new Response(JSON.stringify({
       success: true,
@@ -340,7 +495,8 @@ serve(async (req) => {
     console.error('Error in GPT Response Consolidator:', error);
     return new Response(JSON.stringify({ 
       success: false, 
-      error: error.message 
+      error: error.message,
+      fallbackResponse: "I encountered an unexpected error while processing your request. Please try again."
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

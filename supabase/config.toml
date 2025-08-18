@@ -84,3 +84,6 @@ verify_jwt = true
 
 [functions.ensure-chat-persistence]
 verify_jwt = true
+
+[functions.test-google-nlapi]
+verify_jwt = false

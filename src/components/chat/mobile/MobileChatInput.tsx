@@ -1,13 +1,15 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Send, Loader2 } from "lucide-react";
+import { Send } from "lucide-react";
 import { useDebugLog } from "@/utils/debug/DebugContext";
 import { Input } from "@/components/ui/input";
 import { useTutorial } from "@/contexts/TutorialContext";
 import { useTranslation } from "@/contexts/TranslationContext";
 import { cn } from "@/lib/utils";
 import { useUnifiedKeyboard } from "@/hooks/use-unified-keyboard";
-import { VoiceChatRecorder } from "./VoiceChatRecorder";
+import { VoiceChatRecorder, AudioVisualizer, RecordingState } from "./VoiceChatRecorder";
+import { motion, AnimatePresence } from "framer-motion";
+import { X, ArrowUp, Loader2 } from "lucide-react";
 
 interface MobileChatInputProps {
   onSendMessage: (message: string, isAudio?: boolean) => void;
@@ -23,6 +25,7 @@ export default function MobileChatInput({
   const [inputValue, setInputValue] = useState("");
   const [placeholderText, setPlaceholderText] = useState("Type your message...");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [recordingState, setRecordingState] = useState<RecordingState>('idle');
   const inputRef = useRef<HTMLInputElement>(null);
   const inputContainerRef = useRef<HTMLDivElement>(null);
   const chatDebug = useDebugLog();
@@ -184,7 +187,7 @@ export default function MobileChatInput({
         platform === 'ios' && "platform-ios"
       )}
     >
-      {/* Text Input Container with Voice Recorder positioned on the right */}
+      {/* Text Input Container */}
       <div className="flex-1 relative">
         <Input
           ref={inputRef}
@@ -204,11 +207,59 @@ export default function MobileChatInput({
           data-testid="mobile-chat-input"
         />
         
-        {/* Voice Recorder positioned only over the microphone icon area */}
+        {/* Recording Overlay - Positioned absolutely to cover the input */}
+        <AnimatePresence>
+          {(recordingState === 'recording' || recordingState === 'processing') && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              className="absolute inset-0 bg-background border border-input rounded-md flex items-center z-10"
+            >
+              {recordingState === 'recording' ? (
+                <>
+                  {/* Cancel Button (X) */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setRecordingState('idle')}
+                    className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive shrink-0 ml-1"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+
+                  {/* Waveform Visualization */}
+                  <div className="flex-1 mx-2">
+                    <AudioVisualizer isRecording={true} audioLevel={0} />
+                  </div>
+
+                  {/* Stop/Send Button (Up Arrow) */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setRecordingState('processing')}
+                    className="h-8 w-8 p-0 text-primary hover:text-primary/80 shrink-0 mr-1"
+                  >
+                    <ArrowUp className="h-4 w-4" />
+                  </Button>
+                </>
+              ) : (
+                /* Processing state */
+                <div className="flex items-center justify-center w-full space-x-2 text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="text-sm">Processing audio...</span>
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+        
+        {/* Voice Recorder - positioned only over the mic button area */}
         <VoiceChatRecorder
           onTranscriptionComplete={handleVoiceTranscription}
           isDisabled={isSubmitting || isLoading}
-          className="absolute right-0 top-0 h-full w-12"
+          className="absolute right-2 top-1/2 transform -translate-y-1/2 w-8 h-8"
+          onRecordingStateChange={setRecordingState}
         />
       </div>
       

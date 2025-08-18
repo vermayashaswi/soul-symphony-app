@@ -1,11 +1,16 @@
+
 // Streaming response manager for real-time AI responses
 export class StreamingResponseManager {
-  private encoder = new TextEncoder();
+  writer;
+  encoder;
   
-  constructor(private writer: WritableStreamDefaultWriter<Uint8Array>) {}
+  constructor(writer) {
+    this.writer = writer;
+    this.encoder = new TextEncoder();
+  }
 
   // Create a SSE-compatible streaming response
-  static createStreamingResponse(): Response {
+  static createStreamingResponse() {
     const stream = new ReadableStream({
       start(controller) {
         return controller;
@@ -18,13 +23,13 @@ export class StreamingResponseManager {
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-      },
+        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
+      }
     });
   }
 
   // Send progress update to client
-  async sendProgress(stage: string, data?: any): Promise<void> {
+  async sendProgress(stage, data) {
     const progressEvent = {
       type: 'progress',
       stage,
@@ -36,7 +41,7 @@ export class StreamingResponseManager {
   }
 
   // Send search results chunk
-  async sendSearchResults(results: any[], searchType: 'vector' | 'sql' | 'combined'): Promise<void> {
+  async sendSearchResults(results, searchType) {
     const resultsEvent = {
       type: 'search_results',
       searchType,
@@ -48,7 +53,7 @@ export class StreamingResponseManager {
   }
 
   // Send streaming AI response chunk
-  async sendResponseChunk(chunk: string, isComplete = false): Promise<void> {
+  async sendResponseChunk(chunk, isComplete = false) {
     const responseEvent = {
       type: 'response_chunk',
       chunk,
@@ -59,7 +64,7 @@ export class StreamingResponseManager {
   }
 
   // Send final analysis data
-  async sendAnalysis(analysis: any): Promise<void> {
+  async sendAnalysis(analysis) {
     const analysisEvent = {
       type: 'analysis',
       data: analysis
@@ -69,7 +74,7 @@ export class StreamingResponseManager {
   }
 
   // Send error event
-  async sendError(error: string): Promise<void> {
+  async sendError(error) {
     const errorEvent = {
       type: 'error',
       error,
@@ -80,7 +85,7 @@ export class StreamingResponseManager {
   }
 
   // Complete the stream
-  async complete(): Promise<void> {
+  async complete() {
     const completeEvent = {
       type: 'complete',
       timestamp: Date.now()
@@ -91,15 +96,15 @@ export class StreamingResponseManager {
   }
 
   // Private method to write SSE-formatted data
-  private async writeSSE(data: any): Promise<void> {
+  async writeSSE(data) {
     const formatted = `data: ${JSON.stringify(data)}\n\n`;
     await this.writer.write(this.encoder.encode(formatted));
   }
 }
 
 // Factory function to create streaming response with controller
-export function createStreamingResponse(): { response: Response; controller: ReadableStreamDefaultController<Uint8Array> } {
-  let controller: ReadableStreamDefaultController<Uint8Array>;
+export function createStreamingResponse() {
+  let controller;
   
   const stream = new ReadableStream({
     start(ctrl) {
@@ -113,20 +118,24 @@ export function createStreamingResponse(): { response: Response; controller: Rea
       'Cache-Control': 'no-cache',
       'Connection': 'keep-alive',
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-    },
+      'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
+    }
   });
 
-  return { response, controller: controller! };
+  return { response, controller: controller };
 }
 
 // Stream manager for SSE responses
 export class SSEStreamManager {
-  private encoder = new TextEncoder();
+  controller;
+  encoder;
   
-  constructor(private controller: ReadableStreamDefaultController<Uint8Array>) {}
+  constructor(controller) {
+    this.controller = controller;
+    this.encoder = new TextEncoder();
+  }
 
-  async sendEvent(type: string, data: any): Promise<void> {
+  async sendEvent(type, data) {
     const event = {
       type,
       data,
@@ -138,7 +147,7 @@ export class SSEStreamManager {
   }
 
   // Send user-friendly status message for backend tasks
-  async sendUserMessage(message: string, stage?: string): Promise<void> {
+  async sendUserMessage(message, stage) {
     const event = {
       type: 'user_message',
       message,
@@ -151,7 +160,7 @@ export class SSEStreamManager {
   }
 
   // Send backend task update (triggers loading animation)
-  async sendBackendTask(task: string, description?: string): Promise<void> {
+  async sendBackendTask(task, description) {
     const event = {
       type: 'backend_task',
       task,
@@ -164,7 +173,7 @@ export class SSEStreamManager {
   }
 
   // Send progress update
-  async sendProgress(stage: string, progress?: number): Promise<void> {
+  async sendProgress(stage, progress) {
     const event = {
       type: 'progress',
       stage,
@@ -176,7 +185,7 @@ export class SSEStreamManager {
     this.controller.enqueue(this.encoder.encode(formatted));
   }
 
-  async close(): Promise<void> {
+  async close() {
     this.controller.close();
   }
 }

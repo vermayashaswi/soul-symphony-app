@@ -165,8 +165,17 @@ export class ProcessingStateManager {
       return;
     }
 
-    // Enhanced retry strategy with multiple attempts
+    // FIXED: Enhanced retry strategy with timeout fallback for failed sentiment analysis
     this.performRetryChecks(tempId, 0);
+    
+    // FIXED: Add timeout-based cleanup for stuck entries (when sentiment analysis fails)
+    setTimeout(() => {
+      const entry = this.getEntryById(tempId);
+      if (entry && entry.isVisible) {
+        this.logger.warn('Force cleanup of stuck entry after timeout', { tempId });
+        this.removeEntry(tempId);
+      }
+    }, 30000); // 30 second timeout for stuck entries
   }
 
   private performRetryChecks(tempId: string, attempt: number): void {
@@ -463,6 +472,43 @@ export class ProcessingStateManager {
     this.processingIntentFlag = false;
     this.notifySubscribers();
     console.log('[ProcessingStateManager] Force hid all processing entries');
+  }
+
+  /**
+   * Force immediate cleanup of a specific entry (bypasses retry logic)
+   * Used by Smart UI Detector when processed cards are detected in DOM
+   */
+  public forceImmediateCleanup(tempId: string): void {
+    console.log(`[ProcessingStateManager] Force immediate cleanup for: ${tempId}`);
+    
+    const entryIndex = this.processingEntries.findIndex(entry => entry.tempId === tempId);
+    if (entryIndex === -1) {
+      console.log(`[ProcessingStateManager] Entry ${tempId} not found for immediate cleanup`);
+      return;
+    }
+
+    const entry = this.processingEntries[entryIndex];
+    
+    // Mark as completed and hidden immediately
+    entry.state = EntryProcessingState.COMPLETED;
+    entry.isVisible = false;
+    
+    // Remove from immediate state
+    this.immediateProcessingState.delete(tempId);
+    
+    // Notify subscribers
+    this.notifySubscribers();
+    
+    // Dispatch immediate cleanup event
+    window.dispatchEvent(new CustomEvent('processingEntryHidden', {
+      detail: { 
+        tempId, 
+        trigger: 'smart-ui-immediate-cleanup',
+        timestamp: Date.now()
+      }
+    }));
+    
+    console.log(`[ProcessingStateManager] Immediate cleanup completed for: ${tempId}`);
   }
 }
 
