@@ -15,6 +15,7 @@ interface VoiceChatRecorderProps {
   onTranscriptionComplete: (text: string) => void;
   isDisabled?: boolean;
   className?: string;
+  onRecordingStateChange?: (state: RecordingState) => void;
 }
 
 interface RecordingOverlayProps {
@@ -72,7 +73,8 @@ function AudioVisualizer({ isRecording, audioLevel }: AudioVisualizerProps) {
 export function VoiceChatRecorder({ 
   onTranscriptionComplete, 
   isDisabled = false,
-  className 
+  className,
+  onRecordingStateChange
 }: VoiceChatRecorderProps) {
   const [recordingState, setRecordingState] = useState<RecordingState>('idle');
   const [audioLevel, setAudioLevel] = useState(0);
@@ -149,6 +151,7 @@ export function VoiceChatRecorder({
 
     try {
       setRecordingState('processing');
+      onRecordingStateChange?.('processing');
       cleanupAudioAnalysis();
       
       console.log('[VoiceChatRecorder] Starting chat transcription with blob:', {
@@ -198,20 +201,26 @@ export function VoiceChatRecorder({
         onTranscriptionComplete(result.transcription.trim());
         clearRecording();
         setRecordingState('idle');
+        onRecordingStateChange?.('idle');
       } else {
         throw new Error(result.error || 'Failed to transcribe audio');
       }
     } catch (error: any) {
       console.error('[VoiceChatRecorder] Processing error:', error);
       setRecordingState('error');
+      onRecordingStateChange?.('error');
       toast.error(`Transcription failed: ${error.message}`);
-      setTimeout(() => setRecordingState('idle'), 2000);
+      setTimeout(() => {
+        setRecordingState('idle');
+        onRecordingStateChange?.('idle');
+      }, 2000);
     }
   }
 
   const handleStartRecording = async () => {
     try {
       setRecordingState('recording');
+      onRecordingStateChange?.('recording');
       
       // Get user media for audio analysis
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -221,8 +230,12 @@ export function VoiceChatRecorder({
     } catch (error) {
       console.error('[VoiceChatRecorder] Failed to start recording:', error);
       setRecordingState('error');
+      onRecordingStateChange?.('error');
       toast.error('Failed to start recording. Please check microphone permissions.');
-      setTimeout(() => setRecordingState('idle'), 2000);
+      setTimeout(() => {
+        setRecordingState('idle');
+        onRecordingStateChange?.('idle');
+      }, 2000);
     }
   };
 
@@ -236,6 +249,7 @@ export function VoiceChatRecorder({
     cancelRecording(); // Use the new cancel method instead of stop
     cleanupAudioAnalysis();
     setRecordingState('idle');
+    onRecordingStateChange?.('idle');
   };
 
   // Update state based on recording status
@@ -257,73 +271,23 @@ export function VoiceChatRecorder({
   const isError = recordingState === 'error';
 
   return (
-    <>
-      {/* Recording Overlay - Positioned to cover the entire input container */}
-      <AnimatePresence>
-        {(isRecording || isProcessing) && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.98 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.98 }}
-            className="fixed top-1/2 transform -translate-y-1/2 bg-background border border-input rounded-md flex items-center z-50 h-10"
-            style={{ 
-              left: '12px',
-              right: '72px' // 12px (container padding) + 8px (gap) + 40px (send button) + 12px (container padding)
-            }}
-          >
-            {isRecording ? (
-              <>
-                {/* Cancel Button (X) */}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleCancelRecording}
-                  className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive shrink-0 ml-1"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-
-                {/* Waveform Visualization */}
-                <div className="flex-1 mx-2">
-                  <AudioVisualizer isRecording={isRecording} audioLevel={audioLevel} />
-                </div>
-
-                {/* Stop/Send Button (Up Arrow) */}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleStopRecording}
-                  className="h-8 w-8 p-0 text-primary hover:text-primary/80 shrink-0 mr-1"
-                >
-                  <ArrowUp className="h-4 w-4" />
-                </Button>
-              </>
-            ) : (
-              /* Processing state */
-              <div className="flex items-center justify-center w-full space-x-2 text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span className="text-sm">Processing audio...</span>
-              </div>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Microphone Button - Only visible when idle */}
-      <div className={cn("relative", className)}>
-        {recordingState === 'idle' && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={handleStartRecording}
-            disabled={isDisabled}
-            className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
-          >
-            <Mic className="h-4 w-4" />
-          </Button>
-        )}
-      </div>
-    </>
+    <div className={cn("relative", className)}>
+      {recordingState === 'idle' && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={handleStartRecording}
+          disabled={isDisabled}
+          className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+        >
+          <Mic className="h-4 w-4" />
+        </Button>
+      )}
+    </div>
   );
 }
+
+// Export the audio visualizer and recording state type for use in parent component
+export { AudioVisualizer };
+export type { RecordingState };
