@@ -165,8 +165,17 @@ export class ProcessingStateManager {
       return;
     }
 
-    // Enhanced retry strategy with multiple attempts
+    // FIXED: Enhanced retry strategy with timeout fallback for failed sentiment analysis
     this.performRetryChecks(tempId, 0);
+    
+    // FIXED: Add timeout-based cleanup for stuck entries (when sentiment analysis fails)
+    setTimeout(() => {
+      const entry = this.getEntryById(tempId);
+      if (entry && entry.isVisible) {
+        this.logger.warn('Force cleanup of stuck entry after timeout', { tempId });
+        this.removeEntry(tempId);
+      }
+    }, 30000); // 30 second timeout for stuck entries
   }
 
   private performRetryChecks(tempId: string, attempt: number): void {

@@ -128,7 +128,8 @@ export function JournalEntryCard({
   };
   
   const getSentimentBorderClass = (): string => {
-    if (!safeEntry.sentiment || isProcessing) {
+    // Fixed: Handle sentiment value 0 (neutral) properly - don't treat as falsy
+    if (safeEntry.sentiment === null || safeEntry.sentiment === undefined || isProcessing) {
       return '';
     }
 
