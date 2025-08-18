@@ -127,6 +127,33 @@ serve(async (req) => {
 
     console.log(`[chat-with-rag] Processing query: "${message}" for user: ${userId} (threadId: ${threadId}, messageId: ${messageId})`);
     
+    // Create assistant message for journal-specific queries
+    let assistantMessageId = null;
+    if (threadId) {
+      try {
+        console.log(`[chat-with-rag] Creating assistant message for thread: ${threadId}`);
+        const { data: assistantMessage, error: messageError } = await supabaseClient
+          .from('chat_messages')
+          .insert({
+            thread_id: threadId,
+            sender: 'assistant',
+            role: 'assistant',
+            content: 'Processing your journal query...'
+          })
+          .select('id')
+          .single();
+          
+        if (messageError) {
+          console.error('[chat-with-rag] Error creating assistant message:', messageError);
+        } else {
+          assistantMessageId = assistantMessage?.id;
+          console.log(`[chat-with-rag] Created assistant message: ${assistantMessageId}`);
+        }
+      } catch (error) {
+        console.error('[chat-with-rag] Exception creating assistant message:', error);
+      }
+    }
+    
     // Extract user timezone from profile or default to UTC
     const userTimezone = userProfile?.timezone || 'UTC';
     console.log(`[chat-with-rag] User timezone: ${userTimezone}`);
@@ -229,7 +256,7 @@ serve(async (req) => {
           conversationContext: conversationContext,
           userProfile: userProfile,
           streamingMode: false,
-          messageId: messageId,
+          messageId: assistantMessageId, // Use the assistant message ID we created
           threadId: threadId
         }
       });
@@ -241,9 +268,25 @@ serve(async (req) => {
 
       console.log("[chat-with-rag] Successfully completed RAG pipeline with consolidation");
 
+      // Update the assistant message with the final response
+      if (assistantMessageId && consolidationResponse.data.response) {
+        try {
+          await supabaseClient
+            .from('chat_messages')
+            .update({
+              content: consolidationResponse.data.response
+            })
+            .eq('id', assistantMessageId);
+          console.log(`[chat-with-rag] Updated assistant message ${assistantMessageId} with response`);
+        } catch (updateError) {
+          console.error('[chat-with-rag] Error updating assistant message:', updateError);
+        }
+      }
+
       return new Response(JSON.stringify({
         response: consolidationResponse.data.response,
         userStatusMessage: consolidationResponse.data.userStatusMessage,
+        assistantMessageId: assistantMessageId, // Include the assistant message ID in response
         metadata: {
           classification: classification,
           queryPlan: queryPlan,
@@ -269,7 +312,7 @@ serve(async (req) => {
           conversationContext: conversationContext,
           userProfile: userProfile,
           streamingMode: false,
-          messageId: messageId,
+          messageId: assistantMessageId, // Use the assistant message ID for general queries too
           threadId: threadId
         }
       });
@@ -278,9 +321,25 @@ serve(async (req) => {
         throw new Error(`General response generation failed: ${generalResponse.error.message}`);
       }
 
+      // Update the assistant message for general responses too
+      if (assistantMessageId && generalResponse.data.response) {
+        try {
+          await supabaseClient
+            .from('chat_messages')
+            .update({
+              content: generalResponse.data.response
+            })
+            .eq('id', assistantMessageId);
+          console.log(`[chat-with-rag] Updated assistant message ${assistantMessageId} with general response`);
+        } catch (updateError) {
+          console.error('[chat-with-rag] Error updating assistant message:', updateError);
+        }
+      }
+
       return new Response(JSON.stringify({
         response: generalResponse.data.response,
         userStatusMessage: generalResponse.data.userStatusMessage,
+        assistantMessageId: assistantMessageId,
         metadata: {
           classification: classification,
           strategy: 'general_response',
