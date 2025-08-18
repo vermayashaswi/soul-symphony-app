@@ -27,7 +27,7 @@ import { useTranslation } from "@/contexts/TranslationContext";
 import { useChatRealtime } from "@/hooks/use-chat-realtime";
 import { updateThreadProcessingStatus, createProcessingMessage, updateProcessingMessage, generateThreadTitle } from "@/utils/chat/threadUtils";
 import { MentalHealthInsights } from "@/hooks/use-mental-health-insights";
-import VoiceRecordingButton from "./VoiceRecordingButton";
+
 import { ChatMessage } from "@/types/chat";
 import { getThreadMessages, saveMessage } from "@/services/chat";
 import { useDebugLog } from "@/utils/debug/DebugContext";
@@ -1101,22 +1101,12 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       </div>
       
       <div className="chat-input-container bg-white border-t p-4">
-        <div className="flex items-end gap-2">
-          <div className="flex-1">
-            <ChatInput 
-              onSendMessage={handleSendMessage} 
-              isLoading={showLoadingForThisThread} 
-              userId={effectiveUserId}
-            />
-          </div>
-          <VoiceRecordingButton 
-            isLoading={isLoading || isProcessing}
-            isRecording={false}
-            recordingTime={0}
-            onStartRecording={() => {}}
-            onStopRecording={() => {}}
-          />
-        </div>
+        <ChatInput 
+          onSendMessage={handleSendMessage} 
+          isLoading={showLoadingForThisThread} 
+          userId={effectiveUserId}
+          onVoiceTranscription={handleSendMessage}
+        />
       </div>
       
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

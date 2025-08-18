@@ -113,19 +113,15 @@ export async function processChatMessage(
 
     if (classificationError) {
       console.error('[ChatService] Classification error:', classificationError);
+      throw new Error(`Classification failed: ${classificationError.message}`);
     }
 
-    let classification = classificationData || { category: 'JOURNAL_SPECIFIC' };
-    
-    // PHASE 3: Override classification for follow-up messages that should be general mental health
-    if (isFollowUpMessage && message.toLowerCase().includes('football')) {
-      console.log('[ChatService] Overriding classification for football follow-up');
-      classification = { 
-        category: 'GENERAL_MENTAL_HEALTH', 
-        confidence: 0.9,
-        reasoning: 'Follow-up to sports/activity conversation'
-      };
+    if (!classificationData || !classificationData.category) {
+      console.error('[ChatService] Invalid classification data:', classificationData);
+      throw new Error('Classification service returned invalid data');
     }
+
+    const classification = classificationData;
     
     console.log('[ChatService] Message classification:', classification);
 

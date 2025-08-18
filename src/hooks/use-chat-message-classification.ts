@@ -47,71 +47,70 @@ export function useChatMessageClassification() {
       error: null
     }));
 
-    try {
-      console.log("[Classification Hook] Classifying message with enhanced personal pronoun prioritization:", message);
-      
-      // Use the enhanced chat-query-classifier edge function
-      const { data, error } = await supabase.functions.invoke('chat-query-classifier', {
-        body: { message, conversationContext }
-      });
-
-      if (error) throw error;
-      
-      if (data) {
-        const result = {
-          category: data.category as QueryCategory,
-          confidence: data.confidence,
-          reasoning: data.reasoning,
-          useAllEntries: data.useAllEntries || false // NEW: Support for all entries flag
-        };
+    const maxRetries = 3;
+    let lastError = null;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`[Classification Hook] Classification attempt ${attempt}/${maxRetries} for message:`, message);
         
-        console.log("[Classification Hook] Enhanced classification result:", result);
-        
-        setClassification({
-          ...result,
-          isLoading: false,
-          error: null
+        // Use the enhanced chat-query-classifier edge function
+        const { data, error } = await supabase.functions.invoke('chat-query-classifier', {
+          body: { message, conversationContext }
         });
+
+        if (error) throw error;
         
-        return result;
+        if (data) {
+          const result = {
+            category: data.category as QueryCategory,
+            confidence: data.confidence || 0.8,
+            reasoning: data.reasoning || 'GPT-based classification',
+            useAllEntries: data.useAllEntries || false
+          };
+          
+          console.log("[Classification Hook] Classification successful:", result);
+          
+          setClassification({
+            ...result,
+            isLoading: false,
+            error: null
+          });
+          
+          return result;
+        }
+        
+        throw new Error('No data received from classification service');
+      } catch (error: any) {
+        lastError = error;
+        console.error(`[Classification Hook] Attempt ${attempt} failed:`, error.message);
+        
+        if (attempt < maxRetries) {
+          const delay = Math.pow(2, attempt - 1) * 1000; // Exponential backoff: 1s, 2s, 4s
+          console.log(`[Classification Hook] Retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
       }
-      
-      throw new Error('No data received from classification service');
-    } catch (error: any) {
-      const errorMessage = error.message || 'Unknown error classifying message';
-      
-      console.error("[Classification Hook] Classification error:", errorMessage);
-      
-      // Enhanced fallback for personal pronoun detection with clarification for bare emotions
-      const text = message.toLowerCase().trim();
-      const personalPronounPattern = /\b(i|me|my|mine|myself|am i|do i|how am i|what makes me|how do i|what about me)\b/i;
-      const hasPersonalPronouns = personalPronounPattern.test(text);
-      const hasTimeReference = /\b(last week|yesterday|this week|last month|today|recently|lately|this morning|last night)\b/i.test(text);
-      const isBareEmotion = /^(i\s*(?:am|'m)\s+\w+|i\s*feel\s+\w+|feeling\s+\w+)$/i.test(text);
-      
-      const inferredCategory = hasPersonalPronouns
-        ? (isBareEmotion && !hasTimeReference ? QueryCategory.JOURNAL_SPECIFIC_NEEDS_CLARIFICATION : QueryCategory.JOURNAL_SPECIFIC)
-        : QueryCategory.GENERAL_MENTAL_HEALTH;
-      
-      const fallbackResult = {
-        category: inferredCategory,
-        confidence: hasPersonalPronouns ? 0.9 : 0.3,
-        reasoning: hasPersonalPronouns
-          ? (inferredCategory === QueryCategory.JOURNAL_SPECIFIC_NEEDS_CLARIFICATION
-              ? 'BARE EMOTION DETECTED (fallback) - needs a clarifying question'
-              : 'PERSONAL PRONOUNS DETECTED (fallback) - journal-specific')
-          : 'Error in classification (fallback)',
-        useAllEntries: hasPersonalPronouns && !hasTimeReference // Use all entries if personal pronouns but no time reference
-      };
-      
-      setClassification({
-        ...fallbackResult,
-        isLoading: false,
-        error: errorMessage
-      });
-      
-      return fallbackResult;
     }
+    
+    // All retries failed - return error state
+    const errorMessage = lastError?.message || 'Classification service unavailable';
+    console.error("[Classification Hook] All classification attempts failed:", errorMessage);
+    
+    const errorResult = {
+      category: QueryCategory.GENERAL_MENTAL_HEALTH,
+      confidence: 0,
+      reasoning: 'Classification service unavailable - please try again',
+      useAllEntries: false
+    };
+    
+    setClassification({
+      ...errorResult,
+      isLoading: false,
+      error: errorMessage
+    });
+    
+    return errorResult;
   }, []);
 
   return {
