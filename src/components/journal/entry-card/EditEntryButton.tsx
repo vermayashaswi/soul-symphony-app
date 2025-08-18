@@ -209,14 +209,8 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
           );
         }
         
-        // Immediately emit event to hide loader cards for smoother transition
-        console.log('[EditEntryButton] Entry data ready, signaling immediate loader cleanup');
-        window.dispatchEvent(new CustomEvent('journalEntryDataReady', {
-          detail: { 
-            entryId: entryId,
-            action: 'edit-complete'
-          }
-        }));
+        // Remove premature loader hiding - let SmartUIDetector handle cleanup based on DOM rendering
+        console.log('[EditEntryButton] Entry processing complete, letting SmartUIDetector handle cleanup');
         
         // Ensure minimum processing time for UX consistency
         const minProcessingTime = 1000;
