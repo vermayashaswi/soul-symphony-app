@@ -172,11 +172,8 @@ class SmartUIDetector {
   private triggerImmediateCleanup(tempId: string) {
     console.log(`[SmartUIDetector] Triggering immediate cleanup for: ${tempId}`);
     
-    // Force immediate cleanup in processing state manager
-    processingStateManager.forceImmediateCleanup(tempId);
-    
-    // Dispatch immediate cleanup event
-    window.dispatchEvent(new CustomEvent('smartUICleanup', {
+    // Emit loader cleanup start event FIRST
+    window.dispatchEvent(new CustomEvent('loaderCleanupStarted', {
       detail: { 
         tempId,
         trigger: 'processed-card-detected',
@@ -184,8 +181,30 @@ class SmartUIDetector {
       }
     }));
     
-    // Also hide any visible loading cards with this tempId
+    // Force immediate cleanup in processing state manager
+    processingStateManager.forceImmediateCleanup(tempId);
+    
+    // Hide loading cards with smooth transition
     this.hideLoadingCardsForTempId(tempId);
+    
+    // Dispatch final cleanup event after hiding
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('smartUICleanup', {
+        detail: { 
+          tempId,
+          trigger: 'processed-card-detected',
+          timestamp: Date.now()
+        }
+      }));
+      
+      // Allow processed entry to show after loader is hidden
+      window.dispatchEvent(new CustomEvent('loaderCleanupComplete', {
+        detail: { 
+          tempId,
+          timestamp: Date.now()
+        }
+      }));
+    }, 250); // After fade-out transition
   }
 
   /**
