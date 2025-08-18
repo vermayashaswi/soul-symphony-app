@@ -7,20 +7,24 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { motion } from "framer-motion";
 import { useTutorial } from "@/contexts/TutorialContext";
 import { useTranslation } from "@/contexts/TranslationContext";
+import { VoiceChatRecorder, RecordingState } from "@/components/chat/mobile/VoiceChatRecorder";
 
 interface ChatInputProps {
   onSendMessage: (message: string) => void;
   isLoading: boolean;
   userId?: string;
+  onVoiceTranscription?: (transcribedText: string) => void;
 }
 
 const ChatInput: React.FC<ChatInputProps> = ({ 
   onSendMessage, 
   isLoading,
-  userId
+  userId,
+  onVoiceTranscription
 }) => {
   const [message, setMessage] = useState("");
   const [placeholderText, setPlaceholderText] = useState("Type your message...");
+  const [recordingState, setRecordingState] = useState<RecordingState>('idle');
   const isMobile = useIsMobile();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const inputContainerRef = useRef<HTMLDivElement>(null);
@@ -123,6 +127,15 @@ const ChatInput: React.FC<ChatInputProps> = ({
     adjustTextareaHeight(e.target);
   };
 
+  const handleVoiceTranscription = async (transcribedText: string) => {
+    if (onVoiceTranscription) {
+      await onVoiceTranscription(transcribedText);
+    } else {
+      // Fallback: insert into text input
+      setMessage(prev => prev + transcribedText);
+    }
+  };
+
   return (
     <div 
       className="chat-input-container w-full" 
@@ -163,7 +176,16 @@ const ChatInput: React.FC<ChatInputProps> = ({
           />
         </div>
         
-        <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center">
+        <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center gap-1">
+          {/* Voice Recorder */}
+          <VoiceChatRecorder
+            onTranscriptionComplete={handleVoiceTranscription}
+            isDisabled={isLoading}
+            className="w-7 h-7"
+            onRecordingStateChange={setRecordingState}
+          />
+          
+          {/* Send Button */}
           <Button 
             type="submit" 
             size={isMobile ? "sm" : "default"}
