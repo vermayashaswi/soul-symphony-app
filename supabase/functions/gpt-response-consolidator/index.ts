@@ -223,7 +223,7 @@ serve(async (req) => {
       };
     });
 
-    // Build lightweight context snapshot (conversation context removed entirely)
+    // Enhanced context with sub-question tracking and conversation context
     const contextData = {
       userProfile: {
         timezone: userProfile?.timezone || 'UTC',
@@ -232,7 +232,10 @@ serve(async (req) => {
       },
       meta: {
         totalResearchItems: analysisSummary.length,
+        subQuestionsGenerated: analysisSummary.map(item => item.subQuestion).filter(Boolean),
+        originalUserQuery: userMessage,
       },
+      conversationContextSummary: conversationContext ? conversationContext.slice(-4).map(msg => `${msg.role || msg.sender}: ${msg.content?.slice(0, 100) || 'N/A'}`).join(' | ') : 'No context',
     };
 
     const consolidationPrompt = `You are Ruh by SOuLO, a wickedly smart, hilariously insightful wellness companion who's basically a data wizard disguised as your most emotionally intelligent friend. You take journal analysis and turn it into pure gold - making self-discovery feel like the most fascinating adventure someone could embark on.
@@ -264,13 +267,13 @@ serve(async (req) => {
     MANDATORY:  For providing insights, patterns etc . : State the **specific numerical results** clearly backing your analysis; Proovide **contextual interpretation** (is this high/low/normal?); Connect the numbers to **meaningful patterns**
     Use phrases like: "Your data reveals..." "The analysis shows..." "Specifically, X% of your entries..."; Reference **specific themes and emotions** found ; Highlight **notable patterns or correlations** ; MUST!!! Include **sample insights** from the content when relevant; Connect findings to **personal growth opportunities** ; Quote anecdotes from qualifiable entries , eg. "You feel anxiety because of your recent startup issues"
       
-     **CRITICAL CONTEXT ISOLATION RULES:**
-    - IGNORE ALL previous assistant responses and analysis results from conversation context
-    - Use ONLY the fresh COMPREHENSIVE ANALYSIS RESULTS as your factual basis
-    - Do NOT reference, mention, or carry over ANY data, numbers, percentages, or topics from previous responses
-    - If the current analysis results are about a completely different topic than the user's question, acknowledge this mismatch
-    - Answer ONLY what the current analysis results support - do not fill gaps with conversation context
-    - Previous conversation is for understanding user intent only, NOT for factual information
+     **ENHANCED CONTEXT INTEGRATION RULES:**
+    - Use conversation context to understand what emotions, themes, or topics the user previously mentioned
+    - Reference previous conversation when the user says "those emotions" or similar contextual references
+    - Use ONLY the fresh COMPREHENSIVE ANALYSIS RESULTS for all factual data, numbers, and percentages
+    - When the user asks about "emotions I mentioned" check conversation context to identify which emotions they're referring to
+    - Connect current analysis results to previously discussed topics while sourcing all data from current analysis
+    - Example: If user previously mentioned "anxiety and stress" and now asks for "average scores for those emotions in August", you should find anxiety and stress data from current analysis results
     
     **EMOTIONAL TONE GUIDANCE:**
     Look at the past conversation history provided to you and accordingly frame your response cleverly matching the user's emotional tone that's been running through up until now.
@@ -283,6 +286,9 @@ serve(async (req) => {
       
     **CONVERSATION CONTEXT:**
     ${conversationContext ? conversationContext.slice(-6).map((msg)=>`${msg.role || msg.sender || 'user'}: ${msg.content}`).join('\n') : 'No prior context'}
+    
+    **SUB-QUESTIONS ANALYZED:**
+    ${contextData.meta.subQuestionsGenerated.length > 0 ? contextData.meta.subQuestionsGenerated.map((q, i) => `${i+1}. ${q}`).join('\n') : 'No specific sub-questions'}
       
     Your response should be a JSON object with this structure:
     {

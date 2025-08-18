@@ -193,11 +193,17 @@ async function executeVectorSearch(step: any, userId: string, supabaseClient: an
     const embedding = await generateEmbedding(step.vectorSearch.query);
     
     let vectorResults;
+    // Lowered default threshold for better recall, with fallback reduction
+    const primaryThreshold = step.vectorSearch.threshold || 0.2;
+    const fallbackThreshold = 0.15;
+    
+    console.log(`[${requestId}] Vector search with primary threshold: ${primaryThreshold}`);
+    
     if (step.timeRange) {
       // Use time-filtered vector search
       const { data, error } = await supabaseClient.rpc('match_journal_entries_with_date', {
         query_embedding: embedding,
-        match_threshold: step.vectorSearch.threshold || 0.3,
+        match_threshold: primaryThreshold,
         match_count: step.vectorSearch.limit || 15,
         user_id_filter: userId,
         start_date: step.timeRange.start || null,
@@ -215,7 +221,7 @@ async function executeVectorSearch(step: any, userId: string, supabaseClient: an
       // Use standard vector search
       const { data, error } = await supabaseClient.rpc('match_journal_entries', {
         query_embedding: embedding,
-        match_threshold: step.vectorSearch.threshold || 0.3,
+        match_threshold: primaryThreshold,
         match_count: step.vectorSearch.limit || 15,
         user_id_filter: userId
       });
@@ -227,6 +233,32 @@ async function executeVectorSearch(step: any, userId: string, supabaseClient: an
         return await executeBasicSQLQuery(userId, supabaseClient, requestId);
       }
       vectorResults = data;
+    }
+
+    // Add fallback threshold reduction if no results found
+    if (!vectorResults || vectorResults.length === 0) {
+      console.log(`[${requestId}] No results with threshold ${primaryThreshold}, trying fallback threshold ${fallbackThreshold}`);
+      
+      const fallbackSearch = step.timeRange 
+        ? await supabaseClient.rpc('match_journal_entries_with_date', {
+            query_embedding: embedding,
+            match_threshold: fallbackThreshold,
+            match_count: step.vectorSearch.limit || 15,
+            user_id_filter: userId,
+            start_date: step.timeRange.start || null,
+            end_date: step.timeRange.end || null
+          })
+        : await supabaseClient.rpc('match_journal_entries', {
+            query_embedding: embedding,
+            match_threshold: fallbackThreshold,
+            match_count: step.vectorSearch.limit || 15,
+            user_id_filter: userId
+          });
+      
+      if (!fallbackSearch.error && fallbackSearch.data && fallbackSearch.data.length > 0) {
+        vectorResults = fallbackSearch.data;
+        console.log(`[${requestId}] Fallback threshold search found ${vectorResults.length} results`);
+      }
     }
 
     console.log(`[${requestId}] Vector search results:`, vectorResults?.length || 0);
@@ -476,7 +508,13 @@ ${databaseSchemaContext}
    - For entities: jsonb_each(entities) for types, jsonb_array_elements_text() for values
    - Example: SELECT emotion_key, AVG((emotion_value::text)::numeric) FROM "Journal Entries", jsonb_each(emotions) WHERE user_id = auth.uid() GROUP BY emotion_key
 
-4. **Safe Query Patterns:**
+4. **MANDATORY TIME RANGE INTEGRATION:**
+   - When timeRange is provided in the step, SQL queries MUST include the date filters
+   - Use proper timestamp with time zone format: '2024-08-01T00:00:00Z'::timestamp with time zone
+   - ALWAYS include both start and end date filters when timeRange exists
+   - Example: AND created_at >= 'START_DATE' AND created_at <= 'END_DATE'
+
+5. **Safe Query Patterns:**
    - Always include user_id = auth.uid() in WHERE clause
    - Use proper PostgreSQL syntax with double quotes for table/column names with spaces
    - Avoid complex nested queries - keep it simple and working
@@ -519,14 +557,30 @@ ORDER BY created_at DESC
 LIMIT 5;
 \`\`\`
 
-4. **Date Range Query:**
+4. **Date Range Query with Timezone Conversion:**
 \`\`\`sql
 SELECT COUNT(*) as entry_count,
        AVG(CASE WHEN sentiment = 'positive' THEN 1 WHEN sentiment = 'negative' THEN -1 ELSE 0 END) as avg_sentiment
 FROM "Journal Entries" 
 WHERE user_id = auth.uid() 
-  AND created_at >= '2024-01-01'::timestamp 
-  AND created_at <= '2024-12-31'::timestamp;
+  AND created_at >= '2024-01-01T00:00:00Z'::timestamp with time zone
+  AND created_at <= '2024-01-01T23:59:59Z'::timestamp with time zone;
+\`\`\`
+
+5. **Emotion Analysis with Time Range:**
+\`\`\`sql
+SELECT 
+  emotion_key,
+  AVG((emotion_value::text)::numeric) as avg_score,
+  COUNT(*) as frequency
+FROM "Journal Entries", 
+     jsonb_each(emotions) as e(emotion_key, emotion_value)
+WHERE user_id = auth.uid() 
+  AND emotions IS NOT NULL
+  AND created_at >= '2024-08-01T00:00:00Z'::timestamp with time zone
+  AND created_at <= '2024-08-31T23:59:59Z'::timestamp with time zone
+GROUP BY emotion_key
+ORDER BY avg_score DESC;
 \`\`\`
 
 **CRITICAL TIMEZONE HANDLING RULES:**

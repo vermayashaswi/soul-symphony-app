@@ -12,8 +12,8 @@ export async function executeSQLAnalysis(step: any, userId: string, supabaseClie
     const originalQuery = step.sqlQuery.trim();
     executionDetails.originalQuery = originalQuery;
     
-    // Validate the SQL query
-    const validationResult = validateSQLQuery(originalQuery, requestId);
+    // Enhanced validation including time range requirements
+    const validationResult = validateSQLQuery(originalQuery, requestId, step.timeRange);
     executionDetails.validationResult = validationResult;
     
     if (!validationResult.isValid) {
@@ -99,7 +99,7 @@ export async function executeBasicSQLQuery(userId: string, supabaseClient: any, 
   return data || [];
 }
 
-function validateSQLQuery(query: string, requestId: string): { isValid: boolean; error?: string } {
+function validateSQLQuery(query: string, requestId: string, timeRange?: any): { isValid: boolean; error?: string } {
   try {
     const upperQuery = query.toUpperCase().trim();
     
@@ -132,6 +132,19 @@ function validateSQLQuery(query: string, requestId: string): { isValid: boolean;
       const error = 'Query must reference Journal Entries table';
       console.error(`[${requestId}] ${error}`);
       return { isValid: false, error };
+    }
+    
+    // Enhanced validation: Check if time range is required but missing
+    if (timeRange && (timeRange.start || timeRange.end)) {
+      const hasTimeFilter = upperQuery.includes('CREATED_AT') && 
+                           (upperQuery.includes('>') || upperQuery.includes('<') || upperQuery.includes('BETWEEN'));
+      
+      if (!hasTimeFilter) {
+        console.warn(`[${requestId}] SQL query should include time range filtering but doesn't - timeRange provided: ${JSON.stringify(timeRange)}`);
+        // Note: This is a warning, not an error, to maintain backward compatibility
+      } else {
+        console.log(`[${requestId}] SQL query includes proper time range filtering`);
+      }
     }
     
     console.log(`[${requestId}] SQL query validation passed`);
