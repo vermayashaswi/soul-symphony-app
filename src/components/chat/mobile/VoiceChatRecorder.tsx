@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { Mic, ArrowUp, X, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -16,6 +16,12 @@ interface VoiceChatRecorderProps {
   isDisabled?: boolean;
   className?: string;
   onRecordingStateChange?: (state: RecordingState) => void;
+  onAudioLevelChange?: (level: number) => void;
+}
+
+export interface VoiceChatRecorderRef {
+  stopRecording: () => void;
+  cancelRecording: () => void;
 }
 
 interface RecordingOverlayProps {
@@ -70,18 +76,25 @@ function AudioVisualizer({ isRecording, audioLevel }: AudioVisualizerProps) {
   );
 }
 
-export function VoiceChatRecorder({ 
+export const VoiceChatRecorder = forwardRef<VoiceChatRecorderRef, VoiceChatRecorderProps>(({ 
   onTranscriptionComplete, 
   isDisabled = false,
   className,
-  onRecordingStateChange
-}: VoiceChatRecorderProps) {
+  onRecordingStateChange,
+  onAudioLevelChange
+}, ref) => {
   const [recordingState, setRecordingState] = useState<RecordingState>('idle');
   const [audioLevel, setAudioLevel] = useState(0);
   const { user } = useAuth();
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationFrameRef = useRef<number>();
+  
+  // Expose methods through ref
+  useImperativeHandle(ref, () => ({
+    stopRecording: handleStopRecording,
+    cancelRecording: handleCancelRecording
+  }));
   
   const {
     status,
@@ -113,17 +126,18 @@ export function VoiceChatRecorder({
       
       const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
       
-      const updateAudioLevel = () => {
-        if (analyserRef.current) {
-          analyserRef.current.getByteFrequencyData(dataArray);
-          const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
-          setAudioLevel(average);
-          
-          if (status === 'recording') {
-            animationFrameRef.current = requestAnimationFrame(updateAudioLevel);
+        const updateAudioLevel = () => {
+          if (analyserRef.current) {
+            analyserRef.current.getByteFrequencyData(dataArray);
+            const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+            setAudioLevel(average);
+            onAudioLevelChange?.(average);
+            
+            if (status === 'recording') {
+              animationFrameRef.current = requestAnimationFrame(updateAudioLevel);
+            }
           }
-        }
-      };
+        };
       
       updateAudioLevel();
     } catch (error) {
@@ -281,12 +295,12 @@ export function VoiceChatRecorder({
           disabled={isDisabled}
           className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
         >
-          <Mic className="h-4 w-4" />
+      <Mic className="h-4 w-4" />
         </Button>
       )}
     </div>
   );
-}
+});
 
 // Export the audio visualizer and recording state type for use in parent component
 export { AudioVisualizer };

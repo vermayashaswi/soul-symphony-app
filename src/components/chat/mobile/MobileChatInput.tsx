@@ -7,7 +7,7 @@ import { useTutorial } from "@/contexts/TutorialContext";
 import { useTranslation } from "@/contexts/TranslationContext";
 import { cn } from "@/lib/utils";
 import { useUnifiedKeyboard } from "@/hooks/use-unified-keyboard";
-import { VoiceChatRecorder, AudioVisualizer, RecordingState } from "./VoiceChatRecorder";
+import { VoiceChatRecorder, AudioVisualizer, RecordingState, VoiceChatRecorderRef } from "./VoiceChatRecorder";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, ArrowUp, Loader2 } from "lucide-react";
 
@@ -26,6 +26,8 @@ export default function MobileChatInput({
   const [placeholderText, setPlaceholderText] = useState("Type your message...");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [recordingState, setRecordingState] = useState<RecordingState>('idle');
+  const [audioLevel, setAudioLevel] = useState(0);
+  const voiceRecorderRef = useRef<VoiceChatRecorderRef>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const inputContainerRef = useRef<HTMLDivElement>(null);
   const chatDebug = useDebugLog();
@@ -222,7 +224,7 @@ export default function MobileChatInput({
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setRecordingState('idle')}
+                    onClick={() => voiceRecorderRef.current?.cancelRecording()}
                     className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive shrink-0 ml-1"
                   >
                     <X className="h-4 w-4" />
@@ -230,14 +232,14 @@ export default function MobileChatInput({
 
                   {/* Waveform Visualization */}
                   <div className="flex-1 mx-2">
-                    <AudioVisualizer isRecording={true} audioLevel={0} />
+                    <AudioVisualizer isRecording={true} audioLevel={audioLevel} />
                   </div>
 
                   {/* Stop/Send Button (Up Arrow) */}
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setRecordingState('processing')}
+                    onClick={() => voiceRecorderRef.current?.stopRecording()}
                     className="h-8 w-8 p-0 text-primary hover:text-primary/80 shrink-0 mr-1"
                   >
                     <ArrowUp className="h-4 w-4" />
@@ -256,10 +258,12 @@ export default function MobileChatInput({
         
         {/* Voice Recorder - positioned only over the mic button area */}
         <VoiceChatRecorder
+          ref={voiceRecorderRef}
           onTranscriptionComplete={handleVoiceTranscription}
           isDisabled={isSubmitting || isLoading}
           className="absolute right-2 top-1/2 transform -translate-y-1/2 w-8 h-8"
           onRecordingStateChange={setRecordingState}
+          onAudioLevelChange={setAudioLevel}
         />
       </div>
       
