@@ -56,10 +56,12 @@ function validateSQLQuery(query: string, requestId: string): { isValid: boolean;
     
     console.log(`[${requestId}] Validating SQL query: ${query.substring(0, 100)}...`);
     
-    // Check for dangerous operations
+    // Check for dangerous operations using word boundaries to prevent false positives
     const dangerousKeywords = ['DROP', 'DELETE FROM', 'INSERT INTO', 'UPDATE SET', 'CREATE', 'ALTER', 'TRUNCATE'];
     for (const keyword of dangerousKeywords) {
-      if (upperQuery.includes(keyword)) {
+      // Use word boundary regex to avoid false positives like "COALESCE" containing "CREATE"
+      const keywordRegex = new RegExp(`\\b${keyword.replace(/\s+/g, '\\s+')}\\b`, 'i');
+      if (keywordRegex.test(upperQuery)) {
         const error = `Dangerous SQL keyword detected: ${keyword}`;
         console.error(`[${requestId}] ${error}`);
         return { isValid: false, error };
