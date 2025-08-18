@@ -17,6 +17,14 @@ interface VoiceChatRecorderProps {
   className?: string;
 }
 
+interface RecordingOverlayProps {
+  isRecording: boolean;
+  isProcessing: boolean;
+  audioLevel: number;
+  onCancel: () => void;
+  onStop: () => void;
+}
+
 interface AudioVisualizerProps {
   isRecording: boolean;
   audioLevel: number;
@@ -249,74 +257,70 @@ export function VoiceChatRecorder({
   const isError = recordingState === 'error';
 
   return (
-    <div className={cn("relative", className)}>
-      {/* Recording Overlay - Covers the entire input area when recording */}
+    <>
+      {/* Recording Overlay - Positioned to cover the entire input container */}
       <AnimatePresence>
-        {isRecording && (
+        {(isRecording || isProcessing) && (
           <motion.div
             initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.98 }}
-            className="absolute inset-0 bg-background border border-input rounded-md flex items-center px-3 z-50"
+            className="fixed inset-x-3 top-1/2 transform -translate-y-1/2 bg-background border border-input rounded-md flex items-center z-50 h-10"
+            style={{ left: '12px', right: '12px' }}
           >
-            {/* Cancel Button (X) */}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleCancelRecording}
-              className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive shrink-0"
-            >
-              <X className="h-4 w-4" />
-            </Button>
+            {isRecording ? (
+              <>
+                {/* Cancel Button (X) */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleCancelRecording}
+                  className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive shrink-0 ml-1"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
 
-            {/* Waveform Visualization */}
-            <div className="flex-1 mx-3">
-              <AudioVisualizer isRecording={isRecording} audioLevel={audioLevel} />
-            </div>
+                {/* Waveform Visualization */}
+                <div className="flex-1 mx-2">
+                  <AudioVisualizer isRecording={isRecording} audioLevel={audioLevel} />
+                </div>
 
-            {/* Stop/Send Button (Up Arrow) */}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleStopRecording}
-              className="h-8 w-8 p-0 text-primary hover:text-primary/80 shrink-0"
-            >
-              <ArrowUp className="h-4 w-4" />
-            </Button>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Processing Overlay */}
-      <AnimatePresence>
-        {isProcessing && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 bg-background border border-input rounded-md flex items-center justify-center z-50"
-          >
-            <div className="flex items-center space-x-2 text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span className="text-sm">Processing audio...</span>
-            </div>
+                {/* Stop/Send Button (Up Arrow) */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleStopRecording}
+                  className="h-8 w-8 p-0 text-primary hover:text-primary/80 shrink-0 mr-1"
+                >
+                  <ArrowUp className="h-4 w-4" />
+                </Button>
+              </>
+            ) : (
+              /* Processing state */
+              <div className="flex items-center justify-center w-full space-x-2 text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="text-sm">Processing audio...</span>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
 
       {/* Microphone Button - Only visible when idle */}
-      {recordingState === 'idle' && (
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={handleStartRecording}
-          disabled={isDisabled}
-          className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
-        >
-          <Mic className="h-4 w-4" />
-        </Button>
-      )}
-    </div>
+      <div className={cn("relative", className)}>
+        {recordingState === 'idle' && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={handleStartRecording}
+            disabled={isDisabled}
+            className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+          >
+            <Mic className="h-4 w-4" />
+          </Button>
+        )}
+      </div>
+    </>
   );
 }
