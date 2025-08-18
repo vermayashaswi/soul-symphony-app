@@ -265,8 +265,11 @@ export function VoiceChatRecorder({
             initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.98 }}
-            className="fixed inset-x-3 top-1/2 transform -translate-y-1/2 bg-background border border-input rounded-md flex items-center z-50 h-10"
-            style={{ left: '12px', right: '12px' }}
+            className="fixed top-1/2 transform -translate-y-1/2 bg-background border border-input rounded-md flex items-center z-50 h-10"
+            style={{ 
+              left: '12px',
+              right: '72px' // 12px (container padding) + 8px (gap) + 40px (send button) + 12px (container padding)
+            }}
           >
             {isRecording ? (
               <>
