@@ -108,23 +108,21 @@ export async function processChatVoiceRecording(
       console.log('[ChatAudioProcessing] No duration found in blob, estimating from recording time');
     }
     
-    // Prepare the payload for chat transcription using existing transcribe-audio function
+    // Prepare the payload for chat transcription using dedicated transcribe-chat-audio function
     const payload = {
       audio: base64Audio,
-      recordingTime,
-      chatMode: true // NEW: This tells the function to skip journal entry creation
+      recordingTime
     };
     
-    console.log('[ChatAudioProcessing] Calling transcribe-audio Edge Function in chat mode with payload:', {
+    console.log('[ChatAudioProcessing] Calling transcribe-chat-audio Edge Function with payload:', {
       audioLength: base64Audio.length,
       recordingTime,
       blobSize: normalizedBlob.size,
-      blobType: normalizedBlob.type,
-      chatMode: true
+      blobType: normalizedBlob.type
     });
     
-    // Call the existing transcribe-audio Supabase Edge Function with chatMode parameter
-    const { data, error } = await supabase.functions.invoke('transcribe-audio', {
+    // Call the dedicated transcribe-chat-audio Supabase Edge Function
+    const { data, error } = await supabase.functions.invoke('transcribe-chat-audio', {
       body: payload
     });
     
