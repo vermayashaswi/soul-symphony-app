@@ -12,13 +12,13 @@ export async function analyzeWithGoogleNL(text: string, googleNLApiKey: string) 
     
     if (!googleNLApiKey) {
       console.error('Google NL API key missing from environment');
-      return { sentiment: "0" };
+      return { sentiment: null };
     }
     
     // Improved API key validation - check for basic format but be less restrictive
     if (googleNLApiKey.length < 10) {
       console.error('Google NL API key appears to be too short:', googleNLApiKey.substring(0, 5) + '...');
-      return { sentiment: "0" };
+      return { sentiment: null };
     }
     
     // Make the API call for sentiment analysis
@@ -56,7 +56,7 @@ export async function analyzeWithGoogleNL(text: string, googleNLApiKey: string) 
         console.error('Error parsing Google NL API error response:', e);
       }
       
-      return { sentiment: "0" };
+      return { sentiment: null };
     }
 
     const sentimentResult = await sentimentResponse.json();
@@ -64,13 +64,13 @@ export async function analyzeWithGoogleNL(text: string, googleNLApiKey: string) 
     console.log('Google NL API sentiment analysis complete:', sentimentResult.documentSentiment);
     
     // Get sentiment score from sentiment analysis response
-    const sentimentScore = sentimentResult.documentSentiment?.score?.toString() || "0";
+    const sentimentScore = sentimentResult.documentSentiment?.score?.toString() || null;
     
     console.log(`Extracted sentiment score: ${sentimentScore}`);
     
     return { sentiment: sentimentScore };
   } catch (error) {
     console.error('Error in analyzeWithGoogleNL:', error);
-    return { sentiment: "0" };
+    return { sentiment: null };
   }
 }

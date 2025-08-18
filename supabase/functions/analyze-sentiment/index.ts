@@ -143,21 +143,24 @@ serve(async (req) => {
     }
 
     const result = await response.json();
-    const sentimentScore = result.documentSentiment?.score?.toString() || "0";
+    const sentimentScore = result.documentSentiment?.score?.toString() || null;
     
     console.log('FIXED: Sentiment analysis result:', result);
     console.log('FIXED: Sentiment score:', sentimentScore);
     
     // Categorize the sentiment according to the specified ranges
-    let sentimentCategory;
-    const score = parseFloat(sentimentScore);
+    let sentimentCategory = null;
     
-    if (score >= 0.3) {
-      sentimentCategory = "positive";
-    } else if (score >= -0.1) {
-      sentimentCategory = "neutral";
-    } else {
-      sentimentCategory = "negative";
+    if (sentimentScore !== null) {
+      const score = parseFloat(sentimentScore);
+      
+      if (score >= 0.3) {
+        sentimentCategory = "positive";
+      } else if (score >= -0.1) {
+        sentimentCategory = "neutral";
+      } else {
+        sentimentCategory = "negative";
+      }
     }
     
     console.log('FIXED: Sentiment category:', sentimentCategory);

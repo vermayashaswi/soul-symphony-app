@@ -121,17 +121,51 @@ export async function processChatVoiceRecording(
       blobType: normalizedBlob.type
     });
     
-    // Call the dedicated transcribe-chat-audio Supabase Edge Function
-    const { data, error } = await supabase.functions.invoke('transcribe-chat-audio', {
-      body: payload
-    });
+    // Call the dedicated transcribe-chat-audio Supabase Edge Function with timeout
+    const TIMEOUT_MS = 30000; // 30 second timeout
+    let data, error;
+    
+    try {
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Transcription timeout after 30 seconds')), TIMEOUT_MS)
+      );
+      
+      const functionCall = supabase.functions.invoke('transcribe-chat-audio', {
+        body: payload
+      });
+      
+      const result = await Promise.race([functionCall, timeoutPromise]);
+      data = (result as any).data;
+      error = (result as any).error;
+      
+      console.log('[ChatAudioProcessing] Edge function response:', { 
+        hasData: !!data, 
+        hasError: !!error,
+        errorMessage: error?.message,
+        dataKeys: data ? Object.keys(data) : []
+      });
+      
+    } catch (timeoutError: any) {
+      console.error('[ChatAudioProcessing] Function call timeout or error:', timeoutError);
+      return { 
+        success: false, 
+        error: timeoutError.message?.includes('timeout') ? 
+          'Transcription is taking too long. Please try again.' : 
+          'Network error. Please check your connection and try again.'
+      };
+    }
     
     if (error) {
       console.error('[ChatAudioProcessing] Edge function error:', error);
-      return { success: false, error: error.message };
+      return { success: false, error: `Transcription service error: ${error.message}` };
     }
     
-    if (!data || !data.success) {
+    if (!data) {
+      console.error('[ChatAudioProcessing] No data returned from transcription service');
+      return { success: false, error: 'No response from transcription service' };
+    }
+    
+    if (!data.success) {
       console.error('[ChatAudioProcessing] Transcription failed:', data);
       return { success: false, error: data?.error || 'Transcription failed' };
     }

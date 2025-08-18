@@ -56,10 +56,12 @@ function validateSQLQuery(query: string, requestId: string): { isValid: boolean;
     
     console.log(`[${requestId}] Validating SQL query: ${query.substring(0, 100)}...`);
     
-    // Check for dangerous operations
+    // Check for dangerous operations using word boundaries to prevent false positives
     const dangerousKeywords = ['DROP', 'DELETE FROM', 'INSERT INTO', 'UPDATE SET', 'CREATE', 'ALTER', 'TRUNCATE'];
     for (const keyword of dangerousKeywords) {
-      if (upperQuery.includes(keyword)) {
+      // Use word boundary regex to avoid false positives like "COALESCE" containing "CREATE"
+      const keywordRegex = new RegExp(`\\b${keyword.replace(/\s+/g, '\\s+')}\\b`, 'i');
+      if (keywordRegex.test(upperQuery)) {
         const error = `Dangerous SQL keyword detected: ${keyword}`;
         console.error(`[${requestId}] ${error}`);
         return { isValid: false, error };
@@ -254,9 +256,19 @@ async function executeVectorSearch(step: any, userId: string, supabaseClient: an
             match_count: step.vectorSearch.limit || 15,
             user_id_filter: userId
           });
+
+      if (fallbackSearch.error) {
+        console.error(`[${requestId}] Fallback vector search error:`, fallbackSearch.error);
+        executionDetails.executionError = fallbackSearch.error.message;
+        executionDetails.fallbackUsed = true;
+        // Final fallback to basic SQL only if vector search completely fails
+        console.log(`[${requestId}] Vector search failed completely, using basic SQL as last resort`);
+        return await executeBasicSQLQuery(userId, supabaseClient, requestId);
+      }
+
+      vectorResults = fallbackSearch.data;
       
-      if (!fallbackSearch.error && fallbackSearch.data && fallbackSearch.data.length > 0) {
-        vectorResults = fallbackSearch.data;
+      if (vectorResults && vectorResults.length > 0) {
         console.log(`[${requestId}] Fallback threshold search found ${vectorResults.length} results`);
       }
     }
@@ -277,9 +289,9 @@ async function executeSQLAnalysis(step: any, userId: string, supabaseClient: any
     console.log(`[${requestId}] Executing SQL query:`, step.sqlQuery);
     
     if (!step.sqlQuery || !step.sqlQuery.trim()) {
-      console.log(`[${requestId}] No SQL query provided, using fallback`);
+      console.log(`[${requestId}] No SQL query provided, using vector search fallback`);
       executionDetails.fallbackUsed = true;
-      return await executeBasicSQLQuery(userId, supabaseClient, requestId);
+      return await executeVectorSearchFallback(step, userId, supabaseClient, requestId);
     }
 
     const originalQuery = step.sqlQuery.trim();
@@ -292,7 +304,7 @@ async function executeSQLAnalysis(step: any, userId: string, supabaseClient: any
     if (!validationResult.isValid) {
       console.error(`[${requestId}] SQL query validation failed: ${validationResult.error}`);
       executionDetails.fallbackUsed = true;
-      return await executeBasicSQLQuery(userId, supabaseClient, requestId);
+      return await executeVectorSearchFallback(step, userId, supabaseClient, requestId);
     }
     
     // Sanitize user ID in the query
@@ -304,7 +316,7 @@ async function executeSQLAnalysis(step: any, userId: string, supabaseClient: any
       console.error(`[${requestId}] Query sanitization failed:`, sanitizeError);
       executionDetails.executionError = sanitizeError.message;
       executionDetails.fallbackUsed = true;
-      return await executeBasicSQLQuery(userId, supabaseClient, requestId);
+      return await executeVectorSearchFallback(step, userId, supabaseClient, requestId);
     }
     
     // Use the execute_dynamic_query function to safely run GPT-generated SQL
@@ -331,26 +343,159 @@ async function executeSQLAnalysis(step: any, userId: string, supabaseClient: any
         console.error(`[${requestId}] PostgreSQL error hint: ${error.hint}`);
       }
       
-      // Fallback to basic query if dynamic execution fails
-      return await executeBasicSQLQuery(userId, supabaseClient, requestId);
+      // INTELLIGENT FALLBACK: Use vector search instead of basic SQL
+      console.log(`[${requestId}] SQL execution failed, falling back to vector search`);
+      return await executeVectorSearchFallback(step, userId, supabaseClient, requestId);
     }
 
     if (data && data.success && data.data) {
       console.log(`[${requestId}] SQL query executed successfully, rows:`, data.data.length);
+      // If SQL query executed but returned 0 results, try vector fallback
+      if (data.data.length === 0) {
+        console.log(`[${requestId}] SQL query returned 0 results, falling back to vector search`);
+        executionDetails.fallbackUsed = true;
+        return await executeVectorSearchFallback(step, userId, supabaseClient, requestId);
+      }
       return data.data;
     } else {
       console.warn(`[${requestId}] SQL query returned no results or failed:`, data);
       executionDetails.fallbackUsed = true;
-      return await executeBasicSQLQuery(userId, supabaseClient, requestId);
+      return await executeVectorSearchFallback(step, userId, supabaseClient, requestId);
     }
 
   } catch (error) {
     console.error(`[${requestId}] Error in SQL analysis:`, error);
     executionDetails.executionError = error.message;
     executionDetails.fallbackUsed = true;
-    // Fallback to basic query on error
+    // INTELLIGENT FALLBACK: Use vector search instead of basic SQL
+    console.log(`[${requestId}] SQL analysis error, falling back to vector search`);
+    return await executeVectorSearchFallback(step, userId, supabaseClient, requestId);
+  }
+}
+
+// NEW INTELLIGENT VECTOR SEARCH FALLBACK FUNCTION
+async function executeVectorSearchFallback(step: any, userId: string, supabaseClient: any, requestId: string) {
+  console.log(`[${requestId}] Executing vector search fallback`);
+  
+  try {
+    // Extract query context from the original step
+    let searchQuery = '';
+    if (step.description) {
+      searchQuery = step.description;
+    } else if (step.sqlQuery) {
+      // Extract meaningful terms from the SQL query for vector search
+      searchQuery = extractSearchTermsFromSQL(step.sqlQuery);
+    } else {
+      searchQuery = 'personal thoughts feelings experiences';
+    }
+
+    console.log(`[${requestId}] Vector fallback search query: ${searchQuery}`);
+
+    // Generate embedding for the search query
+    const embedding = await generateEmbedding(searchQuery);
+    
+    // Primary vector search with relaxed threshold
+    const primaryThreshold = 0.2;
+    const fallbackThreshold = 0.15;
+    
+    let vectorResults;
+    
+    // First try with time range if available
+    if (step.timeRange && (step.timeRange.start || step.timeRange.end)) {
+      console.log(`[${requestId}] Vector fallback with time range: ${step.timeRange.start} to ${step.timeRange.end}`);
+      const { data, error } = await supabaseClient.rpc('match_journal_entries_with_date', {
+        query_embedding: embedding,
+        match_threshold: primaryThreshold,
+        match_count: 15,
+        user_id_filter: userId,
+        start_date: step.timeRange.start || null,
+        end_date: step.timeRange.end || null
+      });
+
+      if (error) {
+        console.error(`[${requestId}] Time-filtered vector fallback error:`, error);
+        vectorResults = null;
+      } else {
+        vectorResults = data;
+      }
+    }
+    
+    // If no time range results or no time range specified, try basic vector search
+    if (!vectorResults || vectorResults.length === 0) {
+      console.log(`[${requestId}] Vector fallback without time constraints`);
+      const { data, error } = await supabaseClient.rpc('match_journal_entries', {
+        query_embedding: embedding,
+        match_threshold: primaryThreshold,
+        match_count: 15,
+        user_id_filter: userId
+      });
+
+      if (error) {
+        console.error(`[${requestId}] Basic vector fallback error:`, error);
+        vectorResults = null;
+      } else {
+        vectorResults = data;
+      }
+    }
+    
+    // If still no results, try with lower threshold
+    if (!vectorResults || vectorResults.length === 0) {
+      console.log(`[${requestId}] Vector fallback with lower threshold: ${fallbackThreshold}`);
+      const { data, error } = await supabaseClient.rpc('match_journal_entries', {
+        query_embedding: embedding,
+        match_threshold: fallbackThreshold,
+        match_count: 15,
+        user_id_filter: userId
+      });
+
+      if (error) {
+        console.error(`[${requestId}] Low threshold vector fallback error:`, error);
+        vectorResults = null;
+      } else {
+        vectorResults = data;
+      }
+    }
+    
+    // Final fallback to basic SQL if vector search completely fails
+    if (!vectorResults || vectorResults.length === 0) {
+      console.log(`[${requestId}] Vector fallback failed, using basic SQL as last resort`);
+      return await executeBasicSQLQuery(userId, supabaseClient, requestId);
+    }
+
+    console.log(`[${requestId}] Vector fallback successful, found ${vectorResults.length} results`);
+    return vectorResults;
+
+  } catch (error) {
+    console.error(`[${requestId}] Error in vector search fallback:`, error);
+    // Absolute last resort - basic SQL query
+    console.log(`[${requestId}] Vector fallback error, using basic SQL as absolute last resort`);
     return await executeBasicSQLQuery(userId, supabaseClient, requestId);
   }
+}
+
+// Helper function to extract search terms from SQL queries
+function extractSearchTermsFromSQL(sqlQuery: string): string {
+  // Extract meaningful terms from SQL for vector search
+  const terms = [];
+  
+  // Look for theme references
+  const themeMatches = sqlQuery.match(/'([^']+)'/g);
+  if (themeMatches) {
+    terms.push(...themeMatches.map(match => match.replace(/'/g, '')));
+  }
+  
+  // Look for emotion references
+  const emotionMatches = sqlQuery.match(/emotions.*?'([^']+)'/g);
+  if (emotionMatches) {
+    terms.push(...emotionMatches.map(match => match.replace(/.*'([^']+)'.*/, '$1')));
+  }
+  
+  // Default meaningful search if no specific terms found
+  if (terms.length === 0) {
+    terms.push('feelings', 'thoughts', 'experiences', 'emotions');
+  }
+  
+  return terms.join(' ');
 }
 
 async function executeBasicSQLQuery(userId: string, supabaseClient: any, requestId: string) {
