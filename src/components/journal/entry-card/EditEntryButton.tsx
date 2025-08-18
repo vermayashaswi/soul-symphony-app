@@ -209,6 +209,15 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
           );
         }
         
+        // Immediately emit event to hide loader cards for smoother transition
+        console.log('[EditEntryButton] Entry data ready, signaling immediate loader cleanup');
+        window.dispatchEvent(new CustomEvent('journalEntryDataReady', {
+          detail: { 
+            entryId: entryId,
+            action: 'edit-complete'
+          }
+        }));
+        
         // Ensure minimum processing time for UX consistency
         const minProcessingTime = 1000;
         await new Promise(resolve => setTimeout(resolve, minProcessingTime));

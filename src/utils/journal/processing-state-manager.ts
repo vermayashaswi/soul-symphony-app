@@ -30,6 +30,27 @@ export class ProcessingStateManager {
   
   constructor() {
     this.logger.debug('Initialized with immediate cleanup');
+    this.setupEventListeners();
+  }
+
+  private setupEventListeners() {
+    // Listen for journal entry data ready events for immediate loader cleanup
+    window.addEventListener('journalEntryDataReady', (event) => {
+      const detail = (event as CustomEvent).detail;
+      if (detail?.entryId) {
+        this.logger.debug('Entry data ready, hiding loader immediately for entryId', { entryId: detail.entryId });
+        this.hideLoaderByEntryId(detail.entryId);
+      }
+    });
+  }
+
+  private hideLoaderByEntryId(entryId: number) {
+    // Find the processing entry by entryId and immediately hide it
+    const entry = this.processingEntries.find(e => e.entryId === entryId);
+    if (entry) {
+      this.logger.debug('Found loader entry for entryId and hiding immediately', { entryId });
+      this.forceImmediateCleanup(entry.tempId);
+    }
   }
   
   // Emergency fallback methods for immediate processing detection

@@ -87,7 +87,7 @@
     "info": "정보",
     "conversationDeleted": "대화가 성공적으로 삭제되었습니다",
     "entryDeleted": "항목이 성공적으로 삭제되었습니다",
-    "entryUpdated": "일기 항목이 성공적으로 업데이트되었습니다",
+    "entryUpdated": "일기 항목이 재처리되어 저장되었습니다",
     "translationUpdated": "번역이 성공적으로 업데이트되었습니다",
     "languageChanged": "언어가 성공적으로 변경되었습니다",
     "profileUpdated": "프로필이 성공적으로 업데이트되었습니다",

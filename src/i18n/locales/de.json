@@ -87,7 +87,7 @@
     "info": "Info",
     "conversationDeleted": "Unterhaltung erfolgreich gelöscht",
     "entryDeleted": "Eintrag erfolgreich gelöscht",
-    "entryUpdated": "Tagebucheintrag erfolgreich aktualisiert",
+    "entryUpdated": "Tagebucheintrag neu verarbeitet und gespeichert",
     "translationUpdated": "Übersetzung erfolgreich aktualisiert",
     "languageChanged": "Sprache erfolgreich geändert",
     "profileUpdated": "Profil erfolgreich aktualisiert",

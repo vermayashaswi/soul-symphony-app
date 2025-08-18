@@ -87,7 +87,7 @@
     "info": "معلومات",
     "conversationDeleted": "تم حذف المحادثة بنجاح",
     "entryDeleted": "تم حذف الإدخال بنجاح",
-    "entryUpdated": "تم تحديث إدخال اليومية بنجاح",
+    "entryUpdated": "تم إعادة معالجة وحفظ إدخال اليومية",
     "translationUpdated": "تم تحديث الترجمة بنجاح",
     "languageChanged": "تم تغيير اللغة بنجاح",
     "profileUpdated": "تم تحديث الملف الشخصي بنجاح",
