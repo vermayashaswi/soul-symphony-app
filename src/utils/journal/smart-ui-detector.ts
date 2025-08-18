@@ -32,12 +32,12 @@ class SmartUIDetector {
     // Create MutationObserver to watch for new entry cards
     this.observer = new MutationObserver(this.handleMutations);
     
-    // Watch for child additions in the entire container tree
+    // Enhanced observation for faster detection
     this.observer.observe(this.containerElement, {
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ['data-temp-id', 'data-processing']
+      attributeFilter: ['data-temp-id', 'data-processing', 'data-content-ready', 'class']
     });
 
     this.isObserving = true;
@@ -57,27 +57,36 @@ class SmartUIDetector {
   }
 
   /**
-   * Handle DOM mutations - debounced to avoid excessive processing
+   * Handle DOM mutations - optimized for faster detection
    */
   private handleMutations = debounce((mutations: MutationRecord[]) => {
     console.log('[SmartUIDetector] Processing DOM mutations:', mutations.length);
     
-    for (const mutation of mutations) {
-      if (mutation.type === 'childList') {
-        // Check for newly added nodes
-        mutation.addedNodes.forEach(node => {
-          if (node.nodeType === Node.ELEMENT_NODE) {
-            this.checkForProcessedEntryCard(node as Element);
+    // Use requestAnimationFrame for immediate DOM checks
+    requestAnimationFrame(() => {
+      for (const mutation of mutations) {
+        if (mutation.type === 'childList') {
+          // Check for newly added nodes
+          mutation.addedNodes.forEach(node => {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              this.checkForProcessedEntryCard(node as Element);
+            }
+          });
+        } else if (mutation.type === 'attributes') {
+          // Check for critical attribute changes
+          if (mutation.target.nodeType === Node.ELEMENT_NODE) {
+            const target = mutation.target as Element;
+            // Enhanced attribute monitoring
+            if (mutation.attributeName === 'data-processing' || 
+                mutation.attributeName === 'data-content-ready' ||
+                mutation.attributeName === 'class') {
+              this.checkForProcessedEntryCard(target);
+            }
           }
-        });
-      } else if (mutation.type === 'attributes') {
-        // Check for attribute changes that might indicate a processed entry
-        if (mutation.target.nodeType === Node.ELEMENT_NODE) {
-          this.checkForProcessedEntryCard(mutation.target as Element);
         }
       }
-    }
-  }, 50);
+    });
+  }, 10); // Reduced from 50ms to 10ms for faster detection
 
   /**
    * Check if an element is a processed journal entry card and trigger cleanup
@@ -107,27 +116,52 @@ class SmartUIDetector {
   }
 
   /**
-   * Check if an element has real content (not just skeleton/loading elements)
+   * Enhanced content verification for faster and more accurate detection
    */
   private hasRealContent(element: Element): boolean {
-    // Look for indicators of real content vs loading skeleton
-    const hasTitle = element.querySelector('[data-entry-title]');
-    const hasContent = element.querySelector('[data-entry-content]');
-    const hasDate = element.querySelector('[data-entry-date]');
-    const hasActions = element.querySelector('[data-entry-actions]');
+    // Fast rejection for obvious loading elements
+    if (element.classList.contains('animate-pulse') ||
+        element.classList.contains('loading-entry') ||
+        element.classList.contains('processing-card') ||
+        element.querySelector('[data-loading-skeleton="true"]') ||
+        element.querySelector('.shimmer-skeleton')) {
+      return false;
+    }
+
+    // Enhanced content detection with multiple criteria
+    const contentIndicators = [
+      // Explicit content ready flag
+      () => element.getAttribute('data-content-ready') === 'true',
+      
+      // Specific content elements
+      () => element.querySelector('[data-entry-title], [data-entry-content], [data-entry-date], [data-entry-actions]'),
+      
+      // Real content selectors
+      () => element.querySelector('.journal-entry-content, .entry-content, .transcript, .entry-text, .journal-content'),
+      
+      // Audio content that's not loading
+      () => element.querySelector('audio:not(.loading), .audio-player:not(.loading)'),
+      
+      // Substantial text content (more than loading messages)
+      () => {
+        const textContent = element.textContent?.trim() || '';
+        return textContent.length > 50 && 
+               !textContent.includes('Processing') && 
+               !textContent.includes('Loading') &&
+               !textContent.includes('analyzing');
+      }
+    ];
+
+    const hasRealContent = contentIndicators.some(check => {
+      try {
+        return check();
+      } catch (e) {
+        return false;
+      }
+    });
     
-    // Check for text content that's not just loading placeholders
-    const textContent = element.textContent?.trim() || '';
-    const hasSubstantialText = textContent.length > 20; // More than just "Processing..." etc.
-    
-    // Avoid skeleton/loading indicators
-    const isLoadingSkeleton = element.classList.contains('animate-pulse') ||
-                             element.querySelector('.animate-pulse') ||
-                             element.querySelector('[data-loading-skeleton]');
-    
-    const hasRealContent = (hasTitle || hasContent || hasDate || hasActions || hasSubstantialText) && !isLoadingSkeleton;
-    
-    console.log(`[SmartUIDetector] Content check for ${element.getAttribute('data-temp-id')}: hasRealContent=${hasRealContent}, isLoadingSkeleton=${isLoadingSkeleton}`);
+    const tempId = element.getAttribute('data-temp-id');
+    console.log(`[SmartUIDetector] Enhanced content check for ${tempId}: hasRealContent=${hasRealContent}`);
     
     return hasRealContent;
   }
@@ -138,11 +172,8 @@ class SmartUIDetector {
   private triggerImmediateCleanup(tempId: string) {
     console.log(`[SmartUIDetector] Triggering immediate cleanup for: ${tempId}`);
     
-    // Force immediate cleanup in processing state manager
-    processingStateManager.forceImmediateCleanup(tempId);
-    
-    // Dispatch immediate cleanup event
-    window.dispatchEvent(new CustomEvent('smartUICleanup', {
+    // Emit loader cleanup start event FIRST
+    window.dispatchEvent(new CustomEvent('loaderCleanupStarted', {
       detail: { 
         tempId,
         trigger: 'processed-card-detected',
@@ -150,25 +181,56 @@ class SmartUIDetector {
       }
     }));
     
-    // Also hide any visible loading cards with this tempId
+    // Force immediate cleanup in processing state manager
+    processingStateManager.forceImmediateCleanup(tempId);
+    
+    // Hide loading cards with smooth transition
     this.hideLoadingCardsForTempId(tempId);
+    
+    // Dispatch final cleanup event after hiding
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('smartUICleanup', {
+        detail: { 
+          tempId,
+          trigger: 'processed-card-detected',
+          timestamp: Date.now()
+        }
+      }));
+      
+      // Allow processed entry to show after loader is hidden
+      window.dispatchEvent(new CustomEvent('loaderCleanupComplete', {
+        detail: { 
+          tempId,
+          timestamp: Date.now()
+        }
+      }));
+    }, 250); // After fade-out transition
   }
 
   /**
-   * Immediately hide loading cards with matching tempId
+   * Enhanced loading card hiding with smooth transitions
    */
   private hideLoadingCardsForTempId(tempId: string) {
-    const loadingCards = document.querySelectorAll(`[data-temp-id="${tempId}"][data-loading-skeleton]`);
+    const loadingCards = document.querySelectorAll(`[data-temp-id="${tempId}"][data-loading-skeleton], [data-temp-id="${tempId}"].loading-entry, [data-temp-id="${tempId}"].processing-card`);
     
     loadingCards.forEach(card => {
       if (card instanceof HTMLElement) {
-        console.log(`[SmartUIDetector] Immediately hiding loading card: ${tempId}`);
-        card.style.display = 'none';
-        card.classList.add('hidden');
+        console.log(`[SmartUIDetector] Hiding loading card with smooth transition: ${tempId}`);
         
-        // Dispatch hide event
+        // Add smooth fade-out transition
+        card.style.transition = 'opacity 0.2s ease-out, transform 0.2s ease-out';
+        card.style.opacity = '0';
+        card.style.transform = 'scale(0.95)';
+        
+        // Hide after transition
+        setTimeout(() => {
+          card.style.display = 'none';
+          card.classList.add('hidden');
+        }, 200);
+        
+        // Dispatch hide event immediately
         window.dispatchEvent(new CustomEvent('processingEntryHidden', {
-          detail: { tempId, trigger: 'smart-ui-cleanup' }
+          detail: { tempId, trigger: 'smart-ui-cleanup', timestamp: Date.now() }
         }));
       }
     });

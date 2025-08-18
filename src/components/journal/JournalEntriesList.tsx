@@ -248,9 +248,20 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
   
   console.log(`[JournalEntriesList] Processing detection: isSavingRecording=${isSavingRecording}, isCurrentlyProcessing=${isCurrentlyProcessing}, finalProcessingIds=${finalProcessingIds.length}, filteredEntries=${filteredEntries.length}`);
 
-  // SIMPLIFIED conditional logic - prioritize processing over empty state
+  // Entry visibility coordination - prevent overlap
+  const activeProcessingTempIds = new Set(finalProcessingIds);
+  const entriesWithActiveLoaders = filteredEntries.filter(entry => 
+    entry.tempId && activeProcessingTempIds.has(entry.tempId)
+  );
+  
+  // Only show processed entries if their loader is NOT active
+  const entriesWithoutActiveLoaders = filteredEntries.filter(entry => 
+    !entry.tempId || !activeProcessingTempIds.has(entry.tempId)
+  );
+  
+  // SIMPLIFIED conditional logic - prevent simultaneous display
   const shouldShowProcessing = isCurrentlyProcessing;
-  const shouldShowEntries = filteredEntries.length > 0;
+  const shouldShowEntries = entriesWithoutActiveLoaders.length > 0 && !isCurrentlyProcessing;
   const shouldShowEmpty = !shouldShowProcessing && !shouldShowEntries && !isLoading;
   
   console.log(`[JournalEntriesList] Display logic: shouldShowProcessing=${shouldShowProcessing}, shouldShowEntries=${shouldShowEntries}, shouldShowEmpty=${shouldShowEmpty}, isLoading=${isLoading}`);
@@ -296,43 +307,53 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
             )}
           </div>
           
-          {/* Display regular entries if any exist */}
-          {shouldShowEntries && filteredEntries.map((entry) => {
+          {/* Show entries WITHOUT active loaders only (prevents overlap) */}
+          {shouldShowEntries && entriesWithoutActiveLoaders.map((entry) => {
             const entryIsProcessing = entry.tempId ? processingStateManager.isProcessing(entry.tempId) : false;
             
             return (
-              <JournalEntryCard
+              <div 
                 key={entry.id || entry.tempId || Math.random()}
-                entry={{
-                  ...entry,
-                  content: entry.content || entry["refined text"] || entry["transcription text"] || ""
-                }}
-                processing={entryIsProcessing}
-                processed={processedEntryIds.includes(entry.id)}
-                onDelete={handleDeleteEntry}
-                setEntries={null}
-              />
+                className="opacity-0 animate-in fade-in-0 duration-300"
+                style={{ animationDelay: '100ms' }}
+              >
+                <JournalEntryCard
+                  entry={{
+                    ...entry,
+                    content: entry.content || entry["refined text"] || entry["transcription text"] || ""
+                  }}
+                  processing={entryIsProcessing}
+                  processed={processedEntryIds.includes(entry.id)}
+                  onDelete={handleDeleteEntry}
+                  setEntries={null}
+                />
+              </div>
             );
           })}
         </div>
       ) : shouldShowEntries ? (
-        <div className="grid gap-4" data-entries-count={filteredEntries.length}>
-          {/* Display regular entries only */}
-          {filteredEntries.map((entry) => {
+        <div className="grid gap-4" data-entries-count={entriesWithoutActiveLoaders.length}>
+          {/* Display regular entries only (without active loaders) */}
+          {entriesWithoutActiveLoaders.map((entry) => {
             const entryIsProcessing = entry.tempId ? processingStateManager.isProcessing(entry.tempId) : false;
             
             return (
-              <JournalEntryCard
+              <div 
                 key={entry.id || entry.tempId || Math.random()}
-                entry={{
-                  ...entry,
-                  content: entry.content || entry["refined text"] || entry["transcription text"] || ""
-                }}
-                processing={entryIsProcessing}
-                processed={processedEntryIds.includes(entry.id)}
-                onDelete={handleDeleteEntry}
-                setEntries={null}
-              />
+                className="opacity-0 animate-in fade-in-0 duration-300"
+                style={{ animationDelay: '50ms' }}
+              >
+                <JournalEntryCard
+                  entry={{
+                    ...entry,
+                    content: entry.content || entry["refined text"] || entry["transcription text"] || ""
+                  }}
+                  processing={entryIsProcessing}
+                  processed={processedEntryIds.includes(entry.id)}
+                  onDelete={handleDeleteEntry}
+                  setEntries={null}
+                />
+              </div>
             );
           })}
         </div>

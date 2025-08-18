@@ -87,7 +87,7 @@
     "info": "情報",
     "conversationDeleted": "会話が正常に削除されました",
     "entryDeleted": "エントリが正常に削除されました",
-    "entryUpdated": "日記エントリが正常に更新されました",
+    "entryUpdated": "日記エントリが再処理され保存されました",
     "translationUpdated": "翻訳が正常に更新されました",
     "languageChanged": "言語が正常に変更されました",
     "profileUpdated": "プロフィールが正常に更新されました",

@@ -30,6 +30,12 @@ export class ProcessingStateManager {
   
   constructor() {
     this.logger.debug('Initialized with immediate cleanup');
+    this.setupEventListeners();
+  }
+
+  private setupEventListeners() {
+    // Remove premature hiding - let SmartUIDetector handle all cleanup based on actual DOM rendering
+    this.logger.debug('Event listeners setup - relying on SmartUIDetector for DOM-based cleanup');
   }
   
   // Emergency fallback methods for immediate processing detection
