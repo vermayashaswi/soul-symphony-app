@@ -128,10 +128,16 @@ const ChatInput: React.FC<ChatInputProps> = ({
   };
 
   const handleVoiceTranscription = async (transcribedText: string) => {
-    if (onVoiceTranscription) {
-      await onVoiceTranscription(transcribedText);
-    } else {
-      // Fallback: insert into text input
+    try {
+      if (onVoiceTranscription) {
+        await onVoiceTranscription(transcribedText);
+      } else {
+        // Fallback: insert into text input
+        setMessage(prev => prev + transcribedText);
+      }
+    } catch (error) {
+      console.error('[ChatInput] Error handling voice transcription:', error);
+      // Fallback: insert into text input on error
       setMessage(prev => prev + transcribedText);
     }
   };
