@@ -188,7 +188,7 @@
     "info": "Info",
     "conversationDeleted": "Conversation deleted successfully",
     "entryDeleted": "Entry deleted successfully", 
-    "entryUpdated": "Journal entry re-processed and saved",
+    "entryUpdated": "Entry updated and new themes analyzed",
     "translationUpdated": "Translation updated successfully",
     "languageChanged": "Language changed successfully",
     "profileUpdated": "Profile updated successfully",

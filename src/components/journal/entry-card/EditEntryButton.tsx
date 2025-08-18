@@ -209,9 +209,6 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
           );
         }
         
-        // Remove premature loader hiding - let SmartUIDetector handle cleanup based on DOM rendering
-        console.log('[EditEntryButton] Entry processing complete, letting SmartUIDetector handle cleanup');
-        
         // Ensure minimum processing time for UX consistency
         const minProcessingTime = 1000;
         await new Promise(resolve => setTimeout(resolve, minProcessingTime));

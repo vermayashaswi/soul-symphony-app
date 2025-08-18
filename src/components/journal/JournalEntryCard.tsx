@@ -396,16 +396,11 @@ export function JournalEntryCard({
         data-expanded={isExpanded ? "true" : "false"}
         data-show-themes={showThemes ? "true" : "false"}
       >
-        <Card 
-          className={`bg-background shadow-md ${highlightNew ? 'border-primary' : ''} ${getSentimentBorderClass()}`}
-          data-temp-id={safeEntry.tempId}
-          data-processing={isProcessing ? 'true' : 'false'}
-          data-entry-card="true"
-        >
+        <Card className={`bg-background shadow-md ${highlightNew ? 'border-primary' : ''} ${getSentimentBorderClass()}`}>
           <div className="flex justify-between items-center p-3 md:p-4">
             <div className="flex items-center space-x-3">
               <div className="flex flex-col">
-                <h3 className="scroll-m-20 text-base md:text-lg font-semibold tracking-tight" data-entry-title="true">
+                <h3 className="scroll-m-20 text-base md:text-lg font-semibold tracking-tight">
                   <TranslatableText 
                     text={createdAtFormatted.text} 
                     forceTranslate={createdAtFormatted.type === 'translatable'}
