@@ -87,3 +87,6 @@ verify_jwt = true
 
 [functions.test-google-nlapi]
 verify_jwt = false
+
+[functions.transcribe-chat-audio]
+verify_jwt = true
