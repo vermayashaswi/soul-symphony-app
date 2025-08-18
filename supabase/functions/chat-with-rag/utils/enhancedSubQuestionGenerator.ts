@@ -17,6 +17,10 @@ export function generateSubQuestions(
   
   console.log(`[SubQuestionGenerator] Analyzing: "${userMessage}"`);
   
+  // CONTEXTUAL PRIORITIZATION: Extract user-mentioned specific topics first
+  const specificMentions = extractSpecificMentions(userMessage);
+  console.log(`[SubQuestionGenerator] Specific mentions found:`, specificMentions);
+  
   // Enhanced pattern detection for analytical queries
   const analyticalPatterns = {
     improvement: /improve|improved|better|progress|growth|positive|decline|worse|negative/i,
@@ -45,10 +49,49 @@ export function generateSubQuestions(
     }];
   }
 
-  // For complex analytical queries, generate multiple sub-questions
-  if (analyticalPatterns.improvement.test(lowerMessage)) {
+  // PRIORITY 1: Build questions around user's specific mentions
+  if (specificMentions.length > 0) {
+    const primaryTopic = specificMentions[0]; // Use the first/main mention
+    
+    subQuestions.push({
+      question: `What patterns and insights are evident regarding ${primaryTopic} in journal entries?`,
+      type: 'pattern',
+      priority: 1,
+      searchStrategy: 'vector' // Use vector search to match semantic content about the topic
+    });
+
+    // Add follow-up questions based on analytical patterns
+    if (analyticalPatterns.improvement.test(lowerMessage)) {
+      subQuestions.push({
+        question: `How have experiences and feelings related to ${primaryTopic} changed or improved over time?`,
+        type: 'temporal',
+        priority: 2,
+        searchStrategy: 'hybrid'
+      });
+    }
+
+    if (analyticalPatterns.emotional.test(lowerMessage)) {
+      subQuestions.push({
+        question: `What emotions and feelings are most commonly associated with ${primaryTopic}?`,
+        type: 'emotional',
+        priority: 2,
+        searchStrategy: 'sql'
+      });
+    }
+
+    if (analyticalPatterns.causation.test(lowerMessage)) {
+      subQuestions.push({
+        question: `What causes, triggers, or effects are mentioned in relation to ${primaryTopic}?`,
+        type: 'causal',
+        priority: 3,
+        searchStrategy: 'hybrid'
+      });
+    }
+  }
+  
+  // FALLBACK: General improvement queries if no specific mentions
+  else if (analyticalPatterns.improvement.test(lowerMessage)) {
     if (lowerMessage.includes('not') || lowerMessage.includes("hasn't")) {
-      // "What has not improved?" type queries
       subQuestions.push({
         question: extractCoreImprovementQuery(userMessage, 'negative'),
         type: 'comparative',
@@ -62,15 +105,7 @@ export function generateSubQuestions(
         priority: 2,
         searchStrategy: 'sql'
       });
-      
-      subQuestions.push({
-        question: "What areas show stagnation or lack of progress over time?",
-        type: 'temporal',
-        priority: 3,
-        searchStrategy: 'vector'
-      });
     } else {
-      // "Have I improved?" type queries
       subQuestions.push({
         question: extractCoreImprovementQuery(userMessage, 'positive'),
         type: 'comparative',
@@ -84,15 +119,6 @@ export function generateSubQuestions(
         priority: 2,
         searchStrategy: 'vector'
       });
-      
-      if (analyticalPatterns.temporal.test(lowerMessage)) {
-        subQuestions.push({
-          question: "How have patterns changed over the specified time period?",
-          type: 'temporal',
-          priority: 3,
-          searchStrategy: 'sql'
-        });
-      }
     }
   }
 
@@ -196,4 +222,39 @@ export function shouldGenerateMultipleSubQuestions(userMessage: string, queryPla
   });
 
   return shouldGenerate;
+}
+
+// NEW HELPER FUNCTION: Extract specific topics mentioned by the user
+function extractSpecificMentions(userMessage: string): string[] {
+  const lowerMessage = userMessage.toLowerCase();
+  const mentions: string[] = [];
+  
+  // Common topic patterns that users mention
+  const topicPatterns = {
+    'work': /\b(job|work|career|office|boss|colleague|workplace|employment|professional|business)\b/i,
+    'relationships': /\b(relationship|partner|boyfriend|girlfriend|spouse|marriage|dating|family|friend|social)\b/i,
+    'health': /\b(health|fitness|exercise|workout|physical|medical|doctor|therapy|treatment)\b/i,
+    'sleep': /\b(sleep|insomnia|rest|bedtime|wake|tired|exhausted|fatigue)\b/i,
+    'anxiety': /\b(anxiety|anxious|panic|worry|stress|nervous|overwhelmed)\b/i,
+    'depression': /\b(depression|depressed|sad|down|hopeless|empty|lonely)\b/i,
+    'meditation': /\b(meditation|mindfulness|practice|breathing|calm)\b/i,
+    'school': /\b(school|college|university|study|exam|assignment|student|academic)\b/i,
+    'money': /\b(money|financial|budget|debt|income|expenses|bills|savings)\b/i,
+    'home': /\b(home|house|living|roommate|rent|family|household)\b/i
+  };
+  
+  // Check each pattern and add matches
+  for (const [topic, pattern] of Object.entries(topicPatterns)) {
+    if (pattern.test(userMessage)) {
+      mentions.push(topic);
+    }
+  }
+  
+  // Also extract quoted or emphasized words
+  const quotedWords = userMessage.match(/"([^"]+)"/g);
+  if (quotedWords) {
+    mentions.push(...quotedWords.map(word => word.replace(/"/g, '')));
+  }
+  
+  return mentions;
 }

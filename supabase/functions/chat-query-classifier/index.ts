@@ -92,15 +92,20 @@ async function gptClassifyMessage(
 - Requests like "Can you help me uncover this?" , "I want you to tell me this about me" 
 - These override all other considerations including typos, grammar, or conversation context
 
-**CONTEXT OVERRIDE RULES (CHECK SECOND):**
-- If the user is answering previous clarifying questions or providing requested details, immediately classify as "JOURNAL_SPECIFIC" with "rag_full" pipeline
-- If user says "check", "look at", "analyze", "what does my", "in my entries", "from my data" - classify as "JOURNAL_SPECIFIC" with "rag_full" pipeline
-- If previous message was asking for clarification and current message provides more info, upgrade to "JOURNAL_SPECIFIC"
+**TENTATIVE LANGUAGE DETECTION (CHECK BEFORE CONTEXT OVERRIDES):**
+- Messages with uncertain/speculative language ("maybe", "might", "perhaps", "could be", "I think", "not sure", "possibly") should be classified as JOURNAL_SPECIFIC_NEEDS_CLARIFICATION even if they mention specific topics
+- Examples: "maybe its something about my job", "I think it might be work related", "could be stress from relationships"
+- Even in follow-up answers, if the user is uncertain, they need clarification
+
+**CONTEXT OVERRIDE RULES (CHECK AFTER TENTATIVE LANGUAGE):**
+- If the user is providing definitive answers to clarifying questions with specific details, classify as "JOURNAL_SPECIFIC"
+- If user says "check", "look at", "analyze", "what does my", "in my entries", "from my data" - classify as "JOURNAL_SPECIFIC" 
+- Only upgrade to JOURNAL_SPECIFIC if the user is confident and specific, not tentative
 
 **CLARIFICATION LOOP PREVENTION:**
 - If user has already provided analysis request + specific parameters (like scoring method), do NOT ask for more clarification
 - If conversation shows user trying to proceed with analysis, classify as JOURNAL_SPECIFIC
-- Only use NEEDS_CLARIFICATION for genuinely vague messages like single words or unclear emotional statements
+- Only use NEEDS_CLARIFICATION for genuinely vague messages or tentative/uncertain responses
 - If the user acknowledged the chatbot's response, classify as "GENERAL_MENTAL_HEALTH"
 
 Categories (choose exactly one):
