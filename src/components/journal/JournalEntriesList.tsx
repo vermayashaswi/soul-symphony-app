@@ -11,6 +11,7 @@ import JournalEntryLoadingSkeleton from './JournalEntryLoadingSkeleton';
 import { useProcessingEntries } from '@/hooks/use-processing-entries';
 import { processingStateManager, EntryProcessingState } from '@/utils/journal/processing-state-manager';
 import { hasProcessingIntent } from '@/utils/journal/processing-intent';
+import { smartUIDetector } from '@/utils/journal/smart-ui-detector';
 
 interface JournalEntriesListProps {
   entries: JournalEntry[];
@@ -86,6 +87,9 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
     console.log('[JournalEntriesList] Component mounted');
     setLastAction('Component Mounted');
     
+    // Start Smart UI Detector
+    smartUIDetector.startWatching();
+    
     // IMMEDIATE event handlers - completely synchronous
     const handleImmediateProcessingStarted = (event: CustomEvent) => {
       console.log('[JournalEntriesList] IMMEDIATE processing started event received:', event.detail);
@@ -128,20 +132,31 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
       console.log('[JournalEntriesList] Processing intent event received:', event.detail);
       setHasImmediateProcessing(true);
     };
+
+    const handleSmartUICleanup = (event: CustomEvent) => {
+      console.log('[JournalEntriesList] Smart UI cleanup event received:', event.detail);
+      if (event.detail?.tempId) {
+        setFallbackProcessingIds(prev => prev.filter(id => id !== event.detail.tempId));
+      }
+      forceRefresh();
+    };
     
     window.addEventListener('immediateProcessingStarted', handleImmediateProcessingStarted as EventListener);
     window.addEventListener('processingStarted', handleProcessingStarted as EventListener);
     window.addEventListener('processingEntryCompleted', handleProcessingCompleted as EventListener);
     window.addEventListener('processingEntryHidden', handleProcessingCompleted as EventListener);
     window.addEventListener('processingIntent', handleProcessingIntent as EventListener);
+    window.addEventListener('smartUICleanup', handleSmartUICleanup as EventListener);
     
     return () => {
       console.log('[JournalEntriesList] Component unmounted');
+      smartUIDetector.stopWatching();
       window.removeEventListener('immediateProcessingStarted', handleImmediateProcessingStarted as EventListener);
       window.removeEventListener('processingStarted', handleProcessingStarted as EventListener);
       window.removeEventListener('processingEntryCompleted', handleProcessingCompleted as EventListener);
       window.removeEventListener('processingEntryHidden', handleProcessingCompleted as EventListener);
       window.removeEventListener('processingIntent', handleProcessingIntent as EventListener);
+      window.removeEventListener('smartUICleanup', handleSmartUICleanup as EventListener);
     };
   }, [forceRefresh, isSavingRecording]);
   

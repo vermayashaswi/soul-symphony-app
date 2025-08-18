@@ -87,7 +87,13 @@ const JournalEntryLoadingSkeleton: React.FC<JournalEntryLoadingSkeletonProps> = 
         data-loading-skeleton="true"
       >
         {Array.from({ length: count }).map((_, index) => (
-          <Card key={index} className="journal-entry-card processing-card p-6 mb-4 border border-slate-200/20 bg-gradient-to-br from-slate-50/50 to-white/50 dark:from-slate-900/50 dark:to-slate-800/50">
+          <Card 
+            key={index} 
+            className="journal-entry-card processing-card p-6 mb-4 border border-slate-200/20 bg-gradient-to-br from-slate-50/50 to-white/50 dark:from-slate-900/50 dark:to-slate-800/50"
+            data-temp-id={tempId}
+            data-loading-skeleton="true"
+            data-processing="true"
+          >
             <LoadingEntryContent />
           </Card>
         ))}
