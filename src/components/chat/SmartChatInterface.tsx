@@ -585,233 +585,29 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
         processingMessageId = null;
       }
       
-      let response;
-      // Route to appropriate edge function based on classification
-      if (queryClassification.category === QueryCategory.JOURNAL_SPECIFIC) {
-        debugLog.addEvent("Routing", "Using chat-with-rag for journal-specific query with streaming", "info");
-        
-        // Start streaming chat for enhanced UX
-        await startStreamingChat(
-          message,
-          effectiveUserId,
-          threadId,
-          conversationContext,
-          {
-            useAllEntries: queryClassification.useAllEntries || false,
-            hasPersonalPronouns: message.toLowerCase().includes('i ') || message.toLowerCase().includes('my '),
-            hasExplicitTimeReference: /\b(last week|yesterday|this week|last month|today|recently|lately)\b/i.test(message),
-            threadMetadata: {}
-          }
-        );
-        
-        // Streaming owns the lifecycle; ensure local loader is cleared immediately
-        setLocalLoading(false);
-        updateProcessingStage(null);
-        
-        // Skip the rest since streaming handles the response
-        return;
-        
-        // This code block is no longer needed as streaming handles the response
-        
-      } else if (queryClassification.category === QueryCategory.GENERAL_MENTAL_HEALTH) {
-        debugLog.addEvent("Routing", "Using general-mental-health-chat for mental health query", "info");
-        
-        // Call general-mental-health-chat edge function
-        const { data, error } = await supabase.functions.invoke('general-mental-health-chat', {
-          body: {
-            message,
-            conversationContext,
-            userInsights: mentalHealthInsights
-          }
-        });
-        
-        if (error) {
-          throw new Error(`Mental health chat error: ${error.message}`);
-        }
-        
-        const text = data?.response ?? data?.data ?? (typeof data === 'string' ? data : null);
-        if (!text) {
-          throw new Error('No response received from mental health chat function');
-        }
-        
-        response = {
-          content: text,
-          references: [],
-          analysis: {},
-          hasNumericResult: false,
-          role: 'assistant' as const
-        };
-        
-      } else {
-        // CONVERSATIONAL - use smart-chat for general conversation
-        debugLog.addEvent("Routing", "Using smart-chat for conversational query", "info");
-        
-        const { data, error } = await supabase.functions.invoke('smart-chat', {
-          body: {
-            message,
-            conversationContext
-          }
-        });
-        
-        debugLog.addEvent("Edge Function Response", `Smart-chat response: ${JSON.stringify({
-          hasData: !!data,
-          hasError: !!error,
-          errorMessage: error?.message,
-          dataKeys: data ? Object.keys(data) : [],
-          responseLength: data?.response?.length || 0
-        })}`, data ? "success" : "error");
-        
-        if (error) {
-          throw new Error(`Smart chat error: ${error.message}`);
-        }
-        
-        const text = data?.response ?? data?.data ?? data?.message ?? (typeof data === 'string' ? data : null);
-        if (!text) {
-          debugLog.addEvent("Edge Function Response", "Smart-chat returned no usable response payload", "error");
-          throw new Error("No response received from smart-chat function");
-        }
-        
-        response = {
-          content: text,
-          references: [],
-          analysis: {},
-          hasNumericResult: false,
-          role: 'assistant' as const
-        };
-        
-        debugLog.addEvent("Response Processing", `Created response object: ${JSON.stringify({
-          contentLength: response.content?.length || 0,
-          hasReferences: !!response.references?.length,
-          role: response.role
-        })}`, "success");
-      }
+      // Route ALL queries to chat-with-rag (restored original design)
+      debugLog.addEvent("Routing", "Using chat-with-rag for all queries with streaming", "info");
       
-      // Update or delete the processing message
-      if (processingMessageId) {
-        await updateProcessingMessage(
-          processingMessageId,
-          response.content,
-          response.references,
-          response.analysis,
-          response.hasNumericResult
-        );
-      }
-      
-      // Update thread processing status to 'idle'
-      await updateThreadProcessingStatus(threadId, 'idle');
-      
-      // Handle interactive clarification messages
-      if (response.isInteractive && response.interactiveOptions) {
-        debugLog.addEvent("AI Processing", "Received interactive clarification message", "info");
-        try {
-          const savedResponse = await saveMessage(
-            threadId,
-            response.content,
-            'assistant',
-            effectiveUserId,
-            undefined,
-            false,
-            true,
-            response.interactiveOptions
-          );
-          
-          if (savedResponse) {
-            debugLog.addEvent("Database", `Interactive message saved with ID: ${savedResponse.id}`, "success");
-            const typedSavedResponse: ChatMessage = {
-              ...savedResponse,
-              sender: savedResponse.sender as 'user' | 'assistant' | 'error',
-              role: savedResponse.role as 'user' | 'assistant' | 'error',
-              isInteractive: true,
-              interactiveOptions: response.interactiveOptions
-            };
-            if (threadId === currentThreadIdRef.current) {
-              setChatHistory(prev => [...prev, typedSavedResponse]);
-            }
-          } else {
-            throw new Error("Failed to save interactive message");
-          }
-        } catch (saveError: any) {
-          debugLog.addEvent("Database", `Error saving interactive message: ${saveError.message}`, "error");
-          
-          const interactiveMessage: ChatMessage = {
-            id: `temp-interactive-${Date.now()}`,
-            thread_id: threadId,
-            content: response.content,
-            sender: 'assistant',
-            role: 'assistant',
-            created_at: new Date().toISOString(),
-            isInteractive: true,
-            interactiveOptions: response.interactiveOptions
-          };
-          
-          if (threadId === currentThreadIdRef.current) {
-            setChatHistory(prev => [...prev, interactiveMessage]);
-          }
+      // Start streaming chat for all queries
+      await startStreamingChat(
+        message,
+        effectiveUserId,
+        threadId,
+        conversationContext,
+        {
+          useAllEntries: queryClassification.useAllEntries || false,
+          hasPersonalPronouns: message.toLowerCase().includes('i ') || message.toLowerCase().includes('my '),
+          hasExplicitTimeReference: /\b(last week|yesterday|this week|last month|today|recently|lately)\b/i.test(message),
+          threadMetadata: {}
         }
-      } else {
-        const responseInfo = {
-          role: response.role,
-          hasReferences: !!response.references?.length,
-          refCount: response.references?.length || 0,
-          hasAnalysis: !!response.analysis,
-          hasNumericResult: response.hasNumericResult,
-          errorState: response.role === 'error'
-        };
-        
-        debugLog.addEvent("AI Processing", `Response received: ${JSON.stringify(responseInfo)}`, "success");
-        
-        try {
-          debugLog.addEvent("Database", "Saving assistant response to database", "info");
-          const savedResponse = await saveMessage(
-            threadId,
-            response.content,
-            'assistant',
-            effectiveUserId,
-            response.references,
-            response.hasNumericResult
-          );
-          
-          debugLog.addEvent("Database", `Assistant response saved with ID: ${savedResponse?.id}`, "success");
-          
-          if (savedResponse) {
-            debugLog.addEvent("UI Update", "Adding assistant response to chat history", "info");
-            const typedSavedResponse: ChatMessage = {
-              ...savedResponse,
-              sender: savedResponse.sender as 'user' | 'assistant' | 'error',
-              role: savedResponse.role as 'user' | 'assistant' | 'error'
-            };
-            if (threadId === currentThreadIdRef.current) {
-              setChatHistory(prev => [...prev, typedSavedResponse]);
-            }
-          } else {
-            throw new Error("Failed to save assistant response");
-          }
-        } catch (saveError: any) {
-          debugLog.addEvent("Database", `Error saving assistant response: ${saveError.message || "Unknown error"}`, "error");
-          const assistantMessage: ChatMessage = {
-            id: `temp-response-${Date.now()}`,
-            thread_id: threadId,
-            content: response.content,
-            sender: 'assistant',
-            role: 'assistant',
-            created_at: new Date().toISOString(),
-            reference_entries: response.references,
-            analysis_data: response.analysis,
-            has_numeric_result: response.hasNumericResult
-          };
-          
-          if (threadId === currentThreadIdRef.current) {
-            debugLog.addEvent("UI Update", "Adding fallback temporary assistant response to chat history", "warning");
-            setChatHistory(prev => [...prev, assistantMessage]);
-          }
-          
-          toast({
-            title: "Warning",
-            description: "Response displayed but couldn't be saved to your conversation history",
-            variant: "default"
-          });
-        }
-      }
+      );
+      
+      // Streaming owns the lifecycle; ensure local loader is cleared immediately
+      setLocalLoading(false);
+      updateProcessingStage(null);
+      
+      // Skip the rest since streaming handles the response
+      return;
     } catch (error: any) {
       debugLog.addEvent("Error", `Error in message handling: ${error?.message || "Unknown error"}`, "error");
       
