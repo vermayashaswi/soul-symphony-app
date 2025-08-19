@@ -29,7 +29,7 @@ import { updateThreadProcessingStatus, createProcessingMessage, updateProcessing
 import { MentalHealthInsights } from "@/hooks/use-mental-health-insights";
 
 import { ChatMessage } from "@/types/chat";
-import { getThreadMessages, saveMessage } from "@/services/chat";
+import { getThreadMessages, saveMessage, createChatMessage } from "@/services/chat";
 import { useDebugLog } from "@/utils/debug/DebugContext";
 import { TranslatableText } from "@/components/translation/TranslatableText";
 import { useChatMessageClassification, QueryCategory } from "@/hooks/use-chat-message-classification";
@@ -489,14 +489,39 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       // Check if this is the first message in the thread
       const isFirstMessage = chatHistory.length === 1; // Only the temp message we just added
       
-      // Save the user message
+      // Save the user message with enhanced error handling
       let savedUserMessage: ChatMessage | null = null;
       try {
-        debugLog.addEvent("Database", `Saving user message to thread ${threadId}`, "info");
-        savedUserMessage = await saveMessage(threadId, message, 'user', effectiveUserId);
-        debugLog.addEvent("Database", `User message saved with ID: ${savedUserMessage?.id}`, "success");
+        debugLog.addEvent("Database", `Saving user message to thread ${threadId} for user ${effectiveUserId}`, "info");
+        console.log(`[Message Persistence] Attempting to save user message to thread ${threadId} for user ${effectiveUserId}`);
+        
+        // Verify user authentication before saving
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        if (authError || !user) {
+          throw new Error(`Authentication failed: ${authError?.message || 'No authenticated user'}`);
+        }
+        
+        // Verify thread access
+        const { data: threadData, error: threadError } = await supabase
+          .from('chat_threads')
+          .select('id, user_id')
+          .eq('id', threadId)
+          .eq('user_id', effectiveUserId)
+          .single();
+          
+        if (threadError || !threadData) {
+          throw new Error(`Thread access denied: ${threadError?.message || 'Thread not found'}`);
+        }
+        
+        console.log(`[Message Persistence] Thread verification successful for ${threadId}`);
+        
+        // Use createChatMessage directly for better control
+        savedUserMessage = await createChatMessage(threadId, message, 'user', effectiveUserId);
         
         if (savedUserMessage) {
+          console.log(`[Message Persistence] User message saved successfully with ID: ${savedUserMessage.id}`);
+          debugLog.addEvent("Database", `User message saved with ID: ${savedUserMessage.id}`, "success");
+          
           debugLog.addEvent("UI Update", `Replacing temporary message with saved message: ${savedUserMessage.id}`, "info");
           setChatHistory(prev => prev.map(msg => 
             msg.id === tempUserMessage.id ? {
@@ -526,16 +551,33 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
             }
           }
         } else {
-          debugLog.addEvent("Database", "Failed to save user message - null response", "error");
-          throw new Error("Failed to save message");
+          throw new Error("createChatMessage returned null - message save failed");
         }
       } catch (saveError: any) {
+        console.error(`[Message Persistence] Error saving user message:`, saveError);
         debugLog.addEvent("Database", `Error saving user message: ${saveError.message || "Unknown error"}`, "error");
+        
+        // Show user-friendly error message
         toast({
-          title: "Error saving message",
-          description: saveError.message || "Could not save your message",
+          title: "Message not saved",
+          description: "Your message wasn't saved to the database. Please try again.",
           variant: "destructive"
         });
+        
+        // Mark the temporary message as failed
+        setChatHistory(prev => prev.map(msg => 
+          msg.id === tempUserMessage.id ? {
+            ...msg,
+            content: `${msg.content} (Failed to save)`,
+            sender: 'error' as const,
+            role: 'error' as const
+          } : msg
+        ));
+        
+        // Don't continue with processing if save failed
+        setLocalLoading(false);
+        await updateThreadProcessingStatus(threadId, 'idle');
+        return;
       }
       
       // Initialize processing message placeholder (only created for non-journal queries)
