@@ -435,16 +435,16 @@ You are Ruh, a perceptive, direct wellness companion who cuts through emotional 
         const referenceEntries = researchResults.flatMap((r: any) => [
           ...(r?.executionResults?.vectorResults || []).map((v: any) => ({
             id: v.id,
-            content: v.content?.substring(0, 200) || 'Vector result',
+            snippet: v.content?.substring(0, 200) || 'Vector result',
             similarity: v.similarity,
             source: 'vector',
-            created_at: v.created_at
+            date: v.created_at
           })),
           ...(r?.executionResults?.sqlResults || []).map((s: any) => ({
             id: s.id,
-            content: s['refined text']?.substring(0, 200) || s.content?.substring(0, 200) || 'SQL result',
+            snippet: s['refined text']?.substring(0, 200) || s.content?.substring(0, 200) || 'SQL result',
             source: 'sql',
-            created_at: s.created_at
+            date: s.created_at
           }))
         ]).slice(0, 10); // Limit reference entries
 
