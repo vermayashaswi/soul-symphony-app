@@ -11,7 +11,7 @@ import { useTranslation } from '@/contexts/TranslationContext';
 interface JournalSearchProps {
   entries: JournalEntry[];
   onSelectEntry: (entry: JournalEntry) => void;
-  onSearchResults: (filteredEntries: JournalEntry[]) => void;
+  onSearchResults: (filteredEntries: JournalEntry[], searchQuery: string) => void;
 }
 
 const searchPrompts = [
@@ -150,7 +150,7 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
   useEffect(() => {
     if (!searchQuery.trim()) {
       setFilteredEntries(entries);
-      onSearchResults(entries);
+      onSearchResults(entries, searchQuery);
       return;
     }
 
@@ -197,7 +197,7 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
     });
 
     setFilteredEntries(filtered);
-    onSearchResults(filtered);
+    onSearchResults(filtered, searchQuery);
   }, [searchQuery, entries, onSearchResults]);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {

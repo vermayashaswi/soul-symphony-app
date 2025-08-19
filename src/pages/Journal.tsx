@@ -62,6 +62,7 @@ const Journal = () => {
   const forceUpdateTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [filteredEntries, setFilteredEntries] = useState<JournalEntry[]>([]);
   const [deletedEntryIds, setDeletedEntryIds] = useState<Set<number>>(new Set());
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
   const { 
     entries, 
@@ -840,8 +841,9 @@ const Journal = () => {
   }, [fetchEntries]);
 
   // Update the handleSearchResults function to ensure type compatibility
-  const handleSearchResults = (filtered: JournalEntry[]) => {
+  const handleSearchResults = (filtered: JournalEntry[], query: string) => {
     setFilteredEntries(filtered);
+    setSearchQuery(query);
   };
 
   // Update the entries handling to ensure types are compatible
@@ -859,15 +861,27 @@ const Journal = () => {
   const showLoading = loading && displayEntries.length === 0 && !hasLocalChanges;
 
   // Convert entries to ensure they have the required content field
-  const entriesToDisplay = (filteredEntries.length > 0 && displayEntries.length > 0) ? 
-    filteredEntries.map(entry => ({
-      ...entry,
-      content: entry.content || entry["refined text"] || entry["transcription text"] || ""
-    })) : 
-    displayEntries.map(entry => ({
-      ...entry,
-      content: entry.content || entry["refined text"] || entry["transcription text"] || ""
-    }));
+  const entriesToDisplay = (() => {
+    const hasActiveSearch = searchQuery.trim() !== '';
+    const hasSearchResults = filteredEntries.length > 0;
+    
+    if (!hasActiveSearch) {
+      // No search query - show all entries
+      return displayEntries.map(entry => ({
+        ...entry,
+        content: entry.content || entry["refined text"] || entry["transcription text"] || ""
+      }));
+    } else if (hasSearchResults) {
+      // Search query with results - show filtered entries
+      return filteredEntries.map(entry => ({
+        ...entry,
+        content: entry.content || entry["refined text"] || entry["transcription text"] || ""
+      }));
+    } else {
+      // Search query with no results - show empty array
+      return [];
+    }
+  })();
 
   if (hasRenderError) {
     console.error('[Journal] Recovering from render error');
