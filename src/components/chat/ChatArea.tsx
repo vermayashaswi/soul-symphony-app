@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import ReactMarkdown from "react-markdown";
 import { XIcon, InfoIcon } from "lucide-react";
-import ReferencesDisplay from "./ReferencesDisplay";
+
 import { Button } from "@/components/ui/button";
 import { TranslatableText } from "@/components/translation/TranslatableText";
 import AnalyticsDisplay from "./AnalyticsDisplay";
@@ -139,13 +139,6 @@ const ChatArea: React.FC<ChatAreaProps> = ({
                     </div>
                   )}
 
-                  {/* References */}
-                  {message.reference_entries && Array.isArray(message.reference_entries) && message.reference_entries.length > 0 && (
-                    <ReferencesDisplay 
-                      references={message.reference_entries} 
-                      threadId={threadId || undefined}
-                    />
-                  )}
 
                   {/* Analytics Display for analysis data */}
                   {message.analysis_data && message.has_numeric_result && (

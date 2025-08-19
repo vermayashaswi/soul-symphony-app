@@ -1,13 +1,9 @@
 import React from "react";
 import { Separator } from "@/components/ui/separator";
-import { ChevronDown, ChevronUp, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/AuthContext";
-import { formatShortDate } from "@/utils/format-time";
 import { TranslatableText } from "@/components/translation/TranslatableText";
 import { TranslatableMarkdown } from "@/components/translation/TranslatableMarkdown";
 import TypingIndicator from "../TypingIndicator";
@@ -37,7 +33,6 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({
   showStreamingDots = false 
 }) => {
   // CRITICAL FIX: Always call all hooks before any conditional logic
-  const [showReferences, setShowReferences] = useState(false);
   const { user } = useAuth();
   
   // Memoize formatted content - this hook must always be called
@@ -54,7 +49,6 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({
   const shouldShowMessage = !shouldShowLoading && !shouldShowStreaming;
   
   // Calculate derived values
-  const hasReferences = message.role === 'assistant' && message.references && message.references.length > 0;
   const displayRole = message.role === 'error' ? 'assistant' : message.role;
   
   // RENDER LOGIC: All conditional rendering moved after all hooks
@@ -208,79 +202,6 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({
                 </pre>
               </>
             )}
-          </div>
-        )}
-        
-        {hasReferences && (
-          <div className="mt-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="p-0 h-6 text-xs font-medium flex items-center gap-1 text-muted-foreground dark:text-white/70 dark:hover:text-white"
-              onClick={() => setShowReferences(!showReferences)}
-            >
-              <FileText className="h-3 w-3 mr-1" />
-              <TranslatableText 
-                text={`${message.references!.length} journal entries`}
-                forceTranslate={true}
-                enableFontScaling={true}
-                scalingContext="compact"
-              />
-              {showReferences ? (
-                <ChevronUp className="h-3 w-3 ml-1" />
-              ) : (
-                <ChevronDown className="h-3 w-3 ml-1" />
-              )}
-            </Button>
-            
-            <AnimatePresence>
-              {showReferences && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="mt-1 text-xs max-h-32 overflow-y-auto border-l-2 border-primary/30 pl-2 pr-1"
-                >
-                  {message.references!.slice(0, 2).map((ref, idx) => {
-                    // Handle the new formatShortDate return type
-                    const formattedDate = ref.date && !isNaN(new Date(ref.date).getTime()) 
-                      ? formatShortDate(new Date(ref.date))
-                      : { type: 'translatable' as const, text: 'Unknown date' };
-                    
-                    return (
-                      <div key={idx} className="mb-1 py-1">
-                        <div className="font-medium dark:text-white/90">
-                          <TranslatableText 
-                            text={formattedDate.text} 
-                            forceTranslate={formattedDate.type === 'translatable'}
-                            enableFontScaling={true}
-                            scalingContext="compact"
-                          />
-                        </div>
-                        <div className="text-muted-foreground dark:text-white/70">
-                          <TranslatableText 
-                            text={ref.snippet} 
-                            forceTranslate={true}
-                            enableFontScaling={true}
-                            scalingContext="compact"
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {message.references!.length > 2 && (
-                    <div className="text-xs text-muted-foreground dark:text-white/60">
-                      <TranslatableText 
-                        text={`+${message.references!.length - 2} more entries`}
-                        forceTranslate={true}
-                        enableFontScaling={true}
-                        scalingContext="compact"
-                      />
-                    </div>
-                  )}
-                </motion.div>
-              )}
-            </AnimatePresence>
           </div>
         )}
       </div>

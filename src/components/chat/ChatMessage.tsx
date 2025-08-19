@@ -8,7 +8,7 @@ import ParticleAvatar from './ParticleAvatar';
 import { TranslatableMarkdown } from '@/components/translation/TranslatableMarkdown';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import ChatErrorBoundary from './ChatErrorBoundary';
-import ReferencesDisplay from './ReferencesDisplay';
+
 import { getSanitizedFinalContent } from '@/utils/messageParser';
 
 interface ChatMessageProps {
@@ -59,10 +59,6 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
           <AnalysisMetadataCard metadata={message.analysisMetadata} />
         )}
 
-        {/* References Display for assistant messages */}
-        {!isUser && references.length > 0 && (
-          <ReferencesDisplay references={references} />
-        )}
 
         <Card className={`${
           isUser 
