@@ -246,3 +246,6 @@ export const updateThreadTitle = async (threadId: string, title: string, userId?
   const result = await updateChatThread(threadId, { title }, userId);
   return !!result;
 };
+
+// Re-export message editing functions for convenience
+export { editMessageWithDownstreamDeletion, canEditMessage, getDownstreamMessages } from './messageEditingService';

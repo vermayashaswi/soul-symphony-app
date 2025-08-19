@@ -9,26 +9,37 @@ import { TranslatableMarkdown } from '@/components/translation/TranslatableMarkd
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import ChatErrorBoundary from './ChatErrorBoundary';
 import { getSanitizedFinalContent } from '@/utils/messageParser';
+import { EditableMessage } from './EditableMessage';
+import { ChatMessage as ChatMessageType } from '@/types/chat';
 
 interface ChatMessageProps {
-  message: {
-    id: string;
-    content: string;
-    sender: 'user' | 'assistant';
-    timestamp: string;
-    analysisMetadata?: any;
-  };
+  message: ChatMessageType;
+  userId?: string;
+  onEditMessage?: (messageId: string, newContent: string) => Promise<void>;
+  editingMessageId?: string | null;
+  onStartEdit?: (messageId: string) => void;
+  onCancelEdit?: () => void;
+  isEditLoading?: boolean;
 }
 
-export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
+export const ChatMessage: React.FC<ChatMessageProps> = ({ 
+  message, 
+  userId,
+  onEditMessage,
+  editingMessageId,
+  onStartEdit,
+  onCancelEdit,
+  isEditLoading = false
+}) => {
   const isUser = message.sender === 'user';
+  const isEditing = editingMessageId === message.id;
   
   // Parse message content to handle JSON responses properly
   const displayContent = React.useMemo(() => {
     return isUser ? message.content : getSanitizedFinalContent(message.content);
   }, [message.content, isUser]);
 
-  return (
+  const messageContent = (
     <div className={`flex gap-3 ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
       {!isUser && (
         <div className="mt-1">
@@ -38,8 +49,8 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
 
       <div className={`max-w-[80%] ${isUser ? 'order-first' : ''}`}>
         {/* Analysis Metadata Card for assistant messages */}
-        {!isUser && message.analysisMetadata && (
-          <AnalysisMetadataCard metadata={message.analysisMetadata} />
+        {!isUser && message.analysis_data && (
+          <AnalysisMetadataCard metadata={message.analysis_data} />
         )}
 
         <Card className={`${
@@ -100,4 +111,23 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
       )}
     </div>
   );
+
+  // Only wrap user messages with EditableMessage if editing is enabled
+  if (isUser && userId && onEditMessage && onStartEdit && onCancelEdit) {
+    return (
+      <EditableMessage
+        message={message}
+        userId={userId}
+        onEdit={onEditMessage}
+        isEditing={isEditing}
+        onStartEdit={onStartEdit}
+        onCancelEdit={onCancelEdit}
+        isLoading={isEditLoading}
+      >
+        {messageContent}
+      </EditableMessage>
+    );
+  }
+
+  return messageContent;
 };

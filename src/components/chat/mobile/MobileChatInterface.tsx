@@ -890,7 +890,7 @@ export default function MobileChatInterface({
             {messages.map((message, index) => (
               <ChatErrorBoundary key={index}>
                 <MobileChatMessage 
-                  message={message} 
+                  message={message as any} 
                   showAnalysis={false}
                 />
               </ChatErrorBoundary>
@@ -900,7 +900,14 @@ export default function MobileChatInterface({
             {isStreaming ? (
               <ChatErrorBoundary>
                 <MobileChatMessage 
-                  message={{ role: 'assistant', content: '' }}
+                  message={{ 
+                    id: 'streaming',
+                    thread_id: 'temp',
+                    sender: 'assistant',
+                    role: 'assistant', 
+                    content: '',
+                    created_at: new Date().toISOString()
+                  } as any}
                   streamingMessage={
                     useThreeDotFallback || dynamicMessages.length === 0
                       ? undefined // Show only three-dot animation
@@ -912,7 +919,14 @@ export default function MobileChatInterface({
             ) : (!isStreaming && (isLoading || isProcessing)) ? (
               <ChatErrorBoundary>
                 <MobileChatMessage 
-                  message={{ role: 'assistant', content: '' }}
+                  message={{ 
+                    id: 'loading',
+                    thread_id: 'temp',
+                    sender: 'assistant',
+                    role: 'assistant', 
+                    content: '',
+                    created_at: new Date().toISOString()
+                  } as any}
                   isLoading={true}
                 />
               </ChatErrorBoundary>
