@@ -795,23 +795,6 @@ export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }
         </div>
       )}
 
-      {/* Selected Node Info */}
-      <AnimatePresence>
-        {selectedNodeId && (
-          <motion.div
-            className="absolute top-20 left-4 bg-background/90 backdrop-blur-sm rounded-lg p-4 max-w-xs"
-            initial={{ opacity: 0, x: -50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -50 }}
-          >
-            <div className="text-sm">
-              <div className="font-semibold">
-                {getTranslatedText(processedData.nodes.find(n => n.id === selectedNodeId)?.name || "")}
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </motion.div>
   );
 }
