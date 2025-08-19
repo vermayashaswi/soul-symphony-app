@@ -26,13 +26,45 @@ serve(async (req) => {
     // Follow-up flags removed from pipeline
 
     // Get current time in user's timezone for time-aware responses
-    const userCurrentTime = new Date().toLocaleString('en-US', { 
-      timeZone: userTimezone,
-      weekday: 'long',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true 
-    });
+    let userCurrentTime = '';
+    let currentHour = 0;
+    
+    try {
+      // Validate and normalize timezone
+      let normalizedTimezone = userTimezone;
+      if (userTimezone === 'Asia/Calcutta') {
+        normalizedTimezone = 'Asia/Kolkata';
+        console.log(`[General Mental Health] Updated legacy timezone from ${userTimezone} to ${normalizedTimezone}`);
+      }
+      
+      // Get current time with proper timezone handling
+      const now = new Date();
+      userCurrentTime = now.toLocaleString('en-US', { 
+        timeZone: normalizedTimezone,
+        weekday: 'long',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true 
+      });
+      
+      // Also get hour for validation
+      currentHour = parseInt(now.toLocaleString('en-US', { 
+        timeZone: normalizedTimezone,
+        hour: 'numeric',
+        hour12: false 
+      }));
+      
+      console.log(`[General Mental Health] User time calculation - Timezone: ${normalizedTimezone}, Current time: ${userCurrentTime}, Hour: ${currentHour}`);
+    } catch (error) {
+      console.error(`[General Mental Health] Error calculating user time:`, error);
+      userCurrentTime = new Date().toLocaleString('en-US', { 
+        timeZone: 'UTC',
+        weekday: 'long',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true 
+      }) + ' (UTC fallback)';
+    }
 
     const openAiApiKey = Deno.env.get('OPENAI_API_KEY');
     if (!openAiApiKey) {

@@ -21,8 +21,15 @@ class EnhancedLocationService {
     }
 
     try {
-      // Step 1: Try to detect timezone using browser API
-      const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      // Step 1: Try to detect timezone using browser API and normalize legacy timezones
+      let detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      
+      // Normalize legacy timezone identifiers
+      if (detectedTimezone === 'Asia/Calcutta') {
+        detectedTimezone = 'Asia/Kolkata';
+        console.log('[EnhancedLocationService] Normalized legacy timezone Asia/Calcutta to Asia/Kolkata');
+      }
+      
       console.log('[EnhancedLocationService] Detected timezone:', detectedTimezone);
 
       // Step 2: Enhanced country detection based on timezone and language

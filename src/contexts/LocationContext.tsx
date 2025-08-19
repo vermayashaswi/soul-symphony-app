@@ -34,8 +34,15 @@ export function LocationProvider({ children }: { children: ReactNode }) {
       
       console.log('[LocationContext] Starting location detection');
       
-      // Enhanced location detection with timezone
-      const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+      // Enhanced location detection with timezone (normalize legacy timezones)
+      let detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+      
+      // Normalize legacy timezone identifiers
+      if (detectedTimezone === 'Asia/Calcutta') {
+        detectedTimezone = 'Asia/Kolkata';
+        console.log('[LocationContext] Normalized legacy timezone Asia/Calcutta to Asia/Kolkata');
+      }
+      
       console.log('[LocationContext] Detected timezone:', detectedTimezone);
 
       let detectedCountry = 'DEFAULT';
