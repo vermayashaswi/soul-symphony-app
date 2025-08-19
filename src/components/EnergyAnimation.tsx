@@ -2,6 +2,7 @@
 import React, { useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useTheme } from '@/hooks/use-theme';
+import { useAnimationCenter } from '@/utils/arrow-positioning';
 
 interface EnergyAnimationProps {
   className?: string;
@@ -91,6 +92,9 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
   
   const colors = getThemeColors();
   
+  // Use consistent positioning with arrow button, but keep animation centered (1.0 offset)
+  const animationCenter = useAnimationCenter(bottomNavOffset, 1.0);
+  
   return (
     <div 
       ref={containerRef}
@@ -100,7 +104,14 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
       style={{ pointerEvents: 'none' }} // Ensure the animation doesn't interfere with user interactions
     >
       {/* Glowing center with enhanced blur */}
-      <div className={`absolute left-1/2 transform -translate-x-1/2 ${bottomNavOffset ? 'top-1/2 -translate-y-8' : 'top-1/2 -translate-y-1/2'} z-10`}>
+      <div 
+        className="absolute z-10"
+        style={{
+          left: animationCenter.x,
+          top: animationCenter.y,
+          transform: 'translate(-50%, -50%)'
+        }}
+      >
         <div 
           className="w-32 h-32 rounded-full blur-3xl opacity-70"
           style={{ backgroundColor: colors.pulse }}
@@ -112,9 +123,10 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
       {[...Array(15)].map((_, index) => (
         <motion.div
           key={index}
-          className={`absolute left-1/2 rounded-full ${bottomNavOffset ? 'top-1/2' : 'top-1/2'}`}
+          className="absolute rounded-full"
           style={{
-            transform: bottomNavOffset ? 'translateY(-32px)' : undefined,
+            left: animationCenter.x,
+            top: animationCenter.y,
             background: `radial-gradient(circle, ${colors.main} 0%, ${colors.secondary} 50%, ${colors.tertiary} 100%)`
           }}
           initial={{ 
@@ -159,9 +171,10 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
       {[...Array(24)].map((_, index) => (
         <motion.div
           key={`small-${index}`}
-          className={`absolute left-1/2 rounded-full ${bottomNavOffset ? 'top-1/2' : 'top-1/2'}`}
+          className="absolute rounded-full"
           style={{
-            transform: bottomNavOffset ? 'translateY(-32px)' : undefined,
+            left: animationCenter.x,
+            top: animationCenter.y,
             background: `radial-gradient(circle, rgba(255,255,255,0.8) 0%, ${colors.light} 50%, ${colors.tertiary} 100%)`
           }}
           initial={{ 
@@ -192,8 +205,11 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
       {[...Array(40)].map((_, index) => (
         <motion.div
           key={`particle-${index}`}
-          className={`absolute left-1/2 rounded-full bg-white/80 ${bottomNavOffset ? 'top-1/2' : 'top-1/2'}`}
-          style={{ transform: bottomNavOffset ? 'translateY(-32px)' : undefined }}
+          className="absolute rounded-full bg-white/80"
+          style={{
+            left: animationCenter.x,
+            top: animationCenter.y
+          }}
           initial={{ 
             width: 3, 
             height: 3, 
