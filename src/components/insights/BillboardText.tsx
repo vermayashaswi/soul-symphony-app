@@ -12,6 +12,7 @@ interface BillboardTextProps {
   textAlign?: 'left' | 'right' | 'center' | 'justify';
   anchorX?: number | 'left' | 'center' | 'right';
   anchorY?: number | 'top' | 'top-baseline' | 'middle' | 'bottom-baseline' | 'bottom';
+  fontWeight?: 'normal' | 'bold';
   [key: string]: any;
 }
 
@@ -24,6 +25,7 @@ export const BillboardText: React.FC<BillboardTextProps> = ({
   textAlign = 'center',
   anchorX = 'center',
   anchorY = 'middle',
+  fontWeight = 'normal',
   ...props
 }) => {
   const meshRef = useRef<THREE.Group>(null);
@@ -49,6 +51,7 @@ export const BillboardText: React.FC<BillboardTextProps> = ({
       text: children,
       fontSize: pixelFontSize,
       fontFamily: 'Arial, sans-serif',
+      fontWeight,
       color,
       maxWidth: pixelMaxWidth,
       textAlign,
