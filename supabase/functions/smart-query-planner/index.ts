@@ -18,11 +18,44 @@ interface QueryPlan {
   filters: any;
   emotionFocus?: string;
   timeRange?: any;
-  subQuestions?: string[];
+  subQuestions?: SubQuestion[];
   expectedResponseType: string;
   confidence: number;
   reasoning: string;
   databaseContext: string;
+}
+
+interface SubQuestion {
+  id?: string;
+  question: string;
+  purpose: string;
+  searchStrategy: string;
+  executionStage: number;
+  dependencies?: string[];
+  resultForwarding?: string;
+  executionMode?: 'parallel' | 'sequential' | 'conditional';
+  analysisSteps: AnalysisStep[];
+}
+
+interface AnalysisStep {
+  step: number;
+  description: string;
+  queryType: string;
+  sqlQuery?: string;
+  vectorSearch?: {
+    query: string;
+    threshold: number;
+    limit: number;
+  };
+  timeRange?: any;
+  resultContext?: string;
+  dependencies?: string[];
+}
+
+interface ExecutionContext {
+  stageResults: Map<string, any>;
+  subQuestionResults: Map<string, any>;
+  currentStage: number;
 }
 
 function isValidUUID(uuid: string): boolean {
@@ -76,64 +109,249 @@ async function testVectorOperations(supabaseClient: any, requestId: string): Pro
 }
 
 async function executePlan(plan: any, userId: string, supabaseClient: any, requestId: string) {
-  console.log(`[${requestId}] Executing plan:`, JSON.stringify(plan, null, 2));
+  console.log(`[${requestId}] Executing orchestrated plan:`, JSON.stringify(plan, null, 2));
+
+  // Initialize execution context
+  const executionContext: ExecutionContext = {
+    stageResults: new Map(),
+    subQuestionResults: new Map(),
+    currentStage: 1
+  };
+
+  // Assign IDs to sub-questions if not present
+  plan.subQuestions.forEach((subQ: any, index: number) => {
+    if (!subQ.id) {
+      subQ.id = `sq${index + 1}`;
+    }
+  });
+
+  // Group sub-questions by execution stage
+  const stageGroups = groupByExecutionStage(plan.subQuestions);
+  console.log(`[${requestId}] Execution stages:`, Object.keys(stageGroups).map(k => `Stage ${k}: ${stageGroups[k].length} sub-questions`));
+
+  const allResults = [];
+
+  // Execute stages sequentially
+  for (const stage of Object.keys(stageGroups).sort((a, b) => parseInt(a) - parseInt(b))) {
+    console.log(`[${requestId}] Executing stage ${stage} with ${stageGroups[stage].length} sub-questions`);
+    executionContext.currentStage = parseInt(stage);
+
+    // Execute sub-questions in parallel within the stage (if they're independent)
+    const stageResults = await executeStageInParallel(stageGroups[stage], userId, supabaseClient, requestId, executionContext);
+    
+    // Store stage results for dependency resolution
+    executionContext.stageResults.set(stage, stageResults);
+    
+    // Store individual sub-question results
+    stageResults.forEach((result: any) => {
+      if (result.subQuestion?.id) {
+        executionContext.subQuestionResults.set(result.subQuestion.id, result);
+      }
+    });
+
+    allResults.push(...stageResults);
+  }
+
+  console.log(`[${requestId}] Orchestrated execution complete. Total results: ${allResults.length}`);
+  return allResults;
+}
+
+function groupByExecutionStage(subQuestions: SubQuestion[]): { [stage: number]: SubQuestion[] } {
+  const groups: { [stage: number]: SubQuestion[] } = {};
+  
+  subQuestions.forEach(subQ => {
+    const stage = subQ.executionStage || 1;
+    if (!groups[stage]) {
+      groups[stage] = [];
+    }
+    groups[stage].push(subQ);
+  });
+
+  return groups;
+}
+
+async function executeStageInParallel(
+  subQuestions: SubQuestion[], 
+  userId: string, 
+  supabaseClient: any, 
+  requestId: string, 
+  executionContext: ExecutionContext
+) {
+  // Check for dependencies within the stage
+  const independentQuestions = subQuestions.filter(sq => !sq.dependencies || sq.dependencies.length === 0);
+  const dependentQuestions = subQuestions.filter(sq => sq.dependencies && sq.dependencies.length > 0);
+
+  console.log(`[${requestId}] Stage execution - Independent: ${independentQuestions.length}, Dependent: ${dependentQuestions.length}`);
 
   const results = [];
 
-  for (const subQuestion of plan.subQuestions) {
-    console.log(`[${requestId}] Executing sub-question:`, subQuestion.question);
+  // Execute independent questions in parallel
+  if (independentQuestions.length > 0) {
+    const independentResults = await Promise.all(
+      independentQuestions.map(subQ => executeSubQuestion(subQ, userId, supabaseClient, requestId, executionContext))
+    );
+    results.push(...independentResults);
 
-    const subResults = {
-      subQuestion: subQuestion,
-      researcherOutput: null,
-      executionResults: {
-        sqlResults: [],
-        vectorResults: [],
-        error: null,
-        sqlExecutionDetails: {
-          originalQuery: null,
-          sanitizedQuery: null,
-          validationResult: null,
-          executionError: null,
-          fallbackUsed: false
-        },
-        vectorExecutionDetails: {
-          testPassed: false,
-          executionError: null,
-          fallbackUsed: false
-        }
+    // Update context with independent results
+    independentResults.forEach(result => {
+      if (result.subQuestion?.id) {
+        executionContext.subQuestionResults.set(result.subQuestion.id, result);
       }
-    };
-
-    try {
-      for (const step of subQuestion.analysisSteps) {
-        console.log(`[${requestId}] Executing analysis step:`, step.step, step.description);
-
-        if (step.queryType === 'vector_search') {
-          console.log(`[${requestId}] Vector search:`, step.vectorSearch.query);
-          const vectorResult = await executeVectorSearch(step, userId, supabaseClient, requestId, subResults.executionResults.vectorExecutionDetails);
-          subResults.executionResults.vectorResults = vectorResult || [];
-        } else if (step.queryType === 'sql_analysis') {
-          console.log(`[${requestId}] SQL analysis:`, step.sqlQuery);
-          const sqlResult = await executeSQLAnalysis(step, userId, supabaseClient, requestId, subResults.executionResults.sqlExecutionDetails);
-          subResults.executionResults.sqlResults = sqlResult || [];
-        } else if (step.queryType === 'hybrid_search') {
-          console.log(`[${requestId}] Hybrid search:`, step.vectorSearch.query, step.sqlQuery);
-          const hybridResult = await executeHybridSearch(step, userId, supabaseClient, requestId, subResults.executionResults.sqlExecutionDetails, subResults.executionResults.vectorExecutionDetails);
-          subResults.executionResults.vectorResults = hybridResult?.vectorResults || [];
-          subResults.executionResults.sqlResults = hybridResult?.sqlResults || [];
-        }
-      }
-    } catch (stepError) {
-      console.error(`[${requestId}] Error executing steps:`, stepError);
-      subResults.executionResults.error = stepError.message;
-    }
-
-    results.push(subResults);
+    });
   }
 
-  console.log(`[${requestId}] Execution complete. Results count:`, results.length);
+  // Execute dependent questions sequentially (they might depend on results from independent ones)
+  for (const subQ of dependentQuestions) {
+    console.log(`[${requestId}] Executing dependent sub-question: ${subQ.id} with dependencies: ${subQ.dependencies?.join(', ')}`);
+    const dependentResult = await executeSubQuestion(subQ, userId, supabaseClient, requestId, executionContext);
+    results.push(dependentResult);
+    
+    // Update context
+    if (dependentResult.subQuestion?.id) {
+      executionContext.subQuestionResults.set(dependentResult.subQuestion.id, dependentResult);
+    }
+  }
+
   return results;
+}
+
+async function executeSubQuestion(
+  subQuestion: SubQuestion, 
+  userId: string, 
+  supabaseClient: any, 
+  requestId: string, 
+  executionContext: ExecutionContext
+) {
+  console.log(`[${requestId}] Executing sub-question: ${subQuestion.id} - ${subQuestion.question}`);
+
+  const subResults = {
+    subQuestion: subQuestion,
+    researcherOutput: null,
+    executionResults: {
+      sqlResults: [],
+      vectorResults: [],
+      error: null,
+      dependencyContext: {},
+      sqlExecutionDetails: {
+        originalQuery: null,
+        sanitizedQuery: null,
+        validationResult: null,
+        executionError: null,
+        fallbackUsed: false
+      },
+      vectorExecutionDetails: {
+        testPassed: false,
+        executionError: null,
+        fallbackUsed: false
+      }
+    }
+  };
+
+  try {
+    // Process dependency context if needed
+    if (subQuestion.dependencies && subQuestion.dependencies.length > 0) {
+      subResults.executionResults.dependencyContext = processDependencies(subQuestion.dependencies, executionContext);
+      console.log(`[${requestId}] Dependency context for ${subQuestion.id}:`, Object.keys(subResults.executionResults.dependencyContext));
+    }
+
+    for (const step of subQuestion.analysisSteps) {
+      console.log(`[${requestId}] Executing analysis step: ${step.step} - ${step.description}`);
+
+      // Apply dependency context to step if needed
+      const enhancedStep = applyDependencyContext(step, subResults.executionResults.dependencyContext, requestId);
+
+      if (enhancedStep.queryType === 'vector_search') {
+        console.log(`[${requestId}] Vector search:`, enhancedStep.vectorSearch?.query);
+        const vectorResult = await executeVectorSearch(enhancedStep, userId, supabaseClient, requestId, subResults.executionResults.vectorExecutionDetails);
+        subResults.executionResults.vectorResults = vectorResult || [];
+      } else if (enhancedStep.queryType === 'sql_analysis') {
+        console.log(`[${requestId}] SQL analysis:`, enhancedStep.sqlQuery?.substring(0, 100) + '...');
+        const sqlResult = await executeSQLAnalysis(enhancedStep, userId, supabaseClient, requestId, subResults.executionResults.sqlExecutionDetails);
+        subResults.executionResults.sqlResults = sqlResult || [];
+      } else if (enhancedStep.queryType === 'hybrid_search') {
+        console.log(`[${requestId}] Hybrid search:`, enhancedStep.vectorSearch?.query);
+        const hybridResult = await executeHybridSearch(enhancedStep, userId, supabaseClient, requestId, subResults.executionResults.sqlExecutionDetails, subResults.executionResults.vectorExecutionDetails);
+        subResults.executionResults.vectorResults = hybridResult?.vectorResults || [];
+        subResults.executionResults.sqlResults = hybridResult?.sqlResults || [];
+      }
+    }
+  } catch (stepError) {
+    console.error(`[${requestId}] Error executing sub-question ${subQuestion.id}:`, stepError);
+    subResults.executionResults.error = stepError.message;
+  }
+
+  return subResults;
+}
+
+function processDependencies(dependencies: string[], executionContext: ExecutionContext): any {
+  const dependencyContext: any = {};
+  
+  dependencies.forEach(depId => {
+    const depResult = executionContext.subQuestionResults.get(depId);
+    if (depResult) {
+      dependencyContext[depId] = {
+        sqlResults: depResult.executionResults?.sqlResults || [],
+        vectorResults: depResult.executionResults?.vectorResults || [],
+        entryIds: extractEntryIds(depResult.executionResults)
+      };
+    }
+  });
+
+  return dependencyContext;
+}
+
+function extractEntryIds(executionResults: any): string[] {
+  const entryIds = [];
+  
+  // Extract from SQL results
+  if (executionResults.sqlResults && Array.isArray(executionResults.sqlResults)) {
+    executionResults.sqlResults.forEach((result: any) => {
+      if (result.id) entryIds.push(result.id);
+    });
+  }
+
+  // Extract from vector results  
+  if (executionResults.vectorResults && Array.isArray(executionResults.vectorResults)) {
+    executionResults.vectorResults.forEach((result: any) => {
+      if (result.id) entryIds.push(result.id);
+    });
+  }
+
+  return [...new Set(entryIds)]; // Remove duplicates
+}
+
+function applyDependencyContext(step: AnalysisStep, dependencyContext: any, requestId: string): AnalysisStep {
+  if (!step.resultContext || Object.keys(dependencyContext).length === 0) {
+    return step; // No context to apply
+  }
+
+  const enhancedStep = { ...step };
+
+  // Apply entry IDs from dependencies to SQL queries
+  if (step.sqlQuery && step.resultContext) {
+    const entryIds = Object.values(dependencyContext)
+      .flatMap((dep: any) => dep.entryIds || [])
+      .filter((id, index, arr) => arr.indexOf(id) === index); // Remove duplicates
+
+    if (entryIds.length > 0) {
+      console.log(`[${requestId}] Applying ${entryIds.length} entry IDs from dependencies to SQL query`);
+      
+      // Modify SQL query to filter by entry IDs
+      if (step.sqlQuery.includes('WHERE')) {
+        enhancedStep.sqlQuery = step.sqlQuery.replace(
+          /WHERE\s+/i, 
+          `WHERE id = ANY(ARRAY[${entryIds.map(id => `'${id}'`).join(',')}]) AND `
+        );
+      } else {
+        enhancedStep.sqlQuery = step.sqlQuery.replace(
+          /FROM\s+"Journal Entries"/i,
+          `FROM "Journal Entries" WHERE id = ANY(ARRAY[${entryIds.map(id => `'${id}'`).join(',')}])`
+        );
+      }
+    }
+  }
+
+  return enhancedStep;
 }
 
 async function executeVectorSearch(step: any, userId: string, supabaseClient: any, requestId: string, executionDetails: any) {
@@ -572,7 +790,7 @@ async function analyzeQueryWithSubQuestions(message, conversationContext, userEn
     
     console.log(`[Analyst Agent] Enhanced analysis - Content-seeking: ${isContentSeekingQuery}, Mandatory vector: ${requiresMandatoryVector}, Personal: ${hasPersonalPronouns}, Time ref: ${hasExplicitTimeReference}, Follow-up: ${isFollowUpContext}`);
 
-    const prompt = `You are SOULo's Enhanced Analyst Agent - an intelligent query planning specialist for journal data analysis with MANDATORY VECTOR SEARCH for content-seeking queries and TIMEZONE-AWARE date processing.
+    const prompt = `You are SOULo's Enhanced Analyst Agent - an intelligent query planning specialist for journal data analysis TIMEZONE-AWARE date processing.
 
 ${databaseSchemaContext}
 
@@ -581,6 +799,11 @@ ${databaseSchemaContext}
 - DO NOT hallucinate or invent table structures, column names, or data types
 - STICK STRICTLY to the provided database schema context
 - If uncertain about a database structure, use basic select queries instead of complex ones
+
+SUB-QUESTION/QUERIES GENERATION GUIDELINE (MANDATORY): 
+- Break down user query into ATLEAST 2 sub-questions or more such that all sub-questions can be consolidated to answer the user's ASK 
+- If user's query is vague, look back at last 2 user queries to derive what user wants to know and then frame sub-questions accordingly and hence, the pertinent query for it 
+- For eg. user asks (What % of entries contain the emotion confidence (and is it the dominant one?) when I deal with family matters that also concern health issues? -> sub question 1: How many entries concern family and health both? sub question 2: What are all the emotions and their avg scores ? sub question 3: Rank the emotions)
 
 **ENHANCED SQL QUERY GENERATION GUIDELINES:**
 
@@ -751,10 +974,14 @@ Response format (MUST be valid JSON):
   "userStatusMessage": "Brief status for user",
   "subQuestions": [
     {
+      "id": "sq1",
       "question": "Specific sub-question",
       "purpose": "Why this question is needed",
       "searchStrategy": "vector_mandatory|sql_primary|hybrid_parallel",
       "executionStage": 1,
+      "dependencies": ["sq1", "sq2"] or [],
+      "resultForwarding": "entry_ids_for_next_steps|emotion_data_for_ranking|null",
+      "executionMode": "parallel|sequential|conditional",
       "analysisSteps": [
         {
           "step": 1,
@@ -766,13 +993,15 @@ Response format (MUST be valid JSON):
             "threshold": 0.3,
             "limit": 15
           } or null,
-          "timeRange": {"start": "ISO_DATE", "end": "ISO_DATE", "timezone": "${userTimezone}"} or null
+          "timeRange": {"start": "ISO_DATE", "end": "ISO_DATE", "timezone": "${userTimezone}"} or null,
+          "resultContext": "use_entry_ids_from_sq1|use_emotion_data_from_sq2|null",
+          "dependencies": ["sq1"] or []
         }
       ]
     }
   ],
   "confidence": 0.8,
-  "reasoning": "Explanation of strategy with emphasis on vector search usage and timezone handling",
+  "reasoning": "Explanation of strategy with emphasis on dependency management and execution orchestration",
   "useAllEntries": boolean,
   "hasPersonalPronouns": ${hasPersonalPronouns},
   "hasExplicitTimeReference": ${hasExplicitTimeReference},
@@ -912,10 +1141,13 @@ function createEnhancedFallbackPlan(originalMessage, isContentSeekingQuery, infe
     userStatusMessage: isContentSeekingQuery ? "Semantic content search with enhanced vector analysis" : "Intelligent hybrid search strategy",
     subQuestions: [
       {
+        id: "sq1",
         question: `Enhanced analysis for: ${originalMessage}`,
         purpose: "Comprehensive content retrieval using vector semantic search for accurate results",
         searchStrategy: searchStrategy,
         executionStage: 1,
+        dependencies: [],
+        executionMode: "parallel",
         analysisSteps: [
           {
             step: 1,
@@ -927,7 +1159,8 @@ function createEnhancedFallbackPlan(originalMessage, isContentSeekingQuery, infe
               threshold: 0.3,
               limit: 15
             },
-            timeRange: inferredTimeContext ? { ...inferredTimeContext, timezone: userTimezone } : null
+            timeRange: inferredTimeContext ? { ...inferredTimeContext, timezone: userTimezone } : null,
+            dependencies: []
           }
         ]
       }
