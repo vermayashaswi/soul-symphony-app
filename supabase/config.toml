@@ -90,3 +90,6 @@ verify_jwt = false
 
 [functions.transcribe-chat-audio]
 verify_jwt = true
+
+[functions.chat-query-classifier]
+verify_jwt = true
