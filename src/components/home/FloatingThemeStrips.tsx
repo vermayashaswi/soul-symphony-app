@@ -34,7 +34,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
   } catch (error) {
     console.warn('FloatingThemeStrips: ThemeProvider not ready, using defaults');
   }
-  const [translatedLabel, setTranslatedLabel] = useState<string>("7-day themes");
+  const [translatedLabel, setTranslatedLabel] = useState<string>("2-week themes");
   const isDarkMode = theme === 'dark';
   
   // Enhanced animation management
@@ -66,9 +66,9 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
     const translateLabel = async () => {
       try {
         // Use direct translation to ensure it works regardless of route
-        const result = await directTranslate("7-day themes");
+        const result = await directTranslate("2-week themes");
         console.log("FloatingThemeStrips: Label translated to:", result);
-        setTranslatedLabel(result || "7-day themes");
+        setTranslatedLabel(result || "2-week themes");
       } catch (error) {
         console.error('FloatingThemeStrips: Error translating label:', error);
         // Keep using existing label
@@ -319,7 +319,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
           }}
         >
           <TranslatableText 
-            text={translatedLabel || "7-day themes"} 
+            text={translatedLabel || "2-week themes"} 
             forceTranslate={true}
             className="text-xs font-medium whitespace-nowrap"
             style={{

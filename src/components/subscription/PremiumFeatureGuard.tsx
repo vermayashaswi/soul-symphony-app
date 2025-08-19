@@ -106,7 +106,7 @@ export const PremiumFeatureGuard: React.FC<PremiumFeatureGuardProps> = ({
               <div className="bg-muted/50 rounded-lg p-4 space-y-2">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Clock className="h-4 w-4" />
-                  <TranslatableText text="Your 7-day free trial has ended" />
+                  <TranslatableText text="Your 2-week free trial has ended" />
                 </div>
                 <p className="text-sm">
                   <TranslatableText text="Trial ended on:" />{' '}
@@ -122,10 +122,10 @@ export const PremiumFeatureGuard: React.FC<PremiumFeatureGuardProps> = ({
               <div className="bg-blue-50 dark:bg-blue-950/20 rounded-lg p-4 space-y-2">
                 <div className="flex items-center gap-2 text-sm text-blue-700 dark:text-blue-300">
                   <Clock className="h-4 w-4" />
-                  <TranslatableText text="Start your 7-day free trial" />
+                  <TranslatableText text="Start your 2-week free trial" />
                 </div>
                 <p className="text-sm text-blue-600 dark:text-blue-400">
-                  <TranslatableText text="Get full access to all premium features for 7 days" />
+                  <TranslatableText text="Get full access to all premium features for 2 weeks" />
                 </p>
               </div>
             )}
@@ -152,7 +152,7 @@ export const PremiumFeatureGuard: React.FC<PremiumFeatureGuardProps> = ({
                   className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
                 >
                   <Clock className="mr-2 h-4 w-4" />
-                  <TranslatableText text="Start 7-Day Free Trial" />
+                  <TranslatableText text="Start 2-Week Free Trial" />
                 </Button>
               )}
 

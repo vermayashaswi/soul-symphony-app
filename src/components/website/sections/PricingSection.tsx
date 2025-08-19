@@ -23,7 +23,7 @@ const PricingSection: React.FC<PricingSectionProps> = ({ openAppStore, openPlayS
       features: [
         "Unlimited voice entries",
         "Basic emotion analysis",
-        "7 days of history",
+        "2 weeks of history",
         "Mobile app access"
       ],
       popular: false,
