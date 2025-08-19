@@ -434,18 +434,14 @@ serve(async (req) => {
         const referenceEntries = researchResults.flatMap((r: any) => [
           ...(r?.executionResults?.vectorResults || []).map((v: any) => ({
             id: v.id,
-            date: v.created_at, // Map created_at to date for frontend compatibility
-            snippet: v.content?.substring(0, 200) || v['refined text']?.substring(0, 200) || 'Content not available',
-            content: v.content || v['refined text'] || 'Content not available', // Keep both for backward compatibility
+            content: v.content?.substring(0, 200) || 'Vector result',
             similarity: v.similarity,
             source: 'vector',
             created_at: v.created_at
           })),
           ...(r?.executionResults?.sqlResults || []).map((s: any) => ({
             id: s.id,
-            date: s.created_at, // Map created_at to date for frontend compatibility
-            snippet: s['refined text']?.substring(0, 200) || s.content?.substring(0, 200) || 'Content not available',
-            content: s['refined text'] || s.content || 'Content not available', // Keep both for backward compatibility
+            content: s['refined text']?.substring(0, 200) || s.content?.substring(0, 200) || 'SQL result',
             source: 'sql',
             created_at: s.created_at
           }))

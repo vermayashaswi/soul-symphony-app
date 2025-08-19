@@ -38,22 +38,14 @@ const ReferencesDisplay: React.FC<ReferencesDisplayProps> = ({
       
       {expanded && (
         <div className="mt-2 space-y-2 border-l-2 border-primary/20 pl-3">
-          {references.slice(0, 3).map((ref, idx) => {
-            // Handle both field name variants (date/created_at, snippet/content)
-            const dateValue = ref.date || ref.created_at;
-            const contentValue = ref.snippet || ref.content;
-            
-            return (
-              <Card key={idx} className="p-2 text-xs">
-                <div className="font-medium">
-                  {dateValue ? new Date(dateValue).toLocaleDateString() : "Unknown date"}
-                </div>
-                <p className="text-muted-foreground">
-                  {contentValue || "No content available"}
-                </p>
-              </Card>
-            );
-          })}
+          {references.slice(0, 3).map((ref, idx) => (
+            <Card key={idx} className="p-2 text-xs">
+              <div className="font-medium">
+                {ref.date ? new Date(ref.date).toLocaleDateString() : "Unknown date"}
+              </div>
+              <p className="text-muted-foreground">{ref.snippet}</p>
+            </Card>
+          ))}
           {references.length > 3 && (
             <div className="text-xs text-muted-foreground">
               <TranslatableText text={`+ ${references.length - 3} more entries`} />
