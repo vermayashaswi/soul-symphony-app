@@ -319,12 +319,6 @@ export async function fetchLiveMasterData(supabaseClient) {
 export const JOURNAL_ENTRY_SCHEMA = {
   table: "Journal Entries",
   columns: {
-    id: {
-      type: "bigint",
-      description: "Unique identifier for the journal entry",
-      nullable: false,
-      example: 12345
-    },
     user_id: {
       type: "uuid",
       description: "ID of the user who created this entry - MUST be included in all queries for user isolation",
@@ -336,12 +330,6 @@ export const JOURNAL_ENTRY_SCHEMA = {
       description: "When the journal entry was created - use for temporal analysis and date filtering",
       nullable: false,
       example: "2024-01-15T14:30:00Z"
-    },
-    "transcription text": {
-      type: "text",
-      description: "Raw transcribed text from voice recording - original user input",
-      nullable: true,
-      example: "Today I felt really anxious about the meeting..."
     },
     "refined text": {
       type: "text",
@@ -416,15 +404,6 @@ export const JOURNAL_ENTRY_SCHEMA = {
         ]
       }
     },
-    languages: {
-      type: "jsonb",
-      description: "JSON array of ISO 639-1 language codes detected for the entry",
-      nullable: true,
-      example: [
-        "en",
-        "hi"
-      ]
-    },
     themes: {
       type: "text[]",
       description: "Additional themes/categories extracted from content (legacy/auxiliary)",
@@ -433,22 +412,6 @@ export const JOURNAL_ENTRY_SCHEMA = {
         "work",
         "relationships"
       ]
-    },
-    "foreign key": {
-      type: "text",
-      description: "Legacy reference or external system foreign key (if any)",
-      nullable: true
-    },
-    translation_status: {
-      type: "text",
-      description: "Translation processing status for the entry",
-      nullable: true,
-      example: "completed"
-    },
-    user_feedback: {
-      type: "text",
-      description: "Optional user-provided feedback on the AI processing",
-      nullable: true
     },
     Edit_Status: {
       type: "integer",
@@ -461,29 +424,21 @@ export const JOURNAL_ENTRY_SCHEMA = {
       description: "Duration of the voice recording in seconds",
       nullable: true,
       example: 180.5
-    },
-    audio_url: {
-      type: "text",
-      description: "URL to the stored audio file",
-      nullable: true
     }
   },
   relationships: [
     "journal_embeddings table contains vector embeddings for semantic search",
     "User profile information available in profiles table",
-    "Emotion analysis results are pre-calculated and stored in emotions column",
-    "Language detection results are stored in languages jsonb array for multi-language support"
+    "Emotion analysis results are pre-calculated and stored in emotions column"
   ],
   searchCapabilities: [
     "Vector similarity search using embeddings",
     "Emotion-based filtering with confidence thresholds",
     "Theme-based search and clustering",
     "Date range filtering and temporal analysis",
-    "Content text search in both transcription and refined text",
+    "Content text search in refined text",
     "Entity-based search for people, places, organizations",
-    "Sentiment-based filtering using Google NL API scores",
-    "Multi-language content filtering using detected languages jsonb array",
-    "Language-specific content retrieval and analysis"
+    "Sentiment-based filtering using Google NL API scores"
   ]
 };
 export async function generateDatabaseSchemaContext(supabaseClient) {
