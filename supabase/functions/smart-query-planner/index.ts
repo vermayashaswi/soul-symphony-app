@@ -458,6 +458,38 @@ async function executeVectorSearch(step: any, userId: string, supabaseClient: an
   }
 }
 
+function validateSQLQuery(query: string, requestId: string): { isValid: boolean; errors: string[] } {
+  const restrictedColumns = [
+    '"transcription text"',
+    'transcription text',
+    '"foreign key"', 
+    'foreign key',
+    '"audio_url"',
+    'audio_url',
+    '"user_feedback"',
+    'user_feedback', 
+    '"edit_status"',
+    'edit_status',
+    '"translation_status"',
+    'translation_status'
+  ];
+  
+  const errors: string[] = [];
+  const queryLower = query.toLowerCase();
+  
+  for (const restrictedCol of restrictedColumns) {
+    if (queryLower.includes(restrictedCol.toLowerCase())) {
+      errors.push(`Restricted column detected: ${restrictedCol}`);
+      console.error(`[${requestId}] COLUMN RESTRICTION VIOLATION: ${restrictedCol} found in query`);
+    }
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
+}
+
 async function executeSQLAnalysis(step: any, userId: string, supabaseClient: any, requestId: string, executionDetails: any) {
   try {
     console.log(`[${requestId}] Executing SQL query:`, step.sqlQuery);
@@ -470,6 +502,17 @@ async function executeSQLAnalysis(step: any, userId: string, supabaseClient: any
 
     const originalQuery = step.sqlQuery.trim();
     executionDetails.originalQuery = originalQuery;
+    
+    // Validate SQL query for restricted columns
+    const validation = validateSQLQuery(originalQuery, requestId);
+    executionDetails.validationResult = validation;
+    
+    if (!validation.isValid) {
+      console.error(`[${requestId}] SQL query validation failed:`, validation.errors);
+      executionDetails.executionError = `Query contains restricted columns: ${validation.errors.join(', ')}`;
+      executionDetails.fallbackUsed = true;
+      return await executeVectorSearchFallback(step, userId, supabaseClient, requestId);
+    }
     
     // Sanitize user ID in the query
     let sanitizedQuery;
@@ -814,8 +857,9 @@ SUB-QUESTION/QUERIES GENERATION GUIDELINE (MANDATORY):
 
 2. **Table and Column References:**
    - Use "Journal Entries" (with quotes) for the table name
-   - Valid columns: id, user_id, created_at, "refined text", "transcription text", emotions, master_themes, entities, sentiment
-   - Use COALESCE for text fields: COALESCE("refined text", "transcription text")
+   - FORBIDDEN COLUMNS (NEVER USE): "transcription text", "foreign key", "audio_url", "user_feedback", "edit_status", "translation_status"
+   - Valid columns: user_id, created_at, "refined text", emotions, master_themes, entities, sentiment, themeemotion, themes, duration
+   - Use "refined text" for content analysis (NEVER use transcription text)
 
 3. **JSON Operations on emotions/entities columns:**
    - For emotions: jsonb_each(emotions) to expand, emotions->>'emotion_name' for specific values
@@ -838,7 +882,7 @@ SUB-QUESTION/QUERIES GENERATION GUIDELINE (MANDATORY):
 
 1. **Basic Entry Query:**
 \`\`\`sql
-SELECT id, COALESCE("refined text", "transcription text") as content, created_at, emotions, master_themes 
+SELECT user_id, created_at, "refined text" as content, emotions, master_themes 
 FROM "Journal Entries" 
 WHERE user_id = auth.uid() 
 ORDER BY created_at DESC 
@@ -862,7 +906,7 @@ LIMIT 5;
 
 3. **Theme-based Query:**
 \`\`\`sql
-SELECT id, COALESCE("refined text", "transcription text") as content, created_at, master_themes
+SELECT created_at, "refined text" as content, master_themes
 FROM "Journal Entries" 
 WHERE user_id = auth.uid() 
   AND master_themes IS NOT NULL 
@@ -965,7 +1009,9 @@ Generate a comprehensive analysis plan that:
 3. Creates semantically rich vector search queries using user's language
 4. INCLUDES proper timezone information in all timeRange objects
 5. Generates COMPLETE, SAFE, EXECUTABLE SQL queries using ONLY the provided database schema and working patterns above
-6. Ensures comprehensive coverage of user's intent
+6. NEVER references forbidden columns: transcription text, foreign key, audio_url, user_feedback, edit_status, translation_status
+7. Uses "refined text" as the primary content source (NEVER transcription text)
+8. Ensures comprehensive coverage of user's intent
 
 Response format (MUST be valid JSON):
 {
