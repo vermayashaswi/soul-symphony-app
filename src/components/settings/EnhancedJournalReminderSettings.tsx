@@ -51,9 +51,16 @@ export const EnhancedJournalReminderSettings: React.FC = () => {
       setIsEnabled(settings.enabled);
       setSelectedTimes(settings.times);
       
-      // Load custom times from database if available
-      const fullSettings = await notificationSettingsService.loadSettings();
-      // You'd need to extend this to load full settings with custom times
+      // Load custom times from full database settings
+      const fullSettings = await notificationSettingsService.loadFullSettings();
+      if (fullSettings) {
+        setCustomTimes({
+          morning: fullSettings.morningTime || '08:00',
+          afternoon: fullSettings.afternoonTime || '14:00',
+          evening: fullSettings.eveningTime || '19:00',
+          night: fullSettings.nightTime || '22:00'
+        });
+      }
       
       // Get notification status
       const status = await unifiedNotificationService.getNotificationStatus();
@@ -80,6 +87,16 @@ export const EnhancedJournalReminderSettings: React.FC = () => {
           return;
         }
         
+        // Save settings to backend first
+        const settingsToSave = { enabled: true, times: selectedTimes };
+        const saved = await notificationSettingsService.saveSettings(settingsToSave, customTimes);
+        
+        if (!saved) {
+          toast.error('Failed to save settings to backend');
+          setIsSaving(false);
+          return;
+        }
+        
         const success = await unifiedNotificationService.enableReminders(selectedTimes, customTimes);
         
         if (success) {
@@ -93,6 +110,10 @@ export const EnhancedJournalReminderSettings: React.FC = () => {
           toast.error('Failed to enable reminders. Please check your notification settings.');
         }
       } else {
+        // Save disabled state to backend
+        const settingsToSave = { enabled: false, times: [] };
+        await notificationSettingsService.saveSettings(settingsToSave, customTimes);
+        
         await unifiedNotificationService.disableReminders();
         setIsEnabled(false);
         toast.success('Journal reminders disabled');
@@ -111,6 +132,10 @@ export const EnhancedJournalReminderSettings: React.FC = () => {
       : selectedTimes.filter(t => t !== time);
     
     setSelectedTimes(newTimes);
+    
+    // Save to backend immediately
+    const settingsToSave = { enabled: isEnabled, times: newTimes };
+    await notificationSettingsService.saveSettings(settingsToSave, customTimes);
     
     // If reminders are enabled, update them immediately
     if (isEnabled && !isSaving) {

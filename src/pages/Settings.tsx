@@ -34,6 +34,7 @@ import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { useTutorial } from '@/contexts/TutorialContext';
 import { DeleteAllEntriesSection } from '@/components/settings/DeleteAllEntriesSection';
+import { EnhancedJournalReminderSettings } from '@/components/settings/EnhancedJournalReminderSettings';
 
 
 interface SettingItemProps {
@@ -852,66 +853,13 @@ function SettingsContent() {
               </div>
             </motion.div>
             
-            {/* Enhanced Notifications Section */}
+            {/* Enhanced Journal Reminders Section */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: 0.2 }}
-              className="bg-background rounded-xl p-6 shadow-sm border"
             >
-              <h2 className="text-xl font-semibold mb-4 text-theme-color">
-                <TranslatableText text="Preferences" />
-              </h2>
-              
-              <div className="space-y-3 divide-y">
-                <SettingItem
-                  icon={Bell}
-                  title="Journal Reminders"
-                  description={
-                    notificationsEnabled 
-                      ? ""
-                      : "Get reminders to journal and stay on track"
-                  }
-                >
-                  <div className="flex items-center gap-2">
-                    <Switch 
-                      checked={notificationsEnabled}
-                      onCheckedChange={handleToggleNotifications}
-                    />
-                    {notificationsEnabled && (
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => setShowNotificationSettings(true)}
-                      >
-                        <TranslatableText text="Customize" />
-                      </Button>
-                    )}
-                  </div>
-                </SettingItem>
-                
-                {/* Permission Status Display */}
-                <div className="pt-3">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">
-                      <TranslatableText text="Permission Status" />
-                    </span>
-                    <div className="flex items-center gap-2">
-                      {getPermissionStatusIcon()}
-                      <span className="text-foreground">
-                        <TranslatableText text={getPermissionStatusText()} />
-                      </span>
-                    </div>
-                  </div>
-                  
-                </div>
-                
-                {notificationsEnabled && (
-                  <div className="pt-2 text-sm text-muted-foreground">
-                    {getNotificationSummary()}
-                  </div>
-                )}
-              </div>
+              <EnhancedJournalReminderSettings />
             </motion.div>
             
             <motion.div
@@ -1241,75 +1189,6 @@ function SettingsContent() {
           </DialogContent>
         </Dialog>
         
-        <Dialog
-          open={showNotificationSettings}
-          onOpenChange={(open) => {
-            if (!open) {
-              cancelNotificationSettings();
-            }
-          }}
-        >
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>
-                <TranslatableText text="Notification Settings" />
-              </DialogTitle>
-              <DialogDescription>
-                <TranslatableText text="Choose when you want to receive journal reminders" />
-              </DialogDescription>
-            </DialogHeader>
-            
-            <div className="space-y-6 py-4">
-              <div className="space-y-4">
-                <h3 className="font-medium text-sm">
-                  <TranslatableText text="Reminder Times" />
-                </h3>
-                
-                <div className="grid grid-cols-2 gap-3">
-                  {timeOptions.map(option => (
-                    <div 
-                      key={option.value} 
-                      className={cn(
-                        "border rounded-md px-3 py-2 flex items-center space-x-2 cursor-pointer",
-                        notificationTimes.includes(option.value) 
-                          ? "border-primary bg-primary/10" 
-                          : "border-input"
-                      )}
-                      onClick={() => handleTimeChange(option.value)}
-                    >
-                      <Checkbox 
-                        checked={notificationTimes.includes(option.value)} 
-                        onCheckedChange={() => handleTimeChange(option.value)}
-                        id={`time-${option.value}`}
-                      />
-                      <Label 
-                        htmlFor={`time-${option.value}`} 
-                        className="flex-1 cursor-pointer text-sm"
-                      >
-                        <TranslatableText text={option.label} />
-                      </Label>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-            
-            <div className="flex justify-end gap-3">
-              <Button 
-                variant="outline" 
-                onClick={cancelNotificationSettings}
-              >
-                <TranslatableText text="Cancel" />
-              </Button>
-              <Button 
-                onClick={applyNotificationSettings}
-                disabled={notificationTimes.length === 0}
-              >
-                <TranslatableText text="Save Settings" />
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
         
         {/* Debug Dialog */}
         {/* Removed comprehensive debug modal - now using background diagnostics */}

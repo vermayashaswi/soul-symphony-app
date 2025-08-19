@@ -171,7 +171,7 @@ class NotificationSettingsService {
   }
 
   // Load full settings including custom times
-  private async loadFullSettings(): Promise<NotificationSettings | null> {
+  async loadFullSettings(): Promise<NotificationSettings | null> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
