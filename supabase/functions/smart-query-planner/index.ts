@@ -708,10 +708,21 @@ ORDER BY avg_score DESC;
    - For emotional queries → Vector query: "emotions feelings mood emotional state [specific emotions mentioned]"
    - Preserve user's original language patterns for better semantic matching
 
-4. **TIMEZONE-AWARE TIME RANGES**:
-   - All timeRange objects MUST include "timezone": "${userTimezone}"
-   - Date processing will handle conversion from user's local time to UTC for database queries
-   - Example timeRange: {"start": "2025-08-06T00:00:00", "end": "2025-08-06T23:59:59", "timezone": "${userTimezone}"}
+4. **CRITICAL TIME-OF-DAY QUERY RULES**:
+    - When user asks about "first half vs second half" or "morning vs evening", NEVER generate UTC-based queries
+    - ALWAYS use user's timezone ("${userTimezone}") for time-of-day calculations
+    - Use SQL with AT TIME ZONE to convert stored UTC times to user's local time for hour-based analysis
+    - Example for "first half vs second half": 
+      ```sql
+      SELECT 
+        CASE WHEN EXTRACT(HOUR FROM created_at AT TIME ZONE '${userTimezone}') < 12 THEN 'first_half' ELSE 'second_half' END as day_period,
+        COUNT(*) as entry_count
+      FROM "Journal Entries" 
+      WHERE user_id = auth.uid()
+      GROUP BY day_period;
+      ```
+    - All timeRange objects MUST include "timezone": "${userTimezone}"
+    - Date processing will handle conversion from user's local time to UTC for database queries
 
 USER QUERY: "${message}"
 USER TIMEZONE: "${userTimezone}"
