@@ -489,11 +489,22 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       // Check if this is the first message in the thread
       const isFirstMessage = chatHistory.length === 1; // Only the temp message we just added
       
-      // Save the user message
+      // Save the user message with idempotency key
       let savedUserMessage: ChatMessage | null = null;
       try {
-        debugLog.addEvent("Database", `Saving user message to thread ${threadId}`, "info");
-        savedUserMessage = await saveMessage(threadId, message, 'user', effectiveUserId);
+        const idempotencyKey = `user-${effectiveUserId}-${threadId}-${Date.now()}-${Math.random().toString(36).substring(2)}`;
+        debugLog.addEvent("Database", `Saving user message to thread ${threadId} with idempotency key: ${idempotencyKey}`, "info");
+        savedUserMessage = await saveMessage(
+          threadId, 
+          message, 
+          'user', 
+          effectiveUserId,
+          null, // references
+          undefined, // hasNumericResult
+          false, // isInteractive
+          undefined, // interactiveOptions
+          idempotencyKey
+        );
         debugLog.addEvent("Database", `User message saved with ID: ${savedUserMessage?.id}`, "success");
         
         if (savedUserMessage) {
