@@ -13,7 +13,7 @@ import { TranslatableMarkdown } from "@/components/translation/TranslatableMarkd
 import TypingIndicator from "../TypingIndicator";
 import ParticleAvatar from "../ParticleAvatar";
 import { getSanitizedFinalContent } from "@/utils/messageParser";
-import { EditableMessage } from "../EditableMessage";
+
 import { ChatMessage } from '@/types/chat';
  
  interface MobileChatMessageProps {
@@ -23,11 +23,6 @@ import { ChatMessage } from '@/types/chat';
   streamingMessage?: string;
   showStreamingDots?: boolean;
   userId?: string;
-  onEditMessage?: (messageId: string, newContent: string) => Promise<void>;
-  editingMessageId?: string | null;
-  onStartEdit?: (messageId: string) => void;
-  onCancelEdit?: () => void;
-  isEditLoading?: boolean;
 }
 
 const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ 
@@ -36,12 +31,7 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({
   isLoading = false, 
   streamingMessage,
   showStreamingDots = false,
-  userId,
-  onEditMessage,
-  editingMessageId,
-  onStartEdit,
-  onCancelEdit,
-  isEditLoading = false
+  userId
 }) => {
   // CRITICAL FIX: Always call all hooks before any conditional logic
   const [showReferences, setShowReferences] = useState(false);
@@ -59,7 +49,6 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({
   const shouldShowLoading = isLoading && !streamingMessage;
   const shouldShowStreaming = !!streamingMessage;
   const shouldShowMessage = !shouldShowLoading && !shouldShowStreaming;
-  const isEditing = editingMessageId === message.id;
   
   // Calculate derived values
   const hasReferences = message.sender === 'assistant' && message.reference_entries && Array.isArray(message.reference_entries) && message.reference_entries.length > 0;
@@ -311,22 +300,6 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({
     </motion.div>
   );
 
-  // Only wrap user messages with EditableMessage if editing is enabled
-  if (displayRole === 'user' && userId && onEditMessage && onStartEdit && onCancelEdit) {
-    return (
-      <EditableMessage
-        message={message}
-        userId={userId}
-        onEdit={onEditMessage}
-        isEditing={isEditing}
-        onStartEdit={onStartEdit}
-        onCancelEdit={onCancelEdit}
-        isLoading={isEditLoading}
-      >
-        {messageContent}
-      </EditableMessage>
-    );
-  }
 
   return messageContent;
 };

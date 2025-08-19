@@ -7,7 +7,7 @@ import AnalyticsDisplay from "./AnalyticsDisplay";
 import EmotionRadarChart from "./EmotionRadarChart";
 import TypingIndicator from "./TypingIndicator";
 import { ChatMessage as ChatMessageType } from "@/types/chat";
-import { ChatMessage } from "./ChatMessage";
+import ChatMessage from "./ChatMessage";
 import { useAutoScroll } from "@/hooks/use-auto-scroll";
 import ReferencesDisplay from "./ReferencesDisplay";
 
@@ -18,11 +18,6 @@ export interface ChatAreaProps {
   threadId?: string | null;
   onInteractiveOptionClick?: (option: any) => void;
   userId?: string;
-  onEditMessage?: (messageId: string, newContent: string) => Promise<void>;
-  editingMessageId?: string | null;
-  onStartEdit?: (messageId: string) => void;
-  onCancelEdit?: () => void;
-  isEditLoading?: boolean;
 }
 
 const ChatArea: React.FC<ChatAreaProps> = ({ 
@@ -31,12 +26,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   processingStage,
   threadId,
   onInteractiveOptionClick,
-  userId,
-  onEditMessage,
-  editingMessageId,
-  onStartEdit,
-  onCancelEdit,
-  isEditLoading = false
+  userId
 }) => {
   // Use unified auto-scroll hook
   const { scrollElementRef, scrollToBottom } = useAutoScroll({
@@ -85,15 +75,10 @@ const ChatArea: React.FC<ChatAreaProps> = ({
     <div ref={scrollElementRef} className="flex flex-col p-4 overflow-y-auto h-full pb-20">
       {chatMessages.filter(msg => !msg.is_processing).map((message, index) => (
         <div key={message.id || index}>
-          <ChatMessage
-            message={message}
-            userId={userId}
-            onEditMessage={onEditMessage}
-            editingMessageId={editingMessageId}
-            onStartEdit={onStartEdit}
-            onCancelEdit={onCancelEdit}
-            isEditLoading={isEditLoading}
-          />
+            <ChatMessage
+              message={message}
+              userId={userId}
+            />
           
           {/* Interactive Options */}
           {message.isInteractive && message.interactiveOptions && onInteractiveOptionClick && (

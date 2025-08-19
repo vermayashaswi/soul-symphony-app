@@ -30,7 +30,7 @@ import { MentalHealthInsights } from "@/hooks/use-mental-health-insights";
 
 import { ChatMessage } from "@/types/chat";
 import { getThreadMessages, saveMessage } from "@/services/chat";
-import { useMessageEditingHandlers } from "./MessageEditingHandlers";
+
 import { useDebugLog } from "@/utils/debug/DebugContext";
 import { TranslatableText } from "@/components/translation/TranslatableText";
 import { useChatMessageClassification, QueryCategory } from "@/hooks/use-chat-message-classification";
@@ -74,8 +74,6 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
-  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
-  const [isEditLoading, setIsEditLoading] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
   const { translate } = useTranslation();
@@ -214,16 +212,6 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     scrollThreshold: 100
   });
 
-  // Message editing handlers
-  const { handleEditMessage, handleStartEdit, handleCancelEdit } = useMessageEditingHandlers(
-    effectiveUserId,
-    currentThreadId,
-    chatHistory,
-    setChatHistory,
-    setEditingMessageId,
-    setIsEditLoading,
-    stopStreaming
-  );
 
   // Realtime: append assistant messages saved by backend
   useEffect(() => {
@@ -1109,11 +1097,6 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
             threadId={currentThreadId}
             onInteractiveOptionClick={handleInteractiveOptionClick}
             userId={effectiveUserId}
-            onEditMessage={handleEditMessage}
-            editingMessageId={editingMessageId}
-            onStartEdit={handleStartEdit}
-            onCancelEdit={handleCancelEdit}
-            isEditLoading={isEditLoading}
           />
         )}
         
