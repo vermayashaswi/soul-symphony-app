@@ -11,7 +11,7 @@ import { ChatMessage } from "./ChatMessage";
 import { useAutoScroll } from "@/hooks/use-auto-scroll";
 import ReferencesDisplay from "./ReferencesDisplay";
 
-interface ChatAreaProps {
+export interface ChatAreaProps {
   chatMessages: ChatMessageType[];
   isLoading?: boolean;
   processingStage?: string;
