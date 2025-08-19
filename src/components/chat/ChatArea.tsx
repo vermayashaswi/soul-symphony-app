@@ -1,26 +1,28 @@
 
 import React, { useRef, useEffect } from "react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import ReactMarkdown from "react-markdown";
-import { XIcon, InfoIcon } from "lucide-react";
-import ReferencesDisplay from "./ReferencesDisplay";
 import { Button } from "@/components/ui/button";
 import { TranslatableText } from "@/components/translation/TranslatableText";
 import AnalyticsDisplay from "./AnalyticsDisplay";
 import EmotionRadarChart from "./EmotionRadarChart";
 import TypingIndicator from "./TypingIndicator";
-import ParticleAvatar from "./ParticleAvatar";
-import { ChatMessage } from "@/types/chat";
+import { ChatMessage as ChatMessageType } from "@/types/chat";
+import { ChatMessage } from "./ChatMessage";
 import { useAutoScroll } from "@/hooks/use-auto-scroll";
+import ReferencesDisplay from "./ReferencesDisplay";
 
 interface ChatAreaProps {
-  chatMessages: ChatMessage[];
+  chatMessages: ChatMessageType[];
   isLoading?: boolean;
   processingStage?: string;
   threadId?: string | null;
   onInteractiveOptionClick?: (option: any) => void;
+  userId?: string;
+  onEditMessage?: (messageId: string, newContent: string) => Promise<void>;
+  editingMessageId?: string | null;
+  onStartEdit?: (messageId: string) => void;
+  onCancelEdit?: () => void;
+  isEditLoading?: boolean;
 }
 
 const ChatArea: React.FC<ChatAreaProps> = ({ 
@@ -28,7 +30,13 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   isLoading, 
   processingStage,
   threadId,
-  onInteractiveOptionClick
+  onInteractiveOptionClick,
+  userId,
+  onEditMessage,
+  editingMessageId,
+  onStartEdit,
+  onCancelEdit,
+  isEditLoading = false
 }) => {
   // Use unified auto-scroll hook
   const { scrollElementRef, scrollToBottom } = useAutoScroll({
@@ -76,85 +84,50 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   return (
     <div ref={scrollElementRef} className="flex flex-col p-4 overflow-y-auto h-full pb-20">
       {chatMessages.filter(msg => !msg.is_processing).map((message, index) => (
-        <div
-          key={index}
-          className={`flex ${
-            message.sender === "user" || message.role === "user"
-              ? "justify-end"
-              : "justify-start"
-          } mb-4`}
-        >
-          <div
-            className={`flex gap-3 max-w-[80%] ${
-              message.sender === "user" || message.role === "user"
-                ? "flex-row-reverse"
-                : ""
-            }`}
-          >
-            <div className="mt-1">
-              {message.sender === "user" || message.role === "user" ? (
-                <Avatar className="h-8 w-8">
-                  <AvatarImage 
-                    src={undefined} 
-                    alt="User"
-                    className="bg-primary/20"
-                    loading="eager"
-                  />
-                  <AvatarFallback className="bg-primary text-primary-foreground">
-                    U
-                  </AvatarFallback>
-                </Avatar>
-              ) : (
-                <ParticleAvatar className="h-8 w-8" size={32} />
-              )}
+        <div key={message.id || index}>
+          <ChatMessage
+            message={message}
+            userId={userId}
+            onEditMessage={onEditMessage}
+            editingMessageId={editingMessageId}
+            onStartEdit={onStartEdit}
+            onCancelEdit={onCancelEdit}
+            isEditLoading={isEditLoading}
+          />
+          
+          {/* Interactive Options */}
+          {message.isInteractive && message.interactiveOptions && onInteractiveOptionClick && (
+            <div className="mt-2 mb-4 flex flex-col gap-2 max-w-[80%] ml-auto mr-0">
+              {message.interactiveOptions.map((option, idx) => (
+                <Button
+                  key={idx}
+                  variant="outline"
+                  className="text-left justify-start"
+                  onClick={() => onInteractiveOptionClick(option)}
+                  data-test-id={`interactive-option-${idx}`}
+                >
+                  {option.text}
+                </Button>
+              ))}
             </div>
+          )}
 
-            <Card
-              className={`${
-                message.sender === "user" || message.role === "user"
-                  ? "bg-primary text-primary-foreground"
-                  : message.sender === "error" || message.role === "error"
-                  ? "bg-destructive/10 border-destructive/50"
-                  : ""
-              } overflow-hidden`}
-            >
-              <CardContent className="p-3">
-                <div className="prose prose-sm dark:prose-invert max-w-none">
-                  <ReactMarkdown>{message.content}</ReactMarkdown>
-                  
-                  {/* Interactive Options */}
-                  {message.isInteractive && message.interactiveOptions && onInteractiveOptionClick && (
-                    <div className="mt-4 flex flex-col gap-2">
-                      {message.interactiveOptions.map((option, idx) => (
-                        <Button
-                          key={idx}
-                          variant="outline"
-                          className="text-left justify-start"
-                          onClick={() => onInteractiveOptionClick(option)}
-                          data-test-id={`interactive-option-${idx}`}
-                        >
-                          {option.text}
-                        </Button>
-                      ))}
-                    </div>
-                  )}
+          {/* References */}
+          {message.reference_entries && Array.isArray(message.reference_entries) && message.reference_entries.length > 0 && (
+            <div className="mb-4">
+              <ReferencesDisplay 
+                references={message.reference_entries} 
+                threadId={threadId || undefined}
+              />
+            </div>
+          )}
 
-                  {/* References */}
-                  {message.reference_entries && Array.isArray(message.reference_entries) && message.reference_entries.length > 0 && (
-                    <ReferencesDisplay 
-                      references={message.reference_entries} 
-                      threadId={threadId || undefined}
-                    />
-                  )}
-
-                  {/* Analytics Display for analysis data */}
-                  {message.analysis_data && message.has_numeric_result && (
-                    <AnalyticsDisplay analysisData={message.analysis_data} />
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          {/* Analytics Display for analysis data */}
+          {message.analysis_data && message.has_numeric_result && (
+            <div className="mb-4">
+              <AnalyticsDisplay analysisData={message.analysis_data} />
+            </div>
+          )}
         </div>
       ))}
 
