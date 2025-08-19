@@ -193,6 +193,27 @@ export async function processChatMessage(
       urgency: flowRecommendation.urgencyLevel
     });
 
+    // Get user timezone for accurate temporal queries
+    let userTimezone = 'UTC';
+    try {
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('timezone')
+        .eq('id', userId)
+        .single();
+      
+      if (profileData?.timezone) {
+        userTimezone = profileData.timezone;
+        console.log(`[ChatService] Using user timezone: ${userTimezone}`);
+      } else {
+        userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+        console.log(`[ChatService] Using browser timezone: ${userTimezone}`);
+      }
+    } catch (error) {
+      console.error('[ChatService] Error fetching user timezone:', error);
+      userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    }
+
     // Get intelligent query plan with enhanced database-aware dual-search requirements
     const queryPlanResponse = await supabase.functions.invoke('smart-query-planner', {
       body: {
@@ -204,7 +225,8 @@ export async function processChatMessage(
         threadMetadata: {},
         requireDualSearch: true,
         requireDatabaseValidation: true, // Enhanced requirement for database-validated themes/emotions
-        confidenceThreshold: 0.9
+        confidenceThreshold: 0.9,
+        userTimezone // Add timezone to request body
       }
     });
 
