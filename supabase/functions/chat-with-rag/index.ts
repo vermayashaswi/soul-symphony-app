@@ -301,8 +301,49 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
 
+    } else if (classification.category === 'GENERAL_MENTAL_HEALTH') {
+      // Handle general mental health queries using dedicated function
+      console.log(`[chat-with-rag] EXECUTING: GENERAL_MENTAL_HEALTH pipeline - general mental health chat`);
+      
+      const generalResponse = await supabaseClient.functions.invoke('general-mental-health-chat', {
+        body: {
+          message: message,
+          conversationContext: conversationContext
+        }
+      });
+
+      if (generalResponse.error) {
+        throw new Error(`General mental health response failed: ${generalResponse.error.message}`);
+      }
+
+      // Update the assistant message with the mental health response
+      if (assistantMessageId && generalResponse.data) {
+        try {
+          await supabaseClient
+            .from('chat_messages')
+            .update({
+              content: generalResponse.data
+            })
+            .eq('id', assistantMessageId);
+          console.log(`[chat-with-rag] Updated assistant message ${assistantMessageId} with mental health response`);
+        } catch (updateError) {
+          console.error('[chat-with-rag] Error updating assistant message:', updateError);
+        }
+      }
+
+      return new Response(JSON.stringify({
+        response: generalResponse.data,
+        assistantMessageId: assistantMessageId,
+        metadata: {
+          classification: classification,
+          strategy: 'general_mental_health',
+          userTimezone: userTimezone
+        }
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     } else {
-      // Handle non-journal queries using gpt-response-consolidator with empty results
+      // Handle other non-journal queries using gpt-response-consolidator with empty results
       console.log(`[chat-with-rag] EXECUTING: ${classification.category} pipeline - general response`);
       
       const generalResponse = await supabaseClient.functions.invoke('gpt-response-consolidator', {

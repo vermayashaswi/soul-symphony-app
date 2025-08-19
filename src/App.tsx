@@ -18,6 +18,7 @@ import { nativeAppInitService } from './services/nativeAppInitService';
 import { mobileErrorHandler } from './services/mobileErrorHandler';
 import { mobileOptimizationService } from './services/mobileOptimizationService';
 import { nativeIntegrationService } from './services/nativeIntegrationService';
+import { useNotificationInitialization } from './hooks/useNotificationInitialization';
 import PullToRefresh from './components/system/PullToRefresh';
 
 import { useAppInitialization } from './hooks/useAppInitialization';
@@ -27,6 +28,9 @@ const App: React.FC = () => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [initializationError, setInitializationError] = useState<string | null>(null);
   const appInitialization = useAppInitialization();
+  
+  // Initialize notifications on app start
+  useNotificationInitialization();
 
   useEffect(() => {
     const appLogger = logger.createLogger('App');
