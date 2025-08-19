@@ -519,7 +519,10 @@ async function executeTemporalStats(
     console.warn('[Temporal Stats] Could not fetch user profile timezone, defaulting to UTC:', profileError);
   }
 
-  const timezone = profile?.timezone || 'UTC';
+  // Import and use timezone normalization
+  const { normalizeUserTimezone } = await import('../_shared/timezoneUtils.ts');
+
+  const timezone = normalizeUserTimezone(profile);
 
   const { data, error } = await supabase.rpc(
     'get_time_of_day_distribution',

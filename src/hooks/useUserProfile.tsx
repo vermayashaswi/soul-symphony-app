@@ -105,7 +105,19 @@ export const useUserProfile = (): UserProfileData & {
 
   const getBrowserTimezone = (): string | null => {
     try {
-      return Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      // Normalize legacy timezones
+      const legacyMap: Record<string, string> = {
+        'Asia/Calcutta': 'Asia/Kolkata',
+        'US/Eastern': 'America/New_York',
+        'US/Central': 'America/Chicago',
+        'US/Mountain': 'America/Denver',
+        'US/Pacific': 'America/Los_Angeles',
+        'US/Alaska': 'America/Anchorage',
+        'US/Hawaii': 'Pacific/Honolulu',
+        'Europe/Kiev': 'Europe/Kyiv',
+      };
+      return legacyMap[browserTimezone] || browserTimezone;
     } catch (error) {
       console.error('Error detecting timezone:', error);
       return null;

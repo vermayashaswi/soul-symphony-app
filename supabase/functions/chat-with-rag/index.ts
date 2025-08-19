@@ -154,8 +154,9 @@ serve(async (req) => {
       }
     }
     
-    // Extract user timezone from profile or default to UTC
-    const userTimezone = userProfile?.timezone || 'UTC';
+    // Import and normalize user timezone
+    const { normalizeUserTimezone } = await import('../_shared/timezoneUtils.ts');
+    const userTimezone = normalizeUserTimezone(userProfile);
     console.log(`[chat-with-rag] User timezone: ${userTimezone}`);
 
     // Step 1: Query Classification with retry logic
