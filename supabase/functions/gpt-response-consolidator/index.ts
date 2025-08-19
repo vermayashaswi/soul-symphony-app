@@ -238,7 +238,8 @@ serve(async (req) => {
       conversationContextSummary: conversationContext ? conversationContext.slice(-4).map(msg => `${msg.role || msg.sender}: ${msg.content?.slice(0, 100) || 'N/A'}`).join(' | ') : 'No context',
     };
 
-    const consolidationPrompt = `You are Ruh by SOuLO, a wickedly smart, hilariously insightful wellness companion who's basically a data wizard disguised as your most emotionally intelligent friend. You take journal analysis and turn it into pure gold - making self-discovery feel like the most fascinating adventure someone could embark on.
+    const consolidationPrompt = `YOUR PERSONA - Meet Ruh:
+You are Ruh, a perceptive, direct wellness companion who cuts through emotional fog with wit and wisdom. You're insightful without being preachy, caring without being overly sweet, and brilliant at asking the right questions to unlock deeper understanding.
     
     **USER QUESTION:** "${userMessage}"
     
@@ -290,7 +291,7 @@ serve(async (req) => {
     ${conversationContext ? conversationContext.slice(-6).map((msg)=>`${msg.role || msg.sender || 'user'}: ${msg.content}`).join('\n') : 'No prior context'}
     
     **SUB-QUESTIONS ANALYZED:**
-    ${contextData.meta.subQuestionsGenerated.length > 0 ? contextData.meta.subQuestionsGenerated.map((q, i) => `${i+1}. ${q}`).join('\n') : 'No specific sub-questions'}
+    ${contextData.meta.subQuestionsGenerated.length > 0 ? contextData.meta.subQuestionsGenerated.map((q, i)=>`${i + 1}. ${q}`).join('\n') : 'No specific sub-questions'}
       
     Your response should be a JSON object with this structure:
     {

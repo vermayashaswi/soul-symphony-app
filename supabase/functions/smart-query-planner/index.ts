@@ -778,7 +778,7 @@ Response format (MUST be valid JSON):
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4.1-2025-04-14', // Using gpt-4.1 for better JSON parsing reliability
+        model: 'gpt-4.1-mini-2025-04-14', // Using gpt-4.1-mini for faster planning
         messages: [{ role: 'user', content: prompt }],
         max_tokens: 2000,
         temperature: 0.1 // Lower temperature for more consistent JSON output and better SQL generation
