@@ -93,3 +93,9 @@ verify_jwt = true
 
 [functions.chat-query-classifier]
 verify_jwt = true
+
+[functions.general-mental-health-chat]
+verify_jwt = true
+
+[functions.gpt-clarification-generator]
+verify_jwt = true
