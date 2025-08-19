@@ -48,11 +48,7 @@ const config: CapacitorConfig = {
     LocalNotifications: {
       smallIcon: "ic_stat_icon_config_sample",
       iconColor: "#8b5cf6",
-      sound: "beep.wav",
-      requestPermissionsOnLoad: true,
-      androidAllowWhileIdle: true,
-      androidExact: true,
-      enableAndroidExtraLargeIcon: true
+      sound: "beep.wav"
     }
   },
   ios: {
