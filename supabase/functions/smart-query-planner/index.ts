@@ -713,14 +713,14 @@ ORDER BY avg_score DESC;
     - ALWAYS use user's timezone ("${userTimezone}") for time-of-day calculations
     - Use SQL with AT TIME ZONE to convert stored UTC times to user's local time for hour-based analysis
     - Example for "first half vs second half": 
-      ```sql
+      \`\`\`sql
       SELECT 
-        CASE WHEN EXTRACT(HOUR FROM created_at AT TIME ZONE '${userTimezone}') < 12 THEN 'first_half' ELSE 'second_half' END as day_period,
+        CASE WHEN EXTRACT(HOUR FROM created_at AT TIME ZONE 'USER_TIMEZONE_HERE') < 12 THEN 'first_half' ELSE 'second_half' END as day_period,
         COUNT(*) as entry_count
       FROM "Journal Entries" 
       WHERE user_id = auth.uid()
       GROUP BY day_period;
-      ```
+      \`\`\`
     - All timeRange objects MUST include "timezone": "${userTimezone}"
     - Date processing will handle conversion from user's local time to UTC for database queries
 
