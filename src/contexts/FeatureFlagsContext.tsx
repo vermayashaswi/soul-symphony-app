@@ -2,7 +2,7 @@
 import React, { createContext, useContext, useMemo, ReactNode, useEffect, useState } from "react";
 import { FeatureFlags, AppFeatureFlag } from "../types/featureFlags";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "./AuthContext";
+import { useSafeAuth } from "./AuthContext";
 
 type FeatureFlagsContextValue = {
   flags: FeatureFlags;
@@ -30,7 +30,8 @@ const FeatureFlagsContext = createContext<FeatureFlagsContextValue>({
 });
 
 export const FeatureFlagsProvider = ({ children }: { children: ReactNode }) => {
-  const { user } = useAuth();
+  const authContext = useSafeAuth();
+  const user = authContext?.user || null;
   const [flags, setFlags] = useState<FeatureFlags>(defaultFlags);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

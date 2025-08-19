@@ -671,3 +671,14 @@ export function useAuth() {
   }
   return context;
 }
+
+// Safe auth hook that doesn't throw errors
+export function useSafeAuth() {
+  try {
+    const context = useContext(AuthContext);
+    return context || null;
+  } catch (error) {
+    console.warn('[useSafeAuth] AuthContext not available, returning null');
+    return null;
+  }
+}

@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
+import { useSafeAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useOnboarding } from '@/hooks/use-onboarding';
 import NetworkAwareContent from '@/components/NetworkAwareContent';
@@ -13,7 +13,9 @@ import { nativeIntegrationService } from '@/services/nativeIntegrationService';
 
 const Index = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const authContext = useSafeAuth();
+  const user = authContext?.user || null;
+  const isAuthAvailable = !!authContext;
   const isMobile = useIsMobile();
   const { onboardingComplete, checkOnboardingStatus } = useOnboarding();
   const networkStatus = useNetworkStatus();
@@ -67,7 +69,7 @@ const Index = () => {
 
   // Enhanced tutorial status checking for proper navigation flow - ONLY for web users
   useEffect(() => {
-    if (isNative) return; // Skip for native apps
+    if (isNative || !isAuthAvailable) return; // Skip for native apps or when auth is not available
 
     const handleTutorialNavigation = async () => {
       if (!user) return;
@@ -138,11 +140,11 @@ const Index = () => {
     };
     
     handleTutorialNavigation();
-  }, [user, isNative]);
+  }, [user, isNative, isAuthAvailable]);
 
   // Handle explicit app redirects only - ONLY for web users
   useEffect(() => {
-    if (isNative) return; // Skip for native apps
+    if (isNative || !isAuthAvailable) return; // Skip for native apps or when auth is not available
 
     // Only redirect to app if explicitly requested with a URL parameter
     if (urlParams.has('app')) {
@@ -166,7 +168,7 @@ const Index = () => {
     if (urlParams.has('insights')) {
       navigate('/app/insights');
     }
-  }, [user, navigate, urlParams, checkOnboardingStatus, isNative]);
+  }, [user, navigate, urlParams, checkOnboardingStatus, isNative, isAuthAvailable]);
 
   useEffect(() => {
     // Pre-translate common strings used on the index page
@@ -196,7 +198,8 @@ const Index = () => {
   console.log('[Index] Rendering Index.tsx component, path:', window.location.pathname, {
     hasUser: !!user,
     onboardingComplete,
-    isNative
+    isNative,
+    isAuthAvailable
   });
 
   // For native apps, don't render anything as we redirect immediately
