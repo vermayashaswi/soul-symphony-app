@@ -50,50 +50,6 @@ function sanitizeUserIdInQuery(query: string, userId: string, requestId: string)
   return sanitizedQuery;
 }
 
-function validateSQLQuery(query: string, requestId: string): { isValid: boolean; error?: string } {
-  try {
-    const upperQuery = query.toUpperCase().trim();
-    
-    console.log(`[${requestId}] Validating SQL query: ${query.substring(0, 100)}...`);
-    
-    // Check for dangerous operations using word boundaries to prevent false positives
-    const dangerousKeywords = ['DROP', 'DELETE FROM', 'INSERT INTO', 'UPDATE SET', 'CREATE', 'ALTER', 'TRUNCATE'];
-    for (const keyword of dangerousKeywords) {
-      // Use word boundary regex to avoid false positives like "COALESCE" containing "CREATE"
-      const keywordRegex = new RegExp(`\\b${keyword.replace(/\s+/g, '\\s+')}\\b`, 'i');
-      if (keywordRegex.test(upperQuery)) {
-        const error = `Dangerous SQL keyword detected: ${keyword}`;
-        console.error(`[${requestId}] ${error}`);
-        return { isValid: false, error };
-      }
-    }
-    
-    // Ensure it's a SELECT query
-    if (!upperQuery.startsWith('SELECT')) {
-      const error = 'Only SELECT queries are allowed';
-      console.error(`[${requestId}] ${error}`);
-      return { isValid: false, error };
-    }
-    
-    // More flexible table reference check - allow various forms
-    const hasJournalReference = upperQuery.includes('JOURNAL ENTRIES') || 
-                               upperQuery.includes('"JOURNAL ENTRIES"') ||
-                               upperQuery.includes('`JOURNAL ENTRIES`') ||
-                               upperQuery.includes('ENTRIES');
-    
-    if (!hasJournalReference) {
-      const error = 'Query must reference Journal Entries table';
-      console.error(`[${requestId}] ${error}`);
-      return { isValid: false, error };
-    }
-    
-    console.log(`[${requestId}] SQL query validation passed`);
-    return { isValid: true };
-  } catch (error) {
-    console.error(`[${requestId}] SQL validation error:`, error);
-    return { isValid: false, error: `Validation error: ${error.message}` };
-  }
-}
 
 async function testVectorOperations(supabaseClient: any, requestId: string): Promise<boolean> {
   try {
@@ -296,16 +252,6 @@ async function executeSQLAnalysis(step: any, userId: string, supabaseClient: any
 
     const originalQuery = step.sqlQuery.trim();
     executionDetails.originalQuery = originalQuery;
-    
-    // Validate the SQL query
-    const validationResult = validateSQLQuery(originalQuery, requestId);
-    executionDetails.validationResult = validationResult;
-    
-    if (!validationResult.isValid) {
-      console.error(`[${requestId}] SQL query validation failed: ${validationResult.error}`);
-      executionDetails.fallbackUsed = true;
-      return await executeVectorSearchFallback(step, userId, supabaseClient, requestId);
-    }
     
     // Sanitize user ID in the query
     let sanitizedQuery;
