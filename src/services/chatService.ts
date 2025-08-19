@@ -129,7 +129,7 @@ export async function processChatMessage(
     if (classification.category === 'GENERAL_MENTAL_HEALTH') {
       console.log('[ChatService] Handling general mental health question');
       
-      const generalResponse = await handleGeneralQuestion(message, conversationContext);
+      const generalResponse = await handleGeneralQuestion(message, conversationContext, userId);
       return {
         content: generalResponse,
         role: 'assistant'
@@ -377,15 +377,35 @@ export async function processChatMessage(
   }
 }
 
-async function handleGeneralQuestion(message: string, conversationContext: any[] = []): Promise<string> {
+async function handleGeneralQuestion(message: string, conversationContext: any[] = [], userId: string): Promise<string> {
   console.log('[ChatService] Generating conversational response for:', message);
   
+  // Get user timezone for time-aware responses
+  let userTimezone = 'UTC';
   try {
-    // PHASE 1: Pass conversation context to general chat for better follow-ups
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('timezone')
+      .eq('id', userId)
+      .single();
+    
+    if (profileData?.timezone) {
+      userTimezone = profileData.timezone;
+    } else {
+      userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    }
+  } catch (error) {
+    console.error('[ChatService] Error fetching user timezone for general chat:', error);
+    userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  }
+  
+  try {
+    // PHASE 1: Pass conversation context and timezone to general chat for better follow-ups
     const { data, error } = await supabase.functions.invoke('general-mental-health-chat', {
       body: { 
         message,
-        conversationContext: conversationContext.slice(-3) // Last 3 messages for context
+        conversationContext: conversationContext.slice(-3), // Last 3 messages for context
+        userTimezone // Add timezone for time-aware responses
       }
     });
 

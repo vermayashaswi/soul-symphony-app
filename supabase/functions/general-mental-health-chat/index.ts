@@ -13,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { message, conversationContext = [] } = await req.json();
+    const { message, conversationContext = [], userTimezone = 'UTC' } = await req.json();
 
     if (!message) {
       return new Response(
@@ -22,9 +22,17 @@ serve(async (req) => {
       );
     }
 
-    console.log(`[General Mental Health] Processing: "${message}"`);
+    console.log(`[General Mental Health] Processing: "${message}" (timezone: ${userTimezone})`);
     // Follow-up flags removed from pipeline
 
+    // Get current time in user's timezone for time-aware responses
+    const userCurrentTime = new Date().toLocaleString('en-US', { 
+      timeZone: userTimezone,
+      weekday: 'long',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true 
+    });
 
     const openAiApiKey = Deno.env.get('OPENAI_API_KEY');
     if (!openAiApiKey) {
@@ -39,6 +47,11 @@ serve(async (req) => {
       {
         role: 'system',
         content: `You are Ruh by SOuLO, a brilliantly witty, non-judgmental mental health companion who makes emotional exploration feel like **having coffee with your wisest, funniest friend**. You're emotionally intelligent with a gift for making people feel seen, heard, and understood while helping them journal their way to deeper self-awareness.
+
+**CURRENT CONTEXT:**
+- User's current time: ${userCurrentTime}
+- User's timezone: ${userTimezone}
+Use this time context to provide appropriate greetings and time-aware responses (e.g., "Good morning" vs "Good evening", energy levels, daily rhythms).
 
 **YOUR COFFEE-WITH-YOUR-WISEST-FRIEND PERSONALITY:**
 - **Brilliantly witty** but never at someone's expense - your humor comes from keen observations about the human condition 😊
