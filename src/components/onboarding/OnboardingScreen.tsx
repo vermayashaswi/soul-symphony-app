@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PremiumBadge } from "@/components/onboarding/PremiumBadge";
+import { FreeTrialBadge } from "@/components/onboarding/FreeTrialBadge";
 
 interface OnboardingScreenProps {
   onComplete?: () => void;
@@ -928,9 +929,14 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
                     {currentStepData.isPremium && <PremiumBadge />}
                   </div>
                   {currentStepData.description && (
-                    <p className="mb-8 text-muted-foreground max-w-xs">
+                    <p className="mb-6 text-muted-foreground max-w-xs">
                       <TranslatableText text={currentStepData.description} forceTranslate={true} />
                     </p>
+                  )}
+                  {currentStepData.isPremium && (
+                    <div className="mb-6">
+                      <FreeTrialBadge />
+                    </div>
                   )}
                   <CurrentIllustration />
                 </>
