@@ -11,6 +11,7 @@ import { unifiedNotificationService } from '@/services/unifiedNotificationServic
 import { notificationSettingsService } from '@/services/notificationSettingsService';
 import { JournalReminderTime, DEFAULT_TIME_MAPPINGS } from '@/types/notifications';
 import { toast } from 'sonner';
+import { PlatformGuidance } from './PlatformGuidance';
 
 interface ReminderTimeOption {
   value: JournalReminderTime;
@@ -181,15 +182,50 @@ export const EnhancedJournalReminderSettings: React.FC = () => {
   const handleTestNotification = async () => {
     setIsLoading(true);
     try {
-      const success = await unifiedNotificationService.testNotification();
-      if (success) {
-        toast.success('Test notification sent! Check your notification panel.');
+      // Import mobile notification service for enhanced mobile handling
+      const { mobileNotificationService } = await import('@/services/mobileNotificationService');
+      
+      // First check if we're in mobile context and get compatibility info
+      const compatibility = await mobileNotificationService.checkNotificationCompatibility();
+      
+      if (!compatibility.success) {
+        if (compatibility.requiresPWA) {
+          toast.error('iOS Safari requires PWA installation', {
+            description: compatibility.userGuidance
+          });
+        } else {
+          toast.error('Notification test failed', {
+            description: compatibility.platformLimitation || compatibility.userGuidance
+          });
+        }
+        return;
+      }
+
+      // Try mobile-optimized test first
+      const mobileResult = await mobileNotificationService.testNotification();
+      
+      if (mobileResult.success) {
+        toast.success('Test notification sent!', {
+          description: mobileResult.userGuidance
+        });
       } else {
-        toast.error('Failed to send test notification.');
+        // Fallback to unified service test
+        const fallbackSuccess = await unifiedNotificationService.testNotification();
+        if (fallbackSuccess) {
+          toast.success('Test notification sent!', {
+            description: 'Check your notification panel'
+          });
+        } else {
+          toast.error('Test notification failed', {
+            description: mobileResult.userGuidance || mobileResult.platformLimitation || 'Please check your notification settings'
+          });
+        }
       }
     } catch (error) {
       console.error('Error sending test notification:', error);
-      toast.error('Error sending test notification.');
+      toast.error('Error sending test notification', {
+        description: 'Please check your browser and notification settings'
+      });
     } finally {
       setIsLoading(false);
     }
@@ -304,13 +340,14 @@ export const EnhancedJournalReminderSettings: React.FC = () => {
           />
         </div>
 
-        {/* Time Selection */}
-        <div className="space-y-4">
-          <Label className="text-sm font-medium">
-            <TranslatableText text="Reminder Times" />
-          </Label>
-          
-          {TIME_OPTIONS.map(option => (
+        {/* Time Selection - Only show when enabled */}
+        {isEnabled && (
+          <div className="space-y-4">
+            <Label className="text-sm font-medium">
+              <TranslatableText text="Reminder Times" />
+            </Label>
+            
+            {TIME_OPTIONS.map(option => (
             <div key={option.value} className="space-y-2">
               <div className="flex items-center justify-between p-3 border rounded-lg">
                 <div className="flex items-center space-x-3">
@@ -350,7 +387,8 @@ export const EnhancedJournalReminderSettings: React.FC = () => {
               </div>
             </div>
           ))}
-        </div>
+          </div>
+        )}
 
         {/* Validation Message */}
         {isEnabled && selectedTimes.length === 0 && (
@@ -361,8 +399,8 @@ export const EnhancedJournalReminderSettings: React.FC = () => {
           </div>
         )}
 
-        {/* Action Buttons */}
-        {(isEnabled || selectedTimes.length > 0) && (
+        {/* Action Buttons - Only show when reminders are enabled */}
+        {isEnabled && selectedTimes.length > 0 && (
           <div className="flex gap-2">
             <Button
               onClick={handleTestNotification}
@@ -385,17 +423,13 @@ export const EnhancedJournalReminderSettings: React.FC = () => {
           </div>
         )}
 
-        {/* Android Optimization Tips */}
-        {notificationStatus?.platform === 'android' && (
-          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-            <h4 className="text-sm font-medium text-amber-800 mb-2">Android Optimization Tips</h4>
-            <ul className="text-xs text-amber-700 space-y-1">
-              <li>• Disable battery optimization for this app in Android settings</li>
-              <li>• Allow "Display over other apps" permission if prompted</li>
-              <li>• Set notification importance to "High" in app settings</li>
-              <li>• Enable "Exact alarms" permission for Android 12+</li>
-            </ul>
-          </div>
+        {/* Platform-Specific Guidance */}
+        {notificationStatus && (
+          <PlatformGuidance 
+            platform={notificationStatus.platform} 
+            strategy={notificationStatus.strategy}
+            permissionsGranted={notificationStatus.permissionsGranted}
+          />
         )}
       </CardContent>
     </Card>
