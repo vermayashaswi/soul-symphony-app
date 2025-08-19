@@ -174,11 +174,18 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
 
   // Fetch subscription data when user changes
   useEffect(() => {
-    fetchSubscriptionData();
-    
-    // Reset error handler when user changes
     if (user) {
+      // Add small delay to allow trial setup trigger to complete
+      const timer = setTimeout(() => {
+        fetchSubscriptionData();
+      }, 500);
+      
+      // Reset error handler when user changes
       subscriptionErrorHandler.reset();
+      
+      return () => clearTimeout(timer);
+    } else {
+      fetchSubscriptionData();
     }
   }, [user]);
 

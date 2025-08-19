@@ -99,19 +99,26 @@ class EnhancedLocationService {
       const { data: { user } } = await supabase.auth.getUser();
       
       if (user) {
+        // Only update if we have a valid country (not DEFAULT)
+        const updateData: any = {
+          timezone: locationData.timezone,
+          updated_at: new Date().toISOString()
+        };
+        
+        // Only update country if we detected a valid one (not DEFAULT)
+        if (locationData.country !== 'DEFAULT') {
+          updateData.country = locationData.country;
+        }
+
         const { error } = await supabase
           .from('profiles')
-          .update({
-            timezone: locationData.timezone,
-            country: locationData.country,
-            updated_at: new Date().toISOString()
-          })
+          .update(updateData)
           .eq('id', user.id);
 
         if (error) {
           console.error('[EnhancedLocationService] Failed to update user profile:', error);
         } else {
-          console.log('[EnhancedLocationService] User profile updated with location data');
+          console.log('[EnhancedLocationService] User profile updated with location data:', updateData);
         }
       }
     } catch (error) {
