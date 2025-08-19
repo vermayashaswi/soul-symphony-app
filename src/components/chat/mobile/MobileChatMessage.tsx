@@ -13,16 +13,20 @@ import { TranslatableMarkdown } from "@/components/translation/TranslatableMarkd
 import TypingIndicator from "../TypingIndicator";
 import ParticleAvatar from "../ParticleAvatar";
 import { getSanitizedFinalContent } from "@/utils/messageParser";
-
-import { ChatMessage } from '@/types/chat';
  
  interface MobileChatMessageProps {
-  message: ChatMessage;
+  message: {
+    role: 'user' | 'assistant' | 'error';
+    content: string;
+    analysis?: any;
+    references?: any[];
+    diagnostics?: any;
+    hasNumericResult?: boolean;
+  };
   showAnalysis?: boolean;
   isLoading?: boolean;
   streamingMessage?: string;
   showStreamingDots?: boolean;
-  userId?: string;
 }
 
 const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ 
@@ -30,8 +34,7 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({
   showAnalysis = false, 
   isLoading = false, 
   streamingMessage,
-  showStreamingDots = false,
-  userId
+  showStreamingDots = false 
 }) => {
   // CRITICAL FIX: Always call all hooks before any conditional logic
   const [showReferences, setShowReferences] = useState(false);
@@ -39,7 +42,7 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({
   
   // Memoize formatted content - this hook must always be called
   const formattedContent = React.useMemo(() => {
-    if (message.sender === 'assistant') {
+    if (message.role === 'assistant') {
       return getSanitizedFinalContent(message.content);
     }
     return message.content;
@@ -51,8 +54,8 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({
   const shouldShowMessage = !shouldShowLoading && !shouldShowStreaming;
   
   // Calculate derived values
-  const hasReferences = message.sender === 'assistant' && message.reference_entries && Array.isArray(message.reference_entries) && message.reference_entries.length > 0;
-  const displayRole = message.sender === 'error' ? 'assistant' : message.sender;
+  const hasReferences = message.role === 'assistant' && message.references && message.references.length > 0;
+  const displayRole = message.role === 'error' ? 'assistant' : message.role;
   
   // RENDER LOGIC: All conditional rendering moved after all hooks
   if (shouldShowLoading) {
@@ -146,7 +149,7 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({
     );
   }
   
-  const messageContent = (
+  return (
     <motion.div 
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
@@ -186,22 +189,22 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({
           />
         )}
         
-        {showAnalysis && displayRole === 'assistant' && message.analysis_data && (
+        {showAnalysis && displayRole === 'assistant' && message.analysis && (
           <div className="mt-3 text-xs opacity-70">
             <Separator className="my-2" />
             <div className="font-semibold">
               <TranslatableText text="Analysis:" forceTranslate={true} />
             </div>
             <p>
-              <TranslatableText text={message.analysis_data.analysis} forceTranslate={true} />
+              <TranslatableText text={message.analysis.analysis} forceTranslate={true} />
             </p>
-            {message.analysis_data.requiresSql && (
+            {message.analysis.requiresSql && (
               <>
                 <div className="font-semibold mt-1">
                   <TranslatableText text="SQL Query:" forceTranslate={true} />
                 </div>
                 <pre className="text-[10px] bg-black/10 p-1 rounded overflow-x-auto">
-                  {message.analysis_data.sqlQuery}
+                  {message.analysis.sqlQuery}
                 </pre>
               </>
             )}
@@ -218,7 +221,7 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({
             >
               <FileText className="h-3 w-3 mr-1" />
               <TranslatableText 
-                text={`${(message.reference_entries as any[])!.length} journal entries`}
+                text={`${message.references!.length} journal entries`}
                 forceTranslate={true}
                 enableFontScaling={true}
                 scalingContext="compact"
@@ -238,7 +241,7 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({
                   exit={{ opacity: 0, height: 0 }}
                   className="mt-1 text-xs max-h-32 overflow-y-auto border-l-2 border-primary/30 pl-2 pr-1"
                 >
-                  {(message.reference_entries as any[])!.slice(0, 2).map((ref, idx) => {
+                  {message.references!.slice(0, 2).map((ref, idx) => {
                     // Handle the new formatShortDate return type
                     const formattedDate = ref.date && !isNaN(new Date(ref.date).getTime()) 
                       ? formatShortDate(new Date(ref.date))
@@ -265,10 +268,10 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({
                       </div>
                     );
                   })}
-                  {(message.reference_entries as any[])!.length > 2 && (
+                  {message.references!.length > 2 && (
                     <div className="text-xs text-muted-foreground dark:text-white/60">
                       <TranslatableText 
-                        text={`+${(message.reference_entries as any[])!.length - 2} more entries`}
+                        text={`+${message.references!.length - 2} more entries`}
                         forceTranslate={true}
                         enableFontScaling={true}
                         scalingContext="compact"
@@ -299,9 +302,6 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({
       )}
     </motion.div>
   );
-
-
-  return messageContent;
 };
 
 export default MobileChatMessage;

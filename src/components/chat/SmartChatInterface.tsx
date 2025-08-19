@@ -30,7 +30,6 @@ import { MentalHealthInsights } from "@/hooks/use-mental-health-insights";
 
 import { ChatMessage } from "@/types/chat";
 import { getThreadMessages, saveMessage } from "@/services/chat";
-
 import { useDebugLog } from "@/utils/debug/DebugContext";
 import { TranslatableText } from "@/components/translation/TranslatableText";
 import { useChatMessageClassification, QueryCategory } from "@/hooks/use-chat-message-classification";
@@ -211,7 +210,6 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     delay: 50,
     scrollThreshold: 100
   });
-
 
   // Realtime: append assistant messages saved by backend
   useEffect(() => {
@@ -1096,7 +1094,6 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
             processingStage={processingStage || undefined}
             threadId={currentThreadId}
             onInteractiveOptionClick={handleInteractiveOptionClick}
-            userId={effectiveUserId}
           />
         )}
         

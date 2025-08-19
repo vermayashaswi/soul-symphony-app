@@ -246,4 +246,3 @@ export const updateThreadTitle = async (threadId: string, title: string, userId?
   const result = await updateChatThread(threadId, { title }, userId);
   return !!result;
 };
-
