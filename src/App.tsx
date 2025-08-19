@@ -197,7 +197,7 @@ const App: React.FC = () => {
       <FeatureFlagsProvider>
         <SubscriptionProvider>
           <TutorialProvider>
-            <TranslationLoadingOverlay />
+            
             <JournalProcessingInitializer />
             <PullToRefresh>
               <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
