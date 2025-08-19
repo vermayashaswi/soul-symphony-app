@@ -219,9 +219,9 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
 
   return (
     <Card 
-      className={`w-full transition-all duration-300 bg-transparent border-none shadow-none ${isFocused 
-        ? 'fixed top-0 left-0 right-0 z-50 rounded-none' 
-        : 'sticky top-0 z-10'}`}
+      className={`w-full transition-all duration-300 border-none shadow-none backdrop-blur-none ${isFocused 
+        ? 'fixed top-0 left-0 right-0 z-50 rounded-none bg-white dark:bg-gray-900 opacity-100' 
+        : 'sticky top-0 z-10 bg-transparent'}`}
     >
       <CardContent className="p-1 py-1">
         <div className="flex flex-col space-y-0.5">

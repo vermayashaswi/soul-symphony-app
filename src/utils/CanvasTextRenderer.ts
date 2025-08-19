@@ -4,6 +4,7 @@ interface CanvasTextOptions {
   text: string;
   fontSize: number;
   fontFamily: string;
+  fontWeight?: 'normal' | 'bold';
   color: string;
   maxWidth: number;
   textAlign: 'left' | 'center' | 'right' | 'justify';
@@ -37,9 +38,9 @@ export class CanvasTextRenderer {
   }
 
   private measureText(text: string, options: CanvasTextOptions): TextMetrics {
-    const { fontSize, fontFamily, maxWidth, lineHeight } = options;
+    const { fontSize, fontFamily, fontWeight = 'normal', maxWidth, lineHeight } = options;
     
-    this.context.font = `${fontSize}px ${fontFamily}`;
+    this.context.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
     
     const words = text.split(' ');
     const lines: string[] = [];
@@ -96,6 +97,7 @@ export class CanvasTextRenderer {
       text,
       fontSize,
       fontFamily,
+      fontWeight = 'normal',
       color,
       textAlign,
       lineHeight,
@@ -136,7 +138,7 @@ export class CanvasTextRenderer {
     }
 
     // Set text properties
-    this.context.font = `${fontSize}px ${fontFamily}`;
+    this.context.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
     this.context.fillStyle = color;
     this.context.textBaseline = 'top';
 

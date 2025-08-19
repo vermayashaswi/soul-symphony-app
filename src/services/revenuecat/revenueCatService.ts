@@ -56,7 +56,7 @@ export interface RevenueCatTransaction {
 const REGIONAL_PRODUCTS: Record<string, RevenueCatProduct> = {
   'premium_monthly_in': {
     identifier: 'premium_monthly_in',
-    description: 'Premium features with 7-day free trial',
+    description: 'Premium features with 2-week free trial',
     title: 'Soulo Premium Monthly (India)',
     price: 99,
     priceString: '₹99',
@@ -64,7 +64,7 @@ const REGIONAL_PRODUCTS: Record<string, RevenueCatProduct> = {
   },
   'premium_monthly_us': {
     identifier: 'premium_monthly_us',
-    description: 'Premium features with 7-day free trial',
+    description: 'Premium features with 2-week free trial',
     title: 'Soulo Premium Monthly (US)',
     price: 4.99,
     priceString: '$4.99',
@@ -72,7 +72,7 @@ const REGIONAL_PRODUCTS: Record<string, RevenueCatProduct> = {
   },
   'premium_monthly_gb': {
     identifier: 'premium_monthly_gb',
-    description: 'Premium features with 7-day free trial',
+    description: 'Premium features with 2-week free trial',
     title: 'Soulo Premium Monthly (UK)',
     price: 3.99,
     priceString: '£3.99',
@@ -80,7 +80,7 @@ const REGIONAL_PRODUCTS: Record<string, RevenueCatProduct> = {
   },
   'premium_monthly_default': {
     identifier: 'premium_monthly_default',
-    description: 'Premium features with 7-day free trial',
+    description: 'Premium features with 2-week free trial',
     title: 'Soulo Premium Monthly',
     price: 4.99,
     priceString: '$4.99',

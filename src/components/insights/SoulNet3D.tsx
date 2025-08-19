@@ -49,7 +49,8 @@ function ThemeNode({
   position,
   getTranslatedText,
   selectedNodeId,
-  theme
+  theme,
+  themeColor
 }: {
   node: SoulNet3DNode;
   isSelected: boolean;
@@ -60,6 +61,7 @@ function ThemeNode({
   getTranslatedText: (text: string) => string;
   selectedNodeId: string | null;
   theme: string;
+  themeColor: string;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
@@ -118,13 +120,14 @@ function ThemeNode({
       {/* Percentage Label for connected nodes */}
       {(isSelected || isConnected) && node.percentage && (
         <BillboardText
-          position={[0, 0, -1.5]}
-          fontSize={0.46875}
-          color="#ffd93d"
+          position={[0, 0, -2]}
+          fontSize={0.5859375}
+          color={themeColor}
+          fontWeight="bold"
           anchorX="center"
           anchorY="middle"
           outlineWidth={0.02}
-          outlineColor="#000000"
+          outlineColor={theme === 'light' ? '#ffffff' : '#000000'}
         >
           {`${node.percentage.toFixed(1)}%`}
         </BillboardText>
@@ -142,7 +145,8 @@ function EmotionNode({
   position,
   getTranslatedText,
   selectedNodeId,
-  theme
+  theme,
+  themeColor
 }: {
   node: SoulNet3DNode;
   isSelected: boolean;
@@ -153,6 +157,7 @@ function EmotionNode({
   getTranslatedText: (text: string) => string;
   selectedNodeId: string | null;
   theme: string;
+  themeColor: string;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
@@ -212,13 +217,14 @@ function EmotionNode({
       {/* Percentage Label for connected nodes */}
       {(isSelected || isConnected) && node.percentage && (
         <BillboardText
-          position={[0, 0, -1.05]}
-          fontSize={0.46875}
-          color="#ffd93d"
+          position={[0, 0, -1.4]}
+          fontSize={0.5859375}
+          color={themeColor}
+          fontWeight="bold"
           anchorX="center"
           anchorY="middle"
           outlineWidth={0.02}
-          outlineColor="#000000"
+          outlineColor={theme === 'light' ? '#ffffff' : '#000000'}
         >
           {`${node.percentage.toFixed(1)}%`}
         </BillboardText>
@@ -247,6 +253,18 @@ function ConnectionLines({
     return positions;
   }, [nodes]);
 
+  // Get theme color from CSS variable
+  const getThemeColor = () => {
+    try {
+      const themeColor = getComputedStyle(document.documentElement)
+        .getPropertyValue('--theme-color')
+        .trim();
+      return themeColor || '#8b5cf6'; // fallback to Calm theme color
+    } catch {
+      return '#8b5cf6'; // fallback
+    }
+  };
+
   return (
     <group>
       {links.map((link, index) => {
@@ -259,6 +277,13 @@ function ConnectionLines({
           (link.source === selectedNodeId || link.target === selectedNodeId);
         const isFaded = selectedNodeId && !isHighlighted;
 
+        // Calculate proportional thickness based on connection strength
+        const baseThickness = 0.05; // Standard thickness for 100% strength
+        const connectionStrength = selectedNodeId ? 
+          (nodes.find(n => n.id === (link.source === selectedNodeId ? link.target : link.source))?.percentage || 100) / 100 : 
+          1;
+        const lineWidth = isHighlighted ? Math.max(baseThickness * connectionStrength, 0.01) : 0.02;
+
         const points = [
           new THREE.Vector3(...sourcePos),
           new THREE.Vector3(...targetPos)
@@ -267,11 +292,12 @@ function ConnectionLines({
         const geometry = new THREE.BufferGeometry().setFromPoints(points);
         
         const material = new THREE.LineDashedMaterial({
-          color: isHighlighted ? '#ffd93d' : '#999999',
+          color: isHighlighted ? getThemeColor() : '#999999',
           transparent: true,
           opacity: isFaded ? 0.05 : (isHighlighted ? 1 : 0.2),
           dashSize: 0.1,
-          gapSize: 0.05
+          gapSize: 0.05,
+          linewidth: lineWidth
         });
         
         const line = new THREE.Line(geometry, material);
@@ -286,13 +312,14 @@ function ConnectionLines({
 }
 
 // 3D Scene Component
-function Scene3D({ data, selectedNodeId, onNodeClick, isMobile, getTranslatedText, theme }: {
+function Scene3D({ data, selectedNodeId, onNodeClick, isMobile, getTranslatedText, theme, themeColor }: {
   data: SoulNet3DData;
   selectedNodeId: string | null;
   onNodeClick: (nodeId: string | null) => void;
   isMobile: boolean;
   getTranslatedText: (text: string) => string;
   theme: string;
+  themeColor: string;
 }) {
   const { camera, gl, scene } = useThree();
 
@@ -354,6 +381,7 @@ function Scene3D({ data, selectedNodeId, onNodeClick, isMobile, getTranslatedTex
               getTranslatedText={getTranslatedText}
               selectedNodeId={selectedNodeId}
               theme={theme}
+              themeColor={themeColor}
             />
           );
         } else {
@@ -369,6 +397,7 @@ function Scene3D({ data, selectedNodeId, onNodeClick, isMobile, getTranslatedTex
               getTranslatedText={getTranslatedText}
               selectedNodeId={selectedNodeId}
               theme={theme}
+              themeColor={themeColor}
             />
           );
         }
@@ -421,10 +450,25 @@ export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }
   
   // Defensive theme access with fallback
   let theme = 'dark';
+  let themeColor = '#8b5cf6'; // Default fallback color
   try {
     const themeContext = useTheme();
     // Resolve 'system' theme to actual system theme
     theme = themeContext.theme === 'system' ? themeContext.systemTheme : themeContext.theme;
+    
+    // Get current theme color
+    const getColorHex = (colorTheme: string): string => {
+      switch (colorTheme) {
+        case 'Default': return '#3b82f6';
+        case 'Calm': return '#8b5cf6';
+        case 'Soothing': return '#FFDEE2';
+        case 'Energy': return '#f59e0b';
+        case 'Focus': return '#10b981';
+        case 'Custom': return themeContext.customColor;
+        default: return '#8b5cf6';
+      }
+    };
+    themeColor = getColorHex(themeContext.colorTheme);
   } catch (error) {
     console.warn('SoulNet3D: ThemeProvider not ready, using default theme');
   }
@@ -740,6 +784,7 @@ export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }
             isMobile={isMobile}
             getTranslatedText={getTranslatedText}
             theme={theme}
+            themeColor={themeColor}
           />
         </Canvas>
       ) : (
@@ -750,23 +795,6 @@ export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }
         </div>
       )}
 
-      {/* Selected Node Info */}
-      <AnimatePresence>
-        {selectedNodeId && (
-          <motion.div
-            className="absolute top-20 left-4 bg-background/90 backdrop-blur-sm rounded-lg p-4 max-w-xs"
-            initial={{ opacity: 0, x: -50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -50 }}
-          >
-            <div className="text-sm">
-              <div className="font-semibold">
-                {getTranslatedText(processedData.nodes.find(n => n.id === selectedNodeId)?.name || "")}
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </motion.div>
   );
 }

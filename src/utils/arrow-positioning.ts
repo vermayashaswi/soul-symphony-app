@@ -30,7 +30,8 @@ function isCapacitorNative(): boolean {
 export function getAnimationCenter(
   containerWidth: number = window.innerWidth,
   containerHeight: number = window.innerHeight,
-  bottomNavOffset: boolean = true
+  bottomNavOffset: boolean = true,
+  verticalOffset: number = 1.0
 ): CircleCenter {
   const effectiveHeight = bottomNavOffset ? containerHeight - 64 : containerHeight; // 64px for bottom nav
   
@@ -39,7 +40,7 @@ export function getAnimationCenter(
   
   return {
     x: containerWidth / 2,
-    y: effectiveHeight / 2 - capacitorOffset
+    y: (effectiveHeight / 2 - capacitorOffset) * verticalOffset
   };
 }
 
@@ -49,9 +50,10 @@ export function getAnimationCenter(
 export function getAnimationCenterStyles(
   containerWidth?: number,
   containerHeight?: number,
-  bottomNavOffset: boolean = true
+  bottomNavOffset: boolean = true,
+  verticalOffset: number = 1.0
 ): React.CSSProperties {
-  const center = getAnimationCenter(containerWidth, containerHeight, bottomNavOffset);
+  const center = getAnimationCenter(containerWidth, containerHeight, bottomNavOffset, verticalOffset);
   
   return {
     position: 'fixed' as const,
@@ -65,19 +67,19 @@ export function getAnimationCenterStyles(
 /**
  * Hook to get animation center position with window resize handling
  */
-export function useAnimationCenter(bottomNavOffset: boolean = true): CircleCenter {
+export function useAnimationCenter(bottomNavOffset: boolean = true, verticalOffset: number = 1.0): CircleCenter {
   const [center, setCenter] = React.useState<CircleCenter>(() => 
-    getAnimationCenter(window.innerWidth, window.innerHeight, bottomNavOffset)
+    getAnimationCenter(window.innerWidth, window.innerHeight, bottomNavOffset, verticalOffset)
   );
 
   React.useEffect(() => {
     const updateCenter = () => {
-      setCenter(getAnimationCenter(window.innerWidth, window.innerHeight, bottomNavOffset));
+      setCenter(getAnimationCenter(window.innerWidth, window.innerHeight, bottomNavOffset, verticalOffset));
     };
 
     window.addEventListener('resize', updateCenter);
     return () => window.removeEventListener('resize', updateCenter);
-  }, [bottomNavOffset]);
+  }, [bottomNavOffset, verticalOffset]);
 
   return center;
 }

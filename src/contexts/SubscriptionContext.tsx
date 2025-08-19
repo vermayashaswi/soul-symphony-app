@@ -90,7 +90,8 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
           status: userStatus,
           trialEndDate: userTrialEndDate,
           isTrialActive: userIsTrialActive,
-          isPremium: subscriptionData.is_premium_access
+          isPremium: subscriptionData.is_premium_access,
+          computedAccess: userTier === 'premium' && userStatus === 'trial'
         });
       } else {
         // Fallback to direct profile query if function fails - RLS ensures user can only access their own profile
@@ -173,11 +174,18 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
 
   // Fetch subscription data when user changes
   useEffect(() => {
-    fetchSubscriptionData();
-    
-    // Reset error handler when user changes
     if (user) {
+      // Add small delay to allow trial setup trigger to complete
+      const timer = setTimeout(() => {
+        fetchSubscriptionData();
+      }, 500);
+      
+      // Reset error handler when user changes
       subscriptionErrorHandler.reset();
+      
+      return () => clearTimeout(timer);
+    } else {
+      fetchSubscriptionData();
     }
   }, [user]);
 
@@ -185,10 +193,12 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
   const isPremium = tier === 'premium';
   
   // Check if trial is actually active (not expired) - more robust check
-  const isTrialActive = status === 'trial' && trialEndDate && trialEndDate > new Date();
+  // CRITICAL: For premium tier users in trial status, they should have access
+  const isTrialActive = (status === 'trial' && tier === 'premium' && trialEndDate && trialEndDate > new Date());
   
   // Has active subscription means either active subscription OR active (non-expired) trial
-  const hasActiveSubscription = status === 'active' || isTrialActive;
+  // Also grant access if user has premium tier regardless of trial status (covers edge cases)
+  const hasActiveSubscription = status === 'active' || isTrialActive || (tier === 'premium' && status === 'trial');
   
   const daysRemainingInTrial = trialEndDate && isTrialActive
     ? Math.max(0, Math.ceil((trialEndDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))

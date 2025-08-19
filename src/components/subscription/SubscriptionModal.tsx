@@ -150,7 +150,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                     </div>
                     {isTrialActive && (
                       <Badge variant="outline" className="bg-blue-50 dark:bg-blue-950/20">
-                        <TranslatableText text="Currently in 7-day free trial" />
+                        <TranslatableText text="Currently in 2-week free trial" />
                       </Badge>
                     )}
                     {pricingError && (

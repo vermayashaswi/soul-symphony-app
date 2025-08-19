@@ -1,21 +1,27 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLocation } from '@/contexts/LocationContext';
 import { supabase } from '@/integrations/supabase/client';
 import { secureEnsureProfile } from '@/services/secureProfileService';
 
 export interface UserProfileData {
   displayName: string | null;
   timezone: string | null;
+  country: string | null;
 }
 
 export const useUserProfile = (): UserProfileData & { 
   updateDisplayName: (name: string) => Promise<void>,
-  updateTimezone: (timezone: string) => Promise<void>
+  updateTimezone: (timezone: string) => Promise<void>,
+  updateCountry: (country: string) => Promise<void>
 } => {
   const { user } = useAuth();
+  const { locationData, isLoading: locationLoading } = useLocation();
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [timezone, setTimezone] = useState<string | null>(null);
+  const [country, setCountry] = useState<string | null>(null);
+  const countryUpdateAttempted = useRef(false);
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -35,7 +41,7 @@ export const useUserProfile = (): UserProfileData & {
         // RLS policies ensure user can only access their own profile
         const { data, error } = await supabase
           .from('profiles')
-          .select('display_name, full_name, timezone')
+          .select('display_name, full_name, timezone, country')
           .eq('id', user.id)
           .single();
 
@@ -66,6 +72,11 @@ export const useUserProfile = (): UserProfileData & {
             setTimezone(browserTimezone);
           }
         }
+
+        // Set country from profile data
+        if (data && data.country) {
+          setCountry(data.country);
+        }
       } catch (error) {
         console.error('Error in profile fetching', error);
       }
@@ -73,6 +84,24 @@ export const useUserProfile = (): UserProfileData & {
 
     fetchUserProfile();
   }, [user]);
+
+  // Auto-update country when it's DEFAULT and LocationContext has detected a valid country
+  useEffect(() => {
+    const autoUpdateCountry = async () => {
+      if (!user || !locationData || locationLoading || countryUpdateAttempted.current) {
+        return;
+      }
+
+      // Only update if stored country is DEFAULT and detected country is valid (not DEFAULT)
+      if (country === 'DEFAULT' && locationData.country !== 'DEFAULT' && locationData.country !== country) {
+        console.log('[useUserProfile] Auto-updating country from DEFAULT to:', locationData.country);
+        countryUpdateAttempted.current = true;
+        await updateCountry(locationData.country);
+      }
+    };
+
+    autoUpdateCountry();
+  }, [user, locationData, locationLoading, country]);
 
   const getBrowserTimezone = (): string | null => {
     try {
@@ -129,5 +158,29 @@ export const useUserProfile = (): UserProfileData & {
     }
   };
 
-  return { displayName, timezone, updateDisplayName, updateTimezone };
+  const updateCountry = async (countryCode: string) => {
+    if (!user) return;
+
+    try {
+      // RLS policies ensure user can only update their own profile
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          country: countryCode,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id);
+
+      if (error) {
+        throw error;
+      }
+      
+      setCountry(countryCode);
+      console.log('[useUserProfile] Country updated successfully to:', countryCode);
+    } catch (error) {
+      console.error('Error updating country', error);
+    }
+  };
+
+  return { displayName, timezone, country, updateDisplayName, updateTimezone, updateCountry };
 };

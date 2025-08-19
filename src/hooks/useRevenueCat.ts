@@ -143,7 +143,7 @@ export const useRevenueCat = (): UseRevenueCatReturn => {
       
       toast({
         title: 'Trial Started!',
-        description: 'Your 7-day free trial has begun. Enjoy premium features!',
+        description: 'Your 2-week free trial has begun. Enjoy premium features!',
         variant: 'default'
       });
       

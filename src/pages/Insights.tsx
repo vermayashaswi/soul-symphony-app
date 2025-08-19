@@ -101,7 +101,7 @@ function InsightsContent() {
 
   return (
     <div className="min-h-screen pb-20 insights-container">
-      <TranslationProgressIndicator />
+      
       
       {isSticky && (
         <div className="fixed top-0 left-0 right-0 z-50 py-3 px-4 bg-background border-b shadow-sm flex justify-center insights-sticky-header">

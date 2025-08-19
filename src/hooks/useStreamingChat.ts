@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { showEdgeFunctionRetryToast } from '@/utils/toast-messages';
 import { saveChatStreamingState, getChatStreamingState, clearChatStreamingState } from '@/utils/chatStateStorage';
+import { useTranslation } from '@/contexts/TranslationContext';
 
 export interface StreamingMessage {
   type: 'user_message' | 'backend_task' | 'progress' | 'final_response' | 'error';
@@ -31,6 +32,7 @@ interface ThreadStreamingState {
   currentUserMessage: string;
   showBackendAnimation: boolean;
   dynamicMessages: string[];
+  translatedDynamicMessages: string[];
   currentMessageIndex: number;
   useThreeDotFallback: boolean;
   queryCategory: string;
@@ -50,6 +52,7 @@ const createInitialState = (): ThreadStreamingState => ({
   currentUserMessage: '',
   showBackendAnimation: false,
   dynamicMessages: [],
+  translatedDynamicMessages: [],
   currentMessageIndex: 0,
   useThreeDotFallback: false,
   queryCategory: '',
@@ -67,6 +70,8 @@ const createInitialState = (): ThreadStreamingState => ({
 const threadStates = new Map<string, ThreadStreamingState>();
 
 export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStreamingChatProps = {}) => {
+  const { translate, currentLanguage } = useTranslation();
+  
   // Page visibility and app lifecycle tracking
   const [isPageVisible, setIsPageVisible] = useState(true);
   const [isAppActive, setIsAppActive] = useState(true);
@@ -130,8 +135,9 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
               streamingMessages: savedState.streamingMessages || [],
               currentUserMessage: savedState.currentUserMessage || '',
               showBackendAnimation: !!savedState.showBackendAnimation,
-              dynamicMessages: savedState.dynamicMessages || [],
-              currentMessageIndex: savedState.currentMessageIndex || 0,
+            dynamicMessages: savedState.dynamicMessages || [],
+            translatedDynamicMessages: savedState.translatedDynamicMessages || [],
+            currentMessageIndex: savedState.currentMessageIndex || 0,
               useThreeDotFallback: !!savedState.useThreeDotFallback,
               queryCategory: savedState.queryCategory || '',
               expectedProcessingTime: savedState.expectedProcessingTime || null,
@@ -179,8 +185,9 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
                     streamingMessages: savedState.streamingMessages || [],
                     currentUserMessage: savedState.currentUserMessage || '',
                     showBackendAnimation: !!savedState.showBackendAnimation,
-                    dynamicMessages: savedState.dynamicMessages || [],
-                    currentMessageIndex: savedState.currentMessageIndex || 0,
+            dynamicMessages: savedState.dynamicMessages || [],
+            translatedDynamicMessages: savedState.translatedDynamicMessages || [],
+            currentMessageIndex: savedState.currentMessageIndex || 0,
                     useThreeDotFallback: !!savedState.useThreeDotFallback,
                     queryCategory: savedState.queryCategory || '',
                     expectedProcessingTime: savedState.expectedProcessingTime || null,
@@ -437,12 +444,30 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
       if (data.shouldUseFallback || !data.messages || data.messages.length === 0) {
         updateThreadState(activeThreadId, {
           useThreeDotFallback: true,
-          dynamicMessages: []
+          dynamicMessages: [],
+          translatedDynamicMessages: []
         });
       } else {
+        // Pre-translate all messages to avoid repeated loading indicators
+        const translatedMessages = await Promise.all(
+          data.messages.map(async (message: string) => {
+            if (currentLanguage === 'en') {
+              return message;
+            }
+            try {
+              const translated = await translate(message, 'en', undefined, true);
+              return translated || message;
+            } catch (error) {
+              console.error('[useStreamingChat] Error translating message:', error);
+              return message;
+            }
+          })
+        );
+
         updateThreadState(activeThreadId, {
           useThreeDotFallback: false,
           dynamicMessages: data.messages,
+          translatedDynamicMessages: translatedMessages,
           currentMessageIndex: 0
         });
       }
@@ -450,10 +475,11 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
       console.error('[useStreamingChat] Error generating streaming messages:', error);
       updateThreadState(activeThreadId!, {
         useThreeDotFallback: true,
-        dynamicMessages: []
+        dynamicMessages: [],
+        translatedDynamicMessages: []
       });
     }
-  }, [threadId, updateThreadState]);
+  }, [threadId, updateThreadState, translate, currentLanguage]);
 
   // Automatic retry function for failed messages
   const retryLastMessage = useCallback(async (targetThreadId?: string) => {
@@ -860,6 +886,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     currentUserMessage: state.currentUserMessage,
     showBackendAnimation: state.showBackendAnimation,
     dynamicMessages: state.dynamicMessages,
+    translatedDynamicMessages: state.translatedDynamicMessages,
     currentMessageIndex: state.currentMessageIndex,
     useThreeDotFallback: state.useThreeDotFallback,
     queryCategory: state.queryCategory,

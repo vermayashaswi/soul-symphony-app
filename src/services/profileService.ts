@@ -77,7 +77,31 @@ export const ensureProfileExists = async (user: User | null): Promise<boolean> =
     
     // If no profile exists, create one manually (trigger should handle this, but fallback)
     logProfile('Profile not found, creating manually with trigger handling', 'ProfileService');
-    return await createProfileManually(user);
+    const profileCreated = await createProfileManually(user);
+    
+    // If profile creation succeeded, ensure trial is set up (fallback for trigger)
+    if (profileCreated) {
+      // Small delay to let trigger complete first
+      setTimeout(async () => {
+        try {
+          const { data: currentProfile } = await supabase
+            .from('profiles')
+            .select('subscription_status, subscription_tier, trial_ends_at')
+            .eq('id', user.id)
+            .single();
+            
+          // If trial isn't set up, manually set it up as fallback
+          if (currentProfile && (!currentProfile.subscription_status || currentProfile.subscription_status === 'free')) {
+            logProfile('Trial not set up by trigger, setting up manually as fallback', 'ProfileService');
+            await startUserTrial(user.id);
+          }
+        } catch (err) {
+          logError('Error in trial setup fallback', 'ProfileService', err);
+        }
+      }, 1000);
+    }
+    
+    return profileCreated;
     
   } catch (err) {
     console.error('[ProfileService] Error in ensureProfileExists:', err);

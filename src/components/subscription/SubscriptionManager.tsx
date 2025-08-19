@@ -123,7 +123,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ className = '
       <CardHeader>
         <CardTitle>Start Your Premium Trial</CardTitle>
         <CardDescription>
-          Unlock advanced journaling features with a 7-day free trial
+          Unlock advanced journaling features with a 2-week free trial
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -134,7 +134,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ className = '
                 <h4 className="font-medium">{products[0].title}</h4>
                 <p className="text-sm text-muted-foreground">{products[0].description}</p>
                 <div className="mt-2">
-                  <span className="text-lg font-semibold">7 days free</span>
+                  <span className="text-lg font-semibold">2 weeks free</span>
                   <span className="text-sm text-muted-foreground ml-2">
                     then {products[0].priceString}/month
                   </span>
