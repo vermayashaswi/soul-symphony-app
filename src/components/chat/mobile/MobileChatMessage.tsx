@@ -116,13 +116,7 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({
         ) : streamingMessage && (
           <div className="min-w-0 max-w-[85%] rounded-2xl rounded-tl-none p-3.5 text-sm shadow-sm bg-muted/60 border border-border/50">
             <div className="flex items-center gap-2">
-              <TranslatableText 
-                text={streamingMessage} 
-                className="text-muted-foreground"
-                forceTranslate={true}
-                enableFontScaling={true}
-                scalingContext="compact"
-              />
+              <span className="text-muted-foreground">{streamingMessage}</span>
               {showStreamingDots && (
                 <div className="flex space-x-1">
                   <div 

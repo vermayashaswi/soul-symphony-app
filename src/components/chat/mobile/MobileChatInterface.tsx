@@ -121,6 +121,7 @@ export default function MobileChatInterface({
     showBackendAnimation,
     startStreamingChat,
     dynamicMessages,
+    translatedDynamicMessages,
     currentMessageIndex,
     useThreeDotFallback,
     queryCategory,
@@ -904,7 +905,7 @@ export default function MobileChatInterface({
                   streamingMessage={
                     useThreeDotFallback || dynamicMessages.length === 0
                       ? undefined // Show only three-dot animation
-                      : dynamicMessages[currentMessageIndex] // Show dynamic message
+                      : translatedDynamicMessages[currentMessageIndex] || dynamicMessages[currentMessageIndex] // Use pre-translated message
                   }
                   showStreamingDots={true}
                 />
