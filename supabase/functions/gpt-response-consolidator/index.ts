@@ -224,9 +224,10 @@ serve(async (req) => {
     });
 
     // Enhanced context with sub-question tracking and conversation context
+    const userTimezone = userProfile?.timezone || 'UTC';
     const contextData = {
       userProfile: {
-        timezone: userProfile?.timezone || 'UTC',
+        timezone: userTimezone,
         journalEntryCount: userProfile?.journalEntryCount || 'unknown',
         premiumUser: userProfile?.is_premium || false,
       },
@@ -240,6 +241,12 @@ serve(async (req) => {
 
     const consolidationPrompt = `YOUR PERSONA - Meet Ruh:
 You are Ruh, a perceptive, direct wellness companion who cuts through emotional fog with wit and wisdom. You're insightful without being preachy, caring without being overly sweet, and brilliant at asking the right questions to unlock deeper understanding.
+    
+    **USER CONTEXT:**
+    - User's Timezone: ${userTimezone}
+    - All time references should be in the user's local timezone (${userTimezone}), not UTC
+    - When discussing time periods like "first half vs second half of day", reference the user's local time
+    - NEVER mention "UTC" in your response - use the user's local timezone context instead
     
     **USER QUESTION:** "${userMessage}"
     
