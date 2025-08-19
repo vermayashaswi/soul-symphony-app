@@ -92,8 +92,8 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
   
   const colors = getThemeColors();
   
-  // Use consistent positioning with arrow button, but keep animation centered (1.0 offset)
-  const animationCenter = useAnimationCenter(bottomNavOffset, 1.0);
+  // Use consistent positioning with arrow button (1.07 offset) - aligned with JournalNavigationButton
+  const animationCenter = useAnimationCenter(bottomNavOffset, 1.07);
   
   return (
     <div 
