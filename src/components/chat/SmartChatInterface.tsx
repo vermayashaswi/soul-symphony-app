@@ -168,39 +168,69 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
               console.warn('[Streaming Watchdog] Failed to fetch recent messages:', recentErr.message);
             }
 
-            const alreadyExists = (recent || []).some(m => (m as any).sender === 'assistant' && (m as any).content?.trim() === response.trim());
-            if (!alreadyExists) {
-              // Enhanced idempotency key generation and validation
+            // Check if the exact response already exists or similar content
+            const responseAlreadyExists = (recent || []).some(m => {
+              const existingContent = (m as any).content?.trim() || '';
+              const newContent = response.trim();
+              // Check for exact match or very similar content (edge function may have saved it)
+              return existingContent === newContent || 
+                     (existingContent.length > 50 && newContent.length > 50 && 
+                      existingContent.substring(0, 100) === newContent.substring(0, 100));
+            });
+            
+            if (!responseAlreadyExists) {
+              console.log('[Streaming Watchdog] Assistant response not found in DB, saving fallback');
               try {
-                const idempotencyKey = await idempotencyManager.generateIdempotencyKey(
+                // Create watchdog-specific idempotency key to avoid conflicts
+                const idempotencyKey = `watchdog-${originThreadId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                
+                const savedMessage = await saveMessage(
                   originThreadId, 
                   response, 
-                  'assistant'
+                  'assistant', 
+                  effectiveUserId, 
+                  null, // references
+                  false, // hasNumericResult
+                  false, // isInteractive
+                  [], // interactiveOptions
+                  idempotencyKey,
+                  {
+                    watchdog_fallback: true,
+                    original_request_id: requestId,
+                    fallback_timestamp: new Date().toISOString(),
+                    analysis_data: analysis || null
+                  }
                 );
                 
-                // Check if this key was already used
-                if (!idempotencyManager.isKeyUsed(idempotencyKey)) {
-                  idempotencyManager.registerKey(idempotencyKey, originThreadId, 'temp-assistant', response);
-                  
-                  await supabase.from('chat_messages').upsert({
-                    thread_id: originThreadId,
-                    content: response,
-                    sender: 'assistant',
-                    role: 'assistant',
-                    idempotency_key: idempotencyKey,
-                    analysis_data: analysis || null
-                  }, { onConflict: 'thread_id,idempotency_key' });
+                if (savedMessage) {
+                  console.log(`[Streaming Watchdog] Successfully saved fallback message: ${savedMessage.id}`);
                 } else {
-                  console.log('[Streaming Watchdog] Message already exists with this idempotency key');
+                  console.warn('[Streaming Watchdog] saveMessage returned null');
+                  
+                  // Show user feedback for save failure
+                  toast({
+                    title: "Response not saved",
+                    description: "The AI response was displayed but couldn't be saved to your conversation history.",
+                    variant: "destructive"
+                  });
                 }
               } catch (e) {
-                console.warn('[Streaming Watchdog] Enhanced persist fallback failed:', (e as any)?.message || e);
+                console.error('[Streaming Watchdog] Failed to save fallback message:', (e as any)?.message || e);
+                
+                // Show user feedback for save failure
+                toast({
+                  title: "Response not saved",
+                  description: "The AI response was displayed but couldn't be saved to your conversation history.",
+                  variant: "destructive"
+                });
               }
+            } else {
+              console.log('[Streaming Watchdog] Assistant response already exists in DB, skipping save');
             }
 
             setLocalLoading(false);
             updateProcessingStage(null);
-          }, 1200);
+          }, 800); // Reduced from 1200ms to 800ms for faster fallback
         } catch (e) {
           console.warn('[Streaming Watchdog] Exception scheduling fallback:', (e as any)?.message || e);
           setLocalLoading(false);

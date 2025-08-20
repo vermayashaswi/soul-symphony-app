@@ -773,6 +773,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
         streamingMode: false,
         requestId, // Include request ID for deduplication
         category: messageCategory,
+        correlationId: requestId, // Pass correlation ID for edge function persistence
       }, { attempts: 3, baseDelay: 900 }, targetThreadId);
       // Check if request is still active (not superseded by another request)
       const currentThreadState = getThreadState(targetThreadId);

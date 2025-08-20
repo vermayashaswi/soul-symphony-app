@@ -13,7 +13,14 @@ serve(async (req) => {
   }
 
   try {
-    const { message, conversationContext = [], userTimezone = 'UTC' } = await req.json();
+    const { 
+      message, 
+      conversationContext = [], 
+      userTimezone = 'UTC',
+      userId = null,
+      threadId = null,
+      correlationId = null
+    } = await req.json();
 
     if (!message) {
       return new Response(
@@ -182,6 +189,57 @@ MUST HAVE/DO: ALWAYS BE AWARE OF THE CONVERSATION HISTORY TO UNDERSTAND WHAT THE
     }
     
     console.log(`[General Mental Health] Generated response`);
+
+    // Save response to database if threadId is provided
+    if (threadId && userId && content) {
+      try {
+        const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2.7.1');
+        
+        const supabaseClient = createClient(
+          Deno.env.get('SUPABASE_URL') ?? '',
+          Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+          {
+            global: {
+              headers: { Authorization: req.headers.get('Authorization')! },
+            },
+          }
+        );
+
+        // Generate idempotency key for assistant message
+        const assistantIdempotencyKey = correlationId ? 
+          `general-assistant-${threadId}-${correlationId}` : 
+          `general-assistant-${threadId}-${Date.now()}`;
+
+        console.log(`[General Mental Health] Saving response to thread ${threadId} with key: ${assistantIdempotencyKey}`);
+
+        const { data: savedMessage, error: saveError } = await supabaseClient
+          .from('chat_messages')
+          .upsert({
+            thread_id: threadId,
+            sender: 'assistant',
+            role: 'assistant',
+            content: content,
+            idempotency_key: assistantIdempotencyKey,
+            analysis_data: {
+              model_used: 'gpt-4.1-nano-2025-04-14',
+              processing_type: 'general_mental_health',
+              conversation_context_length: conversationContext.length,
+              user_timezone: userTimezone,
+              timestamp: new Date().toISOString()
+            }
+          }, { onConflict: 'thread_id,idempotency_key' })
+          .select('id')
+          .single();
+
+        if (saveError) {
+          console.error('[General Mental Health] Error saving response:', saveError);
+        } else {
+          console.log(`[General Mental Health] Successfully saved response with ID: ${savedMessage?.id}`);
+        }
+      } catch (error) {
+        console.error('[General Mental Health] Exception saving response:', error);
+      }
+    }
 
     return new Response(
       JSON.stringify({ response: content }),
