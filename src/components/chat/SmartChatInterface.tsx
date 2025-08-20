@@ -152,7 +152,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       if (originThreadId === currentThreadId) {
         // Watchdog: if realtime insert doesn't arrive, persist client-side after a short delay
         try {
-          setTimeout(async () => {
+            setTimeout(async () => {
             // Double-check still on same thread
             if (!currentThreadIdRef.current || currentThreadIdRef.current !== originThreadId) return;
 
@@ -230,7 +230,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
 
             setLocalLoading(false);
             updateProcessingStage(null);
-          }, 800); // Reduced from 1200ms to 800ms for faster fallback
+          }, 500); // Reduced to 500ms for faster failure detection
         } catch (e) {
           console.warn('[Streaming Watchdog] Exception scheduling fallback:', (e as any)?.message || e);
           setLocalLoading(false);

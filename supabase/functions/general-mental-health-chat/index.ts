@@ -212,9 +212,10 @@ MUST HAVE/DO: ALWAYS BE AWARE OF THE CONVERSATION HISTORY TO UNDERSTAND WHAT THE
 
         console.log(`[General Mental Health] Saving response to thread ${threadId} with key: ${assistantIdempotencyKey}`);
 
+        // Use insert with onConflict to handle constraint properly
         const { data: savedMessage, error: saveError } = await supabaseClient
           .from('chat_messages')
-          .upsert({
+          .insert({
             thread_id: threadId,
             sender: 'assistant',
             role: 'assistant',
@@ -227,7 +228,7 @@ MUST HAVE/DO: ALWAYS BE AWARE OF THE CONVERSATION HISTORY TO UNDERSTAND WHAT THE
               user_timezone: userTimezone,
               timestamp: new Date().toISOString()
             }
-          }, { onConflict: 'thread_id,idempotency_key' })
+          })
           .select('id')
           .single();
 

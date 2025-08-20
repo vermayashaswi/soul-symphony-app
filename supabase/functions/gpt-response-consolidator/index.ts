@@ -87,14 +87,20 @@ function sanitizeConsolidatorOutput(raw: string): { responseText: string; status
 }
 
 // Import saveMessage function for consistent persistence  
-const saveMessage = async (threadId: string, content: string, sender: 'user' | 'assistant', userId?: string, additionalData = {}, req: Request) => {
+const saveMessage = async (threadId: string, content: string, sender: 'user' | 'assistant', userId?: string, additionalData = {}, req?: Request) => {
   try {
+    // Validate required parameters
+    if (!threadId || !content || !userId) {
+      console.error('[saveMessage] Missing required parameters:', { threadId: !!threadId, content: !!content, userId: !!userId });
+      return null;
+    }
+
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {
         global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
+          headers: { Authorization: req?.headers.get('Authorization') || '' },
         },
       }
     );

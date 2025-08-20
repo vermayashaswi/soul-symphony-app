@@ -101,12 +101,18 @@ function processTimeRange(timeRange: any, userTimezone: string = 'UTC'): { start
 // Import the saveMessage function for consistent message persistence
 const saveMessage = async (threadId: string, content: string, sender: 'user' | 'assistant', userId?: string, additionalData = {}, req?: Request) => {
   try {
+    // Validate required parameters
+    if (!threadId || !content || !userId) {
+      console.error('[saveMessage] Missing required parameters:', { threadId: !!threadId, content: !!content, userId: !!userId });
+      return null;
+    }
+
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {
         global: {
-          headers: { Authorization: req?.headers.get('Authorization')! },
+          headers: { Authorization: req?.headers.get('Authorization') || '' },
         },
       }
     );
@@ -445,7 +451,8 @@ serve(async (req) => {
               idempotency_key: idempotencyKey,
               references: executionResult || [],
               is_interactive: false
-            }
+            },
+            req
           );
 
           if (savedMessage) {
