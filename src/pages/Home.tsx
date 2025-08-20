@@ -96,11 +96,18 @@ const Home = () => {
 
   return (
     <div 
-      className="min-h-screen min-h-dvh bg-background text-foreground relative overflow-hidden safe-area-top safe-area-left safe-area-right mobile-container"
+      className="min-h-screen min-h-dvh bg-background text-foreground relative overflow-hidden"
       style={{ 
-        // Maintain tutorial functionality while respecting safe areas
+        // Fixed positioning with 3px top offset
         touchAction: 'none',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        position: 'fixed',
+        top: '3px',
+        left: 0,
+        right: 0,
+        bottom: 0,
+        width: '100%',
+        height: 'calc(100% - 3px)'
       }}
     >
       {/* Background elements including animations */}

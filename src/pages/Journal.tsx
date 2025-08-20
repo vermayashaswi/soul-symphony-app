@@ -891,7 +891,19 @@ const Journal = () => {
 
   return (
     <JournalErrorBoundary onReset={resetError}>
-      <div className="max-w-3xl mx-auto px-4 pt-4 pb-24 journal-container">
+      <div 
+        className="max-w-3xl mx-auto px-4 pt-4 pb-24 journal-container"
+        style={{
+          position: 'fixed',
+          top: '3px',
+          left: 0,
+          right: 0,
+          bottom: 0,
+          overflowY: 'auto',
+          width: '100%',
+          height: 'calc(100% - 3px)'
+        }}
+      >
         <JournalHeader />
         
         {isCheckingProfile ? (

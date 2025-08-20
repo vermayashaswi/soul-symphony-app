@@ -608,7 +608,19 @@ function SettingsContent() {
       isLoading={subscriptionLoading || isLoadingProfile} 
       error={subscriptionError}
     >
-      <div className="min-h-screen pb-20 settings-container">
+      <div 
+        className="min-h-screen pb-20 settings-container"
+        style={{
+          position: 'fixed',
+          top: '3px',
+          left: 0,
+          right: 0,
+          bottom: 0,
+          overflowY: 'auto',
+          width: '100%',
+          height: 'calc(100% - 3px)'
+        }}
+      >
         <div className={cn("max-w-3xl mx-auto px-4", isMobile ? "pt-0" : "pt-2")}>
           <div className="mb-6">
             <h1 className="text-3xl font-bold mb-2 text-theme-color">
