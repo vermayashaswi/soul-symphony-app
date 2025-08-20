@@ -756,7 +756,7 @@ export default function MobileChatInterface({
   return (
     <div className="mobile-chat-interface">
       {/* Header */}
-      <div className="sticky top-0 z-40 w-full bg-background border-b safe-area-top" style={{ paddingTop: '5px' }}>
+      <div className="sticky top-0 z-40 w-full bg-background border-b safe-area-top">
         <div className="container flex h-14 max-w-screen-lg items-center">
           <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
             <SheetTrigger asChild>
