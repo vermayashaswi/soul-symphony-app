@@ -11,6 +11,10 @@ import { v4 as uuidv4 } from "uuid";
 import { useToast } from "@/hooks/use-toast";
 import { ChatMessage } from "@/types/chat";
 import { useMessageDeletion } from "@/hooks/use-message-deletion";
+import { useAuthenticationReliability } from "@/hooks/useAuthenticationReliability";
+import { useRealtimeSubscriptionManager } from "@/hooks/useRealtimeSubscriptionManager";
+import { useMessagePersistenceReliability } from "@/hooks/useMessagePersistenceReliability";
+import { useConversationRecovery } from "@/hooks/useConversationRecovery";
 
 export interface ChatThread {
   id: string;
@@ -46,6 +50,12 @@ export const useChatPersistence = (userId: string | undefined) => {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
+  // Enhanced reliability hooks
+  const { isAuthenticated, userId: authUserId, sessionValid, validateSession } = useAuthenticationReliability();
+  const { isConnected, connectionHealth, createSubscription, removeSubscription } = useRealtimeSubscriptionManager();
+  const { fetchMessagesWithRetry, cacheMessages, createMessageWatchdog, syncStatus } = useMessagePersistenceReliability(userId);
+  const { detectInconsistencies, attemptRecovery, logDiagnostic } = useConversationRecovery(userId);
+
   // Handle message deletions
   useMessageDeletion(
     (messageId: string, threadId: string) => {
@@ -55,10 +65,25 @@ export const useChatPersistence = (userId: string | undefined) => {
     activeThread
   );
 
-  // Load threads
+  // Enhanced thread loading with session validation
   useEffect(() => {
     const loadThreads = async () => {
       if (!userId) return;
+      
+      // Validate session before loading
+      if (!sessionValid) {
+        console.log('[useChatPersistence] Session invalid, attempting validation');
+        const isValid = await validateSession();
+        if (!isValid) {
+          console.error('[useChatPersistence] Session validation failed');
+          toast({
+            title: "Session Issue",
+            description: "Please refresh the page or log in again",
+            variant: "destructive"
+          });
+          return;
+        }
+      }
       
       setLoading(true);
       try {
@@ -73,15 +98,24 @@ export const useChatPersistence = (userId: string | undefined) => {
         }
       } catch (error) {
         console.error("Error loading chat threads:", error);
+        logDiagnostic('threads_load', 'load_error', { error, userId });
+        toast({
+          title: "Loading Error",
+          description: "Failed to load conversations. Retrying...",
+          variant: "destructive"
+        });
+        
+        // Retry after delay
+        setTimeout(() => loadThreads(), 2000);
       } finally {
         setLoading(false);
       }
     };
     
     loadThreads();
-  }, [userId]);
+  }, [userId, sessionValid, validateSession, activeThread, toast, logDiagnostic]);
 
-  // Load messages for active thread
+  // Enhanced message loading with reliability features
   useEffect(() => {
     const loadMessages = async () => {
       if (!activeThread || !userId) {
@@ -91,7 +125,9 @@ export const useChatPersistence = (userId: string | undefined) => {
       
       setLoading(true);
       try {
-        const threadMessages = await getChatMessages(activeThread, userId);
+        // Use enhanced fetch with retry logic
+        const threadMessages = await fetchMessagesWithRetry(activeThread);
+        
         if (threadMessages) {
           // Convert ChatMessage to ChatMessagePersistence
           const persistenceMessages: ChatMessagePersistence[] = threadMessages.map(msg => ({
@@ -102,56 +138,144 @@ export const useChatPersistence = (userId: string | undefined) => {
             reference_entries: Array.isArray(msg.reference_entries) ? msg.reference_entries : [],
             sub_query_responses: Array.isArray(msg.sub_query_responses) ? msg.sub_query_responses : []
           }));
+          
           setMessages(persistenceMessages);
+          
+          // Cache for reliability
+          cacheMessages(activeThread, threadMessages);
+          
+          // Detect any inconsistencies
+          const inconsistencyCheck = await detectInconsistencies(activeThread, threadMessages);
+          if (inconsistencyCheck.hasInconsistency) {
+            console.warn('[useChatPersistence] Inconsistencies detected:', inconsistencyCheck.issues);
+            
+            // Attempt automatic recovery for critical issues
+            if (inconsistencyCheck.issues.some(issue => issue.includes('missing'))) {
+              const recovery = await attemptRecovery(activeThread, threadMessages);
+              if (recovery.success) {
+                const recoveredPersistenceMessages: ChatMessagePersistence[] = recovery.recoveredMessages.map(msg => ({
+                  ...msg,
+                  references: Array.isArray(msg.reference_entries) ? msg.reference_entries : [],
+                  analysis: msg.analysis_data,
+                  hasNumericResult: msg.has_numeric_result,
+                  reference_entries: Array.isArray(msg.reference_entries) ? msg.reference_entries : [],
+                  sub_query_responses: Array.isArray(msg.sub_query_responses) ? msg.sub_query_responses : []
+                }));
+                setMessages(recoveredPersistenceMessages);
+              }
+            }
+          }
         }
       } catch (error) {
         console.error("Error loading thread messages:", error);
+        logDiagnostic(activeThread, 'message_load_error', { error, userId });
+        
+        toast({
+          title: "Message Loading Failed",
+          description: "Unable to load conversation. Please try refreshing.",
+          variant: "destructive"
+        });
       } finally {
         setLoading(false);
       }
     };
     
     loadMessages();
-  }, [activeThread, userId]);
+  }, [activeThread, userId, fetchMessagesWithRetry, cacheMessages, detectInconsistencies, attemptRecovery, logDiagnostic, toast]);
 
-  // Set up real-time subscription to thread messages
+  // Enhanced real-time subscription with reliability
   useEffect(() => {
-    if (!activeThread) return;
+    if (!activeThread || !isConnected) return;
     
-    const subscription = supabase
-      .channel(`thread:${activeThread}`)
-      .on('postgres_changes', { 
+    const channelName = `enhanced_thread:${activeThread}`;
+    
+    const handleNewMessage = (payload: any) => {
+      const newMessage = payload.new as any;
+      console.log(`[useChatPersistence] Real-time INSERT for thread ${activeThread}:`, newMessage.id);
+      
+      // Convert to ChatMessagePersistence
+      const persistenceMessage: ChatMessagePersistence = {
+        ...newMessage,
+        sender: newMessage.sender as 'user' | 'assistant' | 'error',
+        references: Array.isArray(newMessage.reference_entries) ? newMessage.reference_entries : [],
+        analysis: newMessage.analysis_data,
+        hasNumericResult: newMessage.has_numeric_result,
+        reference_entries: Array.isArray(newMessage.reference_entries) ? newMessage.reference_entries : [],
+        sub_query_responses: Array.isArray(newMessage.sub_query_responses) ? newMessage.sub_query_responses : []
+      };
+      
+      setMessages(prev => {
+        // Prevent duplicates
+        const exists = prev.some(msg => msg.id === persistenceMessage.id);
+        if (exists) {
+          console.warn(`[useChatPersistence] Duplicate message prevented: ${persistenceMessage.id}`);
+          return prev;
+        }
+        return [...prev, persistenceMessage];
+      });
+
+      // Create watchdog to ensure message persistence
+      const clearWatchdog = createMessageWatchdog(
+        newMessage.id,
+        activeThread,
+        () => {
+          console.error(`[useChatPersistence] Message ${newMessage.id} failed persistence check`);
+          setMessages(prev => prev.filter(msg => msg.id !== newMessage.id));
+          toast({
+            title: "Message Sync Issue", 
+            description: "A message may not have been saved properly",
+            variant: "destructive"
+          });
+        }
+      );
+
+      // Clear watchdog after successful validation
+      setTimeout(clearWatchdog, 5000);
+    };
+
+    const handleDeletedMessage = (payload: any) => {
+      const deletedMessage = payload.old as any;
+      console.log(`[useChatPersistence] Real-time DELETE for thread ${activeThread}:`, deletedMessage.id);
+      
+      // Remove deleted message from local state
+      setMessages(prev => prev.filter(msg => msg.id !== deletedMessage.id));
+    };
+
+    const handleSubscriptionError = (error: any) => {
+      console.error(`[useChatPersistence] Subscription error for ${channelName}:`, error);
+      logDiagnostic(activeThread, 'subscription_error', { error, connectionHealth });
+      
+      if (connectionHealth === 'disconnected') {
+        toast({
+          title: "Connection Issue",
+          description: "Real-time updates may be delayed",
+          variant: "destructive"
+        });
+      }
+    };
+
+    // Create managed subscription
+    const subscription = createSubscription(
+      channelName,
+      { 
         event: 'INSERT', 
         schema: 'public', 
         table: 'chat_messages',
         filter: `thread_id=eq.${activeThread}` 
-      }, (payload) => {
-        const newMessage = payload.new as any;
-        // Convert to ChatMessagePersistence
-        const persistenceMessage: ChatMessagePersistence = {
-          ...newMessage,
-          sender: newMessage.sender as 'user' | 'assistant' | 'error',
-          references: Array.isArray(newMessage.reference_entries) ? newMessage.reference_entries : [],
-          analysis: newMessage.analysis_data,
-          hasNumericResult: newMessage.has_numeric_result,
-          reference_entries: Array.isArray(newMessage.reference_entries) ? newMessage.reference_entries : [],
-          sub_query_responses: Array.isArray(newMessage.sub_query_responses) ? newMessage.sub_query_responses : []
-        };
-        setMessages(prev => [...prev, persistenceMessage]);
-      })
-      .on('postgres_changes', { 
+      },
+      handleNewMessage,
+      handleSubscriptionError
+    );
+
+    // Add DELETE listener if subscription was created successfully
+    if (subscription) {
+      subscription.on('postgres_changes', { 
         event: 'DELETE', 
         schema: 'public', 
         table: 'chat_messages',
         filter: `thread_id=eq.${activeThread}` 
-      }, (payload) => {
-        const deletedMessage = payload.old as any;
-        console.log(`[useChatPersistence] Message deleted in thread ${activeThread}:`, deletedMessage.id);
-        
-        // Remove deleted message from local state
-        setMessages(prev => prev.filter(msg => msg.id !== deletedMessage.id));
-      })
-      .subscribe();
+      }, handleDeletedMessage);
+    }
 
     // Listen for custom deletion events from other components
     const handleMessageDeletion = (event: CustomEvent) => {
@@ -164,10 +288,10 @@ export const useChatPersistence = (userId: string | undefined) => {
     window.addEventListener('chatMessageDeleted', handleMessageDeletion as EventListener);
       
     return () => {
-      supabase.removeChannel(subscription);
+      removeSubscription(channelName);
       window.removeEventListener('chatMessageDeleted', handleMessageDeletion as EventListener);
     };
-  }, [activeThread]);
+  }, [activeThread, isConnected, connectionHealth, createSubscription, removeSubscription, createMessageWatchdog, logDiagnostic, toast]);
 
   const selectThread = (threadId: string) => {
     setActiveThread(threadId);
@@ -307,6 +431,12 @@ export const useChatPersistence = (userId: string | undefined) => {
     selectThread,
     createNewThread,
     sendMessage,
-    updateTitle
+    updateTitle,
+    // Enhanced reliability status
+    isAuthenticated,
+    sessionValid,
+    isConnected,
+    connectionHealth,
+    syncStatus: syncStatus.get(activeThread || '') || 'synced'
   };
 };
