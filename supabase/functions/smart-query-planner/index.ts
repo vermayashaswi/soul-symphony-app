@@ -6,6 +6,7 @@ import {
   getEmotionAnalysisGuidelines, 
   getThemeAnalysisGuidelines 
 } from '../_shared/databaseSchemaContext.ts';
+import { extractAndParseJSON } from './extractAndParseJSON.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -1090,20 +1091,45 @@ Response format (MUST be valid JSON):
         return createEnhancedFallbackPlan(message, isContentSeekingQuery || requiresMandatoryVector, null, supabaseClient, userTimezone);
       }
 
-      // Try to extract JSON from response if wrapped in markdown
-      let jsonString = rawResponse.trim();
-      if (jsonString.startsWith('```json')) {
-        jsonString = jsonString.replace(/```json\n?/, '').replace(/\n?```$/, '');
-      } else if (jsonString.startsWith('```')) {
-        jsonString = jsonString.replace(/```\n?/, '').replace(/\n?```$/, '');
-      }
-
-      analysisResult = JSON.parse(jsonString);
+      // Enhanced JSON extraction with multiple fallback strategies
+      analysisResult = extractAndParseJSON(rawResponse);
       console.log("[Analyst Agent] Successfully parsed JSON response");
     } catch (parseError) {
       console.error("Failed to parse Analyst Agent response:", parseError);
       console.error("Raw response:", rawResponse);
-      return createEnhancedFallbackPlan(message, isContentSeekingQuery || requiresMandatoryVector, null, supabaseClient, userTimezone);
+      
+      // Try using response_format: json_object for next attempt
+      console.log("[Analyst Agent] Attempting JSON object format retry");
+      try {
+        const retryResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'gpt-4.1-mini-2025-04-14',
+            messages: [
+              { role: 'system', content: 'You are a precise query analyzer. Return only valid JSON that matches the exact schema.' },
+              { role: 'user', content: prompt }
+            ],
+            response_format: { type: 'json_object' },
+            max_completion_tokens: 2000
+          }),
+        });
+        
+        if (retryResponse.ok) {
+          const retryData = await retryResponse.json();
+          const retryRawResponse = retryData.choices[0].message.content;
+          analysisResult = JSON.parse(retryRawResponse);
+          console.log("[Analyst Agent] Successfully parsed JSON on retry");
+        } else {
+          throw new Error('Retry also failed');
+        }
+      } catch (retryError) {
+        console.error("JSON retry also failed:", retryError);
+        return createEnhancedFallbackPlan(message, isContentSeekingQuery || requiresMandatoryVector, null, supabaseClient, userTimezone);
+      }
     }
 
     if (!analysisResult || !analysisResult.subQuestions) {
