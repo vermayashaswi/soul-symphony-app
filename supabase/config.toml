@@ -73,20 +73,8 @@ verify_jwt = true
 [functions.gpt-response-consolidator]
 verify_jwt = false
 
-[functions.generate-analysis-themes]
-verify_jwt = true
-
-[functions.generate-emotions-for-entries]
-verify_jwt = true
-
-[functions.sentiment-analysis-batcher]
-verify_jwt = true
-
 [functions.ensure-chat-persistence]
 verify_jwt = true
-
-[functions.test-google-nlapi]
-verify_jwt = false
 
 [functions.transcribe-chat-audio]
 verify_jwt = true
