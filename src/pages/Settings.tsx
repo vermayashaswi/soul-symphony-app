@@ -36,7 +36,6 @@ import { useTutorial } from '@/contexts/TutorialContext';
 import { DeleteAllEntriesSection } from '@/components/settings/DeleteAllEntriesSection';
 import { EnhancedAvatarImage } from '@/components/ui/EnhancedAvatarImage';
 import { avatarSyncService } from '@/services/avatarSyncService';
-import { AvatarDiagnostics } from '@/components/settings/AvatarDiagnostics';
 
 
 interface SettingItemProps {
@@ -123,7 +122,6 @@ function SettingsContent() {
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [nameError, setNameError] = useState<string | null>(null);
   const [avatarRefreshing, setAvatarRefreshing] = useState(false);
-  const [showAvatarDiagnostics, setShowAvatarDiagnostics] = useState(false);
   
   
   const MAX_NAME_LENGTH = 25;
@@ -695,45 +693,17 @@ function SettingsContent() {
               
               <div className="flex flex-col sm:flex-row gap-6 items-center sm:items-start">
                 <div className="flex flex-col items-center space-y-4">
-                  <EnhancedAvatarImage
-                    size={96}
-                    className="h-24 w-24"
-                    alt={displayName || user?.email || "Profile picture"}
-                    showRefreshButton={true}
-                    showLoadingState={true}
-                  />
+                  <Avatar className="h-24 w-24">
+                    <AvatarImage 
+                      src={user?.user_metadata?.avatar_url} 
+                      alt="Profile picture"
+                    />
+                    <AvatarFallback className="text-lg">
+                      {user?.email?.charAt(0).toUpperCase() || 'U'}
+                    </AvatarFallback>
+                  </Avatar>
                   
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleRefreshAvatar}
-                      disabled={avatarRefreshing}
-                      className="text-xs"
-                    >
-                      {avatarRefreshing ? (
-                        <>
-                          <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
-                          <TranslatableText text="Refreshing..." />
-                        </>
-                      ) : (
-                        <>
-                          <RefreshCw className="h-3 w-3 mr-1" />
-                          <TranslatableText text="Refresh Avatar" />
-                        </>
-                      )}
-                    </Button>
-                    
-                    <Button
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => setShowAvatarDiagnostics(true)}
-                      className="text-xs"
-                    >
-                      <AlertCircle className="h-3 w-3 mr-1" />
-                      <TranslatableText text="Diagnostics" />
-                    </Button>
-                  </div>
+                  
                 </div>
                 
                 <div className="flex-1 space-y-4 text-center sm:text-left">
@@ -1431,18 +1401,6 @@ function SettingsContent() {
                 <TranslatableText text="Apply Color" />
               </Button>
             </div>
-          </DialogContent>
-        </Dialog>
-
-        {/* Avatar Diagnostics Dialog */}
-        <Dialog
-          open={showAvatarDiagnostics}
-          onOpenChange={(open) => {
-            if (!open) setShowAvatarDiagnostics(false);
-          }}
-        >
-          <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
-            <AvatarDiagnostics onClose={() => setShowAvatarDiagnostics(false)} />
           </DialogContent>
         </Dialog>
       </div>

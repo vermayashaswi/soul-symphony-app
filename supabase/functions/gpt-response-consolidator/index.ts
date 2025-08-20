@@ -345,7 +345,7 @@ serve(async (req) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-4.1-nano-2025-04-14',
+          model: 'gpt-5-mini-2025-08-07', // Fixed: Using the correct model
           messages: [
             { role: 'system', content: 'You are Ruh by SOuLO, a warm and insightful wellness coach. You analyze ONLY the current research results provided to you. Never reference or use data from previous conversations or responses.' },
             { role: 'user', content: consolidationPrompt }

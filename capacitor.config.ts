@@ -79,11 +79,7 @@ const config: CapacitorConfig = {
     loadOnMainThread: true,
     handlePermissions: true,
     allowNavigationBarColorChange: true,
-    navigationBarColor: "#FFFFFF",
-    // Enhanced CSP for avatar loading
-    additionalHeaders: {
-      "Content-Security-Policy": "default-src 'self' data: gap: https://ssl.gstatic.com 'unsafe-eval' 'unsafe-inline'; img-src 'self' data: blob: https: http: *.googleusercontent.com *.googleapis.com; connect-src 'self' https: wss: ws: blob: *.supabase.co *.supabase.io;"
-    }
+    navigationBarColor: "#FFFFFF"
   }
 };
 
