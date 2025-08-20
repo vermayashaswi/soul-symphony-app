@@ -66,7 +66,7 @@ const config: CapacitorConfig = {
     handleApplicationURL: true
   },
   android: {
-    allowMixedContent: false,
+    allowMixedContent: true, // Allow loading avatars from external sources
     captureInput: true,
     webContentsDebuggingEnabled: false,
     backgroundColor: "#FFFFFF",

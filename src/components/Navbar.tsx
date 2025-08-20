@@ -8,6 +8,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { NotificationCenter } from '@/components/notifications/NotificationCenter';
 import { TranslatableText } from '@/components/translation/TranslatableText';
+import { EnhancedAvatarImage } from '@/components/ui/EnhancedAvatarImage';
 
 const Navbar = () => {
   const { user } = useAuth();
@@ -45,13 +46,12 @@ const Navbar = () => {
             <Settings className="h-5 w-5" />
           </Button>
           
-          <Button 
-            variant="ghost" 
-            size="sm"
-            className="text-muted-foreground hover:text-foreground"
-          >
-            <User className="h-5 w-5" />
-          </Button>
+          <EnhancedAvatarImage
+            size={32}
+            className="h-8 w-8 cursor-pointer hover:ring-2 hover:ring-theme-color/20 transition-all"
+            alt={user.user_metadata?.full_name || user.email || 'User'}
+            showRefreshButton={false}
+          />
         </div>
       </div>
     </nav>
