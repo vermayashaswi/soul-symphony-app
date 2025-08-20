@@ -99,14 +99,14 @@ function processTimeRange(timeRange: any, userTimezone: string = 'UTC'): { start
 }
 
 // Import the saveMessage function for consistent message persistence
-const saveMessage = async (threadId: string, content: string, sender: 'user' | 'assistant', userId?: string, additionalData = {}) => {
+const saveMessage = async (threadId: string, content: string, sender: 'user' | 'assistant', userId?: string, additionalData = {}, req?: Request) => {
   try {
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {
         global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
+          headers: { Authorization: req?.headers.get('Authorization')! },
         },
       }
     );
@@ -453,10 +453,6 @@ serve(async (req) => {
           }
         } catch (error) {
           console.error('[chat-with-rag] Error saving response:', error);
-        }
-      }
-        } catch (updateError) {
-          console.error('[chat-with-rag] Exception updating assistant message:', updateError);
         }
       }
 
