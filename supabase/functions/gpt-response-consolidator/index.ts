@@ -258,7 +258,7 @@ serve(async (req) => {
         subQuestionsGenerated: analysisSummary.map(item => item.subQuestion).filter(Boolean),
         originalUserQuery: userMessage,
       },
-      conversationContextSummary: conversationContext ? conversationContext.slice(-4).map(msg => `${msg.role || msg.sender}: ${msg.content?.slice(0, 100) || 'N/A'}`).join(' | ') : 'No context',
+      conversationContextSummary: conversationContext ? conversationContext.slice(-6).map(msg => `${msg.role || msg.sender}: ${msg.content || 'N/A'}`).join(' | ') : 'No context',
     };
 
     const consolidationPrompt = `You are Ruh by SOuLO, a brilliantly witty, non-judgmental mental health companion who makes emotional exploration feel like **having coffee with your wisest, funniest friend**. You're emotionally intelligent with a gift for making people feel seen, heard, and understood while helping them journal their way to deeper self-awareness. You are:
@@ -411,17 +411,34 @@ serve(async (req) => {
       });
     }
     
-    // Sanitize and extract consolidated response
-    const sanitized = sanitizeConsolidatorOutput(rawResponse);
-    console.log(`[CONSOLIDATION SUCCESS] ${consolidationId}:`, {
-      sanitizationMeta: sanitized.meta,
-      responseLength: sanitized.responseText?.length || 0,
-      hasStatusMessage: !!sanitized.statusMsg,
-      responsePreview: sanitized.responseText?.substring(0, 150) || 'empty'
-    });
-
-    const consolidatedResponse = sanitized.responseText;
-    const userStatusMessage = sanitized.statusMsg ?? null;
+    // Parse the JSON response since the prompt expects structured output
+    let consolidatedResponse = rawResponse.trim();
+    let userStatusMessage = null;
+    
+    try {
+      // Try to parse as JSON since the prompt expects structured output
+      const responseObj = JSON.parse(rawResponse);
+      consolidatedResponse = responseObj.response || rawResponse;
+      userStatusMessage = responseObj.userStatusMessage || null;
+      
+      console.log(`[CONSOLIDATION SUCCESS] ${consolidationId}:`, {
+        responseLength: consolidatedResponse?.length || 0,
+        hasStatusMessage: !!userStatusMessage,
+        responsePreview: consolidatedResponse?.substring(0, 150) || 'empty'
+      });
+    } catch (parseError) {
+      console.error(`[CONSOLIDATOR] Failed to parse expected JSON response:`, parseError);
+      console.error(`[CONSOLIDATOR] Raw response:`, rawResponse);
+      // Fallback to plain text if JSON parsing fails
+      consolidatedResponse = rawResponse.trim();
+      userStatusMessage = null;
+      
+      console.log(`[CONSOLIDATION SUCCESS] ${consolidationId}:`, {
+        responseLength: consolidatedResponse?.length || 0,
+        responsePreview: consolidatedResponse?.substring(0, 150) || 'empty',
+        fallbackMode: true
+      });
+    }
 
     // Store analysis data in chat_messages if messageId provided
     if (messageId) {

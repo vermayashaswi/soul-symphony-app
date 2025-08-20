@@ -776,7 +776,7 @@ async function generateEmbedding(text: string): Promise<number[]> {
  */
 async function analyzeQueryWithSubQuestions(message, conversationContext, userEntryCount, isFollowUp = false, supabaseClient, userTimezone = 'UTC') {
   try {
-    const last = Array.isArray(conversationContext) ? conversationContext.slice(-5) : [];
+    const last = Array.isArray(conversationContext) ? conversationContext.slice(-6) : [];
     
     console.log(`[Analyst Agent] Processing query with user timezone: ${userTimezone}`);
     
@@ -845,7 +845,9 @@ ${databaseSchemaContext}
 
 SUB-QUESTION/QUERIES GENERATION GUIDELINE (MANDATORY): 
 - Break down user query (MANDATORY: remember that current user message might not be a direct query, so you'll have to look in to the conversation context provided to you and look at last user messages to guess the "ASK" and accordingly frame the sub-questions) into ATLEAST 2 sub-questions or more such that all sub-questions can be consolidated to answer the user's ASK 
-- If user's query is vague, look back at last 2 user queries to derive what user wants to know and then frame sub-questions accordingly and hence, the pertinent query for it 
+- CRITICAL: When analyzing vague queries like "I'm confused between these two options" or "help me decide", look at the FULL conversation context to understand what the two options are (e.g., "jobs vs startup", "career choices", etc.) and generate specific sub-questions about those topics
+- If user's query is vague, examine the complete conversation history to derive what the user wants to know and frame sub-questions that address their specific decision or dilemma
+- For career/life decisions: Generate sub-questions about patterns, emotions, and insights related to the specific options being considered
 - For eg. user asks (What % of entries contain the emotion confidence (and is it the dominant one?) when I deal with family matters that also concern health issues? -> sub question 1: How many entries concern family and health both? sub question 2: What are all the emotions and their avg scores ? sub question 3: Rank the emotions)
 
 **ENHANCED SQL QUERY GENERATION GUIDELINES:**
@@ -993,7 +995,7 @@ ORDER BY avg_score DESC;
 
 USER QUERY: "${message}"
 USER TIMEZONE: "${userTimezone}"
-CONTEXT: ${last.length > 0 ? last.map(m => `${m.sender}: ${m.content?.slice(0, 50) || 'N/A'}`).join(' | ') : 'None'}
+CONTEXT: ${last.length > 0 ? last.map(m => `${m.sender}: ${m.content || 'N/A'}`).join(' | ') : 'None'}
 
 ANALYSIS REQUIREMENTS:
 - Content-seeking detected: ${isContentSeekingQuery}
