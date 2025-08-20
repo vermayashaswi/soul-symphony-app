@@ -4,10 +4,13 @@ import { supabase } from "@/integrations/supabase/client";
  * Generates a title for a chat thread using GPT based on the existing messages
  */
 export const generateThreadTitle = async (threadId: string, userId: string | undefined): Promise<string | null> => {
-  if (!threadId || !userId) return null;
+  if (!threadId || !userId) {
+    console.log('[generateThreadTitle] Missing required parameters:', { threadId, userId });
+    return null;
+  }
   
   try {
-    console.log(`Generating title for thread ${threadId}`);
+    console.log(`[generateThreadTitle] Starting title generation for thread ${threadId}`);
     
     // Fetch the first few messages from the thread
     const { data: messages, error } = await supabase
@@ -18,11 +21,17 @@ export const generateThreadTitle = async (threadId: string, userId: string | und
       .limit(3);
     
     if (error) {
-      console.error("Error fetching messages for title generation:", error);
+      console.error("[generateThreadTitle] Error fetching messages for title generation:", {
+        threadId,
+        error
+      });
       return null;
     }
     
+    console.log(`[generateThreadTitle] Fetched ${messages?.length || 0} messages for thread ${threadId}`);
+    
     if (!messages || messages.length === 0) {
+      console.log(`[generateThreadTitle] No messages found for thread ${threadId}, using default title`);
       return "New Conversation";
     }
     

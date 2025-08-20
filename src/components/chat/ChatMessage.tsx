@@ -8,6 +8,7 @@ import ParticleAvatar from './ParticleAvatar';
 import { TranslatableMarkdown } from '@/components/translation/TranslatableMarkdown';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import ChatErrorBoundary from './ChatErrorBoundary';
+
 import { getSanitizedFinalContent } from '@/utils/messageParser';
 
 interface ChatMessageProps {
@@ -28,6 +29,22 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
     return isUser ? message.content : getSanitizedFinalContent(message.content);
   }, [message.content, isUser]);
 
+  // Extract references for consistent display
+  const references = React.useMemo(() => {
+    if (isUser) return [];
+    
+    // Try to get references from analysisMetadata first
+    if (message.analysisMetadata?.referenceEntries?.length > 0) {
+      return message.analysisMetadata.referenceEntries.map((ref: any) => ({
+        date: ref.created_at,
+        snippet: ref.content?.substring(0, 200) || '',
+        id: ref.id
+      }));
+    }
+    
+    return [];
+  }, [message.analysisMetadata, isUser]);
+
   return (
     <div className={`flex gap-3 ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
       {!isUser && (
@@ -41,6 +58,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
         {!isUser && message.analysisMetadata && (
           <AnalysisMetadataCard metadata={message.analysisMetadata} />
         )}
+
 
         <Card className={`${
           isUser 

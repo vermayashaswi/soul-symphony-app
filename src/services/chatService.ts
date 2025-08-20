@@ -129,7 +129,7 @@ export async function processChatMessage(
     if (classification.category === 'GENERAL_MENTAL_HEALTH') {
       console.log('[ChatService] Handling general mental health question');
       
-      const generalResponse = await handleGeneralQuestion(message, conversationContext);
+      const generalResponse = await handleGeneralQuestion(message, conversationContext, userId);
       return {
         content: generalResponse,
         role: 'assistant'
@@ -193,6 +193,27 @@ export async function processChatMessage(
       urgency: flowRecommendation.urgencyLevel
     });
 
+    // Get user timezone for accurate temporal queries
+    let userTimezone = 'UTC';
+    try {
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('timezone')
+        .eq('id', userId)
+        .single();
+      
+      if (profileData?.timezone) {
+        userTimezone = profileData.timezone;
+        console.log(`[ChatService] Using user timezone: ${userTimezone}`);
+      } else {
+        userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+        console.log(`[ChatService] Using browser timezone: ${userTimezone}`);
+      }
+    } catch (error) {
+      console.error('[ChatService] Error fetching user timezone:', error);
+      userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    }
+
     // Get intelligent query plan with enhanced database-aware dual-search requirements
     const queryPlanResponse = await supabase.functions.invoke('smart-query-planner', {
       body: {
@@ -204,7 +225,8 @@ export async function processChatMessage(
         threadMetadata: {},
         requireDualSearch: true,
         requireDatabaseValidation: true, // Enhanced requirement for database-validated themes/emotions
-        confidenceThreshold: 0.9
+        confidenceThreshold: 0.9,
+        userTimezone // Add timezone to request body
       }
     });
 
@@ -355,15 +377,35 @@ export async function processChatMessage(
   }
 }
 
-async function handleGeneralQuestion(message: string, conversationContext: any[] = []): Promise<string> {
+async function handleGeneralQuestion(message: string, conversationContext: any[] = [], userId: string): Promise<string> {
   console.log('[ChatService] Generating conversational response for:', message);
   
+  // Get user timezone for time-aware responses
+  let userTimezone = 'UTC';
   try {
-    // PHASE 1: Pass conversation context to general chat for better follow-ups
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('timezone')
+      .eq('id', userId)
+      .single();
+    
+    if (profileData?.timezone) {
+      userTimezone = profileData.timezone;
+    } else {
+      userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    }
+  } catch (error) {
+    console.error('[ChatService] Error fetching user timezone for general chat:', error);
+    userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  }
+  
+  try {
+    // PHASE 1: Pass conversation context and timezone to general chat for better follow-ups
     const { data, error } = await supabase.functions.invoke('general-mental-health-chat', {
       body: { 
         message,
-        conversationContext: conversationContext.slice(-3) // Last 3 messages for context
+        conversationContext: conversationContext.slice(-3), // Last 3 messages for context
+        userTimezone // Add timezone for time-aware responses
       }
     });
 

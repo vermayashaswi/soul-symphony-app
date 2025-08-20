@@ -12,16 +12,6 @@ export async function executeSQLAnalysis(step: any, userId: string, supabaseClie
     const originalQuery = step.sqlQuery.trim();
     executionDetails.originalQuery = originalQuery;
     
-    // Enhanced validation including time range requirements
-    const validationResult = validateSQLQuery(originalQuery, requestId, step.timeRange);
-    executionDetails.validationResult = validationResult;
-    
-    if (!validationResult.isValid) {
-      console.error(`[${requestId}] SQL query validation failed: ${validationResult.error}`);
-      executionDetails.fallbackUsed = true;
-      return await executeVectorSearchFallback(step, userId, supabaseClient, requestId);
-    }
-    
     // Sanitize user ID in the query
     let sanitizedQuery;
     try {
@@ -107,63 +97,6 @@ export async function executeBasicSQLQuery(userId: string, supabaseClient: any, 
   return data || [];
 }
 
-function validateSQLQuery(query: string, requestId: string, timeRange?: any): { isValid: boolean; error?: string } {
-  try {
-    const upperQuery = query.toUpperCase().trim();
-    
-    console.log(`[${requestId}] Validating SQL query: ${query.substring(0, 100)}...`);
-    
-    // Check for dangerous operations using word boundaries to prevent false positives
-    const dangerousKeywords = ['DROP', 'DELETE FROM', 'INSERT INTO', 'UPDATE SET', 'CREATE', 'ALTER', 'TRUNCATE'];
-    for (const keyword of dangerousKeywords) {
-      // Use word boundary regex to avoid false positives like "COALESCE" containing "CREATE"
-      const keywordRegex = new RegExp(`\\b${keyword.replace(/\s+/g, '\\s+')}\\b`, 'i');
-      if (keywordRegex.test(upperQuery)) {
-        const error = `Dangerous SQL keyword detected: ${keyword}`;
-        console.error(`[${requestId}] ${error}`);
-        return { isValid: false, error };
-      }
-    }
-    
-    // Ensure it's a SELECT query
-    if (!upperQuery.startsWith('SELECT')) {
-      const error = 'Only SELECT queries are allowed';
-      console.error(`[${requestId}] ${error}`);
-      return { isValid: false, error };
-    }
-    
-    // More flexible table reference check - allow various forms
-    const hasJournalReference = upperQuery.includes('JOURNAL ENTRIES') || 
-                               upperQuery.includes('"JOURNAL ENTRIES"') ||
-                               upperQuery.includes('`JOURNAL ENTRIES`') ||
-                               upperQuery.includes('ENTRIES');
-    
-    if (!hasJournalReference) {
-      const error = 'Query must reference Journal Entries table';
-      console.error(`[${requestId}] ${error}`);
-      return { isValid: false, error };
-    }
-    
-    // Enhanced validation: Check if time range is required but missing
-    if (timeRange && (timeRange.start || timeRange.end)) {
-      const hasTimeFilter = upperQuery.includes('CREATED_AT') && 
-                           (upperQuery.includes('>') || upperQuery.includes('<') || upperQuery.includes('BETWEEN'));
-      
-      if (!hasTimeFilter) {
-        console.warn(`[${requestId}] SQL query should include time range filtering but doesn't - timeRange provided: ${JSON.stringify(timeRange)}`);
-        // Note: This is a warning, not an error, to maintain backward compatibility
-      } else {
-        console.log(`[${requestId}] SQL query includes proper time range filtering`);
-      }
-    }
-    
-    console.log(`[${requestId}] SQL query validation passed`);
-    return { isValid: true };
-  } catch (error) {
-    console.error(`[${requestId}] SQL validation error:`, error);
-    return { isValid: false, error: `Validation error: ${error.message}` };
-  }
-}
 
 // NEW INTELLIGENT VECTOR SEARCH FALLBACK FUNCTION
 async function executeVectorSearchFallback(step: any, userId: string, supabaseClient: any, requestId: string) {

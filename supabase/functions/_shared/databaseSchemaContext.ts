@@ -333,7 +333,7 @@ export const JOURNAL_ENTRY_SCHEMA = {
     },
     "refined text": {
       type: "text",
-      description: "Cleaned and refined version of the transcription - use as primary content source",
+      description: "Primary content source for analysis - cleaned and refined journal content",
       nullable: true,
       example: "Today I experienced anxiety about an upcoming meeting..."
     },
@@ -413,12 +413,6 @@ export const JOURNAL_ENTRY_SCHEMA = {
         "relationships"
       ]
     },
-    Edit_Status: {
-      type: "integer",
-      description: "Editing status flag for the entry (0 by default)",
-      nullable: false,
-      example: 0
-    },
     duration: {
       type: "numeric",
       description: "Duration of the voice recording in seconds",
@@ -463,11 +457,11 @@ ${emotions.map((emotion)=>`• "${emotion.name}": ${emotion.description}`).join(
 - emotions column: Contains ONLY emotion names from the master emotions list above with scores 0.0-1.0
 - master_themes column: Contains ONLY theme names from the master themes list above as text array
 - themeemotion column: Combines themes and emotions {theme_name: {emotion_name: score}}
-- languages column: JSONB array of ISO 639-1 codes (e.g., ["en", "hi"]) 
 - sentiment column: real (numeric), typically in range -1.0..1.0
 - For theme-specific emotion queries (like "family emotions"), use: themeemotion->'theme_name' 
 - For general emotion queries, use: emotions column with jsonb operators
 - Always include WHERE user_id = $user_id for security
+- Use "refined text" as the primary content source for all queries
 
 **SQL QUERY PATTERNS FOR THEME-EMOTION ANALYSIS:**
 1. Top emotions for a specific theme:
@@ -487,10 +481,11 @@ ${JOURNAL_ENTRY_SCHEMA.searchCapabilities.map((cap)=>`• ${cap}`).join('\n')}
 
 **IMPORTANT ANALYSIS NOTES:**
 - All emotion data is pre-calculated and stored as numerical scores
-- Use "refined text" as primary content source when available
+- Use "refined text" as primary content source for all content analysis
 - themeemotion column is KEY for theme-specific emotion analysis
 - Vector embeddings enable semantic similarity search
 - Date filtering supports temporal pattern analysis
+- FORBIDDEN COLUMNS: Never reference transcription text, foreign key, audio_url, user_feedback, edit_status, or translation_status
 `;
 }
 export function getEmotionAnalysisGuidelines() {

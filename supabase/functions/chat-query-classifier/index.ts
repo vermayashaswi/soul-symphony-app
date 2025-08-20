@@ -78,8 +78,8 @@ async function gptClassifyMessage(
   }
 
   const contextString = conversationContext.length > 0 
-    ? `\nConversation context: ${conversationContext.slice(-6).map(msg => `${(msg.role || msg.sender || 'user')}: ${msg.content}`).join('\n')}`
-    : '';
+    ? `\n\nCONVERSATION CONTEXT:\n${conversationContext.slice(-6).map((msg) => `${msg.role || msg.sender || 'user'}: ${msg.content}`).join('\n')}`
+    : '\n\nCONVERSATION CONTEXT:\nNo prior context';
 
   const classificationPrompt = `You are the a chat conversation query classifier for a voice journaling app, SOuLO's chatot called "Ruh'. On this app users record their journal entries and SOuLO application has all their entries, emotions, themes, time of entry, entry text etc. available for analysis. People visit the Ruh chatbot on SOuLO to converse about their feelings, problems, share stories, get analysis out of their regular journaling etc. 
   

@@ -8,6 +8,7 @@ import { JournalProcessingInitializer } from './app/journal-processing-init';
 import { TutorialProvider } from './contexts/TutorialContext';
 import TutorialOverlay from './components/tutorial/TutorialOverlay';
 import ErrorBoundary from './components/insights/ErrorBoundary';
+import { AuthErrorBoundary } from './components/error-boundaries/AuthErrorBoundary';
 import { preloadCriticalImages } from './utils/imagePreloader';
 import { toast } from 'sonner';
 import './styles/emoji.css';
@@ -194,20 +195,22 @@ const App: React.FC = () => {
 
   return (
     <ErrorBoundary onError={handleAppError}>
-      <FeatureFlagsProvider>
-        <SubscriptionProvider>
-          <TutorialProvider>
-            
-            <JournalProcessingInitializer />
-            <PullToRefresh>
-              <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
-              <TutorialOverlay />
-              <Toaster />
-              <SonnerToaster position="top-right" />
-            </PullToRefresh>
-          </TutorialProvider>
-        </SubscriptionProvider>
-      </FeatureFlagsProvider>
+      <AuthErrorBoundary>
+        <FeatureFlagsProvider>
+          <SubscriptionProvider>
+            <TutorialProvider>
+              
+              <JournalProcessingInitializer />
+              <PullToRefresh>
+                <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
+                <TutorialOverlay />
+                <Toaster />
+                <SonnerToaster position="top-right" />
+              </PullToRefresh>
+            </TutorialProvider>
+          </SubscriptionProvider>
+        </FeatureFlagsProvider>
+      </AuthErrorBoundary>
     </ErrorBoundary>
   );
 };

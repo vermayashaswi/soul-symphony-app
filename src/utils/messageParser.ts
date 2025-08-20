@@ -145,15 +145,23 @@ export const stripUserStatusArtifacts = (content: string): string => {
  */
 export const getSanitizedFinalContent = (content: string): string => {
   if (!content) return content;
+  
   const parsed = parseMessageContent(content);
-  if (parsed.response && parsed.response.trim()) {
+  
+  // If we successfully parsed JSON and have a response field, use only that
+  if (parsed.isParsedJSON && parsed.response && parsed.response.trim()) {
+    console.log('[MessageParser] Using parsed response field from JSON');
     return parsed.response.trim();
   }
+  
+  // If content is malformed JSON, try to recover
   if (isMalformedJSON(content)) {
     const recovered = recoverFromMalformedJSON(content);
     if (recovered && recovered !== content) {
       return stripUserStatusArtifacts(recovered);
     }
   }
+  
+  // Fallback: clean the original content
   return stripUserStatusArtifacts(content);
 };

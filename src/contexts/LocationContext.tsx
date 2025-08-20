@@ -34,26 +34,86 @@ export function LocationProvider({ children }: { children: ReactNode }) {
       
       console.log('[LocationContext] Starting location detection');
       
-      // Enhanced location detection with timezone
-      const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+      // Enhanced location detection with timezone (normalize legacy timezones)
+      let detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+      
+      // Normalize legacy timezone identifiers
+      if (detectedTimezone === 'Asia/Calcutta') {
+        detectedTimezone = 'Asia/Kolkata';
+        console.log('[LocationContext] Normalized legacy timezone Asia/Calcutta to Asia/Kolkata');
+      }
+      
       console.log('[LocationContext] Detected timezone:', detectedTimezone);
 
       let detectedCountry = 'DEFAULT';
       let detectedCurrency = 'USD';
 
-      // Timezone-based country mapping (enhanced version)
+      // Comprehensive timezone-based country mapping for all 24 supported countries
       const timezoneCountryMap: Record<string, { country: string; currency: string }> = {
+        // India
         'Asia/Kolkata': { country: 'IN', currency: 'INR' },
         'Asia/Calcutta': { country: 'IN', currency: 'INR' },
+        
+        // United States (multiple zones)
         'America/New_York': { country: 'US', currency: 'USD' },
         'America/Los_Angeles': { country: 'US', currency: 'USD' },
         'America/Chicago': { country: 'US', currency: 'USD' },
         'America/Denver': { country: 'US', currency: 'USD' },
+        'America/Anchorage': { country: 'US', currency: 'USD' },
+        'Pacific/Honolulu': { country: 'US', currency: 'USD' },
+        'America/Phoenix': { country: 'US', currency: 'USD' },
+        'America/Detroit': { country: 'US', currency: 'USD' },
+        
+        // United Kingdom
         'Europe/London': { country: 'GB', currency: 'GBP' },
+        
+        // Canada (multiple zones)
         'America/Toronto': { country: 'CA', currency: 'CAD' },
         'America/Vancouver': { country: 'CA', currency: 'CAD' },
+        'America/Winnipeg': { country: 'CA', currency: 'CAD' },
+        'America/Edmonton': { country: 'CA', currency: 'CAD' },
+        'America/Halifax': { country: 'CA', currency: 'CAD' },
+        
+        // Australia (multiple zones)
         'Australia/Sydney': { country: 'AU', currency: 'AUD' },
         'Australia/Melbourne': { country: 'AU', currency: 'AUD' },
+        'Australia/Brisbane': { country: 'AU', currency: 'AUD' },
+        'Australia/Perth': { country: 'AU', currency: 'AUD' },
+        'Australia/Adelaide': { country: 'AU', currency: 'AUD' },
+        'Australia/Hobart': { country: 'AU', currency: 'AUD' },
+        'Australia/Darwin': { country: 'AU', currency: 'AUD' },
+        
+        // Europe
+        'Europe/Berlin': { country: 'DE', currency: 'EUR' },
+        'Europe/Paris': { country: 'FR', currency: 'EUR' },
+        'Europe/Rome': { country: 'IT', currency: 'EUR' },
+        'Europe/Madrid': { country: 'ES', currency: 'EUR' },
+        'Europe/Amsterdam': { country: 'NL', currency: 'EUR' },
+        'Europe/Stockholm': { country: 'SE', currency: 'EUR' },
+        'Europe/Oslo': { country: 'NO', currency: 'EUR' },
+        'Europe/Copenhagen': { country: 'DK', currency: 'EUR' },
+        
+        // Middle East
+        'Asia/Dubai': { country: 'AE', currency: 'AED' },
+        'Asia/Riyadh': { country: 'SA', currency: 'SAR' },
+        
+        // Asia
+        'Asia/Tokyo': { country: 'JP', currency: 'JPY' },
+        'Asia/Seoul': { country: 'KR', currency: 'KRW' },
+        'Asia/Singapore': { country: 'SG', currency: 'USD' },
+        'Asia/Kuala_Lumpur': { country: 'MY', currency: 'USD' },
+        'Asia/Bangkok': { country: 'TH', currency: 'USD' },
+        
+        // Americas
+        'America/Mexico_City': { country: 'MX', currency: 'MXN' },
+        'America/Tijuana': { country: 'MX', currency: 'MXN' },
+        'America/Sao_Paulo': { country: 'BR', currency: 'BRL' },
+        'America/Manaus': { country: 'BR', currency: 'BRL' },
+        'America/Rio_Branco': { country: 'BR', currency: 'BRL' },
+        
+        // Africa
+        'Africa/Johannesburg': { country: 'ZA', currency: 'USD' },
+        'Africa/Lagos': { country: 'NG', currency: 'USD' },
       };
 
       const timezoneMatch = timezoneCountryMap[detectedTimezone];
@@ -71,6 +131,25 @@ export function LocationProvider({ children }: { children: ReactNode }) {
           'GB': { country: 'GB', currency: 'GBP' },
           'CA': { country: 'CA', currency: 'CAD' },
           'AU': { country: 'AU', currency: 'AUD' },
+          'DE': { country: 'DE', currency: 'EUR' },
+          'FR': { country: 'FR', currency: 'EUR' },
+          'IT': { country: 'IT', currency: 'EUR' },
+          'ES': { country: 'ES', currency: 'EUR' },
+          'NL': { country: 'NL', currency: 'EUR' },
+          'SE': { country: 'SE', currency: 'EUR' },
+          'NO': { country: 'NO', currency: 'EUR' },
+          'DK': { country: 'DK', currency: 'EUR' },
+          'AE': { country: 'AE', currency: 'AED' },
+          'SA': { country: 'SA', currency: 'SAR' },
+          'JP': { country: 'JP', currency: 'JPY' },
+          'KR': { country: 'KR', currency: 'KRW' },
+          'SG': { country: 'SG', currency: 'USD' },
+          'MY': { country: 'MY', currency: 'USD' },
+          'TH': { country: 'TH', currency: 'USD' },
+          'MX': { country: 'MX', currency: 'MXN' },
+          'BR': { country: 'BR', currency: 'BRL' },
+          'ZA': { country: 'ZA', currency: 'USD' },
+          'NG': { country: 'NG', currency: 'USD' },
         };
 
         const regionMatch = regionMap[region || ''];

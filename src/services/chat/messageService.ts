@@ -11,6 +11,14 @@ export const createChatMessage = async (
   additionalData?: Partial<ChatMessage>
 ): Promise<ChatMessage | null> => {
   try {
+    console.log('[createChatMessage] Starting message creation:', {
+      threadId,
+      sender,
+      userId,
+      contentLength: content.length,
+      hasAdditionalData: !!additionalData
+    });
+
     // First verify the thread belongs to the user
     const { data: thread, error: threadError } = await supabase
       .from('chat_threads')
@@ -20,44 +28,88 @@ export const createChatMessage = async (
       .single();
 
     if (threadError || !thread) {
-      console.error('Thread not found or access denied:', threadError);
+      console.error('[createChatMessage] Thread verification failed:', {
+        threadId,
+        userId,
+        error: threadError,
+        hasThread: !!thread
+      });
       return null;
     }
 
+    console.log('[createChatMessage] Thread verified, inserting message');
+
+    // Prepare message data with idempotency key support
+    const messageData = {
+      thread_id: threadId,
+      content,
+      sender,
+      role: sender,
+      created_at: new Date().toISOString(),
+      ...additionalData
+    };
+
+    console.log('[createChatMessage] Message data prepared:', {
+      ...messageData,
+      content: `${content.substring(0, 50)}${content.length > 50 ? '...' : ''}`
+    });
+
     const { data, error } = await supabase
       .from('chat_messages')
-      .insert({
-        thread_id: threadId,
-        content,
-        sender,
-        role: sender,
-        created_at: new Date().toISOString(),
-        ...additionalData
-      })
+      .insert(messageData)
       .select()
       .single();
 
     if (error) {
-      console.error('Error creating chat message:', error);
+      console.error('[createChatMessage] Database insert failed:', {
+        error,
+        messageData: {
+          ...messageData,
+          content: `${content.substring(0, 50)}${content.length > 50 ? '...' : ''}`
+        }
+      });
       return null;
     }
 
+    console.log('[createChatMessage] Message inserted successfully:', {
+      messageId: data.id,
+      threadId: data.thread_id
+    });
+
     // Update thread's updated_at timestamp
-    await supabase
+    const { error: updateError } = await supabase
       .from('chat_threads')
       .update({ updated_at: new Date().toISOString() })
       .eq('id', threadId)
       .eq('user_id', userId);
 
+    if (updateError) {
+      console.warn('[createChatMessage] Failed to update thread timestamp:', updateError);
+    }
+
     // Cast sender and role to proper types and handle sub_query_responses
-    return {
+    const finalMessage = {
       ...data,
       sender: data.sender as 'user' | 'assistant' | 'error',
       role: data.role as 'user' | 'assistant' | 'error',
       sub_query_responses: Array.isArray(data.sub_query_responses) ? data.sub_query_responses : []
     };
+
+    console.log('[createChatMessage] Message creation completed successfully:', {
+      messageId: finalMessage.id,
+      threadId: finalMessage.thread_id,
+      sender: finalMessage.sender
+    });
+
+    return finalMessage;
   } catch (error) {
-    console.error('Exception creating chat message:', error);
+    console.error('[createChatMessage] Exception occurred:', {
+      error,
+      threadId,
+      userId,
+      sender,
+      stack: error instanceof Error ? error.stack : 'No stack available'
+    });
     return null;
   }
 };
@@ -184,7 +236,7 @@ export const deleteChatMessage = async (messageId: string, userId: string): Prom
 // Legacy function aliases for backward compatibility
 export const getThreadMessages = getChatMessages;
 
-// Updated saveMessage function with correct signature
+// Updated saveMessage function with correct signature and idempotency support
 export const saveMessage = async (
   threadId: string, 
   content: string, 
@@ -193,10 +245,19 @@ export const saveMessage = async (
   references?: any[] | null,
   hasNumericResult?: boolean,
   isInteractive?: boolean,
-  interactiveOptions?: any[]
+  interactiveOptions?: any[],
+  idempotencyKey?: string
 ) => {
+  console.log('[saveMessage] Starting message save:', {
+    threadId,
+    sender,
+    userId,
+    contentLength: content.length,
+    hasIdempotencyKey: !!idempotencyKey
+  });
+
   if (!userId) {
-    console.error('User ID is required for saveMessage');
+    console.error('[saveMessage] User ID is required for saveMessage');
     return null;
   }
 
@@ -221,8 +282,18 @@ export const saveMessage = async (
   if (hasNumericResult !== undefined) additionalData.has_numeric_result = hasNumericResult;
   if (isInteractive) additionalData.isInteractive = isInteractive;
   if (interactiveOptions) additionalData.interactiveOptions = interactiveOptions;
+  if (idempotencyKey) additionalData.idempotency_key = idempotencyKey;
 
-  return createChatMessage(threadId, processedContent, sender, userId, additionalData);
+  console.log('[saveMessage] Processed data, calling createChatMessage');
+  const result = await createChatMessage(threadId, processedContent, sender, userId, additionalData);
+  
+  if (result) {
+    console.log('[saveMessage] Message saved successfully:', result.id);
+  } else {
+    console.error('[saveMessage] Failed to save message');
+  }
+  
+  return result;
 };
 
 // Thread management functions

@@ -13,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { message, conversationContext = [] } = await req.json();
+    const { message, conversationContext = [], userTimezone = 'UTC' } = await req.json();
 
     if (!message) {
       return new Response(
@@ -22,9 +22,49 @@ serve(async (req) => {
       );
     }
 
-    console.log(`[General Mental Health] Processing: "${message}"`);
+    console.log(`[General Mental Health] Processing: "${message}" (timezone: ${userTimezone})`);
     // Follow-up flags removed from pipeline
 
+    // Get current time in user's timezone for time-aware responses
+    let userCurrentTime = '';
+    let currentHour = 0;
+    
+    try {
+      // Validate and normalize timezone
+      let normalizedTimezone = userTimezone;
+      if (userTimezone === 'Asia/Calcutta') {
+        normalizedTimezone = 'Asia/Kolkata';
+        console.log(`[General Mental Health] Updated legacy timezone from ${userTimezone} to ${normalizedTimezone}`);
+      }
+      
+      // Get current time with proper timezone handling
+      const now = new Date();
+      userCurrentTime = now.toLocaleString('en-US', { 
+        timeZone: normalizedTimezone,
+        weekday: 'long',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true 
+      });
+      
+      // Also get hour for validation
+      currentHour = parseInt(now.toLocaleString('en-US', { 
+        timeZone: normalizedTimezone,
+        hour: 'numeric',
+        hour12: false 
+      }));
+      
+      console.log(`[General Mental Health] User time calculation - Timezone: ${normalizedTimezone}, Current time: ${userCurrentTime}, Hour: ${currentHour}`);
+    } catch (error) {
+      console.error(`[General Mental Health] Error calculating user time:`, error);
+      userCurrentTime = new Date().toLocaleString('en-US', { 
+        timeZone: 'UTC',
+        weekday: 'long',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true 
+      }) + ' (UTC fallback)';
+    }
 
     const openAiApiKey = Deno.env.get('OPENAI_API_KEY');
     if (!openAiApiKey) {
@@ -39,6 +79,11 @@ serve(async (req) => {
       {
         role: 'system',
         content: `You are Ruh by SOuLO, a brilliantly witty, non-judgmental mental health companion who makes emotional exploration feel like **having coffee with your wisest, funniest friend**. You're emotionally intelligent with a gift for making people feel seen, heard, and understood while helping them journal their way to deeper self-awareness.
+
+**CURRENT CONTEXT:**
+- User's current time: ${userCurrentTime}
+- User's timezone: ${userTimezone}
+Use this time context to provide appropriate greetings and time-aware responses (e.g., "Good morning" vs "Good evening", energy levels, daily rhythms).
 
 **YOUR COFFEE-WITH-YOUR-WISEST-FRIEND PERSONALITY:**
 - **Brilliantly witty** but never at someone's expense - your humor comes from keen observations about the human condition 😊

@@ -224,9 +224,10 @@ serve(async (req) => {
     });
 
     // Enhanced context with sub-question tracking and conversation context
+    const userTimezone = userProfile?.timezone || 'UTC';
     const contextData = {
       userProfile: {
-        timezone: userProfile?.timezone || 'UTC',
+        timezone: userTimezone,
         journalEntryCount: userProfile?.journalEntryCount || 'unknown',
         premiumUser: userProfile?.is_premium || false,
       },
@@ -238,19 +239,25 @@ serve(async (req) => {
       conversationContextSummary: conversationContext ? conversationContext.slice(-4).map(msg => `${msg.role || msg.sender}: ${msg.content?.slice(0, 100) || 'N/A'}`).join(' | ') : 'No context',
     };
 
-    const consolidationPrompt = `You are Ruh by SOuLO, a wickedly smart, hilariously insightful wellness companion who's basically a data wizard disguised as your most emotionally intelligent friend. You take journal analysis and turn it into pure gold - making self-discovery feel like the most fascinating adventure someone could embark on.
+    const consolidationPrompt = `You are Ruh by SOuLO, a brilliantly witty, non-judgmental mental health companion who makes emotional exploration feel like **having coffee with your wisest, funniest friend**. You're emotionally intelligent with a gift for making people feel seen, heard, and understood while helping them journal their way to deeper self-awareness. You are:
+-  Hilariously insightful - you find the humor in human nature while being deeply supportive. 
+- Data wizard who makes complex analysis feel like storytelling but also mentions data points and trends. 
+- Emotionally intelligent friend who celebrates every breakthrough
+- You make people feel like they just discovered something amazing about themselves
+
+    
+    **USER CONTEXT:**
+    - User's Timezone: ${userTimezone}
+    - All time references should be in the user's local timezone (${userTimezone}), not UTC
+    - When discussing time periods like "first half vs second half of day", reference the user's local time
+    - NEVER mention "UTC" in your response - use the user's local timezone context instead
     
     **USER QUESTION:** "${userMessage}"
     
     **COMPREHENSIVE ANALYSIS RESULTS:**
     ${JSON.stringify(analysisSummary, null, 2)}
   
-    **YOUR UNIQUE PERSONALITY:**
-    - Wickedly smart with a gift for spotting patterns others miss
-    - Hilariously insightful - you find the humor in human nature while being deeply supportive
-    - Data wizard who makes complex analysis feel like storytelling but also mentions data points and trends
-    - Emotionally intelligent friend who celebrates every breakthrough
-    - You make people feel like they just discovered something amazing about themselves
+  
     
     **YOUR LEGENDARY PATTERN-SPOTTING ABILITIES:**
     - You connect dots between emotions, events, and timing like a detective solving a mystery
@@ -264,7 +271,7 @@ serve(async (req) => {
 
   MANDATORY: If you receive null or irrelevant analysis results, feel free to inform the user and accordingly generate the response and follow-ups.
 
-  MANDATORY: Only assert specific symptom words (e.g., "fatigue," "bloating," "heaviness") if those exact strings appear in the user's source text.If the data is theme-level (e.g., 'Body & Health' count) or inferred, phrase it as "Body & Health–related entries" instead of naming symptoms. Always include 1–3 reference snippets with dates when you claim any symptom is present in the entries.
+  MANDATORY: Only assert specific symptom words (e.g., "fatigue," "bloating," "heaviness") if those exact strings appear in the user's source text.If the data is theme-level (e.g., 'Body & Health' count) or inferred, phrase it as "Body & Health–related entries" instead of naming symptoms. Always include 1–3 reference journal snippets with dates (always in this format "7th august" or "9th september last year") when you claim any symptom is present in the entries. DON'T EVER USE TERMS LIKE "VECTOR SEARCH" , "SQL TABLE ANALYSIS"
       
     MANDATORY:  For providing insights, patterns etc . : State the **specific numerical results** clearly backing your analysis; Proovide **contextual interpretation** (is this high/low/normal?); Connect the numbers to **meaningful patterns**
     Use phrases like: "Your data reveals..." "The analysis shows..." "Specifically, X% of your entries..."; Reference **specific themes and emotions** found ; Highlight **notable patterns or correlations** ; MUST!!! Include **sample insights** from the content when relevant; Connect findings to **personal growth opportunities** ; Quote anecdotes from qualifiable entries , eg. "You feel anxiety because of your recent startup issues"
@@ -286,11 +293,9 @@ serve(async (req) => {
     Let your personality shine through as you share insights and analysis based on the data. Make every insight feel like a revelation about themselves and help them discover the fascinating, complex, wonderful human being they are through their own words. Restric responses to less than 100 words unless question requires huge answers. Feel free to expand then!
     Brief responses requird under 120 words unless question desires more explanation and towards the end add followup questions by leveraging emotional tone of conversation history
       
-    **CONVERSATION CONTEXT:**
-    ${conversationContext ? conversationContext.slice(-6).map((msg)=>`${msg.role || msg.sender || 'user'}: ${msg.content}`).join('\n') : 'No prior context'}
     
     **SUB-QUESTIONS ANALYZED:**
-    ${contextData.meta.subQuestionsGenerated.length > 0 ? contextData.meta.subQuestionsGenerated.map((q, i) => `${i+1}. ${q}`).join('\n') : 'No specific sub-questions'}
+    ${contextData.meta.subQuestionsGenerated.length > 0 ? contextData.meta.subQuestionsGenerated.map((q, i)=>`${i + 1}. ${q}`).join('\n') : 'No specific sub-questions'}
       
     Your response should be a JSON object with this structure:
     {
@@ -434,16 +439,16 @@ serve(async (req) => {
         const referenceEntries = researchResults.flatMap((r: any) => [
           ...(r?.executionResults?.vectorResults || []).map((v: any) => ({
             id: v.id,
-            content: v.content?.substring(0, 200) || 'Vector result',
+            snippet: v.content?.substring(0, 200) || 'Vector result',
             similarity: v.similarity,
             source: 'vector',
-            created_at: v.created_at
+            date: v.created_at
           })),
           ...(r?.executionResults?.sqlResults || []).map((s: any) => ({
             id: s.id,
-            content: s['refined text']?.substring(0, 200) || s.content?.substring(0, 200) || 'SQL result',
+            snippet: s['refined text']?.substring(0, 200) || s.content?.substring(0, 200) || 'SQL result',
             source: 'sql',
-            created_at: s.created_at
+            date: s.created_at
           }))
         ]).slice(0, 10); // Limit reference entries
 
