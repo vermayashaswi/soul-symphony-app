@@ -623,7 +623,7 @@ function SettingsContent() {
       >
         <div className={cn("max-w-3xl mx-auto px-4", isMobile ? "pt-0" : "pt-2")}>
           <div className="mb-6">
-            <h1 className="text-3xl font-bold mb-2 text-theme-color safe-area-top">
+            <h1 className="text-3xl font-bold mb-2 text-theme-color">
               <TranslatableText text="Settings" forceTranslate={true} />
             </h1>
             <p className="text-muted-foreground">

@@ -25,7 +25,7 @@ const JournalHeader = () => {
   
   return (
     <div className={cn(
-      "bg-muted/30 py-2 border-b safe-area-top",
+      "bg-muted/30 py-2 border-b",
       shouldAdjustForMobile ? "mt-0" : "mt-1 md:mt-2"
     )}
     >
