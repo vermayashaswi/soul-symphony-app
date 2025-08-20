@@ -32,35 +32,29 @@ serve(async (req) => {
     console.log(`[General Mental Health] Processing: "${message}" (timezone: ${userTimezone})`);
     // Follow-up flags removed from pipeline
 
-    // Enhanced timezone handling with comprehensive error checking
-    const { safeTimezoneConversion, formatTimezoneForGPT } = await import('../_shared/enhancedTimezoneUtils.ts');
+    // Enhanced timezone processing with comprehensive validation
+    const { processEdgeTimezone, createGPTTimezonePrompt } = await import('../_shared/enhancedEdgeTimezone.ts');
     
-    const timezoneConversion = safeTimezoneConversion(userTimezone, {
-      functionName: 'general-mental-health-chat',
-      includeValidation: true,
-      logFailures: true,
-      fallbackToUTC: true
-    });
+    const timezoneProcessing = processEdgeTimezone(userTimezone, 'general-mental-health-chat');
+    const gptTimezone = createGPTTimezonePrompt(userTimezone, 'general-mental-health-chat');
     
-    const userCurrentTime = timezoneConversion.currentTime;
-    const currentHour = timezoneConversion.currentHour;
-    const normalizedTimezone = timezoneConversion.normalizedTimezone;
-    
-    // Log detailed timezone information for debugging
-    console.log(`[General Mental Health] Enhanced timezone conversion:`, {
+    // Log comprehensive timezone debugging information
+    console.log(`[General Mental Health] Enhanced timezone processing:`, {
       originalTimezone: userTimezone,
-      normalizedTimezone,
-      currentTime: userCurrentTime,
-      currentHour,
-      isValid: timezoneConversion.isValid,
-      conversionError: timezoneConversion.conversionError,
-      rawUtcTime: timezoneConversion.rawUtcTime
+      processing: timezoneProcessing,
+      gptPrompt: gptTimezone.timezonePrompt.substring(0, 200) + '...',
+      validationNotes: gptTimezone.validationNotes
     });
     
-    // Warn if timezone conversion failed
-    if (!timezoneConversion.isValid) {
-      console.warn(`[General Mental Health] Timezone conversion validation failed:`, {
-        error: timezoneConversion.conversionError,
+    const userCurrentTime = timezoneProcessing.currentTime;
+    const currentHour = timezoneProcessing.currentHour;
+    const normalizedTimezone = timezoneProcessing.normalizedTimezone;
+    
+    // Warn if timezone processing failed  
+    if (!timezoneProcessing.isValid) {
+      console.warn(`[General Mental Health] Timezone processing failed:`, {
+        error: timezoneProcessing.validationError,
+        debugInfo: timezoneProcessing.debugInfo,
         fallbackUsed: true
       });
     }
@@ -80,9 +74,10 @@ serve(async (req) => {
         content: `You are Ruh by SOuLO, a brilliantly witty, non-judgmental mental health companion who makes emotional exploration feel like **having coffee with your wisest, funniest friend**. You're emotionally intelligent with a gift for making people feel seen, heard, and understood while helping them journal their way to deeper self-awareness.
 
 **CURRENT CONTEXT:**
-- User's current time: ${userCurrentTime}
-- User's timezone: ${normalizedTimezone}
-- Timezone validation: ${timezoneConversion.isValid ? 'VALID' : 'FAILED - using fallback'}
+${gptTimezone.timezonePrompt}
+
+${gptTimezone.validationNotes.length > 0 ? `**TIMEZONE VALIDATION NOTES:** ${gptTimezone.validationNotes.join(', ')}` : ''}
+
 Use this time context to provide appropriate greetings and time-aware responses (e.g., "Good morning" vs "Good evening", energy levels, daily rhythms).
 
 **YOUR COFFEE-WITH-YOUR-WISEST-FRIEND PERSONALITY:**
