@@ -1,65 +1,49 @@
 
-/* Safe Area Inset Variables and Base Styles */
+/* Universal Safe Area Variables - CSS-First Approach */
 :root {
+  /* Native CSS environment variables as primary source */
   --safe-area-inset-top: env(safe-area-inset-top, 0px);
   --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
   --safe-area-inset-left: env(safe-area-inset-left, 0px);
   --safe-area-inset-right: env(safe-area-inset-right, 0px);
-  --status-bar-height: 0px;
+  
+  /* JavaScript-calculated fallback values */
+  --safe-area-fallback: 24px;
+  --safe-area-bottom-fallback: 12px;
+  --safe-area-left-fallback: 8px;
+  --safe-area-right-fallback: 8px;
+  
+  /* Universal safe area values using CSS max() for progressive enhancement */
+  --safe-area-top: max(var(--safe-area-inset-top), var(--safe-area-fallback));
+  --safe-area-bottom: max(var(--safe-area-inset-bottom), var(--safe-area-bottom-fallback));
+  --safe-area-left: max(var(--safe-area-inset-left), var(--safe-area-left-fallback));
+  --safe-area-right: max(var(--safe-area-inset-right), var(--safe-area-right-fallback));
+  
+  /* App-specific variables */
   --nav-bar-height: 4rem;
   --keyboard-height: 0px;
-  
-  /* Calculated safe areas */
-  --calculated-safe-area-top: var(--safe-area-inset-top);
-  --calculated-safe-area-bottom: var(--safe-area-inset-bottom);
-  --calculated-safe-area-left: var(--safe-area-inset-left);
-  --calculated-safe-area-right: var(--safe-area-inset-right);
 }
 
-/* Platform detection and adjustments - Refined for better spacing */
-.platform-android {
-  /* Reduced minimum heights for better spacing */
-  --status-bar-height: 32px;
-  --calculated-safe-area-bottom: max(env(safe-area-inset-bottom, 0px), 12px);
-}
-
-.platform-ios {
-  --status-bar-height: 44px;
-}
-
-/* Keyboard state management */
+/* Keyboard state management - simplified */
 .keyboard-visible {
   --effective-safe-area-bottom: 0px;
 }
 
-.keyboard-visible.platform-ios {
-  --effective-safe-area-bottom: var(--calculated-safe-area-bottom);
-}
-
-.keyboard-visible.platform-android {
-  --effective-safe-area-bottom: 0px;
-}
-
-/* Safe area utilities - Single source of truth */
+/* Universal safe area utilities - single source of truth */
 .safe-area-top {
-  padding-top: var(--calculated-safe-area-top) !important;
-}
-
-/* Home page specific safe area handling */
-.mobile-container.safe-area-top {
-  padding-top: var(--calculated-safe-area-top) !important;
+  padding-top: var(--safe-area-top) !important;
 }
 
 .safe-area-bottom {
-  padding-bottom: var(--calculated-safe-area-bottom) !important;
+  padding-bottom: var(--safe-area-bottom) !important;
 }
 
 .safe-area-left {
-  padding-left: max(8px, var(--calculated-safe-area-left)) !important;
+  padding-left: var(--safe-area-left) !important;
 }
 
 .safe-area-right {
-  padding-right: max(8px, var(--calculated-safe-area-right)) !important;
+  padding-right: var(--safe-area-right) !important;
 }
 
 /* Mobile container base styles */
