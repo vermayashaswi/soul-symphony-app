@@ -123,16 +123,29 @@ export async function processChatVoiceRecording(
     }
     
     // Prepare the payload for chat transcription using dedicated transcribe-chat-audio function
+    // Include original format info and post-padding format info
+    const originalFormat = normalizedBlob.type;
+    const finalFormat = paddedBlob.type;
+    
     const payload = {
       audio: base64Audio,
-      recordingTime
+      recordingTime,
+      originalFormat,
+      finalFormat,
+      // Additional debugging info
+      originalSize: normalizedBlob.size,
+      paddedSize: paddedBlob.size,
+      hasPadding: paddedBlob !== normalizedBlob
     };
     
     console.log('[ChatAudioProcessing] Calling transcribe-chat-audio Edge Function with payload:', {
       audioLength: base64Audio.length,
       recordingTime,
-      blobSize: paddedBlob.size,
-      blobType: paddedBlob.type
+      originalFormat,
+      finalFormat,
+      originalSize: normalizedBlob.size,
+      paddedSize: paddedBlob.size,
+      hasPadding: paddedBlob !== normalizedBlob
     });
     
     // Call the dedicated transcribe-chat-audio Supabase Edge Function with timeout

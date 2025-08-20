@@ -81,7 +81,7 @@ const JournalHeader: React.FC = () => {
   };
 
   return (
-    <div className={`p-4 flex flex-col journal-header-container safe-area-top ${isInWelcomeTutorialStep ? 'tutorial-target' : ''}`}>
+    <div className={`p-4 flex flex-col journal-header-container ${isInWelcomeTutorialStep ? 'tutorial-target' : ''}`}>
       <div className="flex justify-between items-start w-full relative">
         <div className={`relative max-w-[65%] ${isInWelcomeTutorialStep ? 'z-[9999]' : ''}`}>
           <h1

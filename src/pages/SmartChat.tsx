@@ -137,7 +137,7 @@ const SmartChat = () => {
   return (
     <PremiumFeatureGuard feature="chat">
       <div 
-        className="w-full h-full flex flex-col"
+        className="w-full h-full flex flex-col smart-chat-container"
         style={{
           position: 'fixed',
           top: '3px',

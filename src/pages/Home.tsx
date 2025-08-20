@@ -96,7 +96,7 @@ const Home = () => {
 
   return (
     <div 
-      className="min-h-screen min-h-dvh bg-background text-foreground relative overflow-hidden safe-area-top"
+      className="min-h-screen min-h-dvh bg-background text-foreground relative overflow-hidden"
       style={{ 
         touchAction: 'none',
         overflow: 'hidden',

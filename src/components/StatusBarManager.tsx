@@ -90,10 +90,40 @@ export const StatusBarManager: React.FC<StatusBarManagerProps> = ({ children }) 
     const updateSafeAreaVariables = () => {
       try {
         const viewportHeight = window.innerHeight;
+        const viewportWidth = window.innerWidth;
+        const isNative = nativeIntegrationService.isRunningNatively();
         
-        componentLogger.debug('Universal safe area calculation', {
+        // Enhanced environment detection
+        const userAgent = navigator.userAgent.toLowerCase();
+        const isMobileWebBrowser = !isNative && (
+          /android/.test(userAgent) || 
+          /iphone|ipad|ipod/.test(userAgent) ||
+          ('ontouchstart' in window && viewportWidth < 1024)
+        );
+        const isDesktopBrowser = !isNative && !isMobileWebBrowser;
+        
+        // Detect specific mobile browsers
+        const isChromeMovile = isMobileWebBrowser && /chrome/.test(userAgent);
+        const isSafariMobile = isMobileWebBrowser && /safari/.test(userAgent) && !/chrome/.test(userAgent);
+        const isSamsungBrowser = isMobileWebBrowser && /samsungbrowser/.test(userAgent);
+        
+        // Browser UI detection for mobile web
+        const screenHeight = window.screen.availHeight;
+        const heightDifference = Math.max(0, screenHeight - viewportHeight);
+        const hasBrowserUI = isMobileWebBrowser && heightDifference > 50; // Browser UI likely present
+        
+        componentLogger.debug('Environment-aware safe area calculation', {
           viewportHeight,
-          userAgent: navigator.userAgent.substring(0, 50) + '...'
+          viewportWidth,
+          isNative,
+          isMobileWebBrowser,
+          isDesktopBrowser,
+          isChromeMovile,
+          isSafariMobile,
+          isSamsungBrowser,
+          hasBrowserUI,
+          heightDifference,
+          userAgent: userAgent.substring(0, 50) + '...'
         });
 
         // Check if native CSS env() provides sufficient safe area
@@ -103,44 +133,79 @@ export const StatusBarManager: React.FC<StatusBarManagerProps> = ({ children }) 
             .replace('px', '') || '0'
         );
 
+        // Add debug CSS variables
+        document.documentElement.style.setProperty('--env-safe-area-top', `${envSafeAreaTop}px`);
+
         let calculatedFallback = 0;
         
-        // Only calculate fallback if env() returns 0 or insufficient value
+        // Environment-aware fallback calculation
         if (envSafeAreaTop < 20) {
-          // Universal calculation - no device-specific logic
           let systemUIHeight = 0;
           
           if (window.visualViewport && window.visualViewport.offsetTop > 0) {
             systemUIHeight = window.visualViewport.offsetTop;
             componentLogger.debug('Using visualViewport.offsetTop', { offsetTop: systemUIHeight });
-          } else {
-            // Fallback: calculate from viewport difference
-            const screenHeight = window.screen.availHeight;
-            systemUIHeight = Math.max(0, screenHeight - viewportHeight);
-            componentLogger.debug('Using viewport difference', { systemUIHeight });
+          } else if (hasBrowserUI) {
+            systemUIHeight = heightDifference;
+            componentLogger.debug('Using browser UI height difference', { systemUIHeight });
           }
 
-          // Universal buffer: 2.5% of viewport height for all devices
-          const universalBuffer = viewportHeight * 0.025;
-          
-          // Universal minimum: 24px for all platforms
-          const universalMinimum = 24;
-          
-          // Calculate with universal logic
-          calculatedFallback = Math.max(
-            universalMinimum,
-            systemUIHeight + universalBuffer
-          );
-          
-          // Universal maximum: 8% of viewport height
-          const universalMaximum = viewportHeight * 0.08;
-          calculatedFallback = Math.min(calculatedFallback, universalMaximum);
+          // Environment-specific calculations
+          if (isMobileWebBrowser) {
+            // Mobile Web Browser: Larger fallbacks for browser UI
+            const mobileBuffer = viewportHeight * 0.045; // 4.5% buffer for mobile web
+            const mobileMinimum = 32; // Larger minimum for mobile web browsers
+            const mobileMaximum = viewportHeight * 0.12; // 12% maximum for mobile web
+            
+            calculatedFallback = Math.max(
+              mobileMinimum,
+              systemUIHeight + mobileBuffer
+            );
+            calculatedFallback = Math.min(calculatedFallback, mobileMaximum);
+            
+            componentLogger.debug('Mobile web browser calculation', {
+              mobileBuffer: Math.round(mobileBuffer),
+              mobileMinimum,
+              mobileMaximum: Math.round(mobileMaximum),
+              systemUIHeight,
+              calculatedFallback: Math.round(calculatedFallback)
+            });
+            
+          } else if (isDesktopBrowser) {
+            // Desktop Browser: Minimal padding
+            const desktopBuffer = viewportHeight * 0.01; // 1% buffer for desktop
+            const desktopMinimum = 8; // Minimal for desktop
+            const desktopMaximum = 16; // Small maximum for desktop
+            
+            calculatedFallback = Math.max(
+              desktopMinimum,
+              systemUIHeight + desktopBuffer
+            );
+            calculatedFallback = Math.min(calculatedFallback, desktopMaximum);
+            
+          } else {
+            // Native App: Current universal logic
+            const nativeBuffer = viewportHeight * 0.025; // 2.5% buffer for native
+            const nativeMinimum = 24; // Current minimum for native
+            const nativeMaximum = viewportHeight * 0.08; // 8% maximum for native
+            
+            calculatedFallback = Math.max(
+              nativeMinimum,
+              systemUIHeight + nativeBuffer
+            );
+            calculatedFallback = Math.min(calculatedFallback, nativeMaximum);
+          }
         }
 
-        componentLogger.info('Universal safe area values', {
+        // Add debug CSS variable for calculated fallback
+        document.documentElement.style.setProperty('--calculated-fallback', `${Math.round(calculatedFallback)}px`);
+
+        componentLogger.info('Environment-aware safe area values', {
+          environment: isNative ? 'native' : isMobileWebBrowser ? 'mobile-web' : 'desktop',
           envSafeAreaTop,
           calculatedFallback: Math.round(calculatedFallback),
-          willUseEnv: envSafeAreaTop >= 20
+          willUseEnv: envSafeAreaTop >= 20,
+          hasBrowserUI
         });
 
         // Set the fallback value for CSS max() function
@@ -149,19 +214,31 @@ export const StatusBarManager: React.FC<StatusBarManagerProps> = ({ children }) 
           `${Math.round(calculatedFallback)}px`
         );
 
-        // Set other safe areas with simplified universal logic
-        const universalSideBuffer = Math.max(8, viewportHeight * 0.01);
+        // Environment-aware side and bottom safe areas
+        let sideBuffer, bottomBuffer;
+        
+        if (isMobileWebBrowser) {
+          sideBuffer = Math.max(12, viewportHeight * 0.015); // Larger for mobile web
+          bottomBuffer = Math.max(16, viewportHeight * 0.02); // Larger for mobile web
+        } else if (isDesktopBrowser) {
+          sideBuffer = Math.max(4, viewportHeight * 0.005); // Minimal for desktop
+          bottomBuffer = Math.max(6, viewportHeight * 0.008); // Minimal for desktop
+        } else {
+          sideBuffer = Math.max(8, viewportHeight * 0.01); // Current for native
+          bottomBuffer = Math.max(12, viewportHeight * 0.015); // Current for native
+        }
+        
         document.documentElement.style.setProperty(
           '--safe-area-bottom-fallback',
-          `${Math.max(12, Math.round(viewportHeight * 0.015))}px`
+          `${Math.round(bottomBuffer)}px`
         );
         document.documentElement.style.setProperty(
           '--safe-area-left-fallback',
-          `${Math.round(universalSideBuffer)}px`
+          `${Math.round(sideBuffer)}px`
         );
         document.documentElement.style.setProperty(
           '--safe-area-right-fallback',
-          `${Math.round(universalSideBuffer)}px`
+          `${Math.round(sideBuffer)}px`
         );
 
       } catch (error) {
