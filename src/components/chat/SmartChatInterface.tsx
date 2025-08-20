@@ -537,57 +537,79 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       // Check if this is the first message in the thread
       const isFirstMessage = chatHistory.length === 1; // Only the temp message we just added
       
-      // Save the user message with idempotency key
-      let savedUserMessage: ChatMessage | null = null;
-      try {
-        const idempotencyKey = `user-${effectiveUserId}-${threadId}-${Date.now()}-${Math.random().toString(36).substring(2)}`;
-        debugLog.addEvent("Database", `Saving user message to thread ${threadId} with idempotency key: ${idempotencyKey}`, "info");
-        savedUserMessage = await saveMessage(
-          threadId, 
-          message, 
-          'user', 
-          effectiveUserId,
-          null, // references
-          undefined, // hasNumericResult
-          false, // isInteractive
-          undefined, // interactiveOptions
-          idempotencyKey
-        );
-        debugLog.addEvent("Database", `User message saved with ID: ${savedUserMessage?.id}`, "success");
+    // Save the user message with idempotency key
+    let savedUserMessage: ChatMessage | null = null;
+    let correlationId: string | null = null;
+    
+    try {
+      // Generate correlation ID for request tracking
+      correlationId = idempotencyManager.generateCorrelationId();
+      
+      // Enhanced message validation
+      const messageValidation = idempotencyManager.validateMessageForThread(threadId, message, 'user');
+      if (!messageValidation.valid) {
+        toast({
+          title: "Duplicate message detected", 
+          description: messageValidation.reason,
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // Generate proper idempotency key for user message
+      const userIdempotencyKey = await idempotencyManager.generateIdempotencyKey(threadId, message, 'user');
+      debugLog.addEvent("Database", `Saving user message to thread ${threadId} with idempotency key: ${userIdempotencyKey}`, "info");
+      savedUserMessage = await saveMessage(
+        threadId, 
+        message, 
+        'user', 
+        effectiveUserId,
+        null, // references
+        undefined, // hasNumericResult
+        false, // isInteractive
+        undefined, // interactiveOptions
+        userIdempotencyKey
+      );
+      
+      // Register idempotency key and set active request tracking
+      if (savedUserMessage) {
+        idempotencyManager.registerKey(userIdempotencyKey, threadId, savedUserMessage.id, message);
+        threadSafetyManager.setActiveRequestId(threadId, correlationId);
+      }
+      
+      if (savedUserMessage) {
+        debugLog.addEvent("UI Update", `Replacing temporary message with saved message: ${savedUserMessage.id}`, "info");
+        setChatHistory(prev => prev.map(msg => 
+          msg.id === tempUserMessage.id ? {
+            ...savedUserMessage!,
+            sender: savedUserMessage!.sender as 'user' | 'assistant' | 'error',
+            role: savedUserMessage!.role as 'user' | 'assistant' | 'error'
+          } : msg
+        ));
         
-        if (savedUserMessage) {
-          debugLog.addEvent("UI Update", `Replacing temporary message with saved message: ${savedUserMessage.id}`, "info");
-          setChatHistory(prev => prev.map(msg => 
-            msg.id === tempUserMessage.id ? {
-              ...savedUserMessage!,
-              sender: savedUserMessage!.sender as 'user' | 'assistant' | 'error',
-              role: savedUserMessage!.role as 'user' | 'assistant' | 'error'
-            } : msg
-          ));
-          
-          // Generate title for the first message in a thread
-          if (isFirstMessage) {
-            try {
-              debugLog.addEvent("Title Generation", "Generating thread title after first message", "info");
-              const generatedTitle = await generateThreadTitle(threadId, effectiveUserId);
-              if (generatedTitle) {
-                // Dispatch event to update sidebar
-                window.dispatchEvent(
-                  new CustomEvent('threadTitleUpdated', {
-                    detail: { threadId, title: generatedTitle }
-                  })
-                );
-                debugLog.addEvent("Title Generation", `Generated title: ${generatedTitle}`, "success");
-              }
-            } catch (titleError) {
-              debugLog.addEvent("Title Generation", `Failed to generate title: ${titleError instanceof Error ? titleError.message : "Unknown error"}`, "error");
-              console.warn('Failed to generate thread title:', titleError);
+        // Generate title for the first message in a thread
+        if (isFirstMessage) {
+          try {
+            debugLog.addEvent("Title Generation", "Generating thread title after first message", "info");
+            const generatedTitle = await generateThreadTitle(threadId, effectiveUserId);
+            if (generatedTitle) {
+              // Dispatch event to update sidebar
+              window.dispatchEvent(
+                new CustomEvent('threadTitleUpdated', {
+                  detail: { threadId, title: generatedTitle }
+                })
+              );
+              debugLog.addEvent("Title Generation", `Generated title: ${generatedTitle}`, "success");
             }
+          } catch (titleError) {
+            debugLog.addEvent("Title Generation", `Failed to generate title: ${titleError instanceof Error ? titleError.message : "Unknown error"}`, "error");
+            console.warn('Failed to generate thread title:', titleError);
           }
-        } else {
-          debugLog.addEvent("Database", "Failed to save user message - null response", "error");
-          throw new Error("Failed to save message");
         }
+      } else {
+        debugLog.addEvent("Database", "Failed to save user message - null response", "error");
+        throw new Error("Failed to save message");
+      }
       } catch (saveError: any) {
         debugLog.addEvent("Database", `Error saving user message: ${saveError.message || "Unknown error"}`, "error");
         toast({
@@ -636,19 +658,22 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       // Route ALL queries to chat-with-rag (restored original design)
       debugLog.addEvent("Routing", "Using chat-with-rag for all queries with streaming", "info");
       
-      // Start streaming chat for all queries
-      await startStreamingChat(
-        message,
-        effectiveUserId,
-        threadId,
-        conversationContext,
-        {
-          useAllEntries: queryClassification.useAllEntries || false,
-          hasPersonalPronouns: message.toLowerCase().includes('i ') || message.toLowerCase().includes('my '),
-          hasExplicitTimeReference: /\b(last week|yesterday|this week|last month|today|recently|lately)\b/i.test(message),
-          threadMetadata: {}
-        }
-      );
+      // Start streaming chat for all queries with correlation ID
+      if (correlationId) {
+        await startStreamingChat(
+          message,
+          effectiveUserId,
+          threadId,
+          conversationContext,
+          {
+            useAllEntries: queryClassification.useAllEntries || false,
+            hasPersonalPronouns: message.toLowerCase().includes('i ') || message.toLowerCase().includes('my '),
+            hasExplicitTimeReference: /\b(last week|yesterday|this week|last month|today|recently|lately)\b/i.test(message),
+            threadMetadata: {}
+          }
+          // Note: correlationId is passed through thread safety manager
+        );
+      }
       
       // Streaming owns the lifecycle; ensure local loader is cleared immediately
       setLocalLoading(false);
