@@ -2,6 +2,7 @@
 import React, { useEffect } from 'react';
 import { nativeIntegrationService } from '@/services/nativeIntegrationService';
 import { logger } from '@/utils/logger';
+import { useNotificationPanelDetector } from '@/hooks/use-notification-panel-detector';
 
 interface StatusBarManagerProps {
   children: React.ReactNode;
@@ -9,6 +10,16 @@ interface StatusBarManagerProps {
 
 export const StatusBarManager: React.FC<StatusBarManagerProps> = ({ children }) => {
   const componentLogger = logger.createLogger('StatusBarManager');
+  
+  // Add notification panel gesture detection for immediate status bar hide
+  useNotificationPanelDetector({
+    onNotificationPanelClosed: () => {
+      componentLogger.info('Notification panel closed via gesture - status bar hidden');
+    },
+    topThreshold: 50,
+    swipeThreshold: 100,
+    debounceMs: 300
+  });
   
   useEffect(() => {
     const initializeStatusBar = async () => {
