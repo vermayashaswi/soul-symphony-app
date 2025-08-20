@@ -124,6 +124,14 @@ export async function processChatMessage(
     const classification = classificationData;
     
     console.log('[ChatService] Message classification:', classification);
+    
+    // Store classification data for inclusion in response
+    const classificationMetadata = {
+      category: classification.category,
+      confidence: classification.confidence,
+      reasoning: classification.reasoning,
+      useAllEntries: classification.useAllEntries
+    };
 
     // Handle general mental health with conversational SOULo personality
     if (classification.category === 'GENERAL_MENTAL_HEALTH') {
@@ -132,7 +140,11 @@ export async function processChatMessage(
       const generalResponse = await handleGeneralQuestion(message, conversationContext, userId);
       return {
         content: generalResponse,
-        role: 'assistant'
+        role: 'assistant',
+        analysis: {
+          method: 'general_mental_health',
+          classification: classificationMetadata
+        }
       };
     }
 
@@ -363,7 +375,8 @@ export async function processChatMessage(
             ragTime: ragExecutionTime,
             route: routingResult.primaryRoute.routeName
           }
-        }
+        },
+        classification: classificationMetadata
       },
       hasNumericResult: ragResponse.data.hasNumericResult
     };

@@ -153,51 +153,6 @@ export const getChatMessages = async (threadId: string, userId: string): Promise
   }
 };
 
-export const updateChatMessage = async (
-  messageId: string, 
-  updates: Partial<ChatMessage>,
-  userId: string
-): Promise<ChatMessage | null> => {
-  try {
-    // First verify the message belongs to a thread owned by the user
-    const { data: message, error: messageError } = await supabase
-      .from('chat_messages')
-      .select(`
-        *,
-        chat_threads!inner(user_id)
-      `)
-      .eq('id', messageId)
-      .single();
-
-    if (messageError || !message || message.chat_threads.user_id !== userId) {
-      console.error('Message not found or access denied:', messageError);
-      return null;
-    }
-
-    const { data, error } = await supabase
-      .from('chat_messages')
-      .update(updates)
-      .eq('id', messageId)
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error updating chat message:', error);
-      return null;
-    }
-
-    // Cast sender and role to proper types and handle sub_query_responses
-    return {
-      ...data,
-      sender: data.sender as 'user' | 'assistant' | 'error',
-      role: data.role as 'user' | 'assistant' | 'error',
-      sub_query_responses: Array.isArray(data.sub_query_responses) ? data.sub_query_responses : []
-    };
-  } catch (error) {
-    console.error('Exception updating chat message:', error);
-    return null;
-  }
-};
 
 export const deleteChatMessage = async (messageId: string, userId: string): Promise<boolean> => {
   try {
@@ -236,6 +191,9 @@ export const deleteChatMessage = async (messageId: string, userId: string): Prom
 // Legacy function aliases for backward compatibility
 export const getThreadMessages = getChatMessages;
 
+// Export classification helper
+export { updateUserMessageClassification } from '@/utils/chat/classificationHelpers';
+
 // Updated saveMessage function with correct signature and idempotency support
 export const saveMessage = async (
   threadId: string, 
@@ -246,7 +204,8 @@ export const saveMessage = async (
   hasNumericResult?: boolean,
   isInteractive?: boolean,
   interactiveOptions?: any[],
-  idempotencyKey?: string
+  idempotencyKey?: string,
+  analysisData?: any
 ) => {
   console.log('[saveMessage] Starting message save:', {
     threadId,
@@ -283,6 +242,7 @@ export const saveMessage = async (
   if (isInteractive) additionalData.isInteractive = isInteractive;
   if (interactiveOptions) additionalData.interactiveOptions = interactiveOptions;
   if (idempotencyKey) additionalData.idempotency_key = idempotencyKey;
+  if (analysisData) additionalData.analysis_data = analysisData;
 
   console.log('[saveMessage] Processed data, calling createChatMessage');
   const result = await createChatMessage(threadId, processedContent, sender, userId, additionalData);
@@ -294,6 +254,38 @@ export const saveMessage = async (
   }
   
   return result;
+};
+
+// Update message with classification data
+export const updateChatMessageAnalysis = async (
+  messageId: string,
+  analysisData: any,
+  userId: string
+): Promise<boolean> => {
+  try {
+    console.log('[updateChatMessage] Updating message with analysis data:', {
+      messageId,
+      hasAnalysisData: !!analysisData,
+      userId
+    });
+
+    const { error } = await supabase
+      .from('chat_messages')
+      .update({ analysis_data: analysisData })
+      .eq('id', messageId)
+      .eq('sender', 'user'); // Only update user messages for classification
+
+    if (error) {
+      console.error('[updateChatMessage] Failed to update message:', error);
+      return false;
+    }
+
+    console.log('[updateChatMessage] Successfully updated message with analysis data');
+    return true;
+  } catch (error) {
+    console.error('[updateChatMessage] Exception updating message:', error);
+    return false;
+  }
 };
 
 // Thread management functions

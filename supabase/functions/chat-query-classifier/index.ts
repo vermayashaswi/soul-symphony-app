@@ -94,6 +94,7 @@ async function gptClassifyMessage(
 
 **TENTATIVE LANGUAGE DETECTION (CHECK BEFORE CONTEXT OVERRIDES):**
 - Messages with uncertain/speculative language ("maybe", "might", "perhaps", "could be", "I think", "not sure", "possibly") should be classified as JOURNAL_SPECIFIC_NEEDS_CLARIFICATION even if they mention specific topics
+- Examples "I am feeling bad" , "I am dealing with a lot of stuff" , "Last few days I've been tired"
 - Examples: "maybe its something about my job", "I think it might be work related", "could be stress from relationships"
 - Even in follow-up answers, if the user is uncertain, they need clarification
 

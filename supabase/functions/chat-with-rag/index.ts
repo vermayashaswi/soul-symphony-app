@@ -154,10 +154,19 @@ serve(async (req) => {
       }
     }
     
-    // Import and normalize user timezone
+    // Enhanced timezone handling with validation
     const { normalizeUserTimezone } = await import('../_shared/timezoneUtils.ts');
+    const { safeTimezoneConversion, debugTimezoneInfo } = await import('../_shared/enhancedTimezoneUtils.ts');
+    
     const userTimezone = normalizeUserTimezone(userProfile);
-    console.log(`[chat-with-rag] User timezone: ${userTimezone}`);
+    
+    // Validate timezone and log detailed info for debugging
+    const timezoneDebug = debugTimezoneInfo(userTimezone, 'chat-with-rag');
+    console.log(`[chat-with-rag] User timezone validation:`, {
+      userTimezone,
+      isValid: timezoneDebug.validation.isValid,
+      issues: timezoneDebug.validation.issues
+    });
 
     // Step 1: Query Classification with retry logic
     console.log("[chat-with-rag] Step 1: Query Classification");
@@ -309,7 +318,8 @@ serve(async (req) => {
       const generalResponse = await supabaseClient.functions.invoke('general-mental-health-chat', {
         body: {
           message: message,
-          conversationContext: conversationContext
+          conversationContext: conversationContext,
+          userTimezone: userTimezone  // Pass validated timezone
         }
       });
 
