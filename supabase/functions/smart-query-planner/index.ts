@@ -85,26 +85,33 @@ function sanitizeUserIdInQuery(query: string, userId: string, requestId: string)
 }
 
 
+// Tests the functionality of vector operations with comprehensive validation
 async function testVectorOperations(supabaseClient: any, requestId: string): Promise<boolean> {
   try {
     console.log(`[${requestId}] Testing vector operations...`);
     
-    const { data, error } = await supabaseClient.rpc('test_vector_operations');
+    // Test with enhanced vector verification
+    const { data, error } = await supabaseClient.rpc('verify_vector_operations');
     
     if (error) {
-      console.error(`[${requestId}] Vector test error:`, error);
+      console.error(`[${requestId}] Vector verification RPC error:`, error);
       return false;
     }
     
-    if (data && data.success) {
-      console.log(`[${requestId}] Vector operations test passed:`, data.message);
+    if (data && data.success && data.operator_exists) {
+      console.log(`[${requestId}] Vector operations verified successfully:`, {
+        status: data.vector_extension_status,
+        hasEmbeddings: data.has_embeddings,
+        operatorExists: data.operator_exists,
+        embeddingCount: data.embedding_count
+      });
       return true;
     } else {
-      console.error(`[${requestId}] Vector operations test failed:`, data?.error || 'Unknown error');
+      console.warn(`[${requestId}] Vector operations verification failed:`, data);
       return false;
     }
   } catch (error) {
-    console.error(`[${requestId}] Error testing vector operations:`, error);
+    console.error(`[${requestId}] Vector operations test exception:`, error);
     return false;
   }
 }
@@ -357,15 +364,18 @@ function applyDependencyContext(step: AnalysisStep, dependencyContext: any, requ
 
 async function executeVectorSearch(step: any, userId: string, supabaseClient: any, requestId: string, executionDetails: any) {
   try {
-    // Test vector operations first
+    // Enhanced vector operations validation
     const vectorTestPassed = await testVectorOperations(supabaseClient, requestId);
     executionDetails.testPassed = vectorTestPassed;
     
     if (!vectorTestPassed) {
-      console.warn(`[${requestId}] Vector operations test failed, using fallback`);
+      console.warn(`[${requestId}] Vector operations validation failed, falling back to SQL search`);
       executionDetails.fallbackUsed = true;
+      executionDetails.fallbackReason = 'Vector operations test failed';
       return await executeBasicSQLQuery(userId, supabaseClient, requestId);
     }
+    
+    console.log(`[${requestId}] Vector operations validated successfully, proceeding with vector search`);
 
     const embedding = await generateEmbedding(step.vectorSearch.query);
     
