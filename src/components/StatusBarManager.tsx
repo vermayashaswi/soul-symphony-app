@@ -93,66 +93,85 @@ export const StatusBarManager: React.FC<StatusBarManagerProps> = ({ children }) 
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
                    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
       
-      // Enhanced viewport detection using available height for better accuracy
-      const screenHeight = window.screen.availHeight || window.screen.height;
+      // Enhanced measurement using visualViewport for accuracy
       const viewportHeight = window.innerHeight;
+      const screenHeight = window.screen.availHeight || window.screen.height;
       const devicePixelRatio = window.devicePixelRatio || 1;
+      const viewportWidth = window.innerWidth;
       
-      // Smart Universal Safe Area Calculation
-      let baseHeight = 0;
+      // Use visualViewport.offsetTop for precise system UI measurement when available
+      let accurateSystemUIHeight = 0;
+      if (window.visualViewport && window.visualViewport.offsetTop > 0) {
+        accurateSystemUIHeight = window.visualViewport.offsetTop;
+        componentLogger.debug('Using visualViewport.offsetTop for accurate measurement', { 
+          offsetTop: accurateSystemUIHeight 
+        });
+      } else {
+        // Fallback to screen vs viewport calculation
+        accurateSystemUIHeight = Math.max(0, screenHeight - viewportHeight);
+      }
+      
+      // Smart Universal Safe Area Calculation with refined logic
       let calculatedTopInset = '0px';
       let bottomInset = '0px';
       
       if (isAndroid) {
-        // Layer 1: Enhanced base calculation with device density
-        const heightDifference = screenHeight - viewportHeight;
-        const densityAdjustedHeight = Math.max(24, Math.min(56, heightDifference / 2));
-        baseHeight = densityAdjustedHeight;
+        // Samsung Galaxy S24 specific detection (high DPI, specific dimensions)
+        const isSamsungGalaxy = devicePixelRatio >= 3.0 && 
+                               viewportWidth >= 360 && viewportWidth <= 430 &&
+                               viewportHeight >= 800;
         
-        // Layer 2: Intelligent buffer system
-        const viewportBuffer = Math.max(48, viewportHeight * 0.08); // 8% of viewport height
-        const deviceMultiplier = devicePixelRatio > 2.5 ? 1.25 : 1.15; // High-DPI gets +25%, standard +15%
-        const intelligentBuffer = viewportBuffer * deviceMultiplier;
+        // Layer 1: Base measurement using accurate system UI height
+        let baseHeight = Math.max(24, accurateSystemUIHeight);
         
-        // Layer 3: Platform-specific minimum (56px for Android)
-        const minimumAndroidHeight = 56;
-        const calculatedHeight = Math.max(minimumAndroidHeight, baseHeight + intelligentBuffer);
+        // Layer 2: Adaptive buffer system (reduced from 8% to 4-5%)
+        let bufferPercentage = 0.04; // Default 4%
+        if (viewportWidth >= 600) bufferPercentage = 0.05; // Large screens 5%
+        if (isSamsungGalaxy) bufferPercentage = 0.03; // Samsung specific 3%
         
-        // Layer 4: Fallback maximum (15% of viewport height)
-        const maximumHeight = viewportHeight * 0.15;
+        const adaptiveBuffer = viewportHeight * bufferPercentage;
+        
+        // Layer 3: Reduced platform minimum (32px instead of 56px)
+        const minimumAndroidHeight = 32;
+        const calculatedHeight = Math.max(minimumAndroidHeight, baseHeight + adaptiveBuffer);
+        
+        // Layer 4: Reduced maximum cap (10% instead of 15%)
+        const maximumHeight = viewportHeight * 0.10;
         const finalHeight = Math.min(calculatedHeight, maximumHeight);
         
         calculatedTopInset = `${Math.round(finalHeight)}px`;
-        bottomInset = '12px'; // Standard Android navigation gesture area
+        bottomInset = '12px';
         
         document.documentElement.classList.add('platform-android');
         document.documentElement.classList.remove('platform-ios');
         
-        componentLogger.debug('Android smart safe area calculated', { 
+        componentLogger.debug('Android refined safe area calculated', { 
           screenHeight, 
-          viewportHeight, 
+          viewportHeight,
+          viewportWidth,
           devicePixelRatio,
+          accurateSystemUIHeight,
           baseHeight,
-          intelligentBuffer,
+          adaptiveBuffer: Math.round(adaptiveBuffer),
           finalHeight: Math.round(finalHeight),
           minimumAndroidHeight,
-          maximumHeight: Math.round(maximumHeight)
+          maximumHeight: Math.round(maximumHeight),
+          isSamsungGalaxy,
+          bufferPercentage
         });
       } else if (isIOS) {
         // Layer 1: Base iOS calculation
-        baseHeight = 44;
+        let baseHeight = Math.max(44, accurateSystemUIHeight);
         
-        // Layer 2: Intelligent buffer for iOS
-        const viewportBuffer = Math.max(64, viewportHeight * 0.08);
-        const deviceMultiplier = devicePixelRatio > 2.5 ? 1.25 : 1.15;
-        const intelligentBuffer = viewportBuffer * deviceMultiplier;
+        // Layer 2: Reduced buffer for iOS (5% instead of 8%)
+        const adaptiveBuffer = viewportHeight * 0.05;
         
-        // Layer 3: Platform-specific minimum (64px for iOS)
-        const minimumIOSHeight = 64;
-        const calculatedHeight = Math.max(minimumIOSHeight, baseHeight + intelligentBuffer);
+        // Layer 3: Keep minimum for notched devices
+        const minimumIOSHeight = 44;
+        const calculatedHeight = Math.max(minimumIOSHeight, baseHeight + adaptiveBuffer);
         
-        // Layer 4: Fallback maximum
-        const maximumHeight = viewportHeight * 0.15;
+        // Layer 4: Reduced maximum
+        const maximumHeight = viewportHeight * 0.10;
         const finalHeight = Math.min(calculatedHeight, maximumHeight);
         
         calculatedTopInset = `${Math.round(finalHeight)}px`;
@@ -160,54 +179,47 @@ export const StatusBarManager: React.FC<StatusBarManagerProps> = ({ children }) 
         document.documentElement.classList.add('platform-ios');
         document.documentElement.classList.remove('platform-android');
         
-        componentLogger.debug('iOS smart safe area calculated', { 
+        componentLogger.debug('iOS refined safe area calculated', { 
           baseHeight,
-          intelligentBuffer,
+          adaptiveBuffer: Math.round(adaptiveBuffer),
           finalHeight: Math.round(finalHeight),
           minimumIOSHeight,
           maximumHeight: Math.round(maximumHeight)
         });
       } else {
-        // Web platform - Layer 3: minimum 32px for browser chrome
-        const minimumWebHeight = 32;
-        const viewportBuffer = Math.max(32, viewportHeight * 0.05); // 5% for web
-        const finalHeight = Math.min(minimumWebHeight + viewportBuffer, viewportHeight * 0.1);
+        // Web platform - minimal safe area
+        const minimumWebHeight = 24;
+        const adaptiveBuffer = viewportHeight * 0.03; // 3% for web
+        const finalHeight = Math.min(minimumWebHeight + adaptiveBuffer, viewportHeight * 0.08);
         
         calculatedTopInset = `${Math.round(finalHeight)}px`;
         
-        componentLogger.debug('Web smart safe area calculated', { 
+        componentLogger.debug('Web refined safe area calculated', { 
           finalHeight: Math.round(finalHeight),
-          viewportBuffer
+          adaptiveBuffer: Math.round(adaptiveBuffer)
         });
       }
       
-      // Set CSS custom properties for safe area handling with smart calculated values
+      // Single source of truth - only set calculated-safe-area-top
       const root = document.documentElement;
-      root.style.setProperty('--status-bar-height', calculatedTopInset); // Use smart calculation
       root.style.setProperty('--calculated-safe-area-top', calculatedTopInset);
       root.style.setProperty('--calculated-safe-area-bottom', bottomInset);
       
-      // Update safe area inset variables with calculated or env() values
-      const envTop = getComputedStyle(root).getPropertyValue('--safe-area-inset-top');
-      const envBottom = getComputedStyle(root).getPropertyValue('--safe-area-inset-bottom');
-      
-      // Use calculated values as fallback when env() values are not available
-      const finalTopInset = envTop && !envTop.includes('env(') ? envTop : calculatedTopInset;
-      const finalBottomInset = envBottom && !envBottom.includes('env(') ? envBottom : bottomInset;
-      
-      root.style.setProperty('--safe-area-inset-top', finalTopInset);
-      root.style.setProperty('--safe-area-inset-bottom', finalBottomInset);
+      // Update other variables for compatibility but don't use them for padding
+      root.style.setProperty('--status-bar-height', calculatedTopInset);
+      root.style.setProperty('--safe-area-inset-top', calculatedTopInset);
+      root.style.setProperty('--safe-area-inset-bottom', bottomInset);
       root.style.setProperty('--safe-area-inset-left', 'env(safe-area-inset-left, 0px)');
       root.style.setProperty('--safe-area-inset-right', 'env(safe-area-inset-right, 0px)');
       
-      componentLogger.debug('Smart safe area variables updated', {
+      componentLogger.info('Refined safe area variables updated', {
         calculatedTopInset,
         bottomInset,
-        top: finalTopInset,
-        bottom: finalBottomInset,
         platform: isAndroid ? 'android' : isIOS ? 'ios' : 'web',
         viewportHeight,
-        devicePixelRatio
+        viewportWidth,
+        devicePixelRatio,
+        accurateSystemUIHeight
       });
     };
 

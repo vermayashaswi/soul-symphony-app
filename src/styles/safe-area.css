@@ -16,11 +16,10 @@
   --calculated-safe-area-right: var(--safe-area-inset-right);
 }
 
-/* Platform detection and adjustments */
+/* Platform detection and adjustments - Refined for better spacing */
 .platform-android {
-  --status-bar-height: 24px;
-  /* Ensure minimum safe area bottom for navigation gestures */
-  --safe-area-inset-bottom: max(env(safe-area-inset-bottom, 0px), 12px);
+  /* Reduced minimum heights for better spacing */
+  --status-bar-height: 32px;
   --calculated-safe-area-bottom: max(env(safe-area-inset-bottom, 0px), 12px);
 }
 
@@ -41,14 +40,14 @@
   --effective-safe-area-bottom: 0px;
 }
 
-/* Safe area utilities */
+/* Safe area utilities - Single source of truth */
 .safe-area-top {
-  padding-top: max(var(--status-bar-height), var(--calculated-safe-area-top)) !important;
+  padding-top: var(--calculated-safe-area-top) !important;
 }
 
 /* Home page specific safe area handling */
 .mobile-container.safe-area-top {
-  padding-top: max(var(--status-bar-height), var(--calculated-safe-area-top)) !important;
+  padding-top: var(--calculated-safe-area-top) !important;
 }
 
 .safe-area-bottom {
