@@ -6,6 +6,7 @@ import {
   getEmotionAnalysisGuidelines, 
   getThemeAnalysisGuidelines 
 } from '../_shared/databaseSchemaContext.ts';
+import { extractAndParseJSON } from './extractAndParseJSON.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -84,26 +85,33 @@ function sanitizeUserIdInQuery(query: string, userId: string, requestId: string)
 }
 
 
+// Tests the functionality of vector operations with comprehensive validation
 async function testVectorOperations(supabaseClient: any, requestId: string): Promise<boolean> {
   try {
     console.log(`[${requestId}] Testing vector operations...`);
     
-    const { data, error } = await supabaseClient.rpc('test_vector_operations');
+    // Test with enhanced vector verification
+    const { data, error } = await supabaseClient.rpc('verify_vector_operations');
     
     if (error) {
-      console.error(`[${requestId}] Vector test error:`, error);
+      console.error(`[${requestId}] Vector verification RPC error:`, error);
       return false;
     }
     
-    if (data && data.success) {
-      console.log(`[${requestId}] Vector operations test passed:`, data.message);
+    if (data && data.success && data.operator_exists) {
+      console.log(`[${requestId}] Vector operations verified successfully:`, {
+        status: data.vector_extension_status,
+        hasEmbeddings: data.has_embeddings,
+        operatorExists: data.operator_exists,
+        embeddingCount: data.embedding_count
+      });
       return true;
     } else {
-      console.error(`[${requestId}] Vector operations test failed:`, data?.error || 'Unknown error');
+      console.warn(`[${requestId}] Vector operations verification failed:`, data);
       return false;
     }
   } catch (error) {
-    console.error(`[${requestId}] Error testing vector operations:`, error);
+    console.error(`[${requestId}] Vector operations test exception:`, error);
     return false;
   }
 }
@@ -356,15 +364,18 @@ function applyDependencyContext(step: AnalysisStep, dependencyContext: any, requ
 
 async function executeVectorSearch(step: any, userId: string, supabaseClient: any, requestId: string, executionDetails: any) {
   try {
-    // Test vector operations first
+    // Enhanced vector operations validation
     const vectorTestPassed = await testVectorOperations(supabaseClient, requestId);
     executionDetails.testPassed = vectorTestPassed;
     
     if (!vectorTestPassed) {
-      console.warn(`[${requestId}] Vector operations test failed, using fallback`);
+      console.warn(`[${requestId}] Vector operations validation failed, falling back to SQL search`);
       executionDetails.fallbackUsed = true;
+      executionDetails.fallbackReason = 'Vector operations test failed';
       return await executeBasicSQLQuery(userId, supabaseClient, requestId);
     }
+    
+    console.log(`[${requestId}] Vector operations validated successfully, proceeding with vector search`);
 
     const embedding = await generateEmbedding(step.vectorSearch.query);
     
@@ -833,7 +844,7 @@ async function analyzeQueryWithSubQuestions(message, conversationContext, userEn
     
     console.log(`[Analyst Agent] Enhanced analysis - Content-seeking: ${isContentSeekingQuery}, Mandatory vector: ${requiresMandatoryVector}, Personal: ${hasPersonalPronouns}, Time ref: ${hasExplicitTimeReference}, Follow-up: ${isFollowUpContext}`);
 
-    const prompt = `You are SOULo's Enhanced Analyst Agent - an intelligent query planning specialist for journal data analysis TIMEZONE-AWARE date processing.
+    const prompt = `You are SOULo's Enhanced Analyst Agent - an intelligent query planning specialist for journal data analysis.
 
 ${databaseSchemaContext}
 
@@ -841,20 +852,16 @@ ${databaseSchemaContext}
 - You MUST ONLY use table names, column names, and data types that exist in the database schema above
 - DO NOT hallucinate or invent table structures, column names, or data types
 - STICK STRICTLY to the provided database schema context
-- If uncertain about a database structure, use basic select queries instead of complex ones
 
-SUB-QUESTION/QUERIES GENERATION GUIDELINE (MANDATORY): 
-- Break down user query (MANDATORY: remember that current user message might not be a direct query, so you'll have to look in to the conversation context provided to you and look at last user messages to guess the "ASK" and accordingly frame the sub-questions) into ATLEAST 2 sub-questions or more such that all sub-questions can be consolidated to answer the user's ASK 
-- CRITICAL: When analyzing vague queries like "I'm confused between these two options" or "help me decide", look at the FULL conversation context to understand what the two options are (e.g., "jobs vs startup", "career choices", etc.) and generate specific sub-questions about those topics
-- If user's query is vague, examine the complete conversation history to derive what the user wants to know and frame sub-questions that address their specific decision or dilemma
-- For career/life decisions: Generate sub-questions about patterns, emotions, and insights related to the specific options being considered
-- For eg. user asks (What % of entries contain the emotion confidence (and is it the dominant one?) when I deal with family matters that also concern health issues? -> sub question 1: How many entries concern family and health both? sub question 2: What are all the emotions and their avg scores ? sub question 3: Rank the emotions)
+SUB-QUESTION/QUERIES GENERATION GUIDELINE: 
+- Break down user query into ATLEAST 2 sub-questions that can be consolidated to answer the user's ASK 
+- CRITICAL: When analyzing vague queries, look at the FULL conversation context to understand what the user wants
+- For eg. "What % of entries contain confidence when I deal with family and health?" -> sub question 1: How many entries concern family and health? sub question 2: What are all the emotions and their avg scores? sub question 3: Rank the emotions
 
 **ENHANCED SQL QUERY GENERATION GUIDELINES:**
 
 1. **UUID and User ID Requirements:**
    - ALWAYS use auth.uid() for user filtering (it will be replaced with the actual UUID)
-   - NEVER hardcode user IDs or generate fake UUIDs
    - Example: WHERE user_id = auth.uid()
 
 2. **Table and Column References:**
@@ -866,21 +873,18 @@ SUB-QUESTION/QUERIES GENERATION GUIDELINE (MANDATORY):
 3. **JSON Operations on emotions/entities columns:**
    - For emotions: jsonb_each(emotions) to expand, emotions->>'emotion_name' for specific values
    - For entities: jsonb_each(entities) for types, jsonb_array_elements_text() for values
-   - Example: SELECT emotion_key, AVG((emotion_value::text)::numeric) FROM "Journal Entries", jsonb_each(emotions) WHERE user_id = auth.uid() GROUP BY emotion_key
 
-4. **MANDATORY TIME RANGE INTEGRATION:**
+4. **TIME RANGE INTEGRATION:**
    - When timeRange is provided in the step, SQL queries MUST include the date filters
    - Use proper timestamp with time zone format: '2024-08-01T00:00:00Z'::timestamp with time zone
-   - ALWAYS include both start and end date filters when timeRange exists
    - Example: AND created_at >= 'START_DATE' AND created_at <= 'END_DATE'
 
 5. **Safe Query Patterns:**
    - Always include user_id = auth.uid() in WHERE clause
    - Use proper PostgreSQL syntax with double quotes for table/column names with spaces
-   - Avoid complex nested queries - keep it simple and working
    - Use standard aggregation functions: COUNT, AVG, MAX, MIN, SUM
 
-**WORKING SQL EXAMPLES FOR REFERENCE:**
+**WORKING SQL EXAMPLES:**
 
 1. **Basic Entry Query:**
 \`\`\`sql
@@ -906,92 +910,19 @@ ORDER BY avg_score DESC
 LIMIT 5;
 \`\`\`
 
-3. **Theme-based Query:**
-\`\`\`sql
-SELECT created_at, "refined text" as content, master_themes
-FROM "Journal Entries" 
-WHERE user_id = auth.uid() 
-  AND master_themes IS NOT NULL 
-  AND 'Work' = ANY(master_themes)
-ORDER BY created_at DESC 
-LIMIT 5;
-\`\`\`
+**VECTOR SEARCH RULES:**
 
-4. **Date Range Query with Timezone Conversion:**
-\`\`\`sql
-SELECT COUNT(*) as entry_count,
-       AVG(CASE WHEN sentiment = 'positive' THEN 1 WHEN sentiment = 'negative' THEN -1 ELSE 0 END) as avg_sentiment
-FROM "Journal Entries" 
-WHERE user_id = auth.uid() 
-  AND created_at >= '2024-01-01T00:00:00Z'::timestamp with time zone
-  AND created_at <= '2024-01-01T23:59:59Z'::timestamp with time zone;
-\`\`\`
-
-5. **Emotion Analysis with Time Range:**
-\`\`\`sql
-SELECT 
-  emotion_key,
-  AVG((emotion_value::text)::numeric) as avg_score,
-  COUNT(*) as frequency
-FROM "Journal Entries", 
-     jsonb_each(emotions) as e(emotion_key, emotion_value)
-WHERE user_id = auth.uid() 
-  AND emotions IS NOT NULL
-  AND created_at >= '2024-08-01T00:00:00Z'::timestamp with time zone
-  AND created_at <= '2024-08-31T23:59:59Z'::timestamp with time zone
-GROUP BY emotion_key
-ORDER BY avg_score DESC;
-\`\`\`
-
-**CRITICAL TIMEZONE HANDLING RULES:**
-
-1. **USER TIMEZONE CONTEXT**: User timezone is "${userTimezone}"
-2. **DATABASE STORAGE**: All journal entries are stored in UTC in the database
-3. **TIMEZONE CONVERSION REQUIRED**: When generating date ranges, you MUST account for timezone conversion
-   - User asks about "August 6" in India timezone
-   - Database query needs UTC range that captures all entries made on August 6 India time
-   - Example: August 6 India time = August 5 18:30 UTC to August 6 18:29 UTC
-
-**CRITICAL VECTOR SEARCH RULES - MUST FOLLOW:**
-
-1. **MANDATORY VECTOR SEARCH SCENARIOS** (Always include vector search regardless of time constraints):
+1. **MANDATORY VECTOR SEARCH SCENARIOS**:
    - ANY query asking for "content", "what I wrote", "what I said", "entries about", "show me", "find"
    - Questions seeking emotional context, feelings, moods, or mental states
    - Requests for examples, patterns, insights, or thematic analysis  
    - Queries about achievements, progress, breakthroughs, or personal growth
-   - Comparative analysis ("similar to", "like when", "reminds me of")
-   - Reflective queries ("how was I feeling", "what was going through my mind")
-   - Follow-up questions referencing previous context
    - Any query with words: "exactly", "specifically", "precisely", "detailed", "in-depth"
 
-2. **HYBRID SEARCH STRATEGY** (SQL + Vector for optimal results):
-   - Time-based content queries: Use SQL for date filtering AND vector for semantic content
-   - Statistical queries needing examples: SQL for stats AND vector for relevant samples
-   - Thematic queries: SQL theme analysis AND vector semantic search
-   - Achievement/progress tracking: SQL for metrics AND vector for meaningful content
-
-3. **ENHANCED VECTOR QUERY GENERATION**:
+2. **VECTOR QUERY GENERATION**:
    - Use the user's EXACT words and emotional context in vector searches
    - For "What did I journal in August" → Vector query: "journal entries personal thoughts feelings experiences august"
    - For achievement queries → Vector query: "achievement success accomplishment progress breakthrough proud"
-   - For emotional queries → Vector query: "emotions feelings mood emotional state [specific emotions mentioned]"
-   - Preserve user's original language patterns for better semantic matching
-
-4. **CRITICAL TIME-OF-DAY QUERY RULES**:
-    - When user asks about "first half vs second half" or "morning vs evening", NEVER generate UTC-based queries
-    - ALWAYS use user's timezone ("${userTimezone}") for time-of-day calculations
-    - Use SQL with AT TIME ZONE to convert stored UTC times to user's local time for hour-based analysis
-    - Example for "first half vs second half": 
-      \`\`\`sql
-      SELECT 
-        CASE WHEN EXTRACT(HOUR FROM created_at AT TIME ZONE 'USER_TIMEZONE_HERE') < 12 THEN 'first_half' ELSE 'second_half' END as day_period,
-        COUNT(*) as entry_count
-      FROM "Journal Entries" 
-      WHERE user_id = auth.uid()
-      GROUP BY day_period;
-      \`\`\`
-    - All timeRange objects MUST include "timezone": "${userTimezone}"
-    - Date processing will handle conversion from user's local time to UTC for database queries
 
 USER QUERY: "${message}"
 USER TIMEZONE: "${userTimezone}"
@@ -1000,64 +931,45 @@ CONTEXT: ${last.length > 0 ? last.map(m => `${m.sender}: ${m.content || 'N/A'}`)
 ANALYSIS REQUIREMENTS:
 - Content-seeking detected: ${isContentSeekingQuery}
 - Mandatory vector required: ${requiresMandatoryVector}  
-- Has personal pronouns: ${hasPersonalPronouns}
-- Has time reference: ${hasExplicitTimeReference}
-- Is follow-up query: ${isFollowUpContext}
-- User timezone: ${userTimezone}
 
 Generate a comprehensive analysis plan that:
 1. MANDATES vector search for any content-seeking scenario
 2. Uses hybrid approach (SQL + vector) for time-based content queries
 3. Creates semantically rich vector search queries using user's language
-4. INCLUDES proper timezone information in all timeRange objects
-5. Generates COMPLETE, SAFE, EXECUTABLE SQL queries using ONLY the provided database schema and working patterns above
-6. NEVER references forbidden columns: transcription text, foreign key, audio_url, user_feedback, edit_status, translation_status
-7. Uses "refined text" as the primary content source (NEVER transcription text)
-8. Ensures comprehensive coverage of user's intent
+4. Generates COMPLETE, SAFE, EXECUTABLE SQL queries using ONLY the provided database schema
+5. NEVER references forbidden columns
+6. Uses "refined text" as the primary content source
+7. Ensures comprehensive coverage of user's intent
 
 Response format (MUST be valid JSON):
 {
-  "queryType": "journal_specific|general_inquiry|mental_health",
   "strategy": "intelligent_sub_query|comprehensive_hybrid|vector_mandatory",
-  "userStatusMessage": "Brief status for user",
   "subQuestions": [
     {
       "id": "sq1",
       "question": "Specific sub-question",
-      "purpose": "Why this question is needed",
-      "searchStrategy": "vector_mandatory|sql_primary|hybrid_parallel",
       "executionStage": 1,
       "dependencies": ["sq1", "sq2"] or [],
-      "resultForwarding": "entry_ids_for_next_steps|emotion_data_for_ranking|null",
-      "executionMode": "parallel|sequential|conditional",
       "analysisSteps": [
         {
-          "step": 1,
-          "description": "What this step does",
           "queryType": "vector_search|sql_analysis|hybrid_search",
-          "sqlQuery": "COMPLETE EXECUTABLE SQL QUERY using only existing database schema and working patterns" or null,
+          "sqlQuery": "COMPLETE EXECUTABLE SQL QUERY using only existing database schema" or null,
           "vectorSearch": {
             "query": "Semantically rich search query using user's words",
             "threshold": 0.3,
             "limit": 15
           } or null,
-          "timeRange": {"start": "ISO_DATE", "end": "ISO_DATE", "timezone": "${userTimezone}"} or null,
-          "resultContext": "use_entry_ids_from_sq1|use_emotion_data_from_sq2|null",
-          "dependencies": ["sq1"] or []
+          "timeRange": {"start": "ISO_DATE", "end": "ISO_DATE", "timezone": "${userTimezone}"} or null
         }
       ]
     }
   ],
   "confidence": 0.8,
   "reasoning": "Explanation of strategy with emphasis on dependency management and execution orchestration",
-  "useAllEntries": boolean,
-  "hasPersonalPronouns": ${hasPersonalPronouns},
-  "hasExplicitTimeReference": ${hasExplicitTimeReference},
-  "inferredTimeContext": null or timeframe_object_with_timezone,
   "userTimezone": "${userTimezone}"
 }`;
 
-    console.log(`[Analyst Agent] Calling OpenAI API with enhanced prompt`);
+    console.log(`[Analyst Agent] Calling OpenAI API with optimized prompt`);
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -1066,9 +978,11 @@ Response format (MUST be valid JSON):
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4.1-mini-2025-04-14', // Using gpt-4.1-mini for faster planning
+        model: 'gpt-4.1-mini-2025-04-14', // Using gpt-4.1-mini for reliable query planning
         messages: [{ role: 'user', content: prompt }],
-        max_completion_tokens: 2000
+        response_format: { type: 'json_object' }, // Enforce strict JSON mode
+        max_tokens: 1000, // Token limit for GPT-4.1-mini
+        temperature: 0.1 // Low temperature for consistent responses
       }),
     });
 
@@ -1090,20 +1004,45 @@ Response format (MUST be valid JSON):
         return createEnhancedFallbackPlan(message, isContentSeekingQuery || requiresMandatoryVector, null, supabaseClient, userTimezone);
       }
 
-      // Try to extract JSON from response if wrapped in markdown
-      let jsonString = rawResponse.trim();
-      if (jsonString.startsWith('```json')) {
-        jsonString = jsonString.replace(/```json\n?/, '').replace(/\n?```$/, '');
-      } else if (jsonString.startsWith('```')) {
-        jsonString = jsonString.replace(/```\n?/, '').replace(/\n?```$/, '');
-      }
-
-      analysisResult = JSON.parse(jsonString);
+      // Direct JSON parsing since we enforce JSON mode
+      analysisResult = JSON.parse(rawResponse);
       console.log("[Analyst Agent] Successfully parsed JSON response");
     } catch (parseError) {
       console.error("Failed to parse Analyst Agent response:", parseError);
       console.error("Raw response:", rawResponse);
-      return createEnhancedFallbackPlan(message, isContentSeekingQuery || requiresMandatoryVector, null, supabaseClient, userTimezone);
+      
+      // Try using response_format: json_object for next attempt
+      console.log("[Analyst Agent] Attempting JSON object format retry");
+      try {
+        const retryResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'gpt-4.1-mini-2025-04-14',
+            messages: [
+              { role: 'system', content: 'You are a precise query analyzer. Return only valid JSON that matches the exact schema.' },
+              { role: 'user', content: prompt }
+            ],
+            response_format: { type: 'json_object' },
+            max_completion_tokens: 2000
+          }),
+        });
+        
+        if (retryResponse.ok) {
+          const retryData = await retryResponse.json();
+          const retryRawResponse = retryData.choices[0].message.content;
+          analysisResult = JSON.parse(retryRawResponse);
+          console.log("[Analyst Agent] Successfully parsed JSON on retry");
+        } else {
+          throw new Error('Retry also failed');
+        }
+      } catch (retryError) {
+        console.error("JSON retry also failed:", retryError);
+        return createEnhancedFallbackPlan(message, isContentSeekingQuery || requiresMandatoryVector, null, supabaseClient, userTimezone);
+      }
     }
 
     if (!analysisResult || !analysisResult.subQuestions) {
