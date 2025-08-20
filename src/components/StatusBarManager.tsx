@@ -88,127 +88,91 @@ export const StatusBarManager: React.FC<StatusBarManagerProps> = ({ children }) 
     };
 
     const updateSafeAreaVariables = () => {
-      // Detect platform and calculate actual safe area values
-      const isAndroid = /Android/.test(navigator.userAgent);
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
-                   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-      
-      // Enhanced viewport detection using available height for better accuracy
-      const screenHeight = window.screen.availHeight || window.screen.height;
-      const viewportHeight = window.innerHeight;
-      const devicePixelRatio = window.devicePixelRatio || 1;
-      
-      // Smart Universal Safe Area Calculation
-      let baseHeight = 0;
-      let calculatedTopInset = '0px';
-      let bottomInset = '0px';
-      
-      if (isAndroid) {
-        // Layer 1: Enhanced base calculation with device density
-        const heightDifference = screenHeight - viewportHeight;
-        const densityAdjustedHeight = Math.max(24, Math.min(56, heightDifference / 2));
-        baseHeight = densityAdjustedHeight;
+      try {
+        const viewportHeight = window.innerHeight;
         
-        // Layer 2: Intelligent buffer system
-        const viewportBuffer = Math.max(48, viewportHeight * 0.08); // 8% of viewport height
-        const deviceMultiplier = devicePixelRatio > 2.5 ? 1.25 : 1.15; // High-DPI gets +25%, standard +15%
-        const intelligentBuffer = viewportBuffer * deviceMultiplier;
-        
-        // Layer 3: Platform-specific minimum (56px for Android)
-        const minimumAndroidHeight = 56;
-        const calculatedHeight = Math.max(minimumAndroidHeight, baseHeight + intelligentBuffer);
-        
-        // Layer 4: Fallback maximum (15% of viewport height)
-        const maximumHeight = viewportHeight * 0.15;
-        const finalHeight = Math.min(calculatedHeight, maximumHeight);
-        
-        calculatedTopInset = `${Math.round(finalHeight)}px`;
-        bottomInset = '12px'; // Standard Android navigation gesture area
-        
-        document.documentElement.classList.add('platform-android');
-        document.documentElement.classList.remove('platform-ios');
-        
-        componentLogger.debug('Android smart safe area calculated', { 
-          screenHeight, 
-          viewportHeight, 
-          devicePixelRatio,
-          baseHeight,
-          intelligentBuffer,
-          finalHeight: Math.round(finalHeight),
-          minimumAndroidHeight,
-          maximumHeight: Math.round(maximumHeight)
+        componentLogger.debug('Universal safe area calculation', {
+          viewportHeight,
+          userAgent: navigator.userAgent.substring(0, 50) + '...'
         });
-      } else if (isIOS) {
-        // Layer 1: Base iOS calculation
-        baseHeight = 44;
+
+        // Check if native CSS env() provides sufficient safe area
+        const envSafeAreaTop = parseInt(
+          getComputedStyle(document.documentElement)
+            .getPropertyValue('--safe-area-inset-top')
+            .replace('px', '') || '0'
+        );
+
+        let calculatedFallback = 0;
         
-        // Layer 2: Intelligent buffer for iOS
-        const viewportBuffer = Math.max(64, viewportHeight * 0.08);
-        const deviceMultiplier = devicePixelRatio > 2.5 ? 1.25 : 1.15;
-        const intelligentBuffer = viewportBuffer * deviceMultiplier;
-        
-        // Layer 3: Platform-specific minimum (64px for iOS)
-        const minimumIOSHeight = 64;
-        const calculatedHeight = Math.max(minimumIOSHeight, baseHeight + intelligentBuffer);
-        
-        // Layer 4: Fallback maximum
-        const maximumHeight = viewportHeight * 0.15;
-        const finalHeight = Math.min(calculatedHeight, maximumHeight);
-        
-        calculatedTopInset = `${Math.round(finalHeight)}px`;
-        
-        document.documentElement.classList.add('platform-ios');
-        document.documentElement.classList.remove('platform-android');
-        
-        componentLogger.debug('iOS smart safe area calculated', { 
-          baseHeight,
-          intelligentBuffer,
-          finalHeight: Math.round(finalHeight),
-          minimumIOSHeight,
-          maximumHeight: Math.round(maximumHeight)
+        // Only calculate fallback if env() returns 0 or insufficient value
+        if (envSafeAreaTop < 20) {
+          // Universal calculation - no device-specific logic
+          let systemUIHeight = 0;
+          
+          if (window.visualViewport && window.visualViewport.offsetTop > 0) {
+            systemUIHeight = window.visualViewport.offsetTop;
+            componentLogger.debug('Using visualViewport.offsetTop', { offsetTop: systemUIHeight });
+          } else {
+            // Fallback: calculate from viewport difference
+            const screenHeight = window.screen.availHeight;
+            systemUIHeight = Math.max(0, screenHeight - viewportHeight);
+            componentLogger.debug('Using viewport difference', { systemUIHeight });
+          }
+
+          // Universal buffer: 2.5% of viewport height for all devices
+          const universalBuffer = viewportHeight * 0.025;
+          
+          // Universal minimum: 24px for all platforms
+          const universalMinimum = 24;
+          
+          // Calculate with universal logic
+          calculatedFallback = Math.max(
+            universalMinimum,
+            systemUIHeight + universalBuffer
+          );
+          
+          // Universal maximum: 8% of viewport height
+          const universalMaximum = viewportHeight * 0.08;
+          calculatedFallback = Math.min(calculatedFallback, universalMaximum);
+        }
+
+        componentLogger.info('Universal safe area values', {
+          envSafeAreaTop,
+          calculatedFallback: Math.round(calculatedFallback),
+          willUseEnv: envSafeAreaTop >= 20
         });
-      } else {
-        // Web platform - Layer 3: minimum 32px for browser chrome
-        const minimumWebHeight = 32;
-        const viewportBuffer = Math.max(32, viewportHeight * 0.05); // 5% for web
-        const finalHeight = Math.min(minimumWebHeight + viewportBuffer, viewportHeight * 0.1);
+
+        // Set the fallback value for CSS max() function
+        document.documentElement.style.setProperty(
+          '--safe-area-fallback',
+          `${Math.round(calculatedFallback)}px`
+        );
+
+        // Set other safe areas with simplified universal logic
+        const universalSideBuffer = Math.max(8, viewportHeight * 0.01);
+        document.documentElement.style.setProperty(
+          '--safe-area-bottom-fallback',
+          `${Math.max(12, Math.round(viewportHeight * 0.015))}px`
+        );
+        document.documentElement.style.setProperty(
+          '--safe-area-left-fallback',
+          `${Math.round(universalSideBuffer)}px`
+        );
+        document.documentElement.style.setProperty(
+          '--safe-area-right-fallback',
+          `${Math.round(universalSideBuffer)}px`
+        );
+
+      } catch (error) {
+        componentLogger.error('Error updating safe area variables', error);
         
-        calculatedTopInset = `${Math.round(finalHeight)}px`;
-        
-        componentLogger.debug('Web smart safe area calculated', { 
-          finalHeight: Math.round(finalHeight),
-          viewportBuffer
-        });
+        // Universal fallback values
+        document.documentElement.style.setProperty('--safe-area-fallback', '24px');
+        document.documentElement.style.setProperty('--safe-area-bottom-fallback', '12px');
+        document.documentElement.style.setProperty('--safe-area-left-fallback', '8px');
+        document.documentElement.style.setProperty('--safe-area-right-fallback', '8px');
       }
-      
-      // Set CSS custom properties for safe area handling with smart calculated values
-      const root = document.documentElement;
-      root.style.setProperty('--status-bar-height', calculatedTopInset); // Use smart calculation
-      root.style.setProperty('--calculated-safe-area-top', calculatedTopInset);
-      root.style.setProperty('--calculated-safe-area-bottom', bottomInset);
-      
-      // Update safe area inset variables with calculated or env() values
-      const envTop = getComputedStyle(root).getPropertyValue('--safe-area-inset-top');
-      const envBottom = getComputedStyle(root).getPropertyValue('--safe-area-inset-bottom');
-      
-      // Use calculated values as fallback when env() values are not available
-      const finalTopInset = envTop && !envTop.includes('env(') ? envTop : calculatedTopInset;
-      const finalBottomInset = envBottom && !envBottom.includes('env(') ? envBottom : bottomInset;
-      
-      root.style.setProperty('--safe-area-inset-top', finalTopInset);
-      root.style.setProperty('--safe-area-inset-bottom', finalBottomInset);
-      root.style.setProperty('--safe-area-inset-left', 'env(safe-area-inset-left, 0px)');
-      root.style.setProperty('--safe-area-inset-right', 'env(safe-area-inset-right, 0px)');
-      
-      componentLogger.debug('Smart safe area variables updated', {
-        calculatedTopInset,
-        bottomInset,
-        top: finalTopInset,
-        bottom: finalBottomInset,
-        platform: isAndroid ? 'android' : isIOS ? 'ios' : 'web',
-        viewportHeight,
-        devicePixelRatio
-      });
     };
 
     initializeStatusBar();
