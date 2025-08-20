@@ -25,7 +25,7 @@ interface UseStreamingChatProps {
   threadId?: string | null; // Thread-specific hook instance
 }
 
-// Thread-isolated streaming state management
+// Thread-isolated streaming state management with enhanced safety
 interface ThreadStreamingState {
   isStreaming: boolean;
   streamingMessages: StreamingMessage[];
@@ -44,6 +44,8 @@ interface ThreadStreamingState {
   abortController: AbortController | null;
   activeRequestId: string | null; // Track active request to prevent duplicates
   lastMessageFingerprint: string | null; // Prevent duplicate messages
+  correlationId: string | null; // Request correlation for debugging
+  threadValidation: boolean; // Thread context validation flag
 }
 
 const createInitialState = (): ThreadStreamingState => ({
@@ -64,6 +66,8 @@ const createInitialState = (): ThreadStreamingState => ({
   abortController: null,
   activeRequestId: null,
   lastMessageFingerprint: null,
+  correlationId: null,
+  threadValidation: true,
 });
 
 // Global thread state store
@@ -335,16 +339,37 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
 
   const addStreamingMessage = useCallback((message: StreamingMessage, targetThreadId?: string) => {
     const activeThreadId = targetThreadId || threadId;
-    if (!activeThreadId) return;
+    if (!activeThreadId) {
+      console.warn('[useStreamingChat] No thread ID provided for message:', message.type);
+      return;
+    }
 
-    console.log(`[useStreamingChat] Adding message to thread ${activeThreadId}:`, message.type);
+    console.log(`[useStreamingChat] Adding message to thread ${activeThreadId}:`, message.type, { requestId: message.requestId });
     
     const threadState = getThreadState(activeThreadId);
 
-    // Correlate final/error messages to active request to avoid bleed from older requests
-    if ((message.type === 'final_response' || message.type === 'error') && message.requestId && threadState.activeRequestId && message.requestId !== threadState.activeRequestId) {
-      console.warn('[useStreamingChat] Ignoring message due to requestId mismatch', { incoming: message.requestId, active: threadState.activeRequestId });
-      return;
+    // Enhanced request correlation validation to prevent cross-thread contamination
+    if ((message.type === 'final_response' || message.type === 'error') && message.requestId) {
+      if (threadState.activeRequestId && message.requestId !== threadState.activeRequestId) {
+        console.warn('[useStreamingChat] BLOCKING message due to requestId mismatch', { 
+          incoming: message.requestId, 
+          active: threadState.activeRequestId,
+          threadId: activeThreadId,
+          messageType: message.type
+        });
+        return;
+      }
+      
+      // Additional validation: check if the target thread is still the active one
+      if (activeThreadId !== threadId) {
+        console.warn('[useStreamingChat] BLOCKING message for inactive thread', {
+          targetThread: activeThreadId,
+          currentActiveThread: threadId,
+          messageType: message.type,
+          requestId: message.requestId
+        });
+        return;
+      }
     }
 
     const newMessages = [...threadState.streamingMessages, message];

@@ -35,6 +35,7 @@ import { TranslatableText } from "@/components/translation/TranslatableText";
 import { useChatMessageClassification, QueryCategory } from "@/hooks/use-chat-message-classification";
 import { useStreamingChat } from "@/hooks/useStreamingChat";
 import { threadSafetyManager } from "@/utils/threadSafetyManager";
+import { idempotencyManager } from "@/utils/idempotencyManager";
 import { useAutoScroll } from "@/hooks/use-auto-scroll";
 import {
   AlertDialog,
@@ -115,10 +116,27 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
   } = useStreamingChat({
       threadId: currentThreadId,
     onFinalResponse: async (response, analysis, originThreadId, requestId) => {
-      // Handle final streaming response scoped to its origin thread
+      // Enhanced thread validation for final response handling
       if (!response || !originThreadId || !effectiveUserId) {
         debugLog.addEvent("Streaming Response", "Missing required data for final response", "error");
         console.error("[Streaming] Missing response data:", { response: !!response, originThreadId: !!originThreadId, userId: !!effectiveUserId });
+        return;
+      }
+      
+      // Validate this response belongs to the current thread context
+      const validation = threadSafetyManager.validateThreadContext(originThreadId, requestId || undefined);
+      if (!validation.valid) {
+        console.warn("[Streaming] REJECTING final response due to thread validation failure:", validation.reason);
+        debugLog.addEvent("Streaming Response", `Response rejected: ${validation.reason}`, "warning");
+        return;
+      }
+      
+      // Additional check: only process if this is still the active thread
+      if (originThreadId !== currentThreadIdRef.current) {
+        console.warn("[Streaming] REJECTING final response - thread no longer active", { 
+          originThreadId, 
+          currentActive: currentThreadIdRef.current 
+        });
         return;
       }
       
@@ -152,23 +170,31 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
 
             const alreadyExists = (recent || []).some(m => (m as any).sender === 'assistant' && (m as any).content?.trim() === response.trim());
             if (!alreadyExists) {
-              // Persist safely with an idempotency_key derived from threadId + response
+              // Enhanced idempotency key generation and validation
               try {
-                const enc = new TextEncoder();
-                const keySource = requestId || `${originThreadId}:${response}`;
-                const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
-                const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
-                const idempotencyKey = hex.slice(0, 32);
-
-                await supabase.from('chat_messages').upsert({
-                  thread_id: originThreadId,
-                  content: response,
-                  sender: 'assistant',
-                  role: 'assistant',
-                  idempotency_key: idempotencyKey
-                }, { onConflict: 'thread_id,idempotency_key' });
+                const idempotencyKey = await idempotencyManager.generateIdempotencyKey(
+                  originThreadId, 
+                  response, 
+                  'assistant'
+                );
+                
+                // Check if this key was already used
+                if (!idempotencyManager.isKeyUsed(idempotencyKey)) {
+                  idempotencyManager.registerKey(idempotencyKey, originThreadId, 'temp-assistant', response);
+                  
+                  await supabase.from('chat_messages').upsert({
+                    thread_id: originThreadId,
+                    content: response,
+                    sender: 'assistant',
+                    role: 'assistant',
+                    idempotency_key: idempotencyKey,
+                    analysis_data: analysis || null
+                  }, { onConflict: 'thread_id,idempotency_key' });
+                } else {
+                  console.log('[Streaming Watchdog] Message already exists with this idempotency key');
+                }
               } catch (e) {
-                console.warn('[Streaming Watchdog] Persist fallback failed:', (e as any)?.message || e);
+                console.warn('[Streaming Watchdog] Enhanced persist fallback failed:', (e as any)?.message || e);
               }
             }
 
@@ -225,6 +251,16 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
         },
         (payload) => {
           const m: any = payload.new;
+          
+          // Thread validation: only process messages for current thread
+          if (m.thread_id !== currentThreadIdRef.current) {
+            console.warn('[Realtime] IGNORING message for inactive thread', { 
+              messageThread: m.thread_id, 
+              currentThread: currentThreadIdRef.current 
+            });
+            return;
+          }
+          
           if (m.sender === 'assistant') {
             setChatHistory(prev => {
               if (prev.some(msg => msg.id === m.id)) return prev;
@@ -237,7 +273,8 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
                 created_at: m.created_at,
                 reference_entries: m.reference_entries,
                 analysis_data: m.analysis_data,
-                has_numeric_result: m.has_numeric_result
+                has_numeric_result: m.has_numeric_result,
+                idempotency_key: m.idempotency_key
               } as any;
               return [...prev, newMsg];
             });
@@ -253,6 +290,16 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
         },
         (payload) => {
           const m: any = payload.new;
+          
+          // Thread validation: only process updates for current thread
+          if (m.thread_id !== currentThreadIdRef.current) {
+            console.warn('[Realtime] IGNORING update for inactive thread', { 
+              messageThread: m.thread_id, 
+              currentThread: currentThreadIdRef.current 
+            });
+            return;
+          }
+          
           if (m.sender === 'assistant') {
             setChatHistory(prev => {
               const updatedMsg: ChatMessage = {
@@ -264,7 +311,8 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
                 created_at: m.created_at,
                 reference_entries: m.reference_entries,
                 analysis_data: m.analysis_data,
-                has_numeric_result: m.has_numeric_result
+                has_numeric_result: m.has_numeric_result,
+                idempotency_key: m.idempotency_key
               } as any;
               const idx = prev.findIndex(msg => msg.id === m.id);
               if (idx === -1) {

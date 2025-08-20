@@ -122,24 +122,53 @@ serve(async (req) => {
       threadId = null, 
       messageId = null,
       conversationContext = [],
-      userProfile = null
+      userProfile = null,
+      correlationId = null
     } = await req.json();
 
-    console.log(`[chat-with-rag] Processing query: "${message}" for user: ${userId} (threadId: ${threadId}, messageId: ${messageId})`);
+    console.log(`[chat-with-rag] Processing query: "${message}" for user: ${userId} (threadId: ${threadId}, messageId: ${messageId}, correlationId: ${correlationId})`);
     
-    // Create assistant message for journal-specific queries
+    // Enhanced thread validation before processing
+    if (threadId) {
+      const { data: threadValidation, error: threadError } = await supabaseClient
+        .from('chat_threads')
+        .select('id, user_id')
+        .eq('id', threadId)
+        .eq('user_id', userId)
+        .single();
+        
+      if (threadError || !threadValidation) {
+        console.error('[chat-with-rag] Thread validation failed:', threadError);
+        return new Response(
+          JSON.stringify({ 
+            error: 'Invalid thread context',
+            correlationId: correlationId
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 }
+        );
+      }
+    }
+    
+    // Create assistant message with enhanced idempotency
     let assistantMessageId = null;
     if (threadId) {
       try {
         console.log(`[chat-with-rag] Creating assistant message for thread: ${threadId}`);
+        
+        // Generate idempotency key for assistant message
+        const assistantIdempotencyKey = correlationId ? 
+          `assistant-${threadId}-${correlationId}` : 
+          `assistant-${threadId}-${Date.now()}`;
+        
         const { data: assistantMessage, error: messageError } = await supabaseClient
           .from('chat_messages')
-          .insert({
+          .upsert({
             thread_id: threadId,
             sender: 'assistant',
             role: 'assistant',
-            content: 'Processing your journal query...'
-          })
+            content: 'Processing your journal query...',
+            idempotency_key: assistantIdempotencyKey
+          }, { onConflict: 'thread_id,idempotency_key' })
           .select('id')
           .single();
           
@@ -396,7 +425,8 @@ serve(async (req) => {
       return new Response(JSON.stringify({
         response: consolidationResponse.data.response,
         userStatusMessage: consolidationResponse.data.userStatusMessage,
-        assistantMessageId: assistantMessageId, // Include the assistant message ID in response
+        assistantMessageId: assistantMessageId,
+        correlationId: correlationId, // Return correlation ID for request tracking
         metadata: {
           classification: classification,
           queryPlan: queryPlan,
@@ -405,7 +435,8 @@ serve(async (req) => {
           userTimezone: userTimezone,
           strategy: queryPlan.strategy,
           confidence: queryPlan.confidence,
-          analysisMetadata: consolidationResponse.data.analysisMetadata
+          analysisMetadata: consolidationResponse.data.analysisMetadata,
+          threadValidation: true
         }
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
