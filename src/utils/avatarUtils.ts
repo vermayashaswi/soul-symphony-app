@@ -36,8 +36,9 @@ export const optimizeGoogleAvatarUrl = (url: string, size: number = 192): string
     // Force high quality and center crop
     urlObj.searchParams.set('c', 'k');
     
-    // Add cache-busting parameter for better reliability
-    urlObj.searchParams.set('_cb', Date.now().toString());
+    // Add cache-busting parameter for better reliability (but don't be too aggressive)
+    const cacheKey = Math.floor(Date.now() / 300000); // Update every 5 minutes
+    urlObj.searchParams.set('_cb', cacheKey.toString());
     
     return urlObj.toString();
   } catch (error) {
@@ -72,7 +73,7 @@ export const getOptimizedAvatarUrl = (avatarUrl: string | null | undefined, size
 };
 
 /**
- * Validates if an avatar URL is accessible
+ * Validates if an avatar URL is accessible with enhanced error handling
  * @param url - The avatar URL to validate
  * @returns Promise<boolean> indicating if the URL is accessible
  */
@@ -80,9 +81,22 @@ export const validateAvatarUrl = async (url: string): Promise<boolean> => {
   if (!url) return false;
   
   try {
-    const response = await fetch(url, { method: 'HEAD' });
-    return response.ok;
-  } catch {
+    console.log('[avatarUtils] Validating URL:', url);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+    
+    const response = await fetch(url, { 
+      method: 'HEAD',
+      signal: controller.signal,
+      cache: 'no-cache'
+    });
+    
+    clearTimeout(timeoutId);
+    const isValid = response.ok;
+    console.log('[avatarUtils] URL validation result:', isValid, 'Status:', response.status);
+    return isValid;
+  } catch (error) {
+    console.warn('[avatarUtils] URL validation failed:', error);
     return false;
   }
 };

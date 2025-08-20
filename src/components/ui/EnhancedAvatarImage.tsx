@@ -34,22 +34,27 @@ export const EnhancedAvatarImage: React.FC<EnhancedAvatarImageProps> = ({
   const finalSrc = externalSrc || avatarUrl;
 
   const handleImageLoad = useCallback(() => {
+    console.log('[EnhancedAvatarImage] Image loaded successfully:', finalSrc);
     setImageLoading(false);
     setImageError(false);
-  }, []);
+  }, [finalSrc]);
 
   const handleImageError = useCallback(() => {
+    console.warn('[EnhancedAvatarImage] Image failed to load:', finalSrc);
     setImageLoading(false);
     setImageError(true);
-  }, []);
+  }, [finalSrc]);
 
   const handleRefresh = useCallback(async () => {
+    console.log('[EnhancedAvatarImage] Refresh triggered - imageError:', imageError);
     setImageError(false);
     setImageLoading(true);
     
     if (imageError) {
+      console.log('[EnhancedAvatarImage] Retrying due to image error');
       await retry();
     } else {
+      console.log('[EnhancedAvatarImage] Refreshing avatar from source');
       await refreshAvatar();
     }
   }, [imageError, retry, refreshAvatar]);
