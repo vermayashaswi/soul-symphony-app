@@ -336,7 +336,7 @@ serve(async (req) => {
     - userStatusMessage MUST be exactly 5 words.
     - Do not include trailing explanations or extra fields`;
 
-    console.log(`[CONSOLIDATION] ${consolidationId}: Calling OpenAI API with model gpt-4.1-nano`);
+    console.log(`[CONSOLIDATION] ${consolidationId}: Calling OpenAI API with model gpt-5-mini-2025-08-07`);
 
     // Enhanced OpenAI API call with better error handling
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -346,13 +346,12 @@ serve(async (req) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-4.1-nano', // Fixed: Using the correct model
+          model: 'gpt-5-mini-2025-08-07', // Fixed: Using the correct model
           messages: [
             { role: 'system', content: 'You are Ruh by SOuLO, a warm and insightful wellness coach. You analyze ONLY the current research results provided to you. Never reference or use data from previous conversations or responses.' },
             { role: 'user', content: consolidationPrompt }
           ],
-          max_tokens: 1500, // Using max_tokens for gpt-4.1-nano
-          temperature: 0.8 // Temperature is supported by gpt-4.1-nano
+          max_completion_tokens: 1500
         }),
     });
 
@@ -444,7 +443,7 @@ serve(async (req) => {
           totalResults: researchResults.length,
           userStatusMessage,
           timestamp: new Date().toISOString(),
-          modelUsed: 'gpt-4.1-nano',
+          modelUsed: 'gpt-5-mini-2025-08-07',
           processingSuccess: true,
           sqlResultsCount: researchResults.reduce((sum: number, r: any) => sum + (r?.executionResults?.sqlResults?.length || 0), 0),
           vectorResultsCount: researchResults.reduce((sum: number, r: any) => sum + (r?.executionResults?.vectorResults?.length || 0), 0)
