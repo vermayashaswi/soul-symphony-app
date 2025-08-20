@@ -46,6 +46,11 @@
   padding-top: max(var(--status-bar-height), var(--calculated-safe-area-top)) !important;
 }
 
+/* Home page specific safe area handling */
+.mobile-container.safe-area-top {
+  padding-top: max(var(--status-bar-height), var(--calculated-safe-area-top)) !important;
+}
+
 .safe-area-bottom {
   padding-bottom: var(--calculated-safe-area-bottom) !important;
 }

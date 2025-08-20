@@ -136,7 +136,18 @@ const SmartChat = () => {
 
   return (
     <PremiumFeatureGuard feature="chat">
-      <div className="w-full h-full flex flex-col">
+      <div 
+        className="w-full h-full flex flex-col"
+        style={{
+          position: 'fixed',
+          top: '3px',
+          left: 0,
+          right: 0,
+          bottom: 0,
+          width: '100%',
+          height: 'calc(100% - 3px)'
+        }}
+      >
         {isMobile.isMobile ? (
           <MobileChatInterface
             currentThreadId={currentThreadId}

@@ -100,7 +100,19 @@ function InsightsContent() {
   const hasAnyEntries = statsInsightsData.entries.length > 0 || statsInsightsData.allEntries.length > 0;
 
   return (
-    <div className="min-h-screen pb-20 insights-container">
+    <div 
+      className="min-h-screen pb-20 insights-container"
+      style={{
+        position: 'fixed',
+        top: '3px',
+        left: 0,
+        right: 0,
+        bottom: 0,
+        overflowY: 'auto',
+        width: '100%',
+        height: 'calc(100% - 3px)'
+      }}
+    >
       
       
       {isSticky && (
