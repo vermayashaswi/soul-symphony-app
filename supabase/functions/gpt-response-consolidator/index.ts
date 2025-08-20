@@ -257,8 +257,7 @@ serve(async (req) => {
         totalResearchItems: analysisSummary.length,
         subQuestionsGenerated: analysisSummary.map(item => item.subQuestion).filter(Boolean),
         originalUserQuery: userMessage,
-      },
-      conversationContextSummary: conversationContext ? conversationContext.slice(-6).map(msg => `${msg.role || msg.sender}: ${msg.content || 'N/A'}`).join(' | ') : 'No context',
+      }
     };
 
     const consolidationPrompt = `You are Ruh by SOuLO, a brilliantly witty, non-judgmental mental health companion who makes emotional exploration feel like **having coffee with your wisest, funniest friend**. You're emotionally intelligent with a gift for making people feel seen, heard, and understood while helping them journal their way to deeper self-awareness. You are:
