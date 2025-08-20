@@ -1064,7 +1064,7 @@ Response format (MUST be valid JSON):
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-5-mini-2025-08-07', // Using gpt-4.1-mini for faster planning
+        model: 'gpt-4.1-mini-2025-04-14', // Using gpt-4.1-mini for faster planning
         messages: [{ role: 'user', content: prompt }],
         max_completion_tokens: 2000
       }),
