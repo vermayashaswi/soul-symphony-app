@@ -238,9 +238,11 @@ export const useChatPersistence = (userId: string | undefined) => {
     setMessages(prev => [...prev, tempMessage]);
     
     try {
+      console.log('[useChatPersistence] Saving message to thread:', activeThread);
       const savedMessage = await createChatMessage(activeThread, content, 'user', userId);
       
       if (savedMessage) {
+        console.log('[useChatPersistence] Message saved successfully:', savedMessage.id);
         // Convert to ChatMessagePersistence to avoid type mismatch
         const persistenceMessage: ChatMessagePersistence = {
           ...savedMessage,
@@ -256,13 +258,19 @@ export const useChatPersistence = (userId: string | undefined) => {
           prev.map(msg => msg.id === tempId ? persistenceMessage : msg)
         );
         return persistenceMessage;
+      } else {
+        console.error('[useChatPersistence] createChatMessage returned null');
+        throw new Error('Message save failed - no response from database');
       }
-      return null;
     } catch (error) {
-      console.error("Error saving message:", error);
+      console.error("[useChatPersistence] Error saving message:", error);
+      
+      // Remove temp message on failure
+      setMessages(prev => prev.filter(msg => msg.id !== tempId));
+      
       toast({
-        title: "Error",
-        description: "Failed to save your message",
+        title: "Failed to save message",
+        description: error instanceof Error ? error.message : "Could not save your message",
         variant: "destructive"
       });
       return null;

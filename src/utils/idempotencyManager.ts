@@ -106,16 +106,33 @@ class IdempotencyManager {
    * Validate message for thread consistency
    */
   validateMessageForThread(threadId: string, content: string, sender: 'user' | 'assistant'): { valid: boolean; reason?: string } {
-    // Check for obvious duplicates in recent keys
-    for (const record of this.recentKeys.values()) {
-      if (record.threadId === threadId && record.content === content.slice(0, 100)) {
-        const timeDiff = Date.now() - record.timestamp;
-        if (timeDiff < 5000) { // 5 seconds
-          return { 
-            valid: false, 
-            reason: `Duplicate message detected within 5 seconds for thread ${threadId}` 
-          };
-        }
+    const now = Date.now();
+    const timeWindowMs = 5000; // 5 second window for duplicate detection
+    
+    // For user messages, check if this is likely the first message in thread
+    // by checking if there are any recent keys for this thread
+    const hasRecentMessages = Array.from(this.recentKeys.values()).some(
+      record => record.threadId === threadId && (now - record.timestamp) < 30000 // 30 second window
+    );
+    
+    // Skip duplicate detection for first message in thread
+    if (sender === 'user' && !hasRecentMessages) {
+      console.log(`[IdempotencyManager] Bypassing duplicate check for first message in thread ${threadId}`);
+      return { valid: true };
+    }
+    
+    // Check for recent duplicate messages in this thread
+    for (const [key, record] of this.recentKeys.entries()) {
+      if (
+        record.threadId === threadId &&
+        record.content === content &&
+        (now - record.timestamp) < timeWindowMs
+      ) {
+        console.warn(`[IdempotencyManager] Duplicate message detected for thread ${threadId}`);
+        return {
+          valid: false,
+          reason: `Duplicate message detected within ${timeWindowMs / 1000} seconds`
+        };
       }
     }
     

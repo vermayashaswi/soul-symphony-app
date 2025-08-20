@@ -545,20 +545,26 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       // Generate correlation ID for request tracking
       correlationId = idempotencyManager.generateCorrelationId();
       
-      // Enhanced message validation
+      // Enhanced message validation with better first message handling
       const messageValidation = idempotencyManager.validateMessageForThread(threadId, message, 'user');
       if (!messageValidation.valid) {
+        debugLog.addEvent("Validation", `Duplicate message blocked: ${messageValidation.reason}`, "warn");
         toast({
           title: "Duplicate message detected", 
           description: messageValidation.reason,
           variant: "destructive"
         });
+        // Remove temp message and reset state
+        setChatHistory(prev => prev.filter(msg => msg.id !== tempUserMessage.id));
+        setLocalLoading(false);
         return;
       }
       
       // Generate proper idempotency key for user message
       const userIdempotencyKey = await idempotencyManager.generateIdempotencyKey(threadId, message, 'user');
       debugLog.addEvent("Database", `Saving user message to thread ${threadId} with idempotency key: ${userIdempotencyKey}`, "info");
+      
+      // Save user message with enhanced error handling
       savedUserMessage = await saveMessage(
         threadId, 
         message, 
@@ -575,9 +581,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       if (savedUserMessage) {
         idempotencyManager.registerKey(userIdempotencyKey, threadId, savedUserMessage.id, message);
         threadSafetyManager.setActiveRequestId(threadId, correlationId);
-      }
-      
-      if (savedUserMessage) {
+        
         debugLog.addEvent("UI Update", `Replacing temporary message with saved message: ${savedUserMessage.id}`, "info");
         setChatHistory(prev => prev.map(msg => 
           msg.id === tempUserMessage.id ? {
@@ -607,17 +611,27 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
           }
         }
       } else {
-        debugLog.addEvent("Database", "Failed to save user message - null response", "error");
-        throw new Error("Failed to save message");
+        debugLog.addEvent("Database", "saveMessage returned null - this should not happen", "error");
+        throw new Error("Message save failed - received null response");
       }
-      } catch (saveError: any) {
-        debugLog.addEvent("Database", `Error saving user message: ${saveError.message || "Unknown error"}`, "error");
-        toast({
-          title: "Error saving message",
-          description: saveError.message || "Could not save your message",
-          variant: "destructive"
-        });
-      }
+      
+    } catch (saveError: any) {
+      debugLog.addEvent("Database", `Critical error saving user message: ${saveError.message || "Unknown error"}`, "error");
+      console.error('[SmartChatInterface] Message save failed:', saveError);
+      
+      // Remove temp message from UI on save failure
+      setChatHistory(prev => prev.filter(msg => msg.id !== tempUserMessage.id));
+      setLocalLoading(false);
+      
+      toast({
+        title: "Failed to save message",
+        description: saveError.message || "Could not save your message to the database",
+        variant: "destructive"
+      });
+      
+      // Don't continue with streaming if user message failed to save
+      return;
+    }
       
       // Initialize processing message placeholder (only created for non-journal queries)
       let processingMessageId: string | null = null;
