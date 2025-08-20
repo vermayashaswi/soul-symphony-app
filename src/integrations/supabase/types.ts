@@ -1223,6 +1223,10 @@ export type Database = {
         Args: { embedding_vector: string; entry_id: number }
         Returns: undefined
       }
+      verify_vector_operations: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never

@@ -34,6 +34,9 @@ import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { useTutorial } from '@/contexts/TutorialContext';
 import { DeleteAllEntriesSection } from '@/components/settings/DeleteAllEntriesSection';
+import { EnhancedAvatarImage } from '@/components/ui/EnhancedAvatarImage';
+import { avatarSyncService } from '@/services/avatarSyncService';
+import { AvatarDiagnostics } from '@/components/settings/AvatarDiagnostics';
 
 
 interface SettingItemProps {
@@ -119,6 +122,8 @@ function SettingsContent() {
   const [isEditingName, setIsEditingName] = useState(false);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [nameError, setNameError] = useState<string | null>(null);
+  const [avatarRefreshing, setAvatarRefreshing] = useState(false);
+  const [showAvatarDiagnostics, setShowAvatarDiagnostics] = useState(false);
   
   
   const MAX_NAME_LENGTH = 25;
@@ -300,6 +305,21 @@ function SettingsContent() {
     fetchUserProfile();
   }, [user]);
 
+  // Refresh avatar on Settings page load
+  useEffect(() => {
+    const refreshAvatarOnLoad = async () => {
+      if (user?.id) {
+        try {
+          await avatarSyncService.syncUserAvatar(user);
+        } catch (error) {
+          console.warn('[Settings] Failed to sync avatar on load:', error);
+        }
+      }
+    };
+
+    refreshAvatarOnLoad();
+  }, [user?.id]);
+
   const handleContactSupport = () => {
     const subject = encodeURIComponent("Help me, I don't want to be SOuLO right now");
     const mailtoLink = `mailto:support@soulo.online?subject=${subject}`;
@@ -366,6 +386,26 @@ function SettingsContent() {
     setDisplayName(originalDisplayName);
     setIsEditingName(false);
     setNameError(null);
+  };
+
+  const handleRefreshAvatar = async () => {
+    if (!user?.id) return;
+    
+    try {
+      setAvatarRefreshing(true);
+      const result = await avatarSyncService.refreshFromAuth(user.id);
+      
+      if (result.success) {
+        toast.success(<TranslatableText text="Avatar refreshed successfully" forceTranslate={true} />);
+      } else {
+        toast.error(<TranslatableText text="Failed to refresh avatar" forceTranslate={true} />);
+      }
+    } catch (error) {
+      console.error('Error refreshing avatar:', error);
+      toast.error(<TranslatableText text="Failed to refresh avatar" forceTranslate={true} />);
+    } finally {
+      setAvatarRefreshing(false);
+    }
   };
   
   const handleToggleNotifications = async (checked: boolean) => {
@@ -655,17 +695,45 @@ function SettingsContent() {
               
               <div className="flex flex-col sm:flex-row gap-6 items-center sm:items-start">
                 <div className="flex flex-col items-center space-y-4">
-                  <Avatar className="h-24 w-24">
-                    <AvatarImage 
-                      src={user?.user_metadata?.avatar_url} 
-                      alt="Profile picture"
-                    />
-                    <AvatarFallback className="text-lg">
-                      {user?.email?.charAt(0).toUpperCase() || 'U'}
-                    </AvatarFallback>
-                  </Avatar>
+                  <EnhancedAvatarImage
+                    size={96}
+                    className="h-24 w-24"
+                    alt={displayName || user?.email || "Profile picture"}
+                    showRefreshButton={true}
+                    showLoadingState={true}
+                  />
                   
-                  
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleRefreshAvatar}
+                      disabled={avatarRefreshing}
+                      className="text-xs"
+                    >
+                      {avatarRefreshing ? (
+                        <>
+                          <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
+                          <TranslatableText text="Refreshing..." />
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="h-3 w-3 mr-1" />
+                          <TranslatableText text="Refresh Avatar" />
+                        </>
+                      )}
+                    </Button>
+                    
+                    <Button
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => setShowAvatarDiagnostics(true)}
+                      className="text-xs"
+                    >
+                      <AlertCircle className="h-3 w-3 mr-1" />
+                      <TranslatableText text="Diagnostics" />
+                    </Button>
+                  </div>
                 </div>
                 
                 <div className="flex-1 space-y-4 text-center sm:text-left">
@@ -1363,6 +1431,18 @@ function SettingsContent() {
                 <TranslatableText text="Apply Color" />
               </Button>
             </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Avatar Diagnostics Dialog */}
+        <Dialog
+          open={showAvatarDiagnostics}
+          onOpenChange={(open) => {
+            if (!open) setShowAvatarDiagnostics(false);
+          }}
+        >
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
+            <AvatarDiagnostics onClose={() => setShowAvatarDiagnostics(false)} />
           </DialogContent>
         </Dialog>
       </div>
