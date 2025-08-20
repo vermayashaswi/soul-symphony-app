@@ -98,6 +98,47 @@ function processTimeRange(timeRange: any, userTimezone: string = 'UTC'): { start
   }
 }
 
+// Import the saveMessage function for consistent message persistence
+const saveMessage = async (threadId: string, content: string, sender: 'user' | 'assistant', userId?: string, additionalData = {}) => {
+  try {
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        global: {
+          headers: { Authorization: req.headers.get('Authorization')! },
+        },
+      }
+    );
+
+    const messageData = {
+      thread_id: threadId,
+      sender,
+      role: sender,
+      content,
+      created_at: new Date().toISOString(),
+      ...additionalData
+    };
+
+    const { data, error } = await supabaseClient
+      .from('chat_messages')
+      .insert(messageData)
+      .select('id')
+      .single();
+
+    if (error) {
+      console.error('[saveMessage] Error saving message:', error);
+      return null;
+    }
+
+    console.log(`[saveMessage] Successfully saved ${sender} message:`, data.id);
+    return data;
+  } catch (error) {
+    console.error('[saveMessage] Exception:', error);
+    return null;
+  }
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -373,50 +414,47 @@ serve(async (req) => {
         }
       }
 
-      // Update the assistant message with the final response
-      if (assistantMessageId && consolidationResponse.data.response) {
+      // Save the final response using saveMessage for consistency
+      if (threadId && userId && consolidationResponse.data.response) {
         try {
-          const updateData = {
-            content: consolidationResponse.data.response,
-            analysis_data: {
-              classification: classification,
-              queryPlan: queryPlan,
-              executionSummary: {
-                resultCount: executionResult?.length || 0,
-                strategy: queryPlan?.strategy || 'unknown',
-                confidence: queryPlan?.confidence || 0
-              },
-              timestamp: new Date().toISOString(),
-              modelUsed: 'gpt-4.1-nano-2025-04-14',
-              processingSuccess: true
-            }
+          const idempotencyKey = correlationId ? 
+            `rag-response-${threadId}-${correlationId}` : 
+            `rag-response-${threadId}-${Date.now()}`;
+
+          const analysisData = {
+            classification: classification,
+            queryPlan: queryPlan,
+            executionSummary: {
+              resultCount: executionResult?.length || 0,
+              strategy: queryPlan?.strategy || 'unknown',
+              confidence: queryPlan?.confidence || 0
+            },
+            timestamp: new Date().toISOString(),
+            modelUsed: 'gpt-4.1-nano-2025-04-14',
+            processingSuccess: true,
+            correlationId: correlationId
           };
-          
-          // Add sub_query_responses if we have detailed execution results
-          if (executionResult && executionResult.length > 0) {
-            updateData.sub_query_responses = executionResult.map((result: any, index: number) => ({
-              subQuestion: result.subQuestion?.question || `Sub-query ${index + 1}`,
-              sqlResults: result.executionResults?.sqlResults || [],
-              vectorResults: result.executionResults?.vectorResults || [],
-              resultCount: (result.executionResults?.sqlResults?.length || 0) + (result.executionResults?.vectorResults?.length || 0)
-            }));
+
+          const savedMessage = await saveMessage(
+            threadId,
+            consolidationResponse.data.response,
+            'assistant',
+            userId,
+            {
+              analysis_data: analysisData,
+              idempotency_key: idempotencyKey,
+              references: executionResult || [],
+              is_interactive: false
+            }
+          );
+
+          if (savedMessage) {
+            console.log(`[chat-with-rag] Successfully saved RAG response: ${savedMessage.id}`);
           }
-          
-          const { error: updateError } = await supabaseClient
-            .from('chat_messages')
-            .update(updateData)
-            .eq('id', assistantMessageId);
-            
-          if (updateError) {
-            console.error('[chat-with-rag] Error updating assistant message:', updateError);
-            // Fallback: try updating just the content
-            await supabaseClient
-              .from('chat_messages')
-              .update({ content: consolidationResponse.data.response })
-              .eq('id', assistantMessageId);
-          } else {
-            console.log(`[chat-with-rag] Updated assistant message ${assistantMessageId} with response and analysis data`);
-          }
+        } catch (error) {
+          console.error('[chat-with-rag] Error saving response:', error);
+        }
+      }
         } catch (updateError) {
           console.error('[chat-with-rag] Exception updating assistant message:', updateError);
         }
