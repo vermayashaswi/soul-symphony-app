@@ -182,7 +182,7 @@ Language codes to use: en (English), es (Spanish), fr (French), de (German), it 
         console.log(`[AI] FIXED: Text refinement attempt ${attempt}/2`);
         
         const completion = await openai.chat.completions.create({
-          model: "gpt-4o-mini",
+          model: "gpt-4.1-nano-2025-04-14",
           messages: [
             {
               role: "system",
@@ -304,7 +304,7 @@ export async function analyzeEmotions(
         console.log(`[AI] Emotion analysis attempt ${attempt}/2`);
         
         const completion = await openai.chat.completions.create({
-          model: "gpt-4o-mini",
+          model: "gpt-4.1-nano-2025-04-14",
           messages: [
             {
               role: "system",

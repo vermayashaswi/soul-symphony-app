@@ -412,7 +412,7 @@ serve(async (req) => {
       })
       .join('\n\n');
 
-    const model = 'gpt-5-mini';
+    const model = 'gpt-4.1-nano-2025-04-14';
     const maxTokens = isComplexQuery ? 1200 : 800;
 
     // Optimized system prompt for better performance
