@@ -223,8 +223,30 @@ serve(async (req) => {
       };
     });
 
-    // Enhanced context with sub-question tracking and conversation context
-    const userTimezone = userProfile?.timezone || 'UTC';
+    // Enhanced timezone handling with validation
+    const { safeTimezoneConversion, formatTimezoneForGPT } = await import('../_shared/enhancedTimezoneUtils.ts');
+    
+    const rawUserTimezone = userProfile?.timezone || 'UTC';
+    const timezoneConversion = safeTimezoneConversion(rawUserTimezone, {
+      functionName: 'gpt-response-consolidator',
+      includeValidation: true,
+      logFailures: true
+    });
+    
+    const timezoneFormat = formatTimezoneForGPT(rawUserTimezone, {
+      includeUTCOffset: true,
+      functionName: 'gpt-response-consolidator'
+    });
+    
+    console.log(`[CONSOLIDATOR] ${consolidationId} timezone info:`, {
+      rawTimezone: rawUserTimezone,
+      normalizedTimezone: timezoneConversion.normalizedTimezone,
+      currentTime: timezoneConversion.currentTime,
+      isValid: timezoneConversion.isValid,
+      validationNotes: timezoneFormat.validationNotes
+    });
+    
+    const userTimezone = timezoneConversion.normalizedTimezone;
     const contextData = {
       userProfile: {
         timezone: userTimezone,
@@ -250,10 +272,12 @@ serve(async (req) => {
 
     
     **USER CONTEXT:**
-    - User's Timezone: ${userTimezone}
+    - ${timezoneFormat.currentTimeText}
+    - User's Timezone: ${timezoneFormat.timezoneText}
     - All time references should be in the user's local timezone (${userTimezone}), not UTC
     - When discussing time periods like "first half vs second half of day", reference the user's local time
     - NEVER mention "UTC" in your response - use the user's local timezone context instead
+    - Timezone Status: ${timezoneConversion.isValid ? 'Validated' : 'Using fallback due to conversion issues'}
     
     **USER QUESTION:** "${userMessage}"
     

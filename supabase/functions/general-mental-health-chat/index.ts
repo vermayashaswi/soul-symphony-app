@@ -25,45 +25,37 @@ serve(async (req) => {
     console.log(`[General Mental Health] Processing: "${message}" (timezone: ${userTimezone})`);
     // Follow-up flags removed from pipeline
 
-    // Get current time in user's timezone for time-aware responses
-    let userCurrentTime = '';
-    let currentHour = 0;
+    // Enhanced timezone handling with comprehensive error checking
+    const { safeTimezoneConversion, formatTimezoneForGPT } = await import('../_shared/enhancedTimezoneUtils.ts');
     
-    try {
-      // Validate and normalize timezone
-      let normalizedTimezone = userTimezone;
-      if (userTimezone === 'Asia/Calcutta') {
-        normalizedTimezone = 'Asia/Kolkata';
-        console.log(`[General Mental Health] Updated legacy timezone from ${userTimezone} to ${normalizedTimezone}`);
-      }
-      
-      // Get current time with proper timezone handling
-      const now = new Date();
-      userCurrentTime = now.toLocaleString('en-US', { 
-        timeZone: normalizedTimezone,
-        weekday: 'long',
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true 
+    const timezoneConversion = safeTimezoneConversion(userTimezone, {
+      functionName: 'general-mental-health-chat',
+      includeValidation: true,
+      logFailures: true,
+      fallbackToUTC: true
+    });
+    
+    const userCurrentTime = timezoneConversion.currentTime;
+    const currentHour = timezoneConversion.currentHour;
+    const normalizedTimezone = timezoneConversion.normalizedTimezone;
+    
+    // Log detailed timezone information for debugging
+    console.log(`[General Mental Health] Enhanced timezone conversion:`, {
+      originalTimezone: userTimezone,
+      normalizedTimezone,
+      currentTime: userCurrentTime,
+      currentHour,
+      isValid: timezoneConversion.isValid,
+      conversionError: timezoneConversion.conversionError,
+      rawUtcTime: timezoneConversion.rawUtcTime
+    });
+    
+    // Warn if timezone conversion failed
+    if (!timezoneConversion.isValid) {
+      console.warn(`[General Mental Health] Timezone conversion validation failed:`, {
+        error: timezoneConversion.conversionError,
+        fallbackUsed: true
       });
-      
-      // Also get hour for validation
-      currentHour = parseInt(now.toLocaleString('en-US', { 
-        timeZone: normalizedTimezone,
-        hour: 'numeric',
-        hour12: false 
-      }));
-      
-      console.log(`[General Mental Health] User time calculation - Timezone: ${normalizedTimezone}, Current time: ${userCurrentTime}, Hour: ${currentHour}`);
-    } catch (error) {
-      console.error(`[General Mental Health] Error calculating user time:`, error);
-      userCurrentTime = new Date().toLocaleString('en-US', { 
-        timeZone: 'UTC',
-        weekday: 'long',
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true 
-      }) + ' (UTC fallback)';
     }
 
     const openAiApiKey = Deno.env.get('OPENAI_API_KEY');
@@ -82,7 +74,8 @@ serve(async (req) => {
 
 **CURRENT CONTEXT:**
 - User's current time: ${userCurrentTime}
-- User's timezone: ${userTimezone}
+- User's timezone: ${normalizedTimezone}
+- Timezone validation: ${timezoneConversion.isValid ? 'VALID' : 'FAILED - using fallback'}
 Use this time context to provide appropriate greetings and time-aware responses (e.g., "Good morning" vs "Good evening", energy levels, daily rhythms).
 
 **YOUR COFFEE-WITH-YOUR-WISEST-FRIEND PERSONALITY:**
