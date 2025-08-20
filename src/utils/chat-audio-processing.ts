@@ -3,7 +3,7 @@
  * Chat-specific audio processing module
  * Handles transcription for voice chat queries without creating journal entries
  */
-import { blobToBase64, normalizeAudioBlob, validateAudioBlob } from './audio/blob-utils';
+import { blobToBase64, normalizeAudioBlob, validateAudioBlob, addSilencePadding } from './audio/blob-utils';
 import { supabase } from '@/integrations/supabase/client';
 
 /**
@@ -79,11 +79,25 @@ export async function processChatVoiceRecording(
       };
     }
     
+    // Add 1-second silence padding to prevent truncation
+    console.log('[ChatAudioProcessing] Adding silence padding to prevent truncation...');
+    let paddedBlob: Blob;
+    try {
+      paddedBlob = await addSilencePadding(normalizedBlob);
+      console.log('[ChatAudioProcessing] Silence padding added successfully:', {
+        originalSize: normalizedBlob.size,
+        paddedSize: paddedBlob.size
+      });
+    } catch (error) {
+      console.warn('[ChatAudioProcessing] Failed to add silence padding, using original:', error);
+      paddedBlob = normalizedBlob; // Fallback to original
+    }
+    
     // Test base64 conversion before proceeding (same as journal)
     console.log('[ChatAudioProcessing] Testing base64 conversion...');
     let base64Audio: string;
     try {
-      base64Audio = await blobToBase64(normalizedBlob);
+      base64Audio = await blobToBase64(paddedBlob);
       console.log('[ChatAudioProcessing] Base64 conversion successful, length:', base64Audio.length);
       
       if (base64Audio.length < 50) {
@@ -102,8 +116,8 @@ export async function processChatVoiceRecording(
     
     // Get the duration of the audio
     let recordingTime = 0;
-    if ('duration' in normalizedBlob) {
-      recordingTime = Math.round((normalizedBlob as any).duration * 1000);
+    if ('duration' in paddedBlob) {
+      recordingTime = Math.round((paddedBlob as any).duration * 1000);
     } else {
       console.log('[ChatAudioProcessing] No duration found in blob, estimating from recording time');
     }
@@ -117,8 +131,8 @@ export async function processChatVoiceRecording(
     console.log('[ChatAudioProcessing] Calling transcribe-chat-audio Edge Function with payload:', {
       audioLength: base64Audio.length,
       recordingTime,
-      blobSize: normalizedBlob.size,
-      blobType: normalizedBlob.type
+      blobSize: paddedBlob.size,
+      blobType: paddedBlob.type
     });
     
     // Call the dedicated transcribe-chat-audio Supabase Edge Function with timeout
