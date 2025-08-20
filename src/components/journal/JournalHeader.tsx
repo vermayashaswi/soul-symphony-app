@@ -25,10 +25,9 @@ const JournalHeader = () => {
   
   return (
     <div className={cn(
-      "bg-muted/30 py-2 border-b",
+      "bg-muted/30 py-2 border-b safe-area-top",
       shouldAdjustForMobile ? "mt-0" : "mt-1 md:mt-2"
     )}
-    style={{ marginTop: '5px' }}
     >
       <div className="container mx-auto px-4 max-w-5xl">
         <motion.h1 

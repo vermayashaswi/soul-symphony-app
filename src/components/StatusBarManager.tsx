@@ -37,8 +37,8 @@ export const StatusBarManager: React.FC<StatusBarManagerProps> = ({ children }) 
           
           const statusBarPlugin = nativeIntegrationService.getPlugin('StatusBar');
           if (statusBarPlugin) {
-            // Configure status bar to overlay web view for true full-screen
-            await statusBarPlugin.setOverlaysWebView({ overlay: true });
+            // Configure status bar to NOT overlay web view to prevent header overlap
+            await statusBarPlugin.setOverlaysWebView({ overlay: false });
             await statusBarPlugin.setStyle({ style: 'dark' });
             
             componentLogger.info('Status bar hidden and configured for immersive experience');
@@ -63,7 +63,7 @@ export const StatusBarManager: React.FC<StatusBarManagerProps> = ({ children }) 
           await nativeIntegrationService.hideStatusBar();
           const statusBarPlugin = nativeIntegrationService.getPlugin('StatusBar');
           if (statusBarPlugin) {
-            await statusBarPlugin.setOverlaysWebView({ overlay: true });
+            await statusBarPlugin.setOverlaysWebView({ overlay: false });
           }
         } catch (error) {
           componentLogger.error('Failed to re-hide status bar', error);
@@ -79,7 +79,7 @@ export const StatusBarManager: React.FC<StatusBarManagerProps> = ({ children }) 
           await nativeIntegrationService.hideStatusBar();
           const statusBarPlugin = nativeIntegrationService.getPlugin('StatusBar');
           if (statusBarPlugin) {
-            await statusBarPlugin.setOverlaysWebView({ overlay: true });
+            await statusBarPlugin.setOverlaysWebView({ overlay: false });
           }
         } catch (error) {
           componentLogger.error('Failed to re-hide status bar on resume', error);
@@ -88,65 +88,67 @@ export const StatusBarManager: React.FC<StatusBarManagerProps> = ({ children }) 
     };
 
     const updateSafeAreaVariables = () => {
-      // Detect platform and set appropriate CSS variables
+      // Detect platform and calculate actual safe area values
       const isAndroid = /Android/.test(navigator.userAgent);
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
                    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
       
+      // Enhanced safe area detection using viewport measurements
+      const screenHeight = window.screen.height;
+      const viewportHeight = window.innerHeight;
+      const heightDifference = screenHeight - viewportHeight;
+      
       let statusBarHeight = '0px';
+      let calculatedTopInset = '0px';
       let bottomInset = '0px';
       
       if (isAndroid) {
-        statusBarHeight = '24px';
-        // ANDROID FIX: Force bottom inset for Android
-        bottomInset = '8px';
+        // Calculate actual status bar height for Android
+        const actualStatusBarHeight = Math.max(24, Math.min(48, heightDifference / 2));
+        statusBarHeight = `${actualStatusBarHeight}px`;
+        calculatedTopInset = statusBarHeight;
+        bottomInset = '12px'; // Standard Android navigation gesture area
+        
         document.documentElement.classList.add('platform-android');
         document.documentElement.classList.remove('platform-ios');
         
-        componentLogger.debug('Android platform detected, setting bottom inset to 8px');
+        componentLogger.debug('Android platform detected', { 
+          screenHeight, 
+          viewportHeight, 
+          heightDifference, 
+          calculatedStatusBarHeight: actualStatusBarHeight 
+        });
       } else if (isIOS) {
         statusBarHeight = '44px';
+        calculatedTopInset = statusBarHeight;
         document.documentElement.classList.add('platform-ios');
         document.documentElement.classList.remove('platform-android');
       }
       
-      // Set CSS custom properties for safe area handling
+      // Set CSS custom properties for safe area handling with calculated values
       const root = document.documentElement;
       root.style.setProperty('--status-bar-height', statusBarHeight);
+      root.style.setProperty('--calculated-safe-area-top', calculatedTopInset);
+      root.style.setProperty('--calculated-safe-area-bottom', bottomInset);
       
-      // ANDROID FIX: Force bottom inset for Android
-      if (isAndroid) {
-        root.style.setProperty('--safe-area-inset-bottom', bottomInset);
-      }
+      // Update safe area inset variables with calculated or env() values
+      const envTop = getComputedStyle(root).getPropertyValue('--safe-area-inset-top');
+      const envBottom = getComputedStyle(root).getPropertyValue('--safe-area-inset-bottom');
       
-      // Try to get actual safe area values from CSS env() if available
-      const computedStyle = getComputedStyle(root);
-      const actualTop = computedStyle.getPropertyValue('--safe-area-inset-top') || 'env(safe-area-inset-top, 0px)';
-      const actualBottom = computedStyle.getPropertyValue('--safe-area-inset-bottom') || 'env(safe-area-inset-bottom, 0px)';
-      const actualLeft = computedStyle.getPropertyValue('--safe-area-inset-left') || 'env(safe-area-inset-left, 0px)';
-      const actualRight = computedStyle.getPropertyValue('--safe-area-inset-right') || 'env(safe-area-inset-right, 0px)';
+      // Use calculated values as fallback when env() values are not available
+      const finalTopInset = envTop && !envTop.includes('env(') ? envTop : calculatedTopInset;
+      const finalBottomInset = envBottom && !envBottom.includes('env(') ? envBottom : bottomInset;
       
-      // ANDROID FIX: For Android, ensure minimum bottom inset
-      if (isAndroid) {
-        const bottomValue = actualBottom.includes('env(') ? bottomInset : actualBottom;
-        root.style.setProperty('--safe-area-inset-bottom', bottomValue);
-        componentLogger.debug('Forced bottom inset', { bottomValue });
-      } else {
-        root.style.setProperty('--safe-area-inset-bottom', actualBottom);
-      }
-      
-      // Update other CSS variables
-      root.style.setProperty('--safe-area-inset-top', actualTop);
-      root.style.setProperty('--safe-area-inset-left', actualLeft);
-      root.style.setProperty('--safe-area-inset-right', actualRight);
+      root.style.setProperty('--safe-area-inset-top', finalTopInset);
+      root.style.setProperty('--safe-area-inset-bottom', finalBottomInset);
+      root.style.setProperty('--safe-area-inset-left', 'env(safe-area-inset-left, 0px)');
+      root.style.setProperty('--safe-area-inset-right', 'env(safe-area-inset-right, 0px)');
       
       componentLogger.debug('Safe area variables updated', {
         statusBarHeight,
         bottomInset,
-        top: actualTop,
-        bottom: isAndroid ? bottomInset : actualBottom,
-        left: actualLeft,
-        right: actualRight,
+        top: finalTopInset,
+        bottom: finalBottomInset,
         platform: isAndroid ? 'android' : isIOS ? 'ios' : 'web'
       });
     };
