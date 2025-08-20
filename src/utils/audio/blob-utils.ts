@@ -65,6 +65,127 @@ export function validateAudioBlob(blob: Blob | null): {
 }
 
 /**
+ * Adds 1 second of silence padding to the end of an audio blob
+ * @param blob Original audio blob
+ * @returns Audio blob with 1 second of silence appended
+ */
+export async function addSilencePadding(blob: Blob): Promise<Blob> {
+  try {
+    console.log('[BlobUtils] Adding 1-second silence padding to audio');
+    
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const arrayBuffer = await blob.arrayBuffer();
+    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+    
+    const sampleRate = audioBuffer.sampleRate;
+    const channels = audioBuffer.numberOfChannels;
+    const originalLength = audioBuffer.length;
+    const silenceDuration = 1.0; // 1 second
+    const silenceLength = Math.floor(sampleRate * silenceDuration);
+    const newLength = originalLength + silenceLength;
+    
+    // Create new buffer with extra space for silence
+    const newBuffer = audioContext.createBuffer(channels, newLength, sampleRate);
+    
+    // Copy original audio data
+    for (let channel = 0; channel < channels; channel++) {
+      const originalData = audioBuffer.getChannelData(channel);
+      const newData = newBuffer.getChannelData(channel);
+      
+      // Copy original audio
+      newData.set(originalData, 0);
+      
+      // The remaining space is already filled with zeros (silence)
+    }
+    
+    // Convert back to blob
+    const offlineContext = new OfflineAudioContext(channels, newLength, sampleRate);
+    const source = offlineContext.createBufferSource();
+    source.buffer = newBuffer;
+    source.connect(offlineContext.destination);
+    source.start(0);
+    
+    const renderedBuffer = await offlineContext.startRendering();
+    
+    // Convert to WAV format for consistency
+    const wavBlob = await audioBufferToWav(renderedBuffer);
+    
+    console.log('[BlobUtils] Successfully added silence padding:', {
+      originalSize: blob.size,
+      newSize: wavBlob.size,
+      originalDuration: originalLength / sampleRate,
+      newDuration: newLength / sampleRate
+    });
+    
+    return wavBlob;
+    
+  } catch (error) {
+    console.warn('[BlobUtils] Failed to add silence padding, returning original blob:', error);
+    return blob; // Fallback to original blob if padding fails
+  }
+}
+
+/**
+ * Converts AudioBuffer to WAV blob
+ * @param buffer The audio buffer to convert
+ * @returns WAV blob
+ */
+async function audioBufferToWav(buffer: AudioBuffer): Promise<Blob> {
+  const numberOfChannels = buffer.numberOfChannels;
+  const sampleRate = buffer.sampleRate;
+  const format = 1; // PCM
+  const bitDepth = 16;
+  
+  const bytesPerSample = bitDepth / 8;
+  const blockAlign = numberOfChannels * bytesPerSample;
+  const byteRate = sampleRate * blockAlign;
+  const dataSize = buffer.length * blockAlign;
+  const bufferSize = 44 + dataSize;
+  
+  const arrayBuffer = new ArrayBuffer(bufferSize);
+  const view = new DataView(arrayBuffer);
+  
+  // WAV header
+  const writeString = (offset: number, string: string) => {
+    for (let i = 0; i < string.length; i++) {
+      view.setUint8(offset + i, string.charCodeAt(i));
+    }
+  };
+  
+  writeString(0, 'RIFF');
+  view.setUint32(4, bufferSize - 8, true);
+  writeString(8, 'WAVE');
+  writeString(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, format, true);
+  view.setUint16(22, numberOfChannels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, byteRate, true);
+  view.setUint16(32, blockAlign, true);
+  view.setUint16(34, bitDepth, true);
+  writeString(36, 'data');
+  view.setUint32(40, dataSize, true);
+  
+  // Convert audio data
+  const offset = 44;
+  const channels = [];
+  for (let i = 0; i < numberOfChannels; i++) {
+    channels.push(buffer.getChannelData(i));
+  }
+  
+  let pos = 0;
+  for (let i = 0; i < buffer.length; i++) {
+    for (let channel = 0; channel < numberOfChannels; channel++) {
+      const sample = Math.max(-1, Math.min(1, channels[channel][i]));
+      view.setInt16(offset + pos, sample * 0x7FFF, true);
+      pos += 2;
+    }
+  }
+  
+  return new Blob([arrayBuffer], { type: 'audio/wav' });
+}
+
+/**
  * Normalizes audio blob by ensuring it has the right format and properties
  * @param blob Original audio blob 
  * @returns Normalized blob with corrected metadata
