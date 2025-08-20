@@ -844,7 +844,7 @@ ${databaseSchemaContext}
 - If uncertain about a database structure, use basic select queries instead of complex ones
 
 SUB-QUESTION/QUERIES GENERATION GUIDELINE (MANDATORY): 
-- Break down user query into ATLEAST 2 sub-questions or more such that all sub-questions can be consolidated to answer the user's ASK 
+- Break down user query (MANDATORY: remember that current user message might not be a direct query, so you'll have to look in to the conversation context provided to you and look at last user messages to guess the "ASK" and accordingly frame the sub-questions) into ATLEAST 2 sub-questions or more such that all sub-questions can be consolidated to answer the user's ASK 
 - If user's query is vague, look back at last 2 user queries to derive what user wants to know and then frame sub-questions accordingly and hence, the pertinent query for it 
 - For eg. user asks (What % of entries contain the emotion confidence (and is it the dominant one?) when I deal with family matters that also concern health issues? -> sub question 1: How many entries concern family and health both? sub question 2: What are all the emotions and their avg scores ? sub question 3: Rank the emotions)
 
