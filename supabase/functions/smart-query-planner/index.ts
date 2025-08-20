@@ -968,10 +968,11 @@ Response format (MUST be valid JSON):
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-5-nano-2025-08-07', // Using gpt-5-nano for faster, more reliable planning
+        model: 'gpt-4.1-mini-2025-04-14', // Using gpt-4.1-mini for reliable query planning
         messages: [{ role: 'user', content: prompt }],
         response_format: { type: 'json_object' }, // Enforce strict JSON mode
-        max_completion_tokens: 1000 // Reduced token limit
+        max_tokens: 1000, // Token limit for GPT-4.1-mini
+        temperature: 0.1 // Low temperature for consistent responses
       }),
     });
 
