@@ -96,18 +96,11 @@ const Home = () => {
 
   return (
     <div 
-      className="min-h-screen bg-background text-foreground relative overflow-hidden"
+      className="min-h-screen min-h-dvh bg-background text-foreground relative overflow-hidden safe-area-top safe-area-left safe-area-right mobile-container"
       style={{ 
-        // Always apply fixed positioning on home page (not just during tutorial)
+        // Maintain tutorial functionality while respecting safe areas
         touchAction: 'none',
-        overflow: 'hidden',
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        width: '100%',
-        height: '100%'
+        overflow: 'hidden'
       }}
     >
       {/* Background elements including animations */}
