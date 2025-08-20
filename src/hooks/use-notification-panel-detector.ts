@@ -104,29 +104,36 @@ export const useNotificationPanelDetector = (options: NotificationPanelDetectorO
   }, [topThreshold, swipeThreshold]);
 
   const handleTouchEnd = useCallback((event: TouchEvent) => {
-    if (!touchStartRef.current || !touchMoveRef.current) {
+    if (!touchStartRef.current) {
       touchStartRef.current = null;
       touchMoveRef.current = null;
       return;
     }
 
     const endTime = Date.now();
-    const totalDeltaY = touchMoveRef.current.y - touchStartRef.current.y;
     const totalTime = endTime - touchStartRef.current.timestamp;
-
-    // Detect upward swipe that closes the notification panel
-    const isUpwardSwipe = totalDeltaY < -50; // Negative indicates upward movement
-    const isFastSwipe = totalTime < 1000;
     const startedFromTop = touchStartRef.current.y <= topThreshold;
 
-    if (
-      panelOpenRef.current && 
-      isUpwardSwipe && 
-      isFastSwipe && 
-      startedFromTop
-    ) {
-      console.log('[NotificationPanelDetector] Notification panel closed via gesture');
-      hideStatusBarImmediately();
+    // Check if there was movement (swipe) or just a tap
+    if (touchMoveRef.current) {
+      const totalDeltaY = touchMoveRef.current.y - touchStartRef.current.y;
+      
+      // Detect upward swipe that closes the notification panel
+      const isUpwardSwipe = totalDeltaY < -50;
+      const isFastSwipe = totalTime < 1000;
+
+      if (panelOpenRef.current && isUpwardSwipe && isFastSwipe && startedFromTop) {
+        console.log('[NotificationPanelDetector] Notification panel closed via swipe gesture');
+        hideStatusBarImmediately();
+      }
+    } else {
+      // Handle tap-to-close gesture (no movement detected)
+      const isTap = totalTime < 500; // Quick tap
+      
+      if (panelOpenRef.current && isTap && startedFromTop) {
+        console.log('[NotificationPanelDetector] Notification panel closed via tap gesture');
+        hideStatusBarImmediately();
+      }
     }
 
     // Reset tracking state
@@ -156,14 +163,46 @@ export const useNotificationPanelDetector = (options: NotificationPanelDetectorO
     document.addEventListener('touchend', handleTouchEnd, { passive: true });
     document.addEventListener('touchcancel', handleTouchCancel, { passive: true });
 
+    // Enhanced event listeners for Android WebView
+    const handleVisibilityChange = () => {
+      if (!document.hidden && panelOpenRef.current) {
+        console.log('[NotificationPanelDetector] Document visibility changed - hiding status bar');
+        hideStatusBarImmediately();
+        panelOpenRef.current = false;
+      }
+    };
+
+    const handleWindowFocus = () => {
+      if (panelOpenRef.current) {
+        console.log('[NotificationPanelDetector] Window focus regained - hiding status bar');
+        hideStatusBarImmediately();
+        panelOpenRef.current = false;
+      }
+    };
+
+    // Add enhanced listeners for notification panel detection
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleWindowFocus);
+
+    // Periodic status bar check as fallback (Android WebView specific)
+    const statusBarCheckInterval = setInterval(() => {
+      if (nativeIntegrationService.isRunningNatively()) {
+        // Force status bar hide every 500ms as a safety measure
+        hideStatusBarImmediately();
+      }
+    }, 500);
+
     return () => {
       console.log('[NotificationPanelDetector] Cleaning up gesture listeners');
       document.removeEventListener('touchstart', handleTouchStart);
       document.removeEventListener('touchmove', handleTouchMove);
       document.removeEventListener('touchend', handleTouchEnd);
       document.removeEventListener('touchcancel', handleTouchCancel);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleWindowFocus);
+      clearInterval(statusBarCheckInterval);
     };
-  }, [handleTouchStart, handleTouchMove, handleTouchEnd, handleTouchCancel]);
+  }, [handleTouchStart, handleTouchMove, handleTouchEnd, handleTouchCancel, hideStatusBarImmediately]);
 
   return {
     hideStatusBarImmediately

@@ -36,7 +36,9 @@
 		},
 		"StatusBar": {
 			"style": "dark",
-			"backgroundColor": "#000000"
+			"backgroundColor": "#000000",
+			"overlaysWebView": true,
+			"androidHideOnKeyboardOpen": true
 		},
 		"PushNotifications": {
 			"presentationOptions": [
