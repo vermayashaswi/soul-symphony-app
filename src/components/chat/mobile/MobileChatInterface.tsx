@@ -13,7 +13,7 @@ import { useTranslation } from "@/contexts/TranslationContext";
 import { TranslatableText } from "@/components/translation/TranslatableText";
 import { v4 as uuidv4 } from "uuid";
 import { useDebugLog } from "@/utils/debug/DebugContext";
-import { getThreadMessages, saveMessage } from "@/services/chat";
+import { getThreadMessages, saveMessage, updateUserMessageClassification } from "@/services/chat";
 import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
 import { processChatMessage } from "@/services/chatService";
 import { MentalHealthInsights } from "@/hooks/use-mental-health-insights";
@@ -136,14 +136,39 @@ export default function MobileChatInterface({
          return;
        }
        
-       debugLog.addEvent("Streaming Response", `[Mobile] Final response received for ${originThreadId}: ${response.substring(0, 100)}...`, "success");
+        debugLog.addEvent("Streaming Response", `[Mobile] Final response received for ${originThreadId}: ${response.substring(0, 100)}...`, "success");
 
-        // Optimistic UI: append assistant message immediately so UI doesn't appear blank
-        if (originThreadId === threadId) {
-          setMessages(prev => [...prev, { role: 'assistant', content: response, analysis }]);
-          setShowSuggestions(false);
-          setLocalLoading(false);
-        }
+         // Optimistic UI: append assistant message immediately so UI doesn't appear blank
+         if (originThreadId === threadId) {
+           setMessages(prev => [...prev, { role: 'assistant', content: response, analysis }]);
+           setShowSuggestions(false);
+           setLocalLoading(false);
+         }
+
+         // Update user message with classification data if available
+         if (analysis?.classification && requestId) {
+           try {
+             // Find the most recent user message to update with classification
+             const { data: recentUserMessages } = await supabase
+               .from('chat_messages')
+               .select('id')
+               .eq('thread_id', originThreadId)
+               .eq('sender', 'user')
+               .order('created_at', { ascending: false })
+               .limit(1);
+
+             if (recentUserMessages && recentUserMessages.length > 0) {
+               await updateUserMessageClassification(
+                 recentUserMessages[0].id,
+                 analysis.classification,
+                 user.id
+               );
+               debugLog.addEvent("Classification", "Updated user message with classification data", "success");
+             }
+           } catch (classificationError) {
+             console.warn('[Mobile] Failed to update user message classification:', classificationError);
+           }
+         }
         
         // Let backend persist assistant message; UI will also update via realtime when it arrives
         if (originThreadId === threadId) {
@@ -175,13 +200,14 @@ export default function MobileChatInterface({
                  const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
                  const idempotencyKey = hex.slice(0, 32);
 
-                 await supabase.from('chat_messages').upsert({
-                   thread_id: originThreadId,
-                   content: response,
-                   sender: 'assistant',
-                   role: 'assistant',
-                   idempotency_key: idempotencyKey
-                 }, { onConflict: 'thread_id,idempotency_key' });
+                  await supabase.from('chat_messages').upsert({
+                    thread_id: originThreadId,
+                    content: response,
+                    sender: 'assistant',
+                    role: 'assistant',
+                    idempotency_key: idempotencyKey,
+                    analysis_data: analysis || null
+                  }, { onConflict: 'thread_id,idempotency_key' });
                } catch (e) {
                  console.warn('[Mobile Streaming Watchdog] Persist fallback failed:', (e as any)?.message || e);
                }
