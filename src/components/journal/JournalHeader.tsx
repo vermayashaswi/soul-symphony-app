@@ -27,7 +27,9 @@ const JournalHeader = () => {
     <div className={cn(
       "bg-muted/30 py-2 border-b",
       shouldAdjustForMobile ? "mt-0" : "mt-1 md:mt-2"
-    )}>
+    )}
+    style={{ marginTop: '5px' }}
+    >
       <div className="container mx-auto px-4 max-w-5xl">
         <motion.h1 
           className="text-2xl sm:text-2xl md:text-3xl font-bold flex items-center gap-2"
