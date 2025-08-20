@@ -31,7 +31,7 @@ serve(async (req) => {
       });
     }
 
-    const { audio, recordingTime } = await req.json();
+    const { audio, recordingTime, originalFormat, finalFormat, originalSize, paddedSize, hasPadding } = await req.json();
 
     if (!audio) {
       return new Response(JSON.stringify({ error: 'No audio data provided' }), {
@@ -41,10 +41,46 @@ serve(async (req) => {
     }
 
     console.log('[ChatTranscription] Starting chat-only transcription for user:', user.id);
+    console.log('[ChatTranscription] Audio format info:', {
+      originalFormat,
+      finalFormat,
+      originalSize,
+      paddedSize,
+      hasPadding,
+      audioDataLength: audio.length
+    });
 
     // Convert base64 to binary
     const audioBytes = Uint8Array.from(atob(audio), c => c.charCodeAt(0));
-    const audioBlob = new Blob([audioBytes], { type: 'audio/webm' });
+    
+    // Determine the correct MIME type and file extension from format info
+    let audioType = finalFormat || originalFormat || 'audio/webm';
+    let fileExtension = 'webm';
+    
+    // Extract format from MIME type or use passed format
+    if (audioType.includes('wav')) {
+      audioType = 'audio/wav';
+      fileExtension = 'wav';
+    } else if (audioType.includes('webm')) {
+      audioType = 'audio/webm';
+      fileExtension = 'webm';
+    } else if (audioType.includes('mp4') || audioType.includes('m4a')) {
+      audioType = 'audio/mp4';
+      fileExtension = 'm4a';
+    } else if (audioType.includes('ogg')) {
+      audioType = 'audio/ogg';
+      fileExtension = 'ogg';
+    }
+    
+    const audioBlob = new Blob([audioBytes], { type: audioType });
+    
+    console.log('[ChatTranscription] Audio blob created with detected format:', {
+      detectedType: audioType,
+      fileExtension,
+      size: audioBlob.size,
+      type: audioBlob.type,
+      recordingTime
+    });
 
     console.log('[ChatTranscription] Audio blob created:', {
       size: audioBlob.size,
@@ -61,7 +97,7 @@ serve(async (req) => {
     // Transcribe audio only - no journal entry creation
     const transcriptionResult = await transcribeAudioWithWhisper(
       audioBlob,
-      'webm',
+      fileExtension,
       openaiApiKey,
       'auto'
     );
