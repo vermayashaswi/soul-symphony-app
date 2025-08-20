@@ -343,6 +343,52 @@ serve(async (req) => {
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
+
+    } else if (classification.category === 'JOURNAL_SPECIFIC_NEEDS_CLARIFICATION') {
+      // Handle queries that need clarification
+      console.log(`[chat-with-rag] EXECUTING: JOURNAL_SPECIFIC_NEEDS_CLARIFICATION pipeline - clarification request`);
+      
+      const clarificationResponse = await supabaseClient.functions.invoke('gpt-clarification-generator', {
+        body: {
+          userMessage: message,
+          conversationContext: conversationContext,
+          userProfile: userProfile
+        }
+      });
+
+      if (clarificationResponse.error) {
+        throw new Error(`Clarification generation failed: ${clarificationResponse.error.message}`);
+      }
+
+      // Update the assistant message with the clarification response
+      if (assistantMessageId && clarificationResponse.data.response) {
+        try {
+          await supabaseClient
+            .from('chat_messages')
+            .update({
+              content: clarificationResponse.data.response
+            })
+            .eq('id', assistantMessageId);
+          console.log(`[chat-with-rag] Updated assistant message ${assistantMessageId} with clarification response`);
+        } catch (updateError) {
+          console.error('[chat-with-rag] Error updating assistant message:', updateError);
+        }
+      }
+
+      return new Response(JSON.stringify({
+        response: clarificationResponse.data.response,
+        userStatusMessage: clarificationResponse.data.userStatusMessage,
+        assistantMessageId: assistantMessageId,
+        metadata: {
+          classification: classification,
+          strategy: 'clarification',
+          type: clarificationResponse.data.type,
+          userTimezone: userTimezone
+        }
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+
     } else {
       // Handle other non-journal queries using gpt-response-consolidator with empty results
       console.log(`[chat-with-rag] EXECUTING: ${classification.category} pipeline - general response`);
