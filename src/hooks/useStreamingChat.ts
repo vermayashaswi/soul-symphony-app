@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { showEdgeFunctionRetryToast } from '@/utils/toast-messages';
 import { saveChatStreamingState, getChatStreamingState, clearChatStreamingState } from '@/utils/chatStateStorage';
 import { useTranslation } from '@/contexts/TranslationContext';
+import { useUserProfile } from '@/hooks/useUserProfile';
 
 export interface StreamingMessage {
   type: 'user_message' | 'backend_task' | 'progress' | 'final_response' | 'error';
@@ -75,6 +76,7 @@ const threadStates = new Map<string, ThreadStreamingState>();
 
 export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStreamingChatProps = {}) => {
   const { translate, currentLanguage } = useTranslation();
+  const { timezone } = useUserProfile();
   
   // Page visibility and app lifecycle tracking
   const [isPageVisible, setIsPageVisible] = useState(true);
@@ -770,6 +772,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
         threadId: targetThreadId,
         conversationContext,
         userProfile,
+        userTimezone: timezone || 'UTC', // Include user timezone or fallback to UTC
         streamingMode: false,
         requestId, // Include request ID for deduplication
         category: messageCategory,
@@ -784,9 +787,9 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
 
       if (error) {
         if (isEdgeFunctionError(error) || isNetworkError(error)) {
-          updateThreadState(targetThreadId, {
-            lastFailedMessage: { message, userId, threadId: targetThreadId, conversationContext, userProfile }
-          });
+        updateThreadState(targetThreadId, {
+          lastFailedMessage: { message, userId, threadId: targetThreadId, conversationContext, userProfile, userTimezone: timezone || 'UTC' }
+        });
           setTimeout(() => retryLastMessage(targetThreadId), 800);
           return;
         }
