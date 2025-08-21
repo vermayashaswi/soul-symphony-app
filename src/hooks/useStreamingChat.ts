@@ -578,7 +578,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     };
   }, [threadId, state.isStreaming, state.useThreeDotFallback, state.dynamicMessages.length, state.currentMessageIndex, state.queryCategory, state.expectedProcessingTime, state.processingStartTime, getThreadState, updateThreadState]);
 
-  // Safety completion guard with thread validation
+  // Enhanced safety completion guard with better persistence handling
   useEffect(() => {
     if (!threadId || !state.isStreaming) return;
     
@@ -587,25 +587,50 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
       return; // disable safety error for this category
     }
     
-    const graceMs = 45000;
-    const budget = (state.expectedProcessingTime ?? 60000) + graceMs;
+    const graceMs = 60000; // Increased grace period
+    const budget = (state.expectedProcessingTime ?? 90000) + graceMs; // Increased base time
     const startedAt = state.processingStartTime ?? Date.now();
-    const remaining = Math.max(5000, budget - (Date.now() - startedAt));
+    const remaining = Math.max(10000, budget - (Date.now() - startedAt)); // Minimum 10s
     
     const timer = setTimeout(() => {
       // Verify we're still on the same thread before showing error
-      if (threadId && getThreadState(threadId).isStreaming) {
-        console.warn(`[useStreamingChat] Safety guard triggered for thread: ${threadId}`);
-        addStreamingMessage({
-          type: 'error',
-          error: 'Connection seems unstable. Please retry.',
-          timestamp: Date.now()
-        }, threadId);
+      const currentState = getThreadState(threadId);
+      if (threadId && currentState.isStreaming) {
+        console.warn(`[useStreamingChat] Safety guard triggered for thread: ${threadId}, checking persistence first...`);
         
-        const currentState = getThreadState(threadId);
-        if (currentState.lastFailedMessage) {
-          updateThreadState(threadId, { lastFailedMessage: currentState.lastFailedMessage });
-        }
+        // Instead of immediately showing error, check if message was persisted
+        const checkPersistence = async () => {
+          try {
+            const { data: recentMessages } = await supabase
+              .from('chat_messages')
+              .select('*')
+              .eq('thread_id', threadId)
+              .order('created_at', { ascending: false })
+              .limit(2);
+            
+            if (recentMessages && recentMessages.length >= 2) {
+              // Messages are persisted, don't show error - just stop streaming
+              console.log(`[useStreamingChat] Messages found in DB, gracefully stopping stream for thread: ${threadId}`);
+              updateThreadState(threadId, { 
+                isStreaming: false,
+                showBackendAnimation: false,
+                activeRequestId: null
+              });
+              return;
+            }
+          } catch (error) {
+            console.error(`[useStreamingChat] Error checking persistence for thread ${threadId}:`, error);
+          }
+          
+          // Only show error if no persisted messages found
+          addStreamingMessage({
+            type: 'error',
+            error: 'Connection seems unstable. Please refresh the page to see any saved messages.',
+            timestamp: Date.now()
+          }, threadId);
+        };
+        
+        checkPersistence();
       }
     }, remaining);
     

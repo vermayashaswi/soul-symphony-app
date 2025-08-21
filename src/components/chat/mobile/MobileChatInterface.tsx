@@ -25,6 +25,8 @@ import { useStreamingChat } from "@/hooks/useStreamingChat";
 import { threadSafetyManager } from "@/utils/threadSafetyManager";
 import ChatErrorBoundary from "../ChatErrorBoundary";
 import { useAutoScroll } from "@/hooks/use-auto-scroll";
+import { useMessageSyncValidator } from "@/hooks/useMessageSyncValidator";
+import { messageLifecycleTracker } from "@/services/chat/messageLifecycleTracker";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -131,22 +133,42 @@ export default function MobileChatInterface({
     restoreStreamingState
    } = useStreamingChat({
       threadId: threadId,
-     onFinalResponse: async (response, analysis, originThreadId, requestId) => {
-       // Handle final streaming response scoped to its origin thread
-       if (!response || !originThreadId || !user?.id) {
-         debugLog.addEvent("Streaming Response", "[Mobile] Missing required data for final response", "error");
-         console.error("[Mobile] [Streaming] Missing response data:", { response: !!response, originThreadId: !!originThreadId, userId: !!user?.id });
-         return;
-       }
-       
-        debugLog.addEvent("Streaming Response", `[Mobile] Final response received for ${originThreadId}: ${response.substring(0, 100)}...`, "success");
+      onFinalResponse: async (response, analysis, originThreadId, requestId) => {
+        // Handle final streaming response scoped to its origin thread
+        if (!response || !originThreadId || !user?.id) {
+          debugLog.addEvent("Streaming Response", "[Mobile] Missing required data for final response", "error");
+          console.error("[Mobile] [Streaming] Missing response data:", { response: !!response, originThreadId: !!originThreadId, userId: !!user?.id });
+          return;
+        }
+        
+         debugLog.addEvent("Streaming Response", `[Mobile] Final response received for ${originThreadId}: ${response.substring(0, 100)}...`, "success");
 
-         // Optimistic UI: append assistant message immediately so UI doesn't appear blank
-         if (originThreadId === threadId) {
-           setMessages(prev => [...prev, { role: 'assistant', content: response, analysis }]);
-           setShowSuggestions(false);
-           setLocalLoading(false);
-         }
+          // Track streaming completion
+          messageLifecycleTracker.trackEvent({
+            messageId: null, // Will be set when persisted
+            threadId: originThreadId,
+            stage: 'streaming',
+            timestamp: Date.now(),
+            content: response,
+            source: 'streaming'
+          });
+
+          // Optimistic UI: append assistant message immediately so UI doesn't appear blank
+          if (originThreadId === threadId) {
+            setMessages(prev => [...prev, { role: 'assistant', content: response, analysis }]);
+            setShowSuggestions(false);
+            setLocalLoading(false);
+            
+            // Track UI display
+            messageLifecycleTracker.trackEvent({
+              messageId: null,
+              threadId: originThreadId,
+              stage: 'displayed',
+              timestamp: Date.now(),
+              content: response,
+              source: 'ui'
+            });
+          }
 
          // Update user message with classification data if available
          if (analysis?.classification && requestId) {
@@ -266,6 +288,39 @@ export default function MobileChatInterface({
     dependencies: [messages, isLoading, isProcessing, isStreaming],
     delay: 50,
     scrollThreshold: 100
+  });
+
+  // Add message sync validation
+  const { validateConsistency } = useMessageSyncValidator({
+    threadId,
+    messages,
+    onMissingMessagesDetected: async (missingMessages) => {
+      console.warn(`[MobileChatInterface] Detected ${missingMessages.length} missing messages, syncing...`);
+      
+      // Add missing messages to UI
+      const missingUIMessages = missingMessages.map(msg => ({
+        id: msg.id,
+        role: msg.sender as 'user' | 'assistant',
+        content: msg.content,
+        references: msg.reference_entries ? Array.isArray(msg.reference_entries) ? msg.reference_entries : [] : undefined,
+        hasNumericResult: msg.has_numeric_result,
+        isProcessing: msg.is_processing,
+        created_at: msg.created_at,
+        analysis: msg.analysis_data
+      }));
+      
+      setMessages(prev => {
+        const combined = [...prev, ...missingUIMessages];
+        return combined.sort((a, b) => 
+          new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
+        );
+      });
+      
+      toast({
+        title: "Messages Synced",
+        description: `Restored ${missingMessages.length} missing messages`,
+      });
+    }
   });
 
   // Realtime: append assistant messages saved by backend
@@ -454,6 +509,16 @@ export default function MobileChatInterface({
       const newMessage = payload.new;
       console.log(`[MobileChatInterface] Real-time INSERT: ${newMessage.id} - ${newMessage.sender}`);
       
+      // Track message persistence
+      messageLifecycleTracker.trackEvent({
+        messageId: newMessage.id,
+        threadId: newMessage.thread_id,
+        stage: 'persisted',
+        timestamp: Date.now(),
+        content: newMessage.content,
+        source: 'realtime'
+      });
+      
       setMessages(prevMessages => {
         // Check for duplicate by ID
         const exists = prevMessages.some(msg => msg.id === newMessage.id);
@@ -472,6 +537,16 @@ export default function MobileChatInterface({
           created_at: newMessage.created_at,
           analysis: newMessage.analysis_data
         };
+        
+        // Track UI display
+        messageLifecycleTracker.trackEvent({
+          messageId: newMessage.id,
+          threadId: newMessage.thread_id,
+          stage: 'displayed',
+          timestamp: Date.now(),
+          content: newMessage.content,
+          source: 'ui'
+        });
         
         return [...prevMessages, uiMessage].sort((a, b) => 
           new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
@@ -656,17 +731,45 @@ export default function MobileChatInterface({
         await updateThreadProcessingStatus(currentThreadId, 'failed');
       }
       
-      const errorMessageContent = "I'm having trouble processing your request. Please try again later. " + 
-                 (error?.message ? `Error: ${error.message}` : "");
+      // Check if this error occurred during streaming - if so, don't clear optimistic UI
+      const isStreamingError = streamingMessages && streamingMessages.length > 0;
       
-      if (currentThreadId === currentThreadIdRef.current) {
-        setMessages(prev => [
-          ...prev, 
-          { 
-            role: 'assistant', 
-            content: errorMessageContent
+      if (!isStreamingError) {
+        const errorMessageContent = "I'm having trouble processing your request. Please try again later. " + 
+                   (error?.message ? `Error: ${error.message}` : "");
+        
+        if (currentThreadId === currentThreadIdRef.current) {
+          setMessages(prev => [
+            ...prev, 
+            { 
+              role: 'assistant', 
+              content: errorMessageContent
+            }
+          ]);
+        }
+      } else {
+        // During streaming, log error but don't interfere with optimistic UI
+        console.error('[MobileChatInterface] Streaming error (preserving UI):', error);
+        
+        // Check if message was actually persisted despite the error
+        setTimeout(async () => {
+          try {
+            const { data: recentMessages } = await supabase
+              .from('chat_messages')
+              .select('*')
+              .eq('thread_id', currentThreadId!)
+              .order('created_at', { ascending: false })
+              .limit(1);
+            
+            if (recentMessages && recentMessages.length > 0 && recentMessages[0].sender === 'assistant') {
+              console.log('[MobileChatInterface] Message was persisted, triggering UI sync');
+              // Trigger realtime sync by refreshing subscription
+              await loadThreadMessages(currentThreadId!);
+            }
+          } catch (persistenceCheckError) {
+            console.error('[MobileChatInterface] Error checking message persistence:', persistenceCheckError);
           }
-        ]);
+        }, 2000);
       }
     } finally {
       setLocalLoading(false);
