@@ -37,11 +37,14 @@ import {
 } from "@/components/ui/alert-dialog";
 
 interface UIChatMessage {
+  id?: string;
   role: 'user' | 'assistant' | 'error';
   content: string;
   references?: any[];
   analysis?: any;
   hasNumericResult?: boolean;
+  isProcessing?: boolean;
+  created_at?: string;
 }
 
 interface MobileChatInterfaceProps {
@@ -404,17 +407,22 @@ export default function MobileChatInterface({
       }
       
       const chatMessages = await getThreadMessages(currentThreadId, user.id);
+      console.log(`[MobileChatInterface] Loaded ${chatMessages?.length || 0} messages for thread ${currentThreadId}`);
       
       if (chatMessages && chatMessages.length > 0) {
         const uiMessages = chatMessages
-          .filter(msg => !msg.is_processing)
           .map(msg => ({
+            id: msg.id,
             role: msg.sender as 'user' | 'assistant',
             content: msg.content,
             references: msg.reference_entries ? Array.isArray(msg.reference_entries) ? msg.reference_entries : [] : undefined,
-            hasNumericResult: msg.has_numeric_result
-          }));
+            hasNumericResult: msg.has_numeric_result,
+            isProcessing: msg.is_processing,
+            created_at: msg.created_at
+          }))
+          .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
         
+        console.log(`[MobileChatInterface] Displaying ${uiMessages.length} messages (including ${uiMessages.filter(m => m.isProcessing).length} processing)`);
         setMessages(uiMessages);
         setShowSuggestions(false);
         loadedThreadRef.current = currentThreadId;
@@ -435,6 +443,93 @@ export default function MobileChatInterface({
       setInitialLoading(false);
     }
   };
+
+  // Real-time subscription for message updates
+  useEffect(() => {
+    if (!threadId || !user?.id) return;
+
+    console.log(`[MobileChatInterface] Setting up real-time subscription for thread: ${threadId}`);
+    
+    const handleRealtimeInsert = (payload: any) => {
+      const newMessage = payload.new;
+      console.log(`[MobileChatInterface] Real-time INSERT: ${newMessage.id} - ${newMessage.sender}`);
+      
+      setMessages(prevMessages => {
+        // Check for duplicate by ID
+        const exists = prevMessages.some(msg => msg.id === newMessage.id);
+        if (exists) {
+          console.log(`[MobileChatInterface] Duplicate message ID detected, skipping: ${newMessage.id}`);
+          return prevMessages;
+        }
+        
+        const uiMessage = {
+          id: newMessage.id,
+          role: newMessage.sender as 'user' | 'assistant' | 'error',
+          content: newMessage.content,
+          references: newMessage.reference_entries ? Array.isArray(newMessage.reference_entries) ? newMessage.reference_entries : [] : undefined,
+          hasNumericResult: newMessage.has_numeric_result,
+          isProcessing: newMessage.is_processing,
+          created_at: newMessage.created_at,
+          analysis: newMessage.analysis_data
+        };
+        
+        return [...prevMessages, uiMessage].sort((a, b) => 
+          new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
+        );
+      });
+    };
+
+    const handleRealtimeUpdate = (payload: any) => {
+      const updatedMessage = payload.new;
+      console.log(`[MobileChatInterface] Real-time UPDATE: ${updatedMessage.id} - processing: ${updatedMessage.is_processing}`);
+      
+      setMessages(prevMessages => {
+        return prevMessages.map(msg => 
+          msg.id === updatedMessage.id 
+            ? {
+                ...msg,
+                content: updatedMessage.content,
+                isProcessing: updatedMessage.is_processing,
+                references: updatedMessage.reference_entries ? Array.isArray(updatedMessage.reference_entries) ? updatedMessage.reference_entries : [] : undefined,
+                hasNumericResult: updatedMessage.has_numeric_result,
+                analysis: updatedMessage.analysis_data
+              }
+            : msg
+        );
+      });
+    };
+
+    const channel = supabase
+      .channel(`chat_messages_${threadId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'chat_messages',
+          filter: `thread_id=eq.${threadId}`
+        },
+        handleRealtimeInsert
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'chat_messages',
+          filter: `thread_id=eq.${threadId}`
+        },
+        handleRealtimeUpdate
+      )
+      .subscribe((status) => {
+        console.log(`[MobileChatInterface] Subscription status: ${status}`);
+      });
+
+    return () => {
+      console.log(`[MobileChatInterface] Cleaning up real-time subscription for thread: ${threadId}`);
+      supabase.removeChannel(channel);
+    };
+  }, [threadId, user?.id]);
 
   const handleSendMessage = async (message: string) => {
     if (!message.trim()) return;
