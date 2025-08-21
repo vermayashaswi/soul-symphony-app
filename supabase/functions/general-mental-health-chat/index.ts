@@ -146,7 +146,7 @@ MUST HAVE/DO: ALWAYS BE AWARE OF THE CONVERSATION HISTORY TO UNDERSTAND WHAT THE
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: 'gpt-4.1-mini-2025-04-14',
+            model: 'gpt-4.1-nano',
             messages,
             max_tokens: 800
           }),
@@ -230,7 +230,7 @@ MUST HAVE/DO: ALWAYS BE AWARE OF THE CONVERSATION HISTORY TO UNDERSTAND WHAT THE
         response: content,
         queryClassification: 'GENERAL_MENTAL_HEALTH',
         messageMetadata: {
-          model: 'gpt-4.1-mini-2025-04-14',
+          model: 'gpt-4.1-nano',
           timezone: normalizedTimezone,
           timestamp: new Date().toISOString()
         }
