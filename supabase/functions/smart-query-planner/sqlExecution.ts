@@ -24,6 +24,11 @@ export async function executeSQLAnalysis(step: any, userId: string, supabaseClie
       return await executeVectorSearchFallback(step, userId, supabaseClient, requestId);
     }
     
+    // Store SQL query for debugging before execution
+    if (executionDetails.sqlQueries) {
+      executionDetails.sqlQueries.push(sanitizedQuery);
+    }
+    
     // Use the execute_dynamic_query function to safely run GPT-generated SQL
     console.log(`[${requestId}] Executing sanitized query via RPC:`, sanitizedQuery.substring(0, 200) + '...');
     
@@ -55,15 +60,12 @@ export async function executeSQLAnalysis(step: any, userId: string, supabaseClie
 
     if (data && data.success && data.data) {
       console.log(`[${requestId}] SQL query executed successfully, rows:`, data.data.length);
-      // If SQL query executed but returned 0 results, try vector fallback
-      if (data.data.length === 0) {
-        console.log(`[${requestId}] SQL query returned 0 results, falling back to vector search`);
-        executionDetails.fallbackUsed = true;
-        return await executeVectorSearchFallback(step, userId, supabaseClient, requestId);
-      }
+      // Return data even if empty - empty results are valid!
+      executionDetails.sqlResultCount = data.data.length;
+      console.log(`[${requestId}] SQL execution successful - returning ${data.data.length} results`);
       return data.data;
     } else {
-      console.warn(`[${requestId}] SQL query returned no results or failed:`, data);
+      console.warn(`[${requestId}] SQL query execution failed or returned invalid response:`, data);
       executionDetails.fallbackUsed = true;
       return await executeVectorSearchFallback(step, userId, supabaseClient, requestId);
     }

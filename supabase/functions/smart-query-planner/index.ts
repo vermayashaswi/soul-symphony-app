@@ -855,17 +855,18 @@ SUB-QUESTION/QUERIES GENERATION GUIDELINE (MANDATORY):
    - For entities: jsonb_each(entities) for types, jsonb_array_elements_text() for values
    - Example: SELECT emotion_key, AVG((emotion_value::text)::numeric) FROM "Journal Entries", jsonb_each(emotions) WHERE user_id = auth.uid() GROUP BY emotion_key
 
-4. **MANDATORY TIME RANGE INTEGRATION:**
-   - When timeRange is provided in the step, SQL queries MUST include the date filters
-   - Use proper timestamp with time zone format: '2024-08-01T00:00:00Z'::timestamp with time zone
-   - ALWAYS include both start and end date filters when timeRange exists
-   - Example: AND created_at >= 'START_DATE' AND created_at <= 'END_DATE'
+4. **Enhanced Time Variable Support:**
+   - Use time variables for dynamic date calculations instead of hardcoded dates
+   - Available variables: __NOW__, __TODAY__, __YESTERDAY__, __CURRENT_WEEK_START__, __CURRENT_WEEK_END__, __LAST_WEEK_START__, __LAST_WEEK_END__, __CURRENT_MONTH_START__, __CURRENT_MONTH_END__, __LAST_MONTH_START__, __LAST_MONTH_END__, __30_DAYS_AGO__, __7_DAYS_AGO__
+   - Example: WHERE created_at >= __LAST_WEEK_START__ AND created_at <= __LAST_WEEK_END__
+   - When timeRange is provided, ALWAYS include date filters in SQL queries
 
 5. **Safe Query Patterns:**
    - Always include user_id = auth.uid() in WHERE clause
    - Use proper PostgreSQL syntax with double quotes for table/column names with spaces
-   - Avoid complex nested queries - keep it simple and working
+   - Prefer simple queries over complex nested ones - prioritize reliability
    - Use standard aggregation functions: COUNT, AVG, MAX, MIN, SUM
+   - Remember: Empty results are VALID - don't avoid queries that might return zero rows
 
 **WORKING SQL EXAMPLES FOR REFERENCE:**
 
@@ -904,30 +905,45 @@ ORDER BY created_at DESC
 LIMIT 5;
 \`\`\`
 
-4. **Date Range Query with Timezone Conversion:**
+4. **Time Variable Usage Examples:**
 \`\`\`sql
-SELECT COUNT(*) as entry_count,
-       AVG(CASE WHEN sentiment = 'positive' THEN 1 WHEN sentiment = 'negative' THEN -1 ELSE 0 END) as avg_sentiment
+-- Last week's entries
+SELECT COUNT(*) as entry_count
 FROM "Journal Entries" 
 WHERE user_id = auth.uid() 
-  AND created_at >= '2024-01-01T00:00:00Z'::timestamp with time zone
-  AND created_at <= '2024-01-01T23:59:59Z'::timestamp with time zone;
+  AND created_at >= __LAST_WEEK_START__ 
+  AND created_at <= __LAST_WEEK_END__;
 \`\`\`
 
-5. **Emotion Analysis with Time Range:**
 \`\`\`sql
+-- Current month emotions
 SELECT 
   emotion_key,
-  AVG((emotion_value::text)::numeric) as avg_score,
-  COUNT(*) as frequency
+  AVG((emotion_value::text)::numeric) as avg_score
 FROM "Journal Entries", 
      jsonb_each(emotions) as e(emotion_key, emotion_value)
 WHERE user_id = auth.uid() 
   AND emotions IS NOT NULL
-  AND created_at >= '2024-08-01T00:00:00Z'::timestamp with time zone
-  AND created_at <= '2024-08-31T23:59:59Z'::timestamp with time zone
+  AND created_at >= __CURRENT_MONTH_START__
+  AND created_at <= __CURRENT_MONTH_END__
 GROUP BY emotion_key
 ORDER BY avg_score DESC;
+\`\`\`
+
+5. **Complex Analysis Example:**
+\`\`\`sql
+-- Entries with specific emotion above threshold
+SELECT 
+  "refined text" as content,
+  created_at,
+  (emotions->>'confidence')::numeric as confidence_score
+FROM "Journal Entries" 
+WHERE user_id = auth.uid() 
+  AND emotions ? 'confidence'
+  AND (emotions->>'confidence')::numeric > 0.5
+  AND created_at >= __30_DAYS_AGO__
+ORDER BY confidence_score DESC
+LIMIT 10;
 \`\`\`
 
 **CRITICAL TIMEZONE HANDLING RULES:**
