@@ -44,7 +44,6 @@ interface ThreadStreamingState {
   abortController: AbortController | null;
   activeRequestId: string | null; // Track active request to prevent duplicates
   lastMessageFingerprint: string | null; // Prevent duplicate messages
-  waitingForRealtimeDelivery?: boolean; // Enhanced coordination with realtime
 }
 
 const createInitialState = (): ThreadStreamingState => ({
@@ -287,9 +286,31 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
           const category = (body as any)?.category || threadState.queryCategory;
           let result: { data: any; error: any };
 
-          // Route ALL queries through chat-with-rag for unified message persistence
-          // Disable client-side timeout for all categories as they're handled by chat-with-rag
-          result = (await supabase.functions.invoke('chat-with-rag', { body })) as { data: any; error: any };
+          if (category === 'JOURNAL_SPECIFIC') {
+            // Disable client-side timeout for long-running analysis
+            result = (await supabase.functions.invoke('chat-with-rag', { body })) as { data: any; error: any };
+          } else if (category === 'GENERAL_MENTAL_HEALTH') {
+            const timeoutMs = 20000 + i * 5000;
+            const timeoutPromise = new Promise((_, rej) =>
+              setTimeout(() => rej(new Error('Request timed out')), timeoutMs)
+            );
+
+            result = (await Promise.race([
+              supabase.functions.invoke('general-mental-health-chat', { body }),
+              timeoutPromise,
+            ])) as { data: any; error: any };
+          } else {
+            // Fallback for unknown categories
+            const timeoutMs = 20000 + i * 5000;
+            const timeoutPromise = new Promise((_, rej) =>
+              setTimeout(() => rej(new Error('Request timed out')), timeoutMs)
+            );
+
+            result = (await Promise.race([
+              supabase.functions.invoke('general-mental-health-chat', { body }),
+              timeoutPromise,
+            ])) as { data: any; error: any };
+          }
           if ((result as any)?.error) {
             lastErr = (result as any).error;
             if (isEdgeFunctionError(lastErr) || isNetworkError(lastErr)) {
@@ -579,7 +600,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     };
   }, [threadId, state.isStreaming, state.useThreeDotFallback, state.dynamicMessages.length, state.currentMessageIndex, state.queryCategory, state.expectedProcessingTime, state.processingStartTime, getThreadState, updateThreadState]);
 
-  // Enhanced safety completion guard with better persistence handling
+  // Safety completion guard with thread validation
   useEffect(() => {
     if (!threadId || !state.isStreaming) return;
     
@@ -588,50 +609,25 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
       return; // disable safety error for this category
     }
     
-    const graceMs = 60000; // Increased grace period
-    const budget = (state.expectedProcessingTime ?? 90000) + graceMs; // Increased base time
+    const graceMs = 45000;
+    const budget = (state.expectedProcessingTime ?? 60000) + graceMs;
     const startedAt = state.processingStartTime ?? Date.now();
-    const remaining = Math.max(10000, budget - (Date.now() - startedAt)); // Minimum 10s
+    const remaining = Math.max(5000, budget - (Date.now() - startedAt));
     
     const timer = setTimeout(() => {
       // Verify we're still on the same thread before showing error
-      const currentState = getThreadState(threadId);
-      if (threadId && currentState.isStreaming) {
-        console.warn(`[useStreamingChat] Safety guard triggered for thread: ${threadId}, checking persistence first...`);
+      if (threadId && getThreadState(threadId).isStreaming) {
+        console.warn(`[useStreamingChat] Safety guard triggered for thread: ${threadId}`);
+        addStreamingMessage({
+          type: 'error',
+          error: 'Connection seems unstable. Please retry.',
+          timestamp: Date.now()
+        }, threadId);
         
-        // Instead of immediately showing error, check if message was persisted
-        const checkPersistence = async () => {
-          try {
-            const { data: recentMessages } = await supabase
-              .from('chat_messages')
-              .select('*')
-              .eq('thread_id', threadId)
-              .order('created_at', { ascending: false })
-              .limit(2);
-            
-            if (recentMessages && recentMessages.length >= 2) {
-              // Messages are persisted, don't show error - just stop streaming
-              console.log(`[useStreamingChat] Messages found in DB, gracefully stopping stream for thread: ${threadId}`);
-              updateThreadState(threadId, { 
-                isStreaming: false,
-                showBackendAnimation: false,
-                activeRequestId: null
-              });
-              return;
-            }
-          } catch (error) {
-            console.error(`[useStreamingChat] Error checking persistence for thread ${threadId}:`, error);
-          }
-          
-          // Only show error if no persisted messages found
-          addStreamingMessage({
-            type: 'error',
-            error: 'Connection seems unstable. Please refresh the page to see any saved messages.',
-            timestamp: Date.now()
-          }, threadId);
-        };
-        
-        checkPersistence();
+        const currentState = getThreadState(threadId);
+        if (currentState.lastFailedMessage) {
+          updateThreadState(threadId, { lastFailedMessage: currentState.lastFailedMessage });
+        }
       }
     }, remaining);
     
@@ -871,60 +867,21 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     return false;
   }, [threadId, updateThreadState]);
 
-    // Enhanced coordination with realtime subscription
-    const extendStreamingForRealtimeDelivery = useCallback((targetThreadId?: string) => {
-      const activeThreadId = targetThreadId || threadId;
-      if (!activeThreadId) return;
-
-      console.log(`[useStreamingChat] Extending streaming state to wait for realtime delivery: ${activeThreadId}`);
-      
-      updateThreadState(activeThreadId, {
-        isStreaming: true,
-        showBackendAnimation: false,
-        waitingForRealtimeDelivery: true
-      });
-      
-      // Set a maximum wait time of 10 seconds for realtime delivery
-      setTimeout(() => {
-        const currentState = getThreadState(activeThreadId);
-        if (currentState.waitingForRealtimeDelivery) {
-          console.log(`[useStreamingChat] Realtime delivery timeout, forcing streaming to false: ${activeThreadId}`);
-          updateThreadState(activeThreadId, {
-            isStreaming: false,
-            waitingForRealtimeDelivery: false
-          });
+  // Cleanup when thread changes or component unmounts
+  useEffect(() => {
+    return () => {
+      if (threadId) {
+        const threadState = getThreadState(threadId);
+        if (threadState.abortController) {
+          threadState.abortController.abort();
         }
-      }, 10000);
-    }, [threadId, getThreadState, updateThreadState]);
+      }
+    };
+  }, [threadId, getThreadState]);
 
-    const confirmRealtimeDelivery = useCallback((targetThreadId?: string) => {
-      const activeThreadId = targetThreadId || threadId;
-      if (!activeThreadId) return;
-
-      console.log(`[useStreamingChat] Confirming realtime delivery, ending streaming state: ${activeThreadId}`);
-      
-      updateThreadState(activeThreadId, {
-        isStreaming: false,
-        waitingForRealtimeDelivery: false,
-        showBackendAnimation: false
-      });
-    }, [threadId, updateThreadState]);
-
-    // Cleanup when thread changes or component unmounts
-    useEffect(() => {
-      return () => {
-        if (threadId) {
-          const threadState = getThreadState(threadId);
-          if (threadState.abortController) {
-            threadState.abortController.abort();
-          }
-        }
-      };
-    }, [threadId, getThreadState]);
-
-    return {
-      // Thread-isolated state
-      isStreaming: state.isStreaming,
+  return {
+    // Thread-isolated state
+    isStreaming: state.isStreaming,
     streamingMessages: state.streamingMessages,
     currentUserMessage: state.currentUserMessage,
     showBackendAnimation: state.showBackendAnimation,
@@ -946,10 +903,6 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     clearStreamingMessages,
     restoreStreamingState,
     retryLastMessage: () => retryLastMessage(threadId),
-    
-    // Enhanced realtime coordination methods
-    extendStreamingForRealtimeDelivery,
-    confirmRealtimeDelivery,
     
     // Utility methods
     addStreamingMessage: (message: StreamingMessage) => addStreamingMessage(message, threadId)

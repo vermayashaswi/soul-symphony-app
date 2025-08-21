@@ -23,7 +23,6 @@ export type Database = {
           id: string
           idempotency_key: string | null
           reference_entries: Json | null
-          request_correlation_id: string | null
           role: string | null
           sender: string
           sub_query_responses: Json | null
@@ -40,7 +39,6 @@ export type Database = {
           id?: string
           idempotency_key?: string | null
           reference_entries?: Json | null
-          request_correlation_id?: string | null
           role?: string | null
           sender: string
           sub_query_responses?: Json | null
@@ -57,7 +55,6 @@ export type Database = {
           id?: string
           idempotency_key?: string | null
           reference_entries?: Json | null
-          request_correlation_id?: string | null
           role?: string | null
           sender?: string
           sub_query_responses?: Json | null
@@ -691,10 +688,6 @@ export type Database = {
         Args: { entry_id_param: number }
         Returns: boolean
       }
-      check_message_persistence_health: {
-        Args: { expected_message_count?: number; thread_id_param: string }
-        Returns: Json
-      }
       check_table_columns: {
         Args: { table_name: string }
         Returns: {
@@ -721,10 +714,6 @@ export type Database = {
       cleanup_idle_sessions: {
         Args: Record<PropertyKey, never>
         Returns: number
-      }
-      cleanup_malformed_json_messages: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
       }
       close_user_session: {
         Args: { p_session_id: string; p_user_id: string }
@@ -785,9 +774,7 @@ export type Database = {
         Returns: Json
       }
       execute_dynamic_query: {
-        Args:
-          | { query_text: string }
-          | { query_text: string; user_timezone?: string }
+        Args: { query_text: string }
         Returns: Json
       }
       extend_session_activity: {
@@ -1228,10 +1215,6 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
-      thread_belongs_to_user: {
-        Args: { thread_id: string }
-        Returns: boolean
-      }
       update_session_activity: {
         Args: { p_language?: string; p_page?: string; p_session_id: string }
         Returns: undefined
@@ -1239,10 +1222,6 @@ export type Database = {
       upsert_journal_embedding: {
         Args: { embedding_vector: string; entry_id: number }
         Returns: undefined
-      }
-      validate_thread_ownership: {
-        Args: { p_thread_id: string; p_user_id: string }
-        Returns: boolean
       }
       verify_vector_operations: {
         Args: Record<PropertyKey, never>

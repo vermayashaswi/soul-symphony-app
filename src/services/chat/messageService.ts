@@ -194,7 +194,7 @@ export const getThreadMessages = getChatMessages;
 // Export classification helper
 export { updateUserMessageClassification } from '@/utils/chat/classificationHelpers';
 
-// Enhanced saveMessage function with improved error handling and idempotency
+// Updated saveMessage function with correct signature and idempotency support
 export const saveMessage = async (
   threadId: string, 
   content: string, 
@@ -207,7 +207,7 @@ export const saveMessage = async (
   idempotencyKey?: string,
   analysisData?: any
 ) => {
-  console.log('[saveMessage] Starting enhanced message save:', {
+  console.log('[saveMessage] Starting message save:', {
     threadId,
     sender,
     userId,
@@ -218,18 +218,6 @@ export const saveMessage = async (
   if (!userId) {
     console.error('[saveMessage] User ID is required for saveMessage');
     return null;
-  }
-
-  // Generate idempotency key if not provided
-  if (!idempotencyKey && sender === 'assistant') {
-    const timestamp = Date.now();
-    const encoder = new TextEncoder();
-    const data = encoder.encode(`${threadId}:${content}:${timestamp}`);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const hash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 16);
-    idempotencyKey = `${timestamp}_${hash}`;
-    console.log('[saveMessage] Generated idempotency key:', idempotencyKey);
   }
 
   // Process content for assistant messages to handle JSON responses
@@ -256,64 +244,16 @@ export const saveMessage = async (
   if (idempotencyKey) additionalData.idempotency_key = idempotencyKey;
   if (analysisData) additionalData.analysis_data = analysisData;
 
-  console.log('[saveMessage] Processed data, calling createChatMessage with retry logic');
-
-  // Enhanced retry logic for message creation
-  const maxRetries = 3;
-  let lastError = null;
-
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    console.log(`[saveMessage] Save attempt ${attempt}/${maxRetries}`);
-    
-    try {
-      const result = await createChatMessage(threadId, processedContent, sender, userId, additionalData);
-      
-      if (result) {
-        console.log('[saveMessage] Message saved successfully:', result.id);
-        return result;
-      } else {
-        throw new Error('createChatMessage returned null');
-      }
-    } catch (error) {
-      lastError = error;
-      console.error(`[saveMessage] Attempt ${attempt} failed:`, error);
-
-      // Handle idempotency constraint violation
-      if (error instanceof Error && error.message.includes('duplicate key') && idempotencyKey) {
-        console.log('[saveMessage] Idempotency conflict detected, checking for existing message');
-        
-        try {
-          const { data: existing, error: fetchError } = await supabase
-            .from('chat_messages')
-            .select('*')
-            .eq('thread_id', threadId)
-            .eq('idempotency_key', idempotencyKey)
-            .single();
-
-          if (!fetchError && existing) {
-            console.log('[saveMessage] Found existing message with same idempotency key:', existing.id);
-            return {
-              ...existing,
-              sender: existing.sender as 'user' | 'assistant' | 'error',
-              role: existing.role as 'user' | 'assistant' | 'error',
-              sub_query_responses: Array.isArray(existing.sub_query_responses) ? existing.sub_query_responses : []
-            };
-          }
-        } catch (fetchError) {
-          console.error('[saveMessage] Failed to fetch existing message:', fetchError);
-        }
-      }
-
-      if (attempt < maxRetries) {
-        const delay = Math.pow(2, attempt - 1) * 1000; // Exponential backoff
-        console.log(`[saveMessage] Retrying in ${delay}ms...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
-    }
+  console.log('[saveMessage] Processed data, calling createChatMessage');
+  const result = await createChatMessage(threadId, processedContent, sender, userId, additionalData);
+  
+  if (result) {
+    console.log('[saveMessage] Message saved successfully:', result.id);
+  } else {
+    console.error('[saveMessage] Failed to save message');
   }
-
-  console.error('[saveMessage] All save attempts failed. Last error:', lastError);
-  return null;
+  
+  return result;
 };
 
 // Update message with classification data
