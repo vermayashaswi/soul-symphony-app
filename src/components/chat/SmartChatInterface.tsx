@@ -132,54 +132,79 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       
       // Backend persists assistant message; UI will append via realtime
       if (originThreadId === currentThreadId) {
-        // Watchdog: if realtime insert doesn't arrive, persist client-side after a short delay
-        try {
-          setTimeout(async () => {
-            // Double-check still on same thread
-            if (!currentThreadIdRef.current || currentThreadIdRef.current !== originThreadId) return;
+          // Enhanced watchdog: if realtime insert doesn't arrive, persist client-side after a short delay
+          try {
+            setTimeout(async () => {
+              // Double-check still on same thread
+              if (!currentThreadIdRef.current || currentThreadIdRef.current !== originThreadId) return;
 
-            // Has an assistant message with same content arrived?
-            const { data: recent, error: recentErr } = await supabase
-              .from('chat_messages')
-              .select('id, content, sender, created_at')
-              .eq('thread_id', originThreadId)
-              .order('created_at', { ascending: false })
-              .limit(5);
+              // Has an assistant message with same content arrived?
+              const { data: recent, error: recentErr } = await supabase
+                .from('chat_messages')
+                .select('id, content, sender, created_at, idempotency_key')
+                .eq('thread_id', originThreadId)
+                .order('created_at', { ascending: false })
+                .limit(10);
 
-            if (recentErr) {
-              console.warn('[Streaming Watchdog] Failed to fetch recent messages:', recentErr.message);
-            }
-
-            const alreadyExists = (recent || []).some(m => (m as any).sender === 'assistant' && (m as any).content?.trim() === response.trim());
-            if (!alreadyExists) {
-              // Persist safely with an idempotency_key derived from threadId + response
-              try {
-                const enc = new TextEncoder();
-                const keySource = requestId || `${originThreadId}:${response}`;
-                const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
-                const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
-                const idempotencyKey = hex.slice(0, 32);
-
-                await supabase.from('chat_messages').upsert({
-                  thread_id: originThreadId,
-                  content: response,
-                  sender: 'assistant',
-                  role: 'assistant',
-                  idempotency_key: idempotencyKey
-                }, { onConflict: 'thread_id,idempotency_key' });
-              } catch (e) {
-                console.warn('[Streaming Watchdog] Persist fallback failed:', (e as any)?.message || e);
+              if (recentErr) {
+                console.warn('[Streaming Watchdog] Failed to fetch recent messages:', recentErr.message);
               }
-            }
 
+              // Check for exact content match or similar response
+              const contentTrim = response.trim();
+              const alreadyExists = (recent || []).some(m => 
+                (m as any).sender === 'assistant' && 
+                ((m as any).content?.trim() === contentTrim ||
+                 (m as any).content?.trim().includes(contentTrim.substring(0, 100)))
+              );
+
+              if (!alreadyExists) {
+                console.log('[Streaming Watchdog] Assistant message missing, creating fallback message');
+                
+                try {
+                  // Enhanced persistence with improved idempotency
+                  const enc = new TextEncoder();
+                  const keySource = requestId || `${originThreadId}:${response}:${Date.now()}`;
+                  const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
+                  const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+                  const idempotencyKey = `watchdog_${hex.slice(0, 24)}`;
+
+                  const { data: savedMessage, error: saveError } = await supabase
+                    .from('chat_messages')
+                    .upsert({
+                      thread_id: originThreadId,
+                      content: response,
+                      sender: 'assistant',
+                      role: 'assistant',
+                      idempotency_key: idempotencyKey,
+                      analysis_data: analysis || null
+                    }, { 
+                      onConflict: 'thread_id,idempotency_key',
+                      ignoreDuplicates: false 
+                    })
+                    .select('id')
+                    .single();
+
+                  if (saveError) {
+                    console.warn('[Streaming Watchdog] Fallback persist failed:', saveError.message);
+                  } else {
+                    console.log('[Streaming Watchdog] Successfully created fallback message:', savedMessage?.id);
+                  }
+                } catch (e) {
+                  console.warn('[Streaming Watchdog] Persist fallback exception:', (e as any)?.message || e);
+                }
+              } else {
+                console.log('[Streaming Watchdog] Assistant message found, no fallback needed');
+              }
+
+              setLocalLoading(false);
+              updateProcessingStage(null);
+            }, 1500); // Increased delay to allow for edge function processing
+          } catch (e) {
+            console.warn('[Streaming Watchdog] Exception scheduling fallback:', (e as any)?.message || e);
             setLocalLoading(false);
             updateProcessingStage(null);
-          }, 1200);
-        } catch (e) {
-          console.warn('[Streaming Watchdog] Exception scheduling fallback:', (e as any)?.message || e);
-          setLocalLoading(false);
-          updateProcessingStage(null);
-        }
+          }
       }
     },
     onError: (error) => {
