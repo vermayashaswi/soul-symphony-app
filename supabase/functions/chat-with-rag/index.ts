@@ -126,7 +126,8 @@ serve(async (req) => {
 
     console.log(`[chat-with-rag] Processing query: "${message}" for user: ${userId} (threadId: ${threadId}, messageId: ${messageId})`);
     
-    // Clean approach - let final response create the assistant message
+    // Generate correlation ID for this request to prevent duplicates
+    const requestCorrelationId = `req_${Date.now()}_${crypto.randomUUID().split('-')[0]}`;
     let assistantMessageId = null;
     
     // Enhanced timezone handling with comprehensive validation
@@ -269,24 +270,33 @@ serve(async (req) => {
             finalResponseContent = "I processed your request but encountered an issue with the response format. Please try again.";
           }
           
-          const { data: messageData, error: messageError } = await supabaseClient
-            .from('chat_messages')
-            .insert({
-              thread_id: threadId,
-              sender: 'assistant',
-              role: 'assistant',
-              content: finalResponseContent,
-              analysis_data: consolidationResponse.data.analysisMetadata || null
-            })
-            .select('id')
-            .single();
+          // Generate unique idempotency key for this assistant message
+          const assistantIdempotencyKey = `assistant_${threadId}_${requestCorrelationId}`;
           
-          if (messageError) {
-            console.error('[chat-with-rag] Error creating assistant message:', messageError);
-          } else {
-            assistantMessageId = messageData.id;
-            console.log(`[chat-with-rag] Created assistant message ${assistantMessageId} with response (${finalResponseContent.length} chars)`);
-          }
+          const { data: messageId, error: messageError } = await supabaseClient
+            .rpc('create_chat_message_with_dedup', {
+              p_thread_id: threadId,
+              p_content: finalResponseContent,
+              p_sender: 'assistant',
+              p_role: 'assistant', 
+              p_idempotency_key: assistantIdempotencyKey
+            });
+          
+           if (!messageError && messageId) {
+             // Update with additional metadata
+             await supabaseClient
+               .from('chat_messages')
+               .update({
+                 analysis_data: consolidationResponse.data.analysisMetadata || null,
+                 request_correlation_id: requestCorrelationId
+               })
+               .eq('id', messageId);
+             
+             assistantMessageId = messageId;
+             console.log(`[chat-with-rag] Created assistant message ${assistantMessageId} with response (${finalResponseContent.length} chars)`);
+           } else {
+             console.error('[chat-with-rag] Error creating assistant message:', messageError);
+           }
         } catch (error) {
           console.error('[chat-with-rag] Exception creating assistant message:', error);
         }
@@ -295,7 +305,8 @@ serve(async (req) => {
       return new Response(JSON.stringify({
         response: consolidationResponse.data.response,
         userStatusMessage: userStatusMessageFromPlanner || consolidationResponse.data.userStatusMessage,
-        assistantMessageId: assistantMessageId, // Include the assistant message ID in response
+        assistantMessageId: assistantMessageId,
+        correlationId: requestCorrelationId,
         queryClassification: classification.category,
         queryComplexity: queryPlan?.complexity || 'standard',
         executionStrategy: queryPlan?.strategy || 'unknown',
@@ -333,21 +344,26 @@ serve(async (req) => {
       // Create assistant message with mental health response
       if (threadId && generalResponse.data) {
         try {
-          const { data: messageData, error: messageError } = await supabaseClient
-            .from('chat_messages')
-            .insert({
-              thread_id: threadId,
-              sender: 'assistant',
-              role: 'assistant',
-              content: generalResponse.data
-            })
-            .select('id')
-            .single();
+          const mentalHealthIdempotencyKey = `mental_health_${threadId}_${requestCorrelationId}`;
+          
+          const { data: messageId, error: messageError } = await supabaseClient
+            .rpc('create_chat_message_with_dedup', {
+              p_thread_id: threadId,
+              p_content: generalResponse.data,
+              p_sender: 'assistant',
+              p_role: 'assistant',
+              p_idempotency_key: mentalHealthIdempotencyKey
+            });
           
           if (messageError) {
             console.error('[chat-with-rag] Error creating assistant message:', messageError);
           } else {
-            assistantMessageId = messageData.id;
+            assistantMessageId = messageId;
+            // Update with correlation ID
+            await supabaseClient
+              .from('chat_messages')
+              .update({ request_correlation_id: requestCorrelationId })
+              .eq('id', messageId);
             console.log(`[chat-with-rag] Created assistant message ${assistantMessageId} with mental health response`);
           }
         } catch (error) {
@@ -358,6 +374,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({
         response: generalResponse.data,
         assistantMessageId: assistantMessageId,
+        correlationId: requestCorrelationId,
         metadata: {
           classification: classification,
           strategy: 'general_mental_health',
@@ -386,21 +403,26 @@ serve(async (req) => {
       // Create assistant message with clarification response
       if (threadId && clarificationResponse.data.response) {
         try {
-          const { data: messageData, error: messageError } = await supabaseClient
-            .from('chat_messages')
-            .insert({
-              thread_id: threadId,
-              sender: 'assistant',
-              role: 'assistant',
-              content: clarificationResponse.data.response
-            })
-            .select('id')
-            .single();
+          const clarificationIdempotencyKey = `clarification_${threadId}_${requestCorrelationId}`;
+          
+          const { data: messageId, error: messageError } = await supabaseClient
+            .rpc('create_chat_message_with_dedup', {
+              p_thread_id: threadId,
+              p_content: clarificationResponse.data.response,
+              p_sender: 'assistant',
+              p_role: 'assistant',
+              p_idempotency_key: clarificationIdempotencyKey
+            });
           
           if (messageError) {
             console.error('[chat-with-rag] Error creating assistant message:', messageError);
           } else {
-            assistantMessageId = messageData.id;
+            assistantMessageId = messageId;
+            // Update with correlation ID
+            await supabaseClient
+              .from('chat_messages')
+              .update({ request_correlation_id: requestCorrelationId })
+              .eq('id', messageId);
             console.log(`[chat-with-rag] Created assistant message ${assistantMessageId} with clarification response`);
           }
         } catch (error) {
@@ -411,6 +433,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({
         response: clarificationResponse.data.response,
         assistantMessageId: assistantMessageId,
+        correlationId: requestCorrelationId,
         needsClarification: true,
         clarificationQuestions: clarificationResponse.data.clarificationQuestions,
         metadata: {
@@ -442,21 +465,26 @@ serve(async (req) => {
       // Create assistant message with fallback response
       if (threadId && fallbackResponse.data) {
         try {
-          const { data: messageData, error: messageError } = await supabaseClient
-            .from('chat_messages')
-            .insert({
-              thread_id: threadId,
-              sender: 'assistant',
-              role: 'assistant',
-              content: fallbackResponse.data
-            })
-            .select('id')
-            .single();
+          const fallbackIdempotencyKey = `fallback_${threadId}_${requestCorrelationId}`;
+          
+          const { data: messageId, error: messageError } = await supabaseClient
+            .rpc('create_chat_message_with_dedup', {
+              p_thread_id: threadId,
+              p_content: fallbackResponse.data,
+              p_sender: 'assistant', 
+              p_role: 'assistant',
+              p_idempotency_key: fallbackIdempotencyKey
+            });
           
           if (messageError) {
             console.error('[chat-with-rag] Error creating assistant message:', messageError);
           } else {
-            assistantMessageId = messageData.id;
+            assistantMessageId = messageId;
+            // Update with correlation ID
+            await supabaseClient
+              .from('chat_messages')
+              .update({ request_correlation_id: requestCorrelationId })
+              .eq('id', messageId);
             console.log(`[chat-with-rag] Created assistant message ${assistantMessageId} with fallback response`);
           }
         } catch (error) {
@@ -467,6 +495,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({
         response: fallbackResponse.data,
         assistantMessageId: assistantMessageId,
+        correlationId: requestCorrelationId,
         metadata: {
           classification: classification,
           strategy: 'fallback_general',
