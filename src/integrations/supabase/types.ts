@@ -1189,6 +1189,14 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      pg_advisory_unlock: {
+        Args: { key: number }
+        Returns: boolean
+      }
+      pg_try_advisory_lock: {
+        Args: { key: number }
+        Returns: boolean
+      }
       regenerate_missing_data_for_entry: {
         Args: { target_entry_id: number }
         Returns: Json
