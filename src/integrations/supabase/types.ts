@@ -694,6 +694,10 @@ export type Database = {
         Args: { entry_id_param: number }
         Returns: boolean
       }
+      check_message_persistence_health: {
+        Args: { expected_message_count?: number; thread_id_param: string }
+        Returns: Json
+      }
       check_table_columns: {
         Args: { table_name: string }
         Returns: {
@@ -723,7 +727,7 @@ export type Database = {
       }
       cleanup_stuck_processing_messages: {
         Args: Record<PropertyKey, never>
-        Returns: number
+        Returns: Json
       }
       close_user_session: {
         Args: { p_session_id: string; p_user_id: string }
