@@ -76,5 +76,3 @@ verify_jwt = true
 [functions.general-mental-health-chat]
 verify_jwt = true
 
-[functions.generate-streaming-messages]
-verify_jwt = true

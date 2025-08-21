@@ -129,21 +129,9 @@ serve(async (req) => {
     // Clean approach - let final response create the assistant message
     let assistantMessageId = null;
     
-    // Enhanced timezone handling with comprehensive validation
-    const { normalizeUserTimezone } = await import('../_shared/timezoneUtils.ts');
-    const { validateUserTimezone, debugTimezoneInfo, logTimezoneDebug } = await import('../_shared/timezoneValidation.ts');
-    
-    const userTimezone = normalizeUserTimezone(userProfile);
-    
-    // Comprehensive timezone validation and debugging
-    const timezoneDebug = debugTimezoneInfo(userTimezone, 'chat-with-rag', req.headers.get('user-agent') || '');
-    logTimezoneDebug(timezoneDebug);
-    
-    console.log(`[chat-with-rag] User timezone validation:`, {
-      userTimezone,
-      isValid: timezoneDebug.validation.isValid,
-      issues: timezoneDebug.validation.issues
-    });
+    // Simple timezone handling with fallback
+    const userTimezone = userProfile?.timezone || 'UTC';
+    console.log(`[chat-with-rag] Using user timezone: ${userTimezone}`);
 
     // Step 1: Query Classification with retry logic
     console.log("[chat-with-rag] Step 1: Query Classification");

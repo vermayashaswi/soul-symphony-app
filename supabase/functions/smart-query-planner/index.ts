@@ -1017,11 +1017,9 @@ Response format (MUST be valid JSON):
         return createEnhancedFallbackPlan(message, isContentSeekingQuery || requiresMandatoryVector, null, supabaseClient, userTimezone);
       }
 
-      // Enhanced JSON sanitization and parsing with multiple fallback strategies
-      const { parseOpenAIResponse } = await import('../_shared/messageValidation.ts');
-      
+      // Simple JSON parsing with fallback
       try {
-        analysisResult = parseOpenAIResponse(rawResponse);
+        analysisResult = JSON.parse(rawResponse);
         console.log("[Analyst Agent] Successfully parsed JSON response");
       } catch (enhancedParseError) {
         console.error("Failed to parse Analyst Agent response after all strategies:", enhancedParseError);
