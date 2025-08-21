@@ -17,6 +17,7 @@ import { getThreadMessages, saveMessage, updateUserMessageClassification } from 
 import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
 import { processChatMessage } from "@/services/chatService";
 import { MentalHealthInsights } from "@/hooks/use-mental-health-insights";
+import { insertMessageInOrder, ensureMessageOrder, deduplicateMessages, UIChatMessage } from "@/utils/chat/messageOrdering";
 
 import { updateThreadProcessingStatus, generateThreadTitle } from "@/utils/chat/threadUtils";
 import { useUnifiedKeyboard } from "@/hooks/use-unified-keyboard";
@@ -36,16 +37,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-interface UIChatMessage {
-  id?: string;
-  role: 'user' | 'assistant' | 'error';
-  content: string;
-  references?: any[];
-  analysis?: any;
-  hasNumericResult?: boolean;
-  isProcessing?: boolean;
-  created_at?: string;
-}
+// UIChatMessage interface is now imported from messageOrdering utils
 
 interface MobileChatInterfaceProps {
   currentThreadId: string | null;
@@ -285,28 +277,18 @@ export default function MobileChatInterface({
           
           if (m.sender === 'assistant') {
             setMessages(prev => {
-              // More robust duplicate detection
-              const existingMessage = prev.find(msg => 
-                msg.role === 'assistant' && 
-                msg.content?.trim() === m.content?.trim() &&
-                Math.abs(prev.length - prev.indexOf(msg)) <= 2 // Within last 2 messages
-              );
-              
-              if (existingMessage) {
-                console.log('[MobileChatInterface] Duplicate message detected, skipping');
-                return prev;
-              }
-              
-              console.log('[MobileChatInterface] Adding new assistant message to UI');
               const uiMsg: UIChatMessage = {
+                id: m.id,
                 role: 'assistant',
                 content: m.content,
                 references: m.reference_entries || undefined,
                 analysis: m.analysis_data || undefined,
-                hasNumericResult: m.has_numeric_result || false
+                hasNumericResult: m.has_numeric_result || false,
+                created_at: m.created_at
               };
               
-              return [...prev, uiMsg];
+              console.log('[MobileChatInterface] Adding new assistant message with proper ordering');
+              return insertMessageInOrder(prev, uiMsg);
             });
             
             // Force scroll to bottom when new message arrives
@@ -401,7 +383,7 @@ export default function MobileChatInterface({
       console.log(`[MobileChatInterface] Loaded ${chatMessages?.length || 0} messages for thread ${currentThreadId}`);
       
       if (chatMessages && chatMessages.length > 0) {
-        const uiMessages = chatMessages
+        const uiMessages: UIChatMessage[] = chatMessages
           .map(msg => ({
             id: msg.id,
             role: msg.sender as 'user' | 'assistant',
@@ -409,11 +391,13 @@ export default function MobileChatInterface({
             references: msg.reference_entries ? Array.isArray(msg.reference_entries) ? msg.reference_entries : [] : undefined,
             hasNumericResult: msg.has_numeric_result,
             created_at: msg.created_at
-          }))
-          .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+          }));
         
-        console.log(`[MobileChatInterface] Displaying ${uiMessages.length} messages`);
-        setMessages(uiMessages);
+        // Ensure proper ordering and remove duplicates
+        const orderedMessages = deduplicateMessages(ensureMessageOrder(uiMessages));
+        
+        console.log(`[MobileChatInterface] Displaying ${orderedMessages.length} messages`);
+        setMessages(orderedMessages);
         setShowSuggestions(false);
         loadedThreadRef.current = currentThreadId;
       } else {
@@ -516,9 +500,7 @@ export default function MobileChatInterface({
                 // Force scroll to bottom
                 setTimeout(() => scrollToBottom(), 100);
                 
-                return [...prevMessages, uiMessage].sort((a, b) => 
-                  new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
-                );
+                return insertMessageInOrder(prevMessages, uiMessage);
               }
               return prevMessages;
             });
@@ -575,14 +557,7 @@ export default function MobileChatInterface({
       }
       
       setMessages(prevMessages => {
-        // Check for duplicate by ID
-        const exists = prevMessages.some(msg => msg.id === newMessage.id);
-        if (exists) {
-          console.log(`[MobileChatInterface] Duplicate message ID detected, skipping: ${newMessage.id}`);
-          return prevMessages;
-        }
-        
-        const uiMessage = {
+        const uiMessage: UIChatMessage = {
           id: newMessage.id,
           role: newMessage.sender as 'user' | 'assistant' | 'error',
           content: newMessage.content,
@@ -597,9 +572,7 @@ export default function MobileChatInterface({
           setTimeout(() => scrollToBottom(), 100);
         }
         
-        return [...prevMessages, uiMessage].sort((a, b) => 
-          new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
-        );
+        return insertMessageInOrder(prevMessages, uiMessage);
       });
     };
 
