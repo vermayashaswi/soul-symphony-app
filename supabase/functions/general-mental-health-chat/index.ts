@@ -192,16 +192,9 @@ MUST HAVE/DO: ALWAYS BE AWARE OF THE CONVERSATION HISTORY TO UNDERSTAND WHAT THE
         Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
       );
 
-      // Parse the request body carefully to extract threadId and userId
-      const requestBody = await req.text();
-      let threadId, userId;
-      try {
-        const parsed = JSON.parse(requestBody);
-        threadId = parsed.threadId;
-        userId = parsed.userId;
-      } catch (parseError) {
-        console.error('[General Mental Health] Error parsing request body for persistence:', parseError);
-      }
+      // Use the already parsed request data for threadId and userId
+      const threadId = requestData.threadId;
+      const userId = requestData.userId;
       
       if (threadId && userId) {
         const idempotencyKey = await generateIdempotencyKey(

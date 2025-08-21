@@ -298,6 +298,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
             // Ensure threadId and userId are included for message persistence
             const enhancedBody = {
               ...body,
+              classification: 'GENERAL_MENTAL_HEALTH',
               threadId: body.threadId || targetThreadId,
               userId: body.userId
             };
@@ -315,6 +316,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
             // Ensure threadId and userId are included for message persistence
             const enhancedBody = {
               ...body,
+              classification: 'GPT_CLARIFICATION',
               threadId: body.threadId || targetThreadId,
               userId: body.userId
             };

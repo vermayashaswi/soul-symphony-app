@@ -254,27 +254,66 @@ async function executeSubQuestion(
       console.log(`[${requestId}] Dependency context for ${subQuestion.id}:`, Object.keys(subResults.executionResults.dependencyContext));
     }
 
+    let allStepsSucceeded = true;
+    let hasResults = false;
+
     for (const step of subQuestion.analysisSteps) {
       console.log(`[${requestId}] Executing analysis step: ${step.step} - ${step.description}`);
 
       // Apply dependency context to step if needed
       const enhancedStep = applyDependencyContext(step, subResults.executionResults.dependencyContext, requestId);
 
-      if (enhancedStep.queryType === 'vector_search') {
-        console.log(`[${requestId}] Vector search:`, enhancedStep.vectorSearch?.query);
-        const vectorResult = await executeVectorSearch(enhancedStep, userId, supabaseClient, requestId, subResults.executionResults.vectorExecutionDetails);
-        subResults.executionResults.vectorResults = vectorResult || [];
-      } else if (enhancedStep.queryType === 'sql_analysis') {
-        console.log(`[${requestId}] SQL analysis:`, enhancedStep.sqlQuery?.substring(0, 100) + '...');
-        const sqlResult = await executeSQLAnalysis(enhancedStep, userId, supabaseClient, requestId, subResults.executionResults.sqlExecutionDetails);
-        subResults.executionResults.sqlResults = sqlResult || [];
-      } else if (enhancedStep.queryType === 'hybrid_search') {
-        console.log(`[${requestId}] Hybrid search:`, enhancedStep.vectorSearch?.query);
-        const hybridResult = await executeHybridSearch(enhancedStep, userId, supabaseClient, requestId, subResults.executionResults.sqlExecutionDetails, subResults.executionResults.vectorExecutionDetails);
-        subResults.executionResults.vectorResults = hybridResult?.vectorResults || [];
-        subResults.executionResults.sqlResults = hybridResult?.sqlResults || [];
+      try {
+        if (enhancedStep.queryType === 'vector_search') {
+          console.log(`[${requestId}] Vector search:`, enhancedStep.vectorSearch?.query);
+          const vectorResult = await executeVectorSearch(enhancedStep, userId, supabaseClient, requestId, subResults.executionResults.vectorExecutionDetails);
+          subResults.executionResults.vectorResults = vectorResult || [];
+          if (vectorResult && vectorResult.length > 0) hasResults = true;
+        } else if (enhancedStep.queryType === 'sql_analysis') {
+          console.log(`[${requestId}] SQL analysis:`, enhancedStep.sqlQuery?.substring(0, 100) + '...');
+          const sqlResult = await executeSQLAnalysis(enhancedStep, userId, supabaseClient, requestId, subResults.executionResults.sqlExecutionDetails);
+          subResults.executionResults.sqlResults = sqlResult || [];
+          if (sqlResult && sqlResult.length > 0) hasResults = true;
+        } else if (enhancedStep.queryType === 'hybrid_search') {
+          console.log(`[${requestId}] Hybrid search:`, enhancedStep.vectorSearch?.query);
+          const hybridResult = await executeHybridSearch(enhancedStep, userId, supabaseClient, requestId, subResults.executionResults.sqlExecutionDetails, subResults.executionResults.vectorExecutionDetails);
+          subResults.executionResults.vectorResults = hybridResult?.vectorResults || [];
+          subResults.executionResults.sqlResults = hybridResult?.sqlResults || [];
+          if ((hybridResult?.vectorResults && hybridResult.vectorResults.length > 0) || 
+              (hybridResult?.sqlResults && hybridResult.sqlResults.length > 0)) {
+            hasResults = true;
+          }
+        }
+      } catch (stepExecutionError) {
+        console.error(`[${requestId}] Step ${step.step} execution failed:`, stepExecutionError);
+        allStepsSucceeded = false;
       }
     }
+
+    // NEW: Per sub-question vector fallback if ALL steps failed to produce results
+    if (!hasResults && !allStepsSucceeded) {
+      console.log(`[${requestId}] All steps failed for sub-question ${subQuestion.id}, attempting vector fallback`);
+      try {
+        const fallbackStep = {
+          description: `Vector fallback for sub-question: ${subQuestion.question}`,
+          vectorSearch: {
+            query: `${subQuestion.question} personal journal content experiences thoughts feelings`,
+            threshold: 0.2,
+            limit: 15
+          },
+          timeRange: subQuestion.analysisSteps[0]?.timeRange || null
+        };
+        
+        const vectorFallbackResult = await executeVectorSearchFallback(fallbackStep, userId, supabaseClient, requestId);
+        subResults.executionResults.vectorResults = vectorFallbackResult || [];
+        subResults.executionResults.vectorExecutionDetails.fallbackUsed = true;
+        console.log(`[${requestId}] Vector fallback for sub-question ${subQuestion.id} found ${vectorFallbackResult?.length || 0} results`);
+      } catch (fallbackError) {
+        console.error(`[${requestId}] Vector fallback also failed for sub-question ${subQuestion.id}:`, fallbackError);
+        subResults.executionResults.error = `All execution methods failed: ${fallbackError.message}`;
+      }
+    }
+
   } catch (stepError) {
     console.error(`[${requestId}] Error executing sub-question ${subQuestion.id}:`, stepError);
     subResults.executionResults.error = stepError.message;
@@ -458,31 +497,7 @@ async function executeVectorSearch(step: any, userId: string, supabaseClient: an
   }
 }
 
-function validateSQLQuery(query: string, requestId: string): { isValid: boolean; errors: string[] } {
-  const restrictedColumns = [
-    '"foreign key"', 
-    'foreign key',
-    '"audio_url"',
-    'audio_url',
-    '"user_feedback"',
-    'user_feedback'
-  ];
-  
-  const errors: string[] = [];
-  const queryLower = query.toLowerCase();
-  
-  for (const restrictedCol of restrictedColumns) {
-    if (queryLower.includes(restrictedCol.toLowerCase())) {
-      errors.push(`Restricted column detected: ${restrictedCol}`);
-      console.error(`[${requestId}] COLUMN RESTRICTION VIOLATION: ${restrictedCol} found in query`);
-    }
-  }
-  
-  return {
-    isValid: errors.length === 0,
-    errors
-  };
-}
+// REMOVED: All SQL query validations per user request - trust GPT prompt engineering
 
 async function executeSQLAnalysis(step: any, userId: string, supabaseClient: any, requestId: string, executionDetails: any) {
   try {
@@ -497,16 +512,7 @@ async function executeSQLAnalysis(step: any, userId: string, supabaseClient: any
     const originalQuery = step.sqlQuery.trim();
     executionDetails.originalQuery = originalQuery;
     
-    // Validate SQL query for restricted columns
-    const validation = validateSQLQuery(originalQuery, requestId);
-    executionDetails.validationResult = validation;
-    
-    if (!validation.isValid) {
-      console.error(`[${requestId}] SQL query validation failed:`, validation.errors);
-      executionDetails.executionError = `Query contains restricted columns: ${validation.errors.join(', ')}`;
-      executionDetails.fallbackUsed = true;
-      return await executeVectorSearchFallback(step, userId, supabaseClient, requestId);
-    }
+    // REMOVED: All SQL validations per user request - trust GPT prompt engineering
     
     // Sanitize user ID in the query
     let sanitizedQuery;
@@ -551,17 +557,12 @@ async function executeSQLAnalysis(step: any, userId: string, supabaseClient: any
 
     if (data && data.success && data.data) {
       console.log(`[${requestId}] SQL query executed successfully, rows:`, data.data.length);
-      // If SQL query executed but returned 0 results, try vector fallback
-      if (data.data.length === 0) {
-        console.log(`[${requestId}] SQL query returned 0 results, falling back to vector search`);
-        executionDetails.fallbackUsed = true;
-        return await executeVectorSearchFallback(step, userId, supabaseClient, requestId);
-      }
+      // REMOVED: No more fallback on 0 results - empty result sets are valid
       return data.data;
     } else {
       console.warn(`[${requestId}] SQL query returned no results or failed:`, data);
-      executionDetails.fallbackUsed = true;
-      return await executeVectorSearchFallback(step, userId, supabaseClient, requestId);
+      // Return empty results instead of fallback - let sub-question level handle fallback
+      return [];
     }
 
   } catch (error) {

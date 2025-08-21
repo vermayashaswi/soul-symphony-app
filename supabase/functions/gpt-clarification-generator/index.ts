@@ -16,6 +16,7 @@ serve(async (req) => {
 
   try {
     const { 
+      message,
       userMessage, 
       conversationContext,
       userProfile,
@@ -23,14 +24,19 @@ serve(async (req) => {
       userId
     } = await req.json();
     
+    // Use message or userMessage (for backward compatibility)
+    const actualMessage = message || userMessage;
+    
     console.log('GPT Clarification Generator called with:', { 
-      userMessage: userMessage?.substring(0, 100),
-      contextCount: conversationContext?.length || 0
+      message: actualMessage?.substring(0, 100),
+      contextCount: conversationContext?.length || 0,
+      threadId,
+      userId
     });
 
     const clarificationPrompt = `You are Ruh by SOuLO, a direct, witty mental health companion who combines emotional intelligence with sharp insight. The user has asked a vague personal question that needs clarification to provide meaningful support.
 
-USER QUESTION: "${userMessage}"
+USER QUESTION: "${actualMessage}"
 
 CONVERSATION CONTEXT:
 ${conversationContext ? conversationContext.slice(-6).map((msg) => `${msg.role || msg.sender || 'user'}: ${msg.content}`).join('\n') : 'No prior context'}
@@ -128,8 +134,7 @@ TONE: Direct, insightful, naturally warm, witty when appropriate, and focused on
         Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
       );
 
-      // Extract threadId and userId from the original request body
-      const { threadId, userId } = await req.clone().json();
+      // Use already parsed threadId and userId from request data
       
       if (threadId && userId) {
         const idempotencyKey = await generateIdempotencyKey(
