@@ -460,18 +460,12 @@ async function executeVectorSearch(step: any, userId: string, supabaseClient: an
 
 function validateSQLQuery(query: string, requestId: string): { isValid: boolean; errors: string[] } {
   const restrictedColumns = [
-    '"transcription text"',
-    'transcription text',
     '"foreign key"', 
     'foreign key',
     '"audio_url"',
     'audio_url',
     '"user_feedback"',
-    'user_feedback', 
-    '"edit_status"',
-    'edit_status',
-    '"translation_status"',
-    'translation_status'
+    'user_feedback'
   ];
   
   const errors: string[] = [];
@@ -822,16 +816,10 @@ async function analyzeQueryWithSubQuestions(message, conversationContext, userEn
 
     const requiresMandatoryVector = mandatoryVectorPatterns.some(pattern => pattern.test(message.toLowerCase()));
 
-    // Detect personal pronouns for personalized queries
-    const hasPersonalPronouns = /\b(i|me|my|mine|myself)\b/i.test(message.toLowerCase());
-
-    // Enhanced time reference detection
-    const hasExplicitTimeReference = /\b(last week|yesterday|this week|last month|today|recently|lately|this morning|last night|august|january|february|march|april|may|june|july|september|october|november|december)\b/i.test(message.toLowerCase());
-
     // Detect follow-up context queries
     const isFollowUpContext = isFollowUp || /\b(that|those|it|this|these|above|mentioned|said|talked about)\b/i.test(message.toLowerCase());
     
-    console.log(`[Analyst Agent] Enhanced analysis - Content-seeking: ${isContentSeekingQuery}, Mandatory vector: ${requiresMandatoryVector}, Personal: ${hasPersonalPronouns}, Time ref: ${hasExplicitTimeReference}, Follow-up: ${isFollowUpContext}`);
+    console.log(`[Analyst Agent] Enhanced analysis - Content-seeking: ${isContentSeekingQuery}, Mandatory vector: ${requiresMandatoryVector}, Follow-up: ${isFollowUpContext}`);
 
     const prompt = `You are SOULo's Enhanced Analyst Agent - an intelligent query planning specialist for journal data analysis TIMEZONE-AWARE date processing.
 
@@ -1015,7 +1003,6 @@ Generate a comprehensive analysis plan that:
 
 Response format (MUST be valid JSON):
 {
-  "queryType": "journal_specific|general_inquiry|mental_health",
   "strategy": "intelligent_sub_query|comprehensive_hybrid|vector_mandatory",
   "userStatusMessage": "Brief status for user",
   "subQuestions": [
@@ -1049,8 +1036,6 @@ Response format (MUST be valid JSON):
   "confidence": 0.8,
   "reasoning": "Explanation of strategy with emphasis on dependency management and execution orchestration",
   "useAllEntries": boolean,
-  "hasPersonalPronouns": ${hasPersonalPronouns},
-  "hasExplicitTimeReference": ${hasExplicitTimeReference},
   "inferredTimeContext": null or timeframe_object_with_timezone,
   "userTimezone": "${userTimezone}"
 }`;

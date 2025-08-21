@@ -145,7 +145,7 @@ TONE: Direct, insightful, naturally warm, witty when appropriate, and focused on
           content: responseText,
           is_processing: false,
           idempotency_key: idempotencyKey,
-          query_classification: 'GPT_CLARIFICATION'
+          classification: 'GPT_CLARIFICATION'
         });
         
         if (saveResult.success) {
