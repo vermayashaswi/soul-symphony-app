@@ -75,7 +75,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
 
   return (
     <div ref={scrollElementRef} className="flex flex-col p-4 overflow-y-auto h-full pb-20">
-      {chatMessages.filter(msg => !msg.is_processing).map((message, index) => (
+      {chatMessages.map((message, index) => (
         <div
           key={index}
           className={`flex ${

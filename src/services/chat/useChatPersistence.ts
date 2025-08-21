@@ -237,36 +237,60 @@ export const useChatPersistence = (userId: string | undefined) => {
     // Add to local state immediately
     setMessages(prev => [...prev, tempMessage]);
     
-    try {
-      const savedMessage = await createChatMessage(activeThread, content, 'user', userId);
-      
-      if (savedMessage) {
-        // Convert to ChatMessagePersistence to avoid type mismatch
-        const persistenceMessage: ChatMessagePersistence = {
-          ...savedMessage,
-          references: Array.isArray(savedMessage.reference_entries) ? savedMessage.reference_entries : [],
-          analysis: savedMessage.analysis_data,
-          hasNumericResult: savedMessage.has_numeric_result as boolean,
-          reference_entries: Array.isArray(savedMessage.reference_entries) ? savedMessage.reference_entries : [],
-          sub_query_responses: Array.isArray(savedMessage.sub_query_responses) ? savedMessage.sub_query_responses : []
-        };
+    // Enhanced save with retry logic and better error handling
+    const maxRetries = 3;
+    let lastError = null;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`[useChatPersistence] Message save attempt ${attempt}/${maxRetries}`);
         
-        // Replace temp message with saved one
-        setMessages(prev => 
-          prev.map(msg => msg.id === tempId ? persistenceMessage : msg)
-        );
-        return persistenceMessage;
+        const savedMessage = await createChatMessage(activeThread, content, 'user', userId);
+        
+        if (savedMessage) {
+          // Convert to ChatMessagePersistence to avoid type mismatch
+          const persistenceMessage: ChatMessagePersistence = {
+            ...savedMessage,
+            references: Array.isArray(savedMessage.reference_entries) ? savedMessage.reference_entries : [],
+            analysis: savedMessage.analysis_data,
+            hasNumericResult: savedMessage.has_numeric_result as boolean,
+            reference_entries: Array.isArray(savedMessage.reference_entries) ? savedMessage.reference_entries : [],
+            sub_query_responses: Array.isArray(savedMessage.sub_query_responses) ? savedMessage.sub_query_responses : []
+          };
+          
+          // Replace temp message with saved one
+          setMessages(prev => 
+            prev.map(msg => msg.id === tempId ? persistenceMessage : msg)
+          );
+          console.log(`[useChatPersistence] Message saved successfully: ${savedMessage.id}`);
+          return persistenceMessage;
+        } else {
+          throw new Error('createChatMessage returned null');
+        }
+      } catch (error) {
+        lastError = error;
+        console.error(`[useChatPersistence] Save attempt ${attempt} failed:`, error);
+        
+        if (attempt < maxRetries) {
+          const delay = Math.pow(2, attempt - 1) * 1000;
+          console.log(`[useChatPersistence] Retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
       }
-      return null;
-    } catch (error) {
-      console.error("Error saving message:", error);
-      toast({
-        title: "Error",
-        description: "Failed to save your message",
-        variant: "destructive"
-      });
-      return null;
     }
+    
+    // All attempts failed
+    console.error("[useChatPersistence] All save attempts failed. Last error:", lastError);
+    
+    // Remove temp message from UI to avoid confusion
+    setMessages(prev => prev.filter(msg => msg.id !== tempId));
+    
+    toast({
+      title: "Error",
+      description: "Failed to save your message after multiple attempts. Please try again.",
+      variant: "destructive"
+    });
+    return null;
   };
 
   const updateTitle = async (threadId: string, title: string) => {

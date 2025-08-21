@@ -50,7 +50,7 @@ export async function transcribeAudioWithWhisper(
     const audioFile = new File([audioBytes], filename, { type: audioBlob.type });
     
     // Enhanced retry logic with multiple model attempts
-    const models = ["gpt-4o-transcribe"]; // Use the new model
+    const models = ["gpt-4.1-nano"]; // Use the new model
     let lastError: Error | null = null;
     
     for (const model of models) {
@@ -182,7 +182,7 @@ Language codes to use: en (English), es (Spanish), fr (French), de (German), it 
         console.log(`[AI] FIXED: Text refinement attempt ${attempt}/2`);
         
         const completion = await openai.chat.completions.create({
-          model: "gpt-4o-mini",
+          model: "gpt-4.1-nano",
           messages: [
             {
               role: "system",
@@ -193,8 +193,7 @@ Language codes to use: en (English), es (Spanish), fr (French), de (German), it 
               content: text
             }
           ],
-          max_tokens: 1500,
-          temperature: 0.3,
+          max_completion_tokens: 1500,
           response_format: { type: "json_object" }
         });
         
@@ -304,7 +303,7 @@ export async function analyzeEmotions(
         console.log(`[AI] Emotion analysis attempt ${attempt}/2`);
         
         const completion = await openai.chat.completions.create({
-          model: "gpt-4o-mini",
+          model: "gpt-4.1-nano",
           messages: [
             {
               role: "system",

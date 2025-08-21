@@ -13,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { message, conversationContext = [], userTimezone = 'UTC' } = await req.json();
+    const { message, conversationContext = [], userTimezone = 'UTC', threadId, userId } = await req.json();
 
     if (!message) {
       return new Response(
@@ -146,9 +146,9 @@ MUST HAVE/DO: ALWAYS BE AWARE OF THE CONVERSATION HISTORY TO UNDERSTAND WHAT THE
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: 'gpt-5-mini-2025-08-07',
+            model: 'gpt-4.1-nano',
             messages,
-            max_completion_tokens: 800
+            max_tokens: 800
           }),
         });
 
@@ -183,8 +183,58 @@ MUST HAVE/DO: ALWAYS BE AWARE OF THE CONVERSATION HISTORY TO UNDERSTAND WHAT THE
     
     console.log(`[General Mental Health] Generated response`);
 
+    // Enhanced message persistence with proper metadata
+    try {
+      const { saveMessage, generateIdempotencyKey } = await import('../_shared/messageUtils.ts');
+      const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2.7.1');
+      const supabaseClient = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      );
+
+      // Use the already parsed threadId and userId from line 16
+      const messageThreadId = threadId;
+      const messageUserId = userId;
+      
+      if (messageThreadId && messageUserId) {
+        const idempotencyKey = await generateIdempotencyKey(
+          messageThreadId,
+          content,
+          `general_health_${Date.now()}`
+        );
+
+        const saveResult = await saveMessage(supabaseClient, {
+          thread_id: messageThreadId,
+          sender: 'assistant',
+          role: 'assistant', 
+          content: content,
+          is_processing: false,
+          idempotency_key: idempotencyKey,
+          query_classification: 'GENERAL_MENTAL_HEALTH'
+        });
+        
+        if (saveResult.success) {
+          console.log(`[General Mental Health] Message saved: ${saveResult.messageId}`);
+        } else {
+          console.error('[General Mental Health] Message save failed:', saveResult.error);
+        }
+      } else {
+        console.log('[General Mental Health] No threadId/userId provided for message persistence');
+      }
+    } catch (persistenceError) {
+      console.error('[General Mental Health] Message persistence error:', persistenceError);
+    }
+
     return new Response(
-      JSON.stringify({ response: content }),
+      JSON.stringify({ 
+        response: content,
+        queryClassification: 'GENERAL_MENTAL_HEALTH',
+        messageMetadata: {
+          model: 'gpt-4.1-nano',
+          timezone: normalizedTimezone,
+          timestamp: new Date().toISOString()
+        }
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 

@@ -16,19 +16,27 @@ serve(async (req) => {
 
   try {
     const { 
+      message,
       userMessage, 
       conversationContext,
-      userProfile
+      userProfile,
+      threadId,
+      userId
     } = await req.json();
     
+    // Use message or userMessage (for backward compatibility)
+    const actualMessage = message || userMessage;
+    
     console.log('GPT Clarification Generator called with:', { 
-      userMessage: userMessage?.substring(0, 100),
-      contextCount: conversationContext?.length || 0
+      message: actualMessage?.substring(0, 100),
+      contextCount: conversationContext?.length || 0,
+      threadId,
+      userId
     });
 
     const clarificationPrompt = `You are Ruh by SOuLO, a direct, witty mental health companion who combines emotional intelligence with sharp insight. The user has asked a vague personal question that needs clarification to provide meaningful support.
 
-USER QUESTION: "${userMessage}"
+USER QUESTION: "${actualMessage}"
 
 CONVERSATION CONTEXT:
 ${conversationContext ? conversationContext.slice(-6).map((msg) => `${msg.role || msg.sender || 'user'}: ${msg.content}`).join('\n') : 'No prior context'}
@@ -60,7 +68,7 @@ RESPONSE APPROACH EXAMPLES:
 MANDATORY FORMATTING REQUIREMENTS:
 - Use **bold** for key insights and important points
 - Use *italics* sparingly for emotional reflections
-- Minimal emoji use - only when it genuinely adds value
+- MANDATORY emoji use - only when it genuinely adds value
 - **MANDATORY**: End with one focused follow-up question that moves the conversation forward
 
 **Critical:** Use the conversation history to understand what they actually need - don't overthink it. Be direct, helpful, and naturally conversational.Make a point to answer a user's question apart from ONLY clarifying (if the query demands it). A user might not have just mind related but body, soul and general curiosities as well before he wants to dive into his OWN patterns
@@ -82,7 +90,7 @@ TONE: Direct, insightful, naturally warm, witty when appropriate, and focused on
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-5-mini-2025-08-07',
+          model: 'gpt-4.1-nano',
           messages: [
             { role: 'system', content: 'You are Ruh, the soul-centered wellness companion by SOuLO. You combine ancient wisdom with modern psychology to help people connect with their deepest truth and inner knowing.' },
             { role: 'user', content: clarificationPrompt }
@@ -117,11 +125,56 @@ TONE: Direct, insightful, naturally warm, witty when appropriate, and focused on
       if (statusMatch) userStatusMessage = statusMatch[1];
     }
 
+    // Enhanced message persistence with proper metadata
+    try {
+      const { saveMessage, generateIdempotencyKey } = await import('../_shared/messageUtils.ts');
+      const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2.7.1');
+      const supabaseClient = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      );
+
+      // Use already parsed threadId and userId from request data
+      
+      if (threadId && userId) {
+        const idempotencyKey = await generateIdempotencyKey(
+          threadId,
+          responseText,
+          `clarification_${Date.now()}`
+        );
+
+        const saveResult = await saveMessage(supabaseClient, {
+          thread_id: threadId,
+          sender: 'assistant',
+          role: 'assistant',
+          content: responseText,
+          is_processing: false,
+          idempotency_key: idempotencyKey,
+          classification: 'GPT_CLARIFICATION'
+        });
+        
+        if (saveResult.success) {
+          console.log(`[GPT Clarification] Message saved: ${saveResult.messageId}`);
+        } else {
+          console.error('[GPT Clarification] Message save failed:', saveResult.error);
+        }
+      } else {
+        console.log('[GPT Clarification] No threadId/userId provided for message persistence');
+      }
+    } catch (persistenceError) {
+      console.error('[GPT Clarification] Message persistence error:', persistenceError);
+    }
+
     return new Response(JSON.stringify({
       success: true,
       response: responseText,
       userStatusMessage,
-      type: 'clarification'
+      type: 'clarification',
+      queryClassification: 'GPT_CLARIFICATION',
+      messageMetadata: {
+        model: 'gpt-4.1-nano',
+        timestamp: new Date().toISOString()
+      }
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
