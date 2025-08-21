@@ -126,38 +126,8 @@ serve(async (req) => {
 
     console.log(`[chat-with-rag] Processing query: "${message}" for user: ${userId} (threadId: ${threadId}, messageId: ${messageId})`);
     
-    // Create assistant message for responses - NO PROCESSING STATE
+    // Clean approach - let final response create the assistant message
     let assistantMessageId = null;
-    if (threadId) {
-      try {
-        console.log(`[chat-with-rag] Creating assistant message for thread: ${threadId}`);
-        const { saveMessage, generateIdempotencyKey } = await import('../_shared/messageUtils.ts');
-        
-        // Generate idempotency key for the response message
-        const idempotencyKey = await generateIdempotencyKey(
-          threadId,
-          'AI Assistant',
-          `response_${Date.now()}`
-        );
-        
-        const saveResult = await saveMessage(supabaseClient, {
-          thread_id: threadId,
-          sender: 'assistant',
-          role: 'assistant',
-          content: 'Thinking...',
-          idempotency_key: idempotencyKey
-        }, { requireIdempotency: true });
-        
-        if (saveResult.success) {
-          assistantMessageId = saveResult.messageId;
-          console.log(`[chat-with-rag] Created assistant message: ${assistantMessageId}`);
-        } else {
-          console.error('[chat-with-rag] Error creating assistant message:', saveResult.error);
-        }
-      } catch (error) {
-        console.error('[chat-with-rag] Exception creating assistant message:', error);
-      }
-    }
     
     // Enhanced timezone handling with comprehensive validation
     const { normalizeUserTimezone } = await import('../_shared/timezoneUtils.ts');
@@ -245,6 +215,7 @@ serve(async (req) => {
 
       const queryPlan = queryPlanResponse.data.queryPlan;
       const executionResult = queryPlanResponse.data.executionResult;
+      const userStatusMessageFromPlanner = queryPlanResponse.data.userStatusMessage;
       
       console.log(`[chat-with-rag] Query plan strategy: ${queryPlan.strategy}, complexity: ${queryPlan.queryComplexity}`);
       console.log(`[chat-with-rag] Execution result summary:`, {
@@ -285,27 +256,12 @@ serve(async (req) => {
 
       console.log("[chat-with-rag] Successfully completed RAG pipeline with consolidation");
 
-      // Update the assistant message with the final response using shared utilities
-      if (assistantMessageId && consolidationResponse.data) {
+      // Create assistant message with the final response content directly
+      if (threadId && consolidationResponse.data) {
         try {
-          const { updateMessage } = await import('../_shared/messageUtils.ts');
-          
-          // Enhanced validation and extraction of response content
-          console.log('[chat-with-rag] Consolidation response structure:', {
-            hasData: !!consolidationResponse.data,
-            dataKeys: Object.keys(consolidationResponse.data || {}),
-            responseType: typeof consolidationResponse.data?.response,
-            responseLength: consolidationResponse.data?.response?.length || 0,
-            responsePreview: consolidationResponse.data?.response?.substring(0, 100) || 'none'
-          });
+          console.log('[chat-with-rag] Creating assistant message with final response');
           
           let finalResponseContent = consolidationResponse.data.response;
-          
-          // Additional safety check: ensure we're not storing JSON objects as content
-          if (typeof finalResponseContent === 'object') {
-            console.error('[chat-with-rag] ERROR: Response content is an object, not a string!', finalResponseContent);
-            finalResponseContent = JSON.stringify(finalResponseContent);
-          }
           
           // Validate that the content is actually a readable string
           if (!finalResponseContent || typeof finalResponseContent !== 'string') {
@@ -313,24 +269,32 @@ serve(async (req) => {
             finalResponseContent = "I processed your request but encountered an issue with the response format. Please try again.";
           }
           
-          const updateResult = await updateMessage(supabaseClient, assistantMessageId, {
-            content: finalResponseContent,
-            analysis_data: consolidationResponse.data.analysisMetadata || null
-          });
+          const { data: messageData, error: messageError } = await supabaseClient
+            .from('chat_messages')
+            .insert({
+              thread_id: threadId,
+              sender: 'assistant',
+              role: 'assistant',
+              content: finalResponseContent,
+              analysis_data: consolidationResponse.data.analysisMetadata || null
+            })
+            .select('id')
+            .single();
           
-          if (updateResult.success) {
-            console.log(`[chat-with-rag] Updated assistant message ${assistantMessageId} with response (${finalResponseContent.length} chars)`);
+          if (messageError) {
+            console.error('[chat-with-rag] Error creating assistant message:', messageError);
           } else {
-            console.error('[chat-with-rag] Error updating assistant message:', updateResult.error);
+            assistantMessageId = messageData.id;
+            console.log(`[chat-with-rag] Created assistant message ${assistantMessageId} with response (${finalResponseContent.length} chars)`);
           }
-        } catch (updateError) {
-          console.error('[chat-with-rag] Exception updating assistant message:', updateError);
+        } catch (error) {
+          console.error('[chat-with-rag] Exception creating assistant message:', error);
         }
       }
 
       return new Response(JSON.stringify({
         response: consolidationResponse.data.response,
-        userStatusMessage: consolidationResponse.data.userStatusMessage,
+        userStatusMessage: userStatusMessageFromPlanner || consolidationResponse.data.userStatusMessage,
         assistantMessageId: assistantMessageId, // Include the assistant message ID in response
         queryClassification: classification.category,
         queryComplexity: queryPlan?.complexity || 'standard',
@@ -366,22 +330,28 @@ serve(async (req) => {
         throw new Error(`General mental health response failed: ${generalResponse.error.message}`);
       }
 
-      // Update the assistant message with the mental health response using shared utilities
-      if (assistantMessageId && generalResponse.data) {
+      // Create assistant message with mental health response
+      if (threadId && generalResponse.data) {
         try {
-          const { updateMessage } = await import('../_shared/messageUtils.ts');
+          const { data: messageData, error: messageError } = await supabaseClient
+            .from('chat_messages')
+            .insert({
+              thread_id: threadId,
+              sender: 'assistant',
+              role: 'assistant',
+              content: generalResponse.data
+            })
+            .select('id')
+            .single();
           
-          const updateResult = await updateMessage(supabaseClient, assistantMessageId, {
-            content: generalResponse.data
-          });
-          
-          if (updateResult.success) {
-            console.log(`[chat-with-rag] Updated assistant message ${assistantMessageId} with mental health response`);
+          if (messageError) {
+            console.error('[chat-with-rag] Error creating assistant message:', messageError);
           } else {
-            console.error('[chat-with-rag] Error updating assistant message:', updateResult.error);
+            assistantMessageId = messageData.id;
+            console.log(`[chat-with-rag] Created assistant message ${assistantMessageId} with mental health response`);
           }
-        } catch (updateError) {
-          console.error('[chat-with-rag] Exception updating assistant message:', updateError);
+        } catch (error) {
+          console.error('[chat-with-rag] Exception creating assistant message:', error);
         }
       }
 
@@ -413,22 +383,28 @@ serve(async (req) => {
         throw new Error(`Clarification generation failed: ${clarificationResponse.error.message}`);
       }
 
-      // Update the assistant message with the clarification response using shared utilities
-      if (assistantMessageId && clarificationResponse.data.response) {
+      // Create assistant message with clarification response
+      if (threadId && clarificationResponse.data.response) {
         try {
-          const { updateMessage } = await import('../_shared/messageUtils.ts');
+          const { data: messageData, error: messageError } = await supabaseClient
+            .from('chat_messages')
+            .insert({
+              thread_id: threadId,
+              sender: 'assistant',
+              role: 'assistant',
+              content: clarificationResponse.data.response
+            })
+            .select('id')
+            .single();
           
-          const updateResult = await updateMessage(supabaseClient, assistantMessageId, {
-            content: clarificationResponse.data.response
-          });
-          
-          if (updateResult.success) {
-            console.log(`[chat-with-rag] Updated assistant message ${assistantMessageId} with clarification response`);
+          if (messageError) {
+            console.error('[chat-with-rag] Error creating assistant message:', messageError);
           } else {
-            console.error('[chat-with-rag] Error updating assistant message:', updateResult.error);
+            assistantMessageId = messageData.id;
+            console.log(`[chat-with-rag] Created assistant message ${assistantMessageId} with clarification response`);
           }
-        } catch (updateError) {
-          console.error('[chat-with-rag] Exception updating assistant message:', updateError);
+        } catch (error) {
+          console.error('[chat-with-rag] Exception creating assistant message:', error);
         }
       }
 
@@ -463,22 +439,28 @@ serve(async (req) => {
         throw new Error(`Fallback response failed: ${fallbackResponse.error.message}`);
       }
 
-      // Update the assistant message with the fallback response using shared utilities
-      if (assistantMessageId && fallbackResponse.data) {
+      // Create assistant message with fallback response
+      if (threadId && fallbackResponse.data) {
         try {
-          const { updateMessage } = await import('../_shared/messageUtils.ts');
+          const { data: messageData, error: messageError } = await supabaseClient
+            .from('chat_messages')
+            .insert({
+              thread_id: threadId,
+              sender: 'assistant',
+              role: 'assistant',
+              content: fallbackResponse.data
+            })
+            .select('id')
+            .single();
           
-          const updateResult = await updateMessage(supabaseClient, assistantMessageId, {
-            content: fallbackResponse.data
-          });
-          
-          if (updateResult.success) {
-            console.log(`[chat-with-rag] Updated assistant message ${assistantMessageId} with fallback response`);
+          if (messageError) {
+            console.error('[chat-with-rag] Error creating assistant message:', messageError);
           } else {
-            console.error('[chat-with-rag] Error updating assistant message:', updateResult.error);
+            assistantMessageId = messageData.id;
+            console.log(`[chat-with-rag] Created assistant message ${assistantMessageId} with fallback response`);
           }
-        } catch (updateError) {
-          console.error('[chat-with-rag] Exception updating assistant message:', updateError);
+        } catch (error) {
+          console.error('[chat-with-rag] Exception creating assistant message:', error);
         }
       }
 

@@ -1200,6 +1200,7 @@ serve(async (req) => {
       // Return just the plan without execution
       return new Response(JSON.stringify({
         queryPlan: analysisResult,
+        userStatusMessage: analysisResult.userStatusMessage || "Planning your journal analysis...",
         timestamp: new Date().toISOString(),
         requestId
       }), {
@@ -1213,6 +1214,7 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       queryPlan: analysisResult,
       executionResult,
+      userStatusMessage: analysisResult.userStatusMessage || "Analyzing your journal entries...",
       timestamp: new Date().toISOString(),
       requestId
     }), {
