@@ -183,8 +183,31 @@ MUST HAVE/DO: ALWAYS BE AWARE OF THE CONVERSATION HISTORY TO UNDERSTAND WHAT THE
     
     console.log(`[General Mental Health] Generated response`);
 
+    // Enhanced message persistence with proper metadata
+    try {
+      const { saveMessage } = await import('../_shared/messageUtils.ts');
+      const supabaseClient = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+      );
+
+      // Note: We would need threadId and userId from request to save message
+      // This should be added to the request payload for proper persistence
+      console.log('[General Mental Health] Message persistence would require threadId and userId in request');
+    } catch (persistenceError) {
+      console.error('[General Mental Health] Message persistence error:', persistenceError);
+    }
+
     return new Response(
-      JSON.stringify({ response: content }),
+      JSON.stringify({ 
+        response: content,
+        queryClassification: 'GENERAL_MENTAL_HEALTH',
+        messageMetadata: {
+          model: 'gpt-4.1-mini-2025-04-14',
+          timezone: normalizedTimezone,
+          timestamp: new Date().toISOString()
+        }
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 

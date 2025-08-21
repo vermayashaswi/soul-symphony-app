@@ -1089,18 +1089,19 @@ Response format (MUST be valid JSON):
         return createEnhancedFallbackPlan(message, isContentSeekingQuery || requiresMandatoryVector, null, supabaseClient, userTimezone);
       }
 
-      // Try to extract JSON from response if wrapped in markdown
-      let jsonString = rawResponse.trim();
-      if (jsonString.startsWith('```json')) {
-        jsonString = jsonString.replace(/```json\n?/, '').replace(/\n?```$/, '');
-      } else if (jsonString.startsWith('```')) {
-        jsonString = jsonString.replace(/```\n?/, '').replace(/\n?```$/, '');
+      // Enhanced JSON sanitization and parsing with multiple fallback strategies
+      const { parseOpenAIResponse } = await import('../_shared/messageValidation.ts');
+      
+      try {
+        analysisResult = parseOpenAIResponse(rawResponse);
+        console.log("[Analyst Agent] Successfully parsed JSON response");
+      } catch (enhancedParseError) {
+        console.error("Failed to parse Analyst Agent response after all strategies:", enhancedParseError);
+        console.error("Raw response:", rawResponse);
+        return createEnhancedFallbackPlan(message, isContentSeekingQuery || requiresMandatoryVector, null, supabaseClient, userTimezone);
       }
-
-      analysisResult = JSON.parse(jsonString);
-      console.log("[Analyst Agent] Successfully parsed JSON response");
     } catch (parseError) {
-      console.error("Failed to parse Analyst Agent response:", parseError);
+      console.error("Critical parsing error in Analyst Agent:", parseError);
       console.error("Raw response:", rawResponse);
       return createEnhancedFallbackPlan(message, isContentSeekingQuery || requiresMandatoryVector, null, supabaseClient, userTimezone);
     }

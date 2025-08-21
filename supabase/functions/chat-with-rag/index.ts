@@ -333,6 +333,9 @@ serve(async (req) => {
         response: consolidationResponse.data.response,
         userStatusMessage: consolidationResponse.data.userStatusMessage,
         assistantMessageId: assistantMessageId, // Include the assistant message ID in response
+        queryClassification: classification.category,
+        queryComplexity: queryPlan?.complexity || 'standard',
+        executionStrategy: queryPlan?.strategy || 'unknown',
         metadata: {
           classification: classification,
           queryPlan: queryPlan,
@@ -341,7 +344,8 @@ serve(async (req) => {
           userTimezone: userTimezone,
           strategy: queryPlan.strategy,
           confidence: queryPlan.confidence,
-          analysisMetadata: consolidationResponse.data.analysisMetadata
+          analysisMetadata: consolidationResponse.data.analysisMetadata,
+          timestamp: new Date().toISOString()
         }
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
