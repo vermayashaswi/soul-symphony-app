@@ -987,8 +987,7 @@ CONTEXT: ${last.length > 0 ? last.map(m => `${m.sender}: ${m.content?.slice(0, 5
 ANALYSIS REQUIREMENTS:
 - Content-seeking detected: ${isContentSeekingQuery}
 - Mandatory vector required: ${requiresMandatoryVector}  
-- Has personal pronouns: ${hasPersonalPronouns}
-- Has time reference: ${hasExplicitTimeReference}
+- User timezone: ${userTimezone}
 - Is follow-up query: ${isFollowUpContext}
 - User timezone: ${userTimezone}
 
@@ -1124,8 +1123,6 @@ Response format (MUST be valid JSON):
     const finalResult = {
       ...analysisResult,
       useAllEntries: analysisResult.useAllEntries !== false,
-      hasPersonalPronouns,
-      hasExplicitTimeReference: false, // Override to false to prevent time-only strategies
       inferredTimeContext: null,
       userTimezone
     };
@@ -1201,8 +1198,6 @@ function createEnhancedFallbackPlan(originalMessage, isContentSeekingQuery, infe
     confidence: 0.7,
     reasoning: `Enhanced fallback plan using mandatory vector search for content-seeking query: "${originalMessage}". This ensures semantic understanding and comprehensive content retrieval with proper timezone handling.`,
     useAllEntries: true,
-    hasPersonalPronouns: /\b(i|me|my|mine|myself)\b/i.test(lowerMessage),
-    hasExplicitTimeReference: false, // Override to ensure vector search
     inferredTimeContext: inferredTimeContext,
     userTimezone
   };
