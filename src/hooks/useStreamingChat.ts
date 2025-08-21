@@ -44,6 +44,7 @@ interface ThreadStreamingState {
   abortController: AbortController | null;
   activeRequestId: string | null; // Track active request to prevent duplicates
   lastMessageFingerprint: string | null; // Prevent duplicate messages
+  waitingForRealtimeDelivery?: boolean; // Enhanced coordination with realtime
 }
 
 const createInitialState = (): ThreadStreamingState => ({
@@ -870,21 +871,60 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     return false;
   }, [threadId, updateThreadState]);
 
-  // Cleanup when thread changes or component unmounts
-  useEffect(() => {
-    return () => {
-      if (threadId) {
-        const threadState = getThreadState(threadId);
-        if (threadState.abortController) {
-          threadState.abortController.abort();
-        }
-      }
-    };
-  }, [threadId, getThreadState]);
+    // Enhanced coordination with realtime subscription
+    const extendStreamingForRealtimeDelivery = useCallback((targetThreadId?: string) => {
+      const activeThreadId = targetThreadId || threadId;
+      if (!activeThreadId) return;
 
-  return {
-    // Thread-isolated state
-    isStreaming: state.isStreaming,
+      console.log(`[useStreamingChat] Extending streaming state to wait for realtime delivery: ${activeThreadId}`);
+      
+      updateThreadState(activeThreadId, {
+        isStreaming: true,
+        showBackendAnimation: false,
+        waitingForRealtimeDelivery: true
+      });
+      
+      // Set a maximum wait time of 10 seconds for realtime delivery
+      setTimeout(() => {
+        const currentState = getThreadState(activeThreadId);
+        if (currentState.waitingForRealtimeDelivery) {
+          console.log(`[useStreamingChat] Realtime delivery timeout, forcing streaming to false: ${activeThreadId}`);
+          updateThreadState(activeThreadId, {
+            isStreaming: false,
+            waitingForRealtimeDelivery: false
+          });
+        }
+      }, 10000);
+    }, [threadId, getThreadState, updateThreadState]);
+
+    const confirmRealtimeDelivery = useCallback((targetThreadId?: string) => {
+      const activeThreadId = targetThreadId || threadId;
+      if (!activeThreadId) return;
+
+      console.log(`[useStreamingChat] Confirming realtime delivery, ending streaming state: ${activeThreadId}`);
+      
+      updateThreadState(activeThreadId, {
+        isStreaming: false,
+        waitingForRealtimeDelivery: false,
+        showBackendAnimation: false
+      });
+    }, [threadId, updateThreadState]);
+
+    // Cleanup when thread changes or component unmounts
+    useEffect(() => {
+      return () => {
+        if (threadId) {
+          const threadState = getThreadState(threadId);
+          if (threadState.abortController) {
+            threadState.abortController.abort();
+          }
+        }
+      };
+    }, [threadId, getThreadState]);
+
+    return {
+      // Thread-isolated state
+      isStreaming: state.isStreaming,
     streamingMessages: state.streamingMessages,
     currentUserMessage: state.currentUserMessage,
     showBackendAnimation: state.showBackendAnimation,
@@ -906,6 +946,10 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     clearStreamingMessages,
     restoreStreamingState,
     retryLastMessage: () => retryLastMessage(threadId),
+    
+    // Enhanced realtime coordination methods
+    extendStreamingForRealtimeDelivery,
+    confirmRealtimeDelivery,
     
     // Utility methods
     addStreamingMessage: (message: StreamingMessage) => addStreamingMessage(message, threadId)

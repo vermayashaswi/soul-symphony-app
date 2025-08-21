@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Menu, Plus, Trash2 } from "lucide-react";
@@ -122,7 +122,9 @@ export default function MobileChatInterface({
     currentMessageIndex,
     useThreeDotFallback,
     queryCategory,
-    restoreStreamingState
+    restoreStreamingState,
+    extendStreamingForRealtimeDelivery,
+    confirmRealtimeDelivery
    } = useStreamingChat({
       threadId: threadId,
       onFinalResponse: async (response, analysis, originThreadId, requestId) => {
@@ -432,6 +434,116 @@ export default function MobileChatInterface({
     }
   };
 
+  // Enhanced real-time subscription with message persistence tracking
+  const [pendingMessageTracker, setPendingMessageTracker] = useState<{
+    messageId: string | null;
+    expectedAt: number;
+    pollingInterval: NodeJS.Timeout | null;
+  }>({
+    messageId: null,
+    expectedAt: 0,
+    pollingInterval: null
+  });
+
+  // Clear any existing polling when component unmounts or thread changes
+  useEffect(() => {
+    return () => {
+      if (pendingMessageTracker.pollingInterval) {
+        clearInterval(pendingMessageTracker.pollingInterval);
+      }
+    };
+  }, [threadId]);
+
+  // Backup polling mechanism for message persistence checking
+  const startMessagePersistenceTracking = useCallback((expectedMessageType: 'assistant' = 'assistant') => {
+    console.log(`[MobileChatInterface] Starting message persistence tracking for ${expectedMessageType} message`);
+    
+    // Clear any existing tracking
+    if (pendingMessageTracker.pollingInterval) {
+      clearInterval(pendingMessageTracker.pollingInterval);
+    }
+
+    const startTime = Date.now();
+    const pollingInterval = setInterval(async () => {
+      const elapsed = Date.now() - startTime;
+      
+      // Stop polling after 15 seconds
+      if (elapsed > 15000) {
+        console.log(`[MobileChatInterface] Message persistence tracking timeout`);
+        clearInterval(pollingInterval);
+        setPendingMessageTracker({
+          messageId: null,
+          expectedAt: 0,
+          pollingInterval: null
+        });
+        return;
+      }
+
+      try {
+        // Check for new assistant messages
+        const { data: recentMessages } = await supabase
+          .from('chat_messages')
+          .select('*')
+          .eq('thread_id', threadId!)
+          .eq('sender', expectedMessageType)
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (recentMessages && recentMessages.length > 0) {
+          const latestMessage = recentMessages[0];
+          const messageAge = Date.now() - new Date(latestMessage.created_at).getTime();
+          
+          // If message is newer than our tracking start and not in UI yet
+          if (messageAge < elapsed + 2000) {
+            console.log(`[MobileChatInterface] Found persisted message via polling: ${latestMessage.id}`);
+            
+            // Check if message is already in UI
+            setMessages(prevMessages => {
+              const exists = prevMessages.some(msg => msg.id === latestMessage.id);
+              if (!exists) {
+                console.log(`[MobileChatInterface] Adding persisted message to UI: ${latestMessage.id}`);
+                
+                const uiMessage = {
+                  id: latestMessage.id,
+                  role: latestMessage.sender as 'user' | 'assistant' | 'error',
+                  content: latestMessage.content,
+                  references: latestMessage.reference_entries ? Array.isArray(latestMessage.reference_entries) ? latestMessage.reference_entries : [] : undefined,
+                  hasNumericResult: latestMessage.has_numeric_result,
+                  created_at: latestMessage.created_at,
+                  analysis: latestMessage.analysis_data
+                };
+                
+                // Force scroll to bottom
+                setTimeout(() => scrollToBottom(), 100);
+                
+                return [...prevMessages, uiMessage].sort((a, b) => 
+                  new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
+                );
+              }
+              return prevMessages;
+            });
+
+            // Clear tracking
+            clearInterval(pollingInterval);
+            setPendingMessageTracker({
+              messageId: null,
+              expectedAt: 0,
+              pollingInterval: null
+            });
+          }
+        }
+      } catch (error) {
+        console.error('[MobileChatInterface] Error in message persistence polling:', error);
+      }
+    }, 2000); // Poll every 2 seconds
+
+    setPendingMessageTracker({
+      messageId: null,
+      expectedAt: startTime,
+      pollingInterval: pollingInterval
+    });
+  }, [threadId, scrollToBottom]);
+
   // Real-time subscription for message updates
   useEffect(() => {
     if (!threadId || !user?.id) return;
@@ -442,6 +554,25 @@ export default function MobileChatInterface({
       const newMessage = payload.new;
       console.log(`[MobileChatInterface] Real-time INSERT: ${newMessage.id} - ${newMessage.sender}`);
       
+      // Clear persistence tracking and confirm realtime delivery if this is an assistant message
+      if (newMessage.sender === 'assistant') {
+        console.log(`[MobileChatInterface] Received assistant message, confirming realtime delivery`);
+        
+        // Clear polling tracker
+        if (pendingMessageTracker.pollingInterval) {
+          clearInterval(pendingMessageTracker.pollingInterval);
+          setPendingMessageTracker({
+            messageId: null,
+            expectedAt: 0,
+            pollingInterval: null
+          });
+        }
+        
+        // Confirm realtime delivery to useStreamingChat
+        if (confirmRealtimeDelivery && threadId) {
+          confirmRealtimeDelivery(threadId);
+        }
+      }
       
       setMessages(prevMessages => {
         // Check for duplicate by ID
@@ -461,6 +592,10 @@ export default function MobileChatInterface({
           analysis: newMessage.analysis_data
         };
         
+        // Force scroll to bottom for assistant messages
+        if (newMessage.sender === 'assistant') {
+          setTimeout(() => scrollToBottom(), 100);
+        }
         
         return [...prevMessages, uiMessage].sort((a, b) => 
           new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
@@ -628,6 +763,9 @@ export default function MobileChatInterface({
         role: msg.role,
         content: msg.content
       }));
+      
+      // Start message persistence tracking
+      startMessagePersistenceTracking('assistant');
       
       // Start streaming chat with conversation context
       await startStreamingChat(
