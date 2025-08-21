@@ -184,29 +184,42 @@ class MobileErrorHandler {
   }
 
   private startCrashDetection(): void {
-    // Check if app crashed during last session
-    const lastTimestamp = localStorage.getItem('app_heartbeat');
-    const gracefulShutdown = localStorage.getItem('app_graceful_shutdown');
-    const currentTime = Date.now();
-    
-    if (lastTimestamp && !gracefulShutdown) {
-      const lastTime = parseInt(lastTimestamp);
-      const timeDiff = currentTime - lastTime;
+    // Delay crash detection to allow graceful shutdown detection to complete
+    setTimeout(() => {
+      // Check if app crashed during last session
+      const lastTimestamp = localStorage.getItem('app_heartbeat');
+      const gracefulShutdown = localStorage.getItem('app_graceful_shutdown');
+      const currentTime = Date.now();
       
-      // Only consider it a crash if more than 30 minutes and no graceful shutdown
-      if (timeDiff > 1800000) { // 30 minutes instead of 5
-        this.handleError({
-          type: 'crash',
-          message: 'App crash detected from previous session',
-          timestamp: currentTime,
-          platform: getPlatform(),
-          details: { timeSinceLastHeartbeat: timeDiff }
-        });
+      // Check graceful shutdown timestamp - if recent (within 10 seconds), consider it graceful
+      if (gracefulShutdown) {
+        const shutdownTime = parseInt(gracefulShutdown);
+        const shutdownDiff = currentTime - shutdownTime;
+        if (shutdownDiff < 10000) { // 10 seconds
+          localStorage.removeItem('app_graceful_shutdown');
+          return; // Skip crash detection
+        }
       }
-    }
-    
-    // Clear graceful shutdown flag after checking
-    localStorage.removeItem('app_graceful_shutdown');
+      
+      if (lastTimestamp && !gracefulShutdown) {
+        const lastTime = parseInt(lastTimestamp);
+        const timeDiff = currentTime - lastTime;
+        
+        // Only consider it a crash if more than 30 minutes and no graceful shutdown
+        if (timeDiff > 1800000) { // 30 minutes
+          this.handleError({
+            type: 'crash',
+            message: 'App crash detected from previous session',
+            timestamp: currentTime,
+            platform: getPlatform(),
+            details: { timeSinceLastHeartbeat: timeDiff }
+          });
+        }
+      }
+      
+      // Clear graceful shutdown flag after checking
+      localStorage.removeItem('app_graceful_shutdown');
+    }, 3000); // 3 second delay
     
     // Set up heartbeat
     const updateHeartbeat = () => {

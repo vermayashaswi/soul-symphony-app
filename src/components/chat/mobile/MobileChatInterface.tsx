@@ -265,6 +265,9 @@ export default function MobileChatInterface({
   // Realtime: append assistant messages saved by backend
   useEffect(() => {
     if (!threadId) return;
+    
+    console.log('[MobileChatInterface] Setting up realtime subscription for thread:', threadId);
+    
     const channel = supabase
       .channel(`mobile-thread-assistant-append-${threadId}`)
       .on('postgres_changes',
@@ -276,28 +279,46 @@ export default function MobileChatInterface({
         },
         (payload) => {
           const m: any = payload.new;
+          console.log('[MobileChatInterface] Realtime message received:', { sender: m.sender, contentLength: m.content?.length });
+          
           if (m.sender === 'assistant') {
             setMessages(prev => {
-              // Avoid duplicates by simple heuristic
-              const last = prev[prev.length - 1];
-              if (last && last.role === 'assistant' && last.content === m.content) return prev;
+              // More robust duplicate detection
+              const existingMessage = prev.find(msg => 
+                msg.role === 'assistant' && 
+                msg.content?.trim() === m.content?.trim() &&
+                Math.abs(prev.length - prev.indexOf(msg)) <= 2 // Within last 2 messages
+              );
+              
+              if (existingMessage) {
+                console.log('[MobileChatInterface] Duplicate message detected, skipping');
+                return prev;
+              }
+              
+              console.log('[MobileChatInterface] Adding new assistant message to UI');
               const uiMsg: UIChatMessage = {
                 role: 'assistant',
                 content: m.content,
                 references: m.reference_entries || undefined,
                 analysis: m.analysis_data || undefined,
                 hasNumericResult: m.has_numeric_result || false
-               };
-               return [...prev, uiMsg];
-             });
-           }
-         }
-       )
-       .subscribe();
+              };
+              
+              return [...prev, uiMsg];
+            });
+            
+            // Force scroll to bottom when new message arrives
+            setTimeout(() => scrollToBottom(), 100);
+          }
+        }
+      )
+      .subscribe();
+      
     return () => {
+      console.log('[MobileChatInterface] Cleaning up realtime subscription for thread:', threadId);
       supabase.removeChannel(channel);
     };
-  }, [threadId]);
+  }, [threadId, scrollToBottom]);
 
   useEffect(() => {
     if (threadId) {
