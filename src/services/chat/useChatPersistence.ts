@@ -99,8 +99,7 @@ export const useChatPersistence = (userId: string | undefined) => {
             references: Array.isArray(msg.reference_entries) ? msg.reference_entries : [],
             analysis: msg.analysis_data,
             hasNumericResult: msg.has_numeric_result,
-            reference_entries: Array.isArray(msg.reference_entries) ? msg.reference_entries : [],
-            sub_query_responses: Array.isArray(msg.sub_query_responses) ? msg.sub_query_responses : []
+            reference_entries: Array.isArray(msg.reference_entries) ? msg.reference_entries : []
           }));
           setMessages(persistenceMessages);
         }
@@ -134,8 +133,7 @@ export const useChatPersistence = (userId: string | undefined) => {
           references: Array.isArray(newMessage.reference_entries) ? newMessage.reference_entries : [],
           analysis: newMessage.analysis_data,
           hasNumericResult: newMessage.has_numeric_result,
-          reference_entries: Array.isArray(newMessage.reference_entries) ? newMessage.reference_entries : [],
-          sub_query_responses: Array.isArray(newMessage.sub_query_responses) ? newMessage.sub_query_responses : []
+          reference_entries: Array.isArray(newMessage.reference_entries) ? newMessage.reference_entries : []
         };
         setMessages(prev => [...prev, persistenceMessage]);
       })
@@ -254,8 +252,7 @@ export const useChatPersistence = (userId: string | undefined) => {
             references: Array.isArray(savedMessage.reference_entries) ? savedMessage.reference_entries : [],
             analysis: savedMessage.analysis_data,
             hasNumericResult: savedMessage.has_numeric_result as boolean,
-            reference_entries: Array.isArray(savedMessage.reference_entries) ? savedMessage.reference_entries : [],
-            sub_query_responses: Array.isArray(savedMessage.sub_query_responses) ? savedMessage.sub_query_responses : []
+            reference_entries: Array.isArray(savedMessage.reference_entries) ? savedMessage.reference_entries : []
           };
           
           // Replace temp message with saved one

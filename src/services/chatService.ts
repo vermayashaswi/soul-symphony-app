@@ -52,7 +52,7 @@ export async function processChatMessage(
     console.log('[ChatService] Loading enhanced conversation context');
     const { data: previousMessages } = await supabase
       .from('chat_messages')
-      .select('content, sender, role, created_at')
+      .select('content, sender, created_at')
       .eq('thread_id', threadId)
       .order('created_at', { ascending: false })
       .limit(10); // Increased limit for better context
