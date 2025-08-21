@@ -24,7 +24,7 @@ import { BugIcon, HelpCircleIcon, InfoIcon, MessagesSquareIcon, Trash } from 'lu
 import DebugPanel from "@/components/debug/DebugPanel";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "@/contexts/TranslationContext";
-import { useChatLoading } from "@/hooks/useChatLoading";
+
 import { updateThreadProcessingStatus, createProcessingMessage, updateProcessingMessage, generateThreadTitle } from "@/utils/chat/threadUtils";
 import { MentalHealthInsights } from "@/hooks/use-mental-health-insights";
 
@@ -126,7 +126,6 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
 
       // Keep typing indicator visible while we finalize and render the message for the active thread
       if (originThreadId === currentThreadId) {
-        startLoading();
       }
       
       // Backend persists assistant message; UI will append via realtime
@@ -196,17 +195,14 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
                 console.log('[Streaming Watchdog] Assistant message found, no fallback needed');
               }
 
-              stopLoading();
             }, 1500); // Increased delay to allow for edge function processing
           } catch (e) {
             console.warn('[Streaming Watchdog] Exception scheduling fallback:', (e as any)?.message || e);
-            stopLoading();
           }
       }
     },
     onError: (error) => {
       // Ensure UI never gets stuck on loader after errors
-      stopLoading();
       toast({
         title: "Error",
         description: error,
@@ -216,16 +212,10 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
   });
   
   // Use simple loading state management
-  const {
-    isLoading,
-    loadingMessage,
-    startLoading,
-    stopLoading
-  } = useChatLoading();
   
   // Use unified auto-scroll hook
   const { scrollElementRef, scrollToBottom } = useAutoScroll({
-    dependencies: [chatHistory, isLoading, isStreaming, streamingMessages],
+    dependencies: [chatHistory, isStreaming, streamingMessages],
     delay: 50,
     scrollThreshold: 100
   });
@@ -472,7 +462,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     }
     
     // Prevent multiple concurrent requests
-    if (isLoading) {
+    if (isStreaming) {
       toast({
         title: "Please wait",
         description: "Another request is currently being processed.",
@@ -497,7 +487,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     window.dispatchEvent(new Event('chat:forceScrollToBottom'));
     
     // Set local loading state for immediate UI feedback
-    startLoading();
+    
     
     // Ensure we stay pinned to bottom as processing begins
     window.dispatchEvent(new Event('chat:forceScrollToBottom'));
@@ -616,7 +606,6 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       );
       
       // Streaming owns the lifecycle; ensure local loader is cleared immediately
-      stopLoading();
       
       // Skip the rest since streaming handles the response
       return;
@@ -687,7 +676,6 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     } finally {
       // Clear local loading state - only if still on originating thread
       if (threadId === currentThreadIdRef.current) {
-        stopLoading();
       }
     }
   };
@@ -738,7 +726,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     }
 
     // Prevent deletion if currently processing
-    if (isLoading) {
+    if (isStreaming) {
       toast({
         title: "Cannot delete conversation",
         description: "Please wait for the current request to complete before deleting this conversation.",
@@ -840,10 +828,10 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
   };
 
   // Check if deletion should be disabled - use loading state
-  const isDeletionDisabled = isLoading;
+  const isDeletionDisabled = isStreaming;
 
   // Thread-scoped loading indicator: during streaming, only show for current thread
-  const showLoadingForThisThread = isLoading || isStreaming;
+  const showLoadingForThisThread = isStreaming;
 
   return (
     <div className="chat-interface flex flex-col h-full">
@@ -857,7 +845,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
               size="sm"
               onClick={() => {
                 stopStreaming(currentThreadId);
-                stopLoading();
+                
               }}
               aria-label="Cancel processing"
             >
@@ -908,7 +896,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
           <ChatArea 
             chatMessages={chatHistory}
             isLoading={showLoadingForThisThread}
-            processingStage={loadingMessage || undefined}
+            processingStage={undefined}
             threadId={currentThreadId}
             onInteractiveOptionClick={handleInteractiveOptionClick}
           />

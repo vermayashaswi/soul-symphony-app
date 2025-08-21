@@ -23,7 +23,6 @@ import { getSanitizedFinalContent } from "@/utils/messageParser";
     created_at?: string;
   };
   showAnalysis?: boolean;
-  loadingMessage?: string;
   isLoading?: boolean;
   streamingMessage?: string;
   showStreamingDots?: boolean;
@@ -34,8 +33,7 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({
   showAnalysis = false, 
   isLoading = false, 
   streamingMessage,
-  showStreamingDots = false,
-  loadingMessage
+  showStreamingDots = false
 }) => {
   // CRITICAL FIX: Always call all hooks before any conditional logic
   const { user } = useAuth();
