@@ -25,8 +25,6 @@ import { useStreamingChat } from "@/hooks/useStreamingChat";
 import { threadSafetyManager } from "@/utils/threadSafetyManager";
 import ChatErrorBoundary from "../ChatErrorBoundary";
 import { useAutoScroll } from "@/hooks/use-auto-scroll";
-import { useMessageSyncValidator } from "@/hooks/useMessageSyncValidator";
-import { messageLifecycleTracker } from "@/services/chat/messageLifecycleTracker";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -143,15 +141,6 @@ export default function MobileChatInterface({
         
          debugLog.addEvent("Streaming Response", `[Mobile] Final response received for ${originThreadId}: ${response.substring(0, 100)}...`, "success");
 
-          // Track streaming completion
-          messageLifecycleTracker.trackEvent({
-            messageId: null, // Will be set when persisted
-            threadId: originThreadId,
-            stage: 'streaming',
-            timestamp: Date.now(),
-            content: response,
-            source: 'streaming'
-          });
 
           // Optimistic UI: append assistant message immediately so UI doesn't appear blank
           if (originThreadId === threadId) {
@@ -159,15 +148,6 @@ export default function MobileChatInterface({
             setShowSuggestions(false);
             setLocalLoading(false);
             
-            // Track UI display
-            messageLifecycleTracker.trackEvent({
-              messageId: null,
-              threadId: originThreadId,
-              stage: 'displayed',
-              timestamp: Date.now(),
-              content: response,
-              source: 'ui'
-            });
           }
 
          // Update user message with classification data if available
@@ -290,38 +270,6 @@ export default function MobileChatInterface({
     scrollThreshold: 100
   });
 
-  // Add message sync validation
-  const { validateConsistency } = useMessageSyncValidator({
-    threadId,
-    messages,
-    onMissingMessagesDetected: async (missingMessages) => {
-      console.warn(`[MobileChatInterface] Detected ${missingMessages.length} missing messages, syncing...`);
-      
-      // Add missing messages to UI
-      const missingUIMessages = missingMessages.map(msg => ({
-        id: msg.id,
-        role: msg.sender as 'user' | 'assistant',
-        content: msg.content,
-        references: msg.reference_entries ? Array.isArray(msg.reference_entries) ? msg.reference_entries : [] : undefined,
-        hasNumericResult: msg.has_numeric_result,
-        isProcessing: msg.is_processing,
-        created_at: msg.created_at,
-        analysis: msg.analysis_data
-      }));
-      
-      setMessages(prev => {
-        const combined = [...prev, ...missingUIMessages];
-        return combined.sort((a, b) => 
-          new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
-        );
-      });
-      
-      toast({
-        title: "Messages Synced",
-        description: `Restored ${missingMessages.length} missing messages`,
-      });
-    }
-  });
 
   // Realtime: append assistant messages saved by backend
   useEffect(() => {
@@ -466,19 +414,17 @@ export default function MobileChatInterface({
       
       if (chatMessages && chatMessages.length > 0) {
         const uiMessages = chatMessages
-          .filter(msg => !msg.is_processing) // Filter out processing messages from UI
           .map(msg => ({
             id: msg.id,
             role: msg.sender as 'user' | 'assistant',
             content: msg.content,
             references: msg.reference_entries ? Array.isArray(msg.reference_entries) ? msg.reference_entries : [] : undefined,
             hasNumericResult: msg.has_numeric_result,
-            isProcessing: msg.is_processing,
             created_at: msg.created_at
           }))
           .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
         
-        console.log(`[MobileChatInterface] Displaying ${uiMessages.length} messages (including ${uiMessages.filter(m => m.isProcessing).length} processing)`);
+        console.log(`[MobileChatInterface] Displaying ${uiMessages.length} messages`);
         setMessages(uiMessages);
         setShowSuggestions(false);
         loadedThreadRef.current = currentThreadId;
@@ -510,21 +456,6 @@ export default function MobileChatInterface({
       const newMessage = payload.new;
       console.log(`[MobileChatInterface] Real-time INSERT: ${newMessage.id} - ${newMessage.sender}`);
       
-      // Skip processing messages from UI display
-      if (newMessage.is_processing) {
-        console.log(`[MobileChatInterface] Skipping processing message from UI: ${newMessage.id}`);
-        return;
-      }
-      
-      // Track message persistence
-      messageLifecycleTracker.trackEvent({
-        messageId: newMessage.id,
-        threadId: newMessage.thread_id,
-        stage: 'persisted',
-        timestamp: Date.now(),
-        content: newMessage.content,
-        source: 'realtime'
-      });
       
       setMessages(prevMessages => {
         // Check for duplicate by ID
@@ -540,20 +471,10 @@ export default function MobileChatInterface({
           content: newMessage.content,
           references: newMessage.reference_entries ? Array.isArray(newMessage.reference_entries) ? newMessage.reference_entries : [] : undefined,
           hasNumericResult: newMessage.has_numeric_result,
-          isProcessing: newMessage.is_processing,
           created_at: newMessage.created_at,
           analysis: newMessage.analysis_data
         };
         
-        // Track UI display
-        messageLifecycleTracker.trackEvent({
-          messageId: newMessage.id,
-          threadId: newMessage.thread_id,
-          stage: 'displayed',
-          timestamp: Date.now(),
-          content: newMessage.content,
-          source: 'ui'
-        });
         
         return [...prevMessages, uiMessage].sort((a, b) => 
           new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
@@ -563,7 +484,7 @@ export default function MobileChatInterface({
 
     const handleRealtimeUpdate = (payload: any) => {
       const updatedMessage = payload.new;
-      console.log(`[MobileChatInterface] Real-time UPDATE: ${updatedMessage.id} - processing: ${updatedMessage.is_processing}`);
+      console.log(`[MobileChatInterface] Real-time UPDATE: ${updatedMessage.id}`);
       
       setMessages(prevMessages => {
         return prevMessages.map(msg => 
@@ -571,7 +492,6 @@ export default function MobileChatInterface({
             ? {
                 ...msg,
                 content: updatedMessage.content,
-                isProcessing: updatedMessage.is_processing,
                 references: updatedMessage.reference_entries ? Array.isArray(updatedMessage.reference_entries) ? updatedMessage.reference_entries : [] : undefined,
                 hasNumericResult: updatedMessage.has_numeric_result,
                 analysis: updatedMessage.analysis_data

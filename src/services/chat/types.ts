@@ -52,7 +52,7 @@ export interface ChatMessage {
   isInteractive?: boolean;
   interactiveOptions?: any[];
   diagnostics?: any;
-  is_processing?: boolean;
+  
   time_pattern_analysis?: any; // Add this field for time pattern analysis results
   themeemotion?: any; // FIXED: Added themeemotion field to replace entityemotion
 }

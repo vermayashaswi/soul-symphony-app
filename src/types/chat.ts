@@ -11,7 +11,7 @@ export interface ChatMessage {
   reference_entries?: Json | any[] | null;
   analysis_data?: Json | any | null;
   has_numeric_result?: boolean | null;
-  is_processing?: boolean | null;
+  
   sub_query1?: string | null;
   sub_query2?: string | null;
   sub_query3?: string | null;

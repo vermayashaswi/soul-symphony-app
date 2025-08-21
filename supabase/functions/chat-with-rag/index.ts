@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
@@ -127,26 +126,25 @@ serve(async (req) => {
 
     console.log(`[chat-with-rag] Processing query: "${message}" for user: ${userId} (threadId: ${threadId}, messageId: ${messageId})`);
     
-    // Create assistant message for journal-specific queries using shared utilities
+    // Create assistant message for responses - NO PROCESSING STATE
     let assistantMessageId = null;
     if (threadId) {
       try {
         console.log(`[chat-with-rag] Creating assistant message for thread: ${threadId}`);
         const { saveMessage, generateIdempotencyKey } = await import('../_shared/messageUtils.ts');
         
-        // Generate idempotency key for the initial processing message
+        // Generate idempotency key for the response message
         const idempotencyKey = await generateIdempotencyKey(
           threadId,
-          'Processing your journal query...',
-          `initial_${Date.now()}`
+          'AI Assistant',
+          `response_${Date.now()}`
         );
         
         const saveResult = await saveMessage(supabaseClient, {
           thread_id: threadId,
           sender: 'assistant',
           role: 'assistant',
-          content: 'Processing your journal query...',
-          is_processing: true,
+          content: 'Thinking...',
           idempotency_key: idempotencyKey
         }, { requireIdempotency: true });
         
@@ -317,7 +315,6 @@ serve(async (req) => {
           
           const updateResult = await updateMessage(supabaseClient, assistantMessageId, {
             content: finalResponseContent,
-            is_processing: false,
             analysis_data: consolidationResponse.data.analysisMetadata || null
           });
           
@@ -375,8 +372,7 @@ serve(async (req) => {
           const { updateMessage } = await import('../_shared/messageUtils.ts');
           
           const updateResult = await updateMessage(supabaseClient, assistantMessageId, {
-            content: generalResponse.data,
-            is_processing: false
+            content: generalResponse.data
           });
           
           if (updateResult.success) {
@@ -423,8 +419,7 @@ serve(async (req) => {
           const { updateMessage } = await import('../_shared/messageUtils.ts');
           
           const updateResult = await updateMessage(supabaseClient, assistantMessageId, {
-            content: clarificationResponse.data.response,
-            is_processing: false
+            content: clarificationResponse.data.response
           });
           
           if (updateResult.success) {
@@ -439,60 +434,13 @@ serve(async (req) => {
 
       return new Response(JSON.stringify({
         response: clarificationResponse.data.response,
-        userStatusMessage: clarificationResponse.data.userStatusMessage,
         assistantMessageId: assistantMessageId,
+        needsClarification: true,
+        clarificationQuestions: clarificationResponse.data.clarificationQuestions,
         metadata: {
           classification: classification,
-          strategy: 'clarification',
-          type: clarificationResponse.data.type,
-          userTimezone: userTimezone
-        }
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-
-    } else if (classification.category === 'UNRELATED') {
-      // Handle unrelated queries with witty rejection messages
-      console.log(`[chat-with-rag] EXECUTING: UNRELATED pipeline - witty rejection`);
-      
-      // Array of witty rejection responses
-      const unrelatedResponses = [
-        "Haha, you caught me! I'm basically a one-trick pony, but it's a really GOOD trick! 🐴✨ Think of me as your personal feelings detective, journal whisperer, and emotional GPS all rolled into one. I can't help with that question, but I'd love to hear what's been stirring in your world today! 🌍💫",
-        "Whoops! Looks like you've found the edge of my brain! 🤯 I'm like that friend who's AMAZING at deep 2am conversations about life but terrible at trivia night. I live for your thoughts, feelings, journal entries, and all things emotional wellbeing - that's where I absolutely shine! ✨ What's your heart been up to lately? 💛",
-        "Oops! You just wandered into my 'does not compute' zone! 🤖💫 I'm basically a specialist who speaks fluent emotion and journal-ese, but that question is outside my wheelhouse. How about we dive into something I'm actually brilliant at - like exploring what's been on your mind recently? 🧠✨",
-        "Plot twist! You stumbled upon the one thing I can't chat about! 😄 I'm like a really passionate therapist friend who only knows how to talk about feelings, patterns, and personal growth. But hey, that's not so bad, right? What's been weighing on your heart lately? 💭💙"
-      ];
-      
-      // Randomly select a response
-      const selectedResponse = unrelatedResponses[Math.floor(Math.random() * unrelatedResponses.length)];
-      
-      // Update the assistant message with the rejection response using shared utilities
-      if (assistantMessageId) {
-        try {
-          const { updateMessage } = await import('../_shared/messageUtils.ts');
-          
-          const updateResult = await updateMessage(supabaseClient, assistantMessageId, {
-            content: selectedResponse,
-            is_processing: false
-          });
-          
-          if (updateResult.success) {
-            console.log(`[chat-with-rag] Updated assistant message ${assistantMessageId} with unrelated response`);
-          } else {
-            console.error('[chat-with-rag] Error updating assistant message:', updateResult.error);
-          }
-        } catch (updateError) {
-          console.error('[chat-with-rag] Exception updating assistant message:', updateError);
-        }
-      }
-
-      return new Response(JSON.stringify({
-        response: selectedResponse,
-        userStatusMessage: "Politely redirecting with humor",
-        assistantMessageId: assistantMessageId,
-        metadata: {
-          classification: classification,
-          strategy: 'unrelated_rejection',
+          strategy: 'clarification_needed',
+          clarificationReason: clarificationResponse.data.clarificationReason,
           userTimezone: userTimezone
         }
       }), {
@@ -500,19 +448,28 @@ serve(async (req) => {
       });
 
     } else {
-      // Handle unexpected classification categories with fallback
-      console.log(`[chat-with-rag] UNKNOWN CLASSIFICATION: ${classification.category} - using fallback response`);
+      // Fallback to general mental health for unclassified queries
+      console.log(`[chat-with-rag] FALLBACK: Unrecognized category '${classification.category}' - using general mental health`);
       
-      const fallbackResponse = "I'm having trouble understanding your request right now. Could you try rephrasing it? I'm here to help with your journal insights and emotional wellbeing! 💙";
-      
-      // Update the assistant message with fallback response using shared utilities
-      if (assistantMessageId) {
+      const fallbackResponse = await supabaseClient.functions.invoke('general-mental-health-chat', {
+        body: {
+          message: message,
+          conversationContext: conversationContext,
+          userTimezone: userTimezone
+        }
+      });
+
+      if (fallbackResponse.error) {
+        throw new Error(`Fallback response failed: ${fallbackResponse.error.message}`);
+      }
+
+      // Update the assistant message with the fallback response using shared utilities
+      if (assistantMessageId && fallbackResponse.data) {
         try {
           const { updateMessage } = await import('../_shared/messageUtils.ts');
           
           const updateResult = await updateMessage(supabaseClient, assistantMessageId, {
-            content: fallbackResponse,
-            is_processing: false
+            content: fallbackResponse.data
           });
           
           if (updateResult.success) {
@@ -526,12 +483,11 @@ serve(async (req) => {
       }
 
       return new Response(JSON.stringify({
-        response: fallbackResponse,
-        userStatusMessage: "Handling unknown request type",
+        response: fallbackResponse.data,
         assistantMessageId: assistantMessageId,
         metadata: {
           classification: classification,
-          strategy: 'fallback_response',
+          strategy: 'fallback_general',
           userTimezone: userTimezone
         }
       }), {
@@ -540,15 +496,14 @@ serve(async (req) => {
     }
 
   } catch (error) {
-    console.error('[chat-with-rag] Error:', error);
+    console.error("[chat-with-rag] Error in enhanced RAG processing:", error);
     
     return new Response(JSON.stringify({
-      error: 'Failed to process query with RAG pipeline',
-      details: error.message,
-      fallbackResponse: "I apologize, but I'm having trouble processing your request right now. Please try rephrasing your question or try again later."
+      error: "Failed to process your message. Please try again.",
+      details: error.message
     }), {
-      status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 500,
     });
   }
 });

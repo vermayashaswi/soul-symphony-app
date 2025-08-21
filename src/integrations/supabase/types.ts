@@ -22,7 +22,6 @@ export type Database = {
           has_numeric_result: boolean | null
           id: string
           idempotency_key: string | null
-          is_processing: boolean | null
           reference_entries: Json | null
           request_correlation_id: string | null
           role: string | null
@@ -40,7 +39,6 @@ export type Database = {
           has_numeric_result?: boolean | null
           id?: string
           idempotency_key?: string | null
-          is_processing?: boolean | null
           reference_entries?: Json | null
           request_correlation_id?: string | null
           role?: string | null
@@ -58,7 +56,6 @@ export type Database = {
           has_numeric_result?: boolean | null
           id?: string
           idempotency_key?: string | null
-          is_processing?: boolean | null
           reference_entries?: Json | null
           request_correlation_id?: string | null
           role?: string | null
@@ -686,10 +683,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      auto_cleanup_processing_messages: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
       check_database_health: {
         Args: Record<PropertyKey, never>
         Returns: Json
@@ -730,10 +723,6 @@ export type Database = {
         Returns: number
       }
       cleanup_malformed_json_messages: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
-      cleanup_stuck_processing_messages: {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
