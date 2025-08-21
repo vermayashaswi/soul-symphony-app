@@ -17,7 +17,7 @@ import { getThreadMessages, saveMessage, updateUserMessageClassification } from 
 import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
 import { processChatMessage } from "@/services/chatService";
 import { MentalHealthInsights } from "@/hooks/use-mental-health-insights";
-import { useChatRealtime } from "@/hooks/use-chat-realtime";
+import { useChatLoading } from "@/hooks/useChatLoading";
 import { updateThreadProcessingStatus, generateThreadTitle } from "@/utils/chat/threadUtils";
 import { useUnifiedKeyboard } from "@/hooks/use-unified-keyboard";
 import { useEnhancedSwipeGestures } from "@/hooks/use-enhanced-swipe-gestures";
@@ -83,10 +83,10 @@ export default function MobileChatInterface({
   
   const {
     isLoading,
-    isProcessing,
-    processingStatus,
-    setLocalLoading
-  } = useChatRealtime(threadId);
+    loadingMessage,
+    startLoading,
+    stopLoading
+  } = useChatLoading();
   
   const { isKeyboardVisible } = useUnifiedKeyboard();
   
@@ -146,7 +146,7 @@ export default function MobileChatInterface({
           if (originThreadId === threadId) {
             setMessages(prev => [...prev, { role: 'assistant', content: response, analysis }]);
             setShowSuggestions(false);
-            setLocalLoading(false);
+            stopLoading();
             
           }
 
@@ -218,11 +218,11 @@ export default function MobileChatInterface({
                }
              }
 
-             setLocalLoading(false);
+              stopLoading();
            }, 1200);
          } catch (e) {
            console.warn('[Mobile Streaming Watchdog] Exception scheduling fallback:', (e as any)?.message || e);
-           setLocalLoading(false);
+            stopLoading();
          }
        }
     },
@@ -265,7 +265,7 @@ export default function MobileChatInterface({
   
   // Use unified auto-scroll hook
   const { scrollElementRef, scrollToBottom } = useAutoScroll({
-    dependencies: [messages, isLoading, isProcessing, isStreaming],
+    dependencies: [messages, isLoading, isStreaming],
     delay: 50,
     scrollThreshold: 100
   });
@@ -296,39 +296,15 @@ export default function MobileChatInterface({
                 references: m.reference_entries || undefined,
                 analysis: m.analysis_data || undefined,
                 hasNumericResult: m.has_numeric_result || false
-              };
-              return [...prev, uiMsg];
-            });
-          }
-        }
-      )
-      .on('postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'chat_messages',
-          filter: `thread_id=eq.${threadId}`
-        },
-        (payload) => {
-          const m: any = payload.new;
-          if (m.sender === 'assistant') {
-            setMessages(prev => {
-              // If last assistant message already matches, skip; else append updated
-              const last = prev[prev.length - 1];
-              if (last && last.role === 'assistant' && last.content === m.content) return prev;
-              const uiMsg: UIChatMessage = {
-                role: 'assistant',
-                content: m.content,
-                references: m.reference_entries || undefined,
-                analysis: m.analysis_data || undefined,
-                hasNumericResult: m.has_numeric_result || false
-              };
-              return [...prev, uiMsg];
-            });
-          }
-        }
-      )
-      .subscribe();
+               };
+               return [...prev, uiMsg];
+             });
+             // Stop loading when assistant message arrives
+             stopLoading();
+           }
+         }
+       )
+       .subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
@@ -544,7 +520,7 @@ export default function MobileChatInterface({
       return;
     }
 
-    if (isProcessing || isLoading) {
+    if (isLoading) {
       toast({
         title: "Please wait",
         description: "Another request is currently being processed.",
@@ -601,7 +577,7 @@ export default function MobileChatInterface({
     setMessages(prev => [...prev, { role: 'user', content: message }]);
     // Force scroll to bottom on send so user sees streaming/processing
     scrollToBottom(true);
-    setLocalLoading(true, "Processing your request...");
+    startLoading("Processing your request...");
     // Ensure we remain pinned to bottom as processing begins
     scrollToBottom(true);
     
@@ -706,7 +682,7 @@ export default function MobileChatInterface({
         }, 2000);
       }
     } finally {
-      setLocalLoading(false);
+      stopLoading();
     }
   };
 
@@ -784,7 +760,7 @@ export default function MobileChatInterface({
       return;
     }
 
-    if (isProcessing || processingStatus === 'processing') {
+    if (isLoading) {
       console.log('[MobileChat] Cannot delete thread while processing');
       toast({
         title: "Cannot delete conversation",
@@ -883,7 +859,7 @@ export default function MobileChatInterface({
     }
   };
 
-  const isDeletionDisabled = isProcessing || processingStatus === 'processing' || isLoading;
+  const isDeletionDisabled = isLoading;
 
   return (
     <div className="mobile-chat-interface">
@@ -1030,7 +1006,7 @@ export default function MobileChatInterface({
                       size="sm"
                       className="px-3 py-2 h-auto justify-start text-sm text-left bg-muted/50 hover:bg-muted w-full"
                       onClick={() => handleSendMessage(question.text)}
-                      disabled={isLoading || isProcessing}
+                      disabled={isLoading}
                     >
                       <div className="flex items-start w-full">
                         <span className="mr-2">{question.icon}</span>
@@ -1068,11 +1044,12 @@ export default function MobileChatInterface({
                   showStreamingDots={true}
                 />
               </ChatErrorBoundary>
-            ) : (!isStreaming && (isLoading || isProcessing)) ? (
+            ) : (!isStreaming && isLoading) ? (
               <ChatErrorBoundary>
                 <MobileChatMessage 
                   message={{ role: 'assistant', content: '' }}
                   isLoading={true}
+                  loadingMessage={loadingMessage}
                 />
               </ChatErrorBoundary>
             ) : null}
@@ -1086,7 +1063,7 @@ export default function MobileChatInterface({
       {/* Chat Input */}
       <MobileChatInput 
         onSendMessage={handleSendMessage} 
-        isLoading={isLoading || isProcessing}
+        isLoading={isLoading}
         userId={userId || user?.id}
       />
       

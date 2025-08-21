@@ -23,6 +23,7 @@ import { getSanitizedFinalContent } from "@/utils/messageParser";
     created_at?: string;
   };
   showAnalysis?: boolean;
+  loadingMessage?: string;
   isLoading?: boolean;
   streamingMessage?: string;
   showStreamingDots?: boolean;
@@ -33,7 +34,8 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({
   showAnalysis = false, 
   isLoading = false, 
   streamingMessage,
-  showStreamingDots = false 
+  showStreamingDots = false,
+  loadingMessage
 }) => {
   // CRITICAL FIX: Always call all hooks before any conditional logic
   const { user } = useAuth();
@@ -63,7 +65,7 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({
         transition={{ duration: 0.3 }}
         className="mb-3"
       >
-        <TypingIndicator className="justify-start" />
+        <TypingIndicator className="justify-start" message={loadingMessage} />
       </motion.div>
     );
   }
