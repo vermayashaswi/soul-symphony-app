@@ -190,31 +190,49 @@ export default function MobileChatInterface({
                console.warn('[Mobile Streaming Watchdog] Failed to fetch recent messages:', recentErr.message);
              }
 
-             const alreadyExists = (recent || []).some(m => (m as any).sender === 'assistant' && (m as any).content?.trim() === response.trim());
-             if (!alreadyExists) {
-               // Persist safely with an idempotency_key derived from threadId + response
-               try {
-                 const enc = new TextEncoder();
-                 const keySource = requestId || `${originThreadId}:${response}`;
-                 const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
-                 const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
-                 const idempotencyKey = hex.slice(0, 32);
+              // Check if the exact response already exists or similar content
+              const responseAlreadyExists = (recent || []).some(m => {
+                const existingContent = (m as any).content?.trim() || '';
+                const newContent = response.trim();
+                return existingContent === newContent || 
+                       (existingContent.length > 50 && newContent.length > 50 && 
+                        existingContent.substring(0, 100) === newContent.substring(0, 100));
+              });
+              
+              if (!responseAlreadyExists) {
+                console.log('[Mobile Streaming Watchdog] Assistant response not found in DB, saving fallback');
+                try {
+                  // Create mobile watchdog-specific idempotency key
+                  const idempotencyKey = `mobile-watchdog-${originThreadId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-                  await supabase.from('chat_messages').upsert({
+                  const { data: savedMsg, error: saveErr } = await supabase.from('chat_messages').upsert({
                     thread_id: originThreadId,
                     content: response,
                     sender: 'assistant',
                     role: 'assistant',
                     idempotency_key: idempotencyKey,
-                    analysis_data: analysis || null
-                  }, { onConflict: 'thread_id,idempotency_key' });
-               } catch (e) {
-                 console.warn('[Mobile Streaming Watchdog] Persist fallback failed:', (e as any)?.message || e);
-               }
-             }
+                    analysis_data: {
+                      ...(analysis || {}),
+                      mobile_watchdog_fallback: true,
+                      original_request_id: requestId,
+                      fallback_timestamp: new Date().toISOString()
+                    }
+                  }, { onConflict: 'thread_id,idempotency_key' }).select('id').single();
+
+                  if (saveErr) {
+                    console.error('[Mobile Streaming Watchdog] Failed to save message:', saveErr);
+                  } else {
+                    console.log(`[Mobile Streaming Watchdog] Successfully saved fallback message: ${savedMsg?.id}`);
+                  }
+                } catch (e) {
+                  console.error('[Mobile Streaming Watchdog] Exception saving fallback message:', (e as any)?.message || e);
+                }
+              } else {
+                console.log('[Mobile Streaming Watchdog] Assistant response already exists in DB, skipping save');
+              }
 
              setLocalLoading(false);
-           }, 1200);
+           }, 800); // Reduced from 1200ms for faster fallback
          } catch (e) {
            console.warn('[Mobile Streaming Watchdog] Exception scheduling fallback:', (e as any)?.message || e);
            setLocalLoading(false);

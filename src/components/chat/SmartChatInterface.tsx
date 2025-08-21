@@ -152,7 +152,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       if (originThreadId === currentThreadId) {
         // Watchdog: if realtime insert doesn't arrive, persist client-side after a short delay
         try {
-          setTimeout(async () => {
+            setTimeout(async () => {
             // Double-check still on same thread
             if (!currentThreadIdRef.current || currentThreadIdRef.current !== originThreadId) return;
 
@@ -168,39 +168,69 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
               console.warn('[Streaming Watchdog] Failed to fetch recent messages:', recentErr.message);
             }
 
-            const alreadyExists = (recent || []).some(m => (m as any).sender === 'assistant' && (m as any).content?.trim() === response.trim());
-            if (!alreadyExists) {
-              // Enhanced idempotency key generation and validation
+            // Check if the exact response already exists or similar content
+            const responseAlreadyExists = (recent || []).some(m => {
+              const existingContent = (m as any).content?.trim() || '';
+              const newContent = response.trim();
+              // Check for exact match or very similar content (edge function may have saved it)
+              return existingContent === newContent || 
+                     (existingContent.length > 50 && newContent.length > 50 && 
+                      existingContent.substring(0, 100) === newContent.substring(0, 100));
+            });
+            
+            if (!responseAlreadyExists) {
+              console.log('[Streaming Watchdog] Assistant response not found in DB, saving fallback');
               try {
-                const idempotencyKey = await idempotencyManager.generateIdempotencyKey(
+                // Create watchdog-specific idempotency key to avoid conflicts
+                const idempotencyKey = `watchdog-${originThreadId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                
+                const savedMessage = await saveMessage(
                   originThreadId, 
                   response, 
-                  'assistant'
+                  'assistant', 
+                  effectiveUserId, 
+                  null, // references
+                  false, // hasNumericResult
+                  false, // isInteractive
+                  [], // interactiveOptions
+                  idempotencyKey,
+                  {
+                    watchdog_fallback: true,
+                    original_request_id: requestId,
+                    fallback_timestamp: new Date().toISOString(),
+                    analysis_data: analysis || null
+                  }
                 );
                 
-                // Check if this key was already used
-                if (!idempotencyManager.isKeyUsed(idempotencyKey)) {
-                  idempotencyManager.registerKey(idempotencyKey, originThreadId, 'temp-assistant', response);
-                  
-                  await supabase.from('chat_messages').upsert({
-                    thread_id: originThreadId,
-                    content: response,
-                    sender: 'assistant',
-                    role: 'assistant',
-                    idempotency_key: idempotencyKey,
-                    analysis_data: analysis || null
-                  }, { onConflict: 'thread_id,idempotency_key' });
+                if (savedMessage) {
+                  console.log(`[Streaming Watchdog] Successfully saved fallback message: ${savedMessage.id}`);
                 } else {
-                  console.log('[Streaming Watchdog] Message already exists with this idempotency key');
+                  console.warn('[Streaming Watchdog] saveMessage returned null');
+                  
+                  // Show user feedback for save failure
+                  toast({
+                    title: "Response not saved",
+                    description: "The AI response was displayed but couldn't be saved to your conversation history.",
+                    variant: "destructive"
+                  });
                 }
               } catch (e) {
-                console.warn('[Streaming Watchdog] Enhanced persist fallback failed:', (e as any)?.message || e);
+                console.error('[Streaming Watchdog] Failed to save fallback message:', (e as any)?.message || e);
+                
+                // Show user feedback for save failure
+                toast({
+                  title: "Response not saved",
+                  description: "The AI response was displayed but couldn't be saved to your conversation history.",
+                  variant: "destructive"
+                });
               }
+            } else {
+              console.log('[Streaming Watchdog] Assistant response already exists in DB, skipping save');
             }
 
             setLocalLoading(false);
             updateProcessingStage(null);
-          }, 1200);
+          }, 500); // Reduced to 500ms for faster failure detection
         } catch (e) {
           console.warn('[Streaming Watchdog] Exception scheduling fallback:', (e as any)?.message || e);
           setLocalLoading(false);
@@ -545,20 +575,26 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       // Generate correlation ID for request tracking
       correlationId = idempotencyManager.generateCorrelationId();
       
-      // Enhanced message validation
+      // Enhanced message validation with better first message handling
       const messageValidation = idempotencyManager.validateMessageForThread(threadId, message, 'user');
       if (!messageValidation.valid) {
+        debugLog.addEvent("Validation", `Duplicate message blocked: ${messageValidation.reason}`, "warn");
         toast({
           title: "Duplicate message detected", 
           description: messageValidation.reason,
           variant: "destructive"
         });
+        // Remove temp message and reset state
+        setChatHistory(prev => prev.filter(msg => msg.id !== tempUserMessage.id));
+        setLocalLoading(false);
         return;
       }
       
       // Generate proper idempotency key for user message
       const userIdempotencyKey = await idempotencyManager.generateIdempotencyKey(threadId, message, 'user');
       debugLog.addEvent("Database", `Saving user message to thread ${threadId} with idempotency key: ${userIdempotencyKey}`, "info");
+      
+      // Save user message with enhanced error handling
       savedUserMessage = await saveMessage(
         threadId, 
         message, 
@@ -575,9 +611,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       if (savedUserMessage) {
         idempotencyManager.registerKey(userIdempotencyKey, threadId, savedUserMessage.id, message);
         threadSafetyManager.setActiveRequestId(threadId, correlationId);
-      }
-      
-      if (savedUserMessage) {
+        
         debugLog.addEvent("UI Update", `Replacing temporary message with saved message: ${savedUserMessage.id}`, "info");
         setChatHistory(prev => prev.map(msg => 
           msg.id === tempUserMessage.id ? {
@@ -607,17 +641,27 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
           }
         }
       } else {
-        debugLog.addEvent("Database", "Failed to save user message - null response", "error");
-        throw new Error("Failed to save message");
+        debugLog.addEvent("Database", "saveMessage returned null - this should not happen", "error");
+        throw new Error("Message save failed - received null response");
       }
-      } catch (saveError: any) {
-        debugLog.addEvent("Database", `Error saving user message: ${saveError.message || "Unknown error"}`, "error");
-        toast({
-          title: "Error saving message",
-          description: saveError.message || "Could not save your message",
-          variant: "destructive"
-        });
-      }
+      
+    } catch (saveError: any) {
+      debugLog.addEvent("Database", `Critical error saving user message: ${saveError.message || "Unknown error"}`, "error");
+      console.error('[SmartChatInterface] Message save failed:', saveError);
+      
+      // Remove temp message from UI on save failure
+      setChatHistory(prev => prev.filter(msg => msg.id !== tempUserMessage.id));
+      setLocalLoading(false);
+      
+      toast({
+        title: "Failed to save message",
+        description: saveError.message || "Could not save your message to the database",
+        variant: "destructive"
+      });
+      
+      // Don't continue with streaming if user message failed to save
+      return;
+    }
       
       // Initialize processing message placeholder (only created for non-journal queries)
       let processingMessageId: string | null = null;

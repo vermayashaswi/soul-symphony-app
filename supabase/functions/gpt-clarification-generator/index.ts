@@ -1,6 +1,7 @@
 
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -8,6 +9,53 @@ const corsHeaders = {
 };
 
 const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+
+// Import saveMessage function for consistent persistence
+const saveMessage = async (threadId: string, content: string, sender: 'user' | 'assistant', userId?: string, additionalData = {}, req?: Request) => {
+  try {
+    // Validate required parameters
+    if (!threadId || !content || !userId) {
+      console.error('[saveMessage] Missing required parameters:', { threadId: !!threadId, content: !!content, userId: !!userId });
+      return null;
+    }
+
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        global: {
+          headers: { Authorization: req?.headers.get('Authorization') || '' },
+        },
+      }
+    );
+
+    const messageData = {
+      thread_id: threadId,
+      sender,
+      role: sender,
+      content,
+      created_at: new Date().toISOString(),
+      ...additionalData
+    };
+
+    const { data, error } = await supabaseClient
+      .from('chat_messages')
+      .insert(messageData)
+      .select('id')
+      .single();
+
+    if (error) {
+      console.error('[saveMessage] Error saving message:', error);
+      return null;
+    }
+
+    console.log(`[saveMessage] Successfully saved ${sender} message:`, data.id);
+    return data;
+  } catch (error) {
+    console.error('[saveMessage] Exception:', error);
+    return null;
+  }
+};
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -18,7 +66,10 @@ serve(async (req) => {
     const { 
       userMessage, 
       conversationContext,
-      userProfile
+      userProfile,
+      threadId,
+      userId,
+      correlationId
     } = await req.json();
     
     console.log('GPT Clarification Generator called with:', { 
@@ -115,6 +166,33 @@ TONE: Direct, insightful, naturally warm, witty when appropriate, and focused on
       }
       const statusMatch = rawContent.match(/\"userStatusMessage\"\s*:\s*\"([^\"]{0,100})\"/m);
       if (statusMatch) userStatusMessage = statusMatch[1];
+    }
+
+    // Save clarification response if threadId and userId are provided
+    if (threadId && userId && responseText) {
+      try {
+        const idempotencyKey = correlationId ? 
+          `clarification-${threadId}-${correlationId}` : 
+          `clarification-${threadId}-${Date.now()}`;
+
+        await saveMessage(
+          threadId,
+          responseText,
+          'assistant',
+          userId,
+          {
+            analysis_data: {
+              type: 'clarification',
+              timestamp: new Date().toISOString(),
+              correlationId: correlationId
+            },
+            idempotency_key: idempotencyKey
+          },
+          req
+        );
+      } catch (error) {
+        console.error('[gpt-clarification-generator] Error saving response:', error);
+      }
     }
 
     return new Response(JSON.stringify({

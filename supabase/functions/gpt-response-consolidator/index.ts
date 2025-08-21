@@ -86,6 +86,53 @@ function sanitizeConsolidatorOutput(raw: string): { responseText: string; status
   }
 }
 
+// Import saveMessage function for consistent persistence  
+const saveMessage = async (threadId: string, content: string, sender: 'user' | 'assistant', userId?: string, additionalData = {}, req?: Request) => {
+  try {
+    // Validate required parameters
+    if (!threadId || !content || !userId) {
+      console.error('[saveMessage] Missing required parameters:', { threadId: !!threadId, content: !!content, userId: !!userId });
+      return null;
+    }
+
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        global: {
+          headers: { Authorization: req?.headers.get('Authorization') || '' },
+        },
+      }
+    );
+
+    const messageData = {
+      thread_id: threadId,
+      sender,
+      role: sender,
+      content,
+      created_at: new Date().toISOString(),
+      ...additionalData
+    };
+
+    const { data, error } = await supabaseClient
+      .from('chat_messages')
+      .insert(messageData)
+      .select('id')
+      .single();
+
+    if (error) {
+      console.error('[saveMessage] Error saving message:', error);
+      return null;
+    }
+
+    console.log(`[saveMessage] Successfully saved ${sender} message:`, data.id);
+    return data;
+  } catch (error) {
+    console.error('[saveMessage] Exception:', error);
+    return null;
+  }
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -100,6 +147,8 @@ serve(async (req) => {
     const streamingMode = raw.streamingMode ?? false;
     const messageId = raw.messageId;
     const threadId = raw.threadId;
+    const userId = raw.userId;
+    const correlationId = raw.correlationId;
     
     // Generate unique consolidation ID for tracking
     const consolidationId = `cons_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -223,30 +272,25 @@ serve(async (req) => {
       };
     });
 
-    // Enhanced timezone handling with validation
-    const { safeTimezoneConversion, formatTimezoneForGPT } = await import('../_shared/enhancedTimezoneUtils.ts');
+    // Enhanced timezone processing with comprehensive validation
+    const { processEdgeTimezone, createGPTTimezonePrompt } = await import('../_shared/enhancedEdgeTimezone.ts');
     
     const rawUserTimezone = userProfile?.timezone || 'UTC';
-    const timezoneConversion = safeTimezoneConversion(rawUserTimezone, {
-      functionName: 'gpt-response-consolidator',
-      includeValidation: true,
-      logFailures: true
-    });
+    const timezoneProcessing = processEdgeTimezone(rawUserTimezone, 'gpt-response-consolidator');
+    const gptTimezone = createGPTTimezonePrompt(rawUserTimezone, 'gpt-response-consolidator');
     
-    const timezoneFormat = formatTimezoneForGPT(rawUserTimezone, {
-      includeUTCOffset: true,
-      functionName: 'gpt-response-consolidator'
-    });
-    
-    console.log(`[CONSOLIDATOR] ${consolidationId} timezone info:`, {
+    console.log(`[CONSOLIDATOR] ${consolidationId} enhanced timezone processing:`, {
       rawTimezone: rawUserTimezone,
-      normalizedTimezone: timezoneConversion.normalizedTimezone,
-      currentTime: timezoneConversion.currentTime,
-      isValid: timezoneConversion.isValid,
-      validationNotes: timezoneFormat.validationNotes
+      processing: {
+        normalizedTimezone: timezoneProcessing.normalizedTimezone,
+        currentTime: timezoneProcessing.currentTime,
+        isValid: timezoneProcessing.isValid,
+        validationError: timezoneProcessing.validationError
+      },
+      validationNotes: gptTimezone.validationNotes
     });
     
-    const userTimezone = timezoneConversion.normalizedTimezone;
+    const userTimezone = timezoneProcessing.normalizedTimezone;
     const contextData = {
       userProfile: {
         timezone: userTimezone,
@@ -271,12 +315,13 @@ serve(async (req) => {
 
     
     **USER CONTEXT:**
-    - ${timezoneFormat.currentTimeText}
-    - User's Timezone: ${timezoneFormat.timezoneText}
+    ${gptTimezone.timezonePrompt}
+    
+    ${gptTimezone.validationNotes.length > 0 ? `**TIMEZONE VALIDATION NOTES:** ${gptTimezone.validationNotes.join(', ')}` : ''}
+    
     - All time references should be in the user's local timezone (${userTimezone}), not UTC
     - When discussing time periods like "first half vs second half of day", reference the user's local time
     - NEVER mention "UTC" in your response - use the user's local timezone context instead
-    - Timezone Status: ${timezoneConversion.isValid ? 'Validated' : 'Using fallback due to conversion issues'}
     
     **USER QUESTION:** "${userMessage}"
     

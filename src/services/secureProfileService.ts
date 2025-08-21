@@ -7,6 +7,7 @@
 
 import { User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { normalizeTimezone, validateTimezoneFormat } from './timezoneService';
 
 /**
  * Validates that the current user is authenticated and authorized
@@ -18,6 +19,68 @@ const validateUserAccess = (user: User | null, requiredUserId?: string): void =>
   
   if (requiredUserId && user.id !== requiredUserId) {
     throw new Error('Unauthorized access to user data');
+  }
+};
+
+/**
+ * Enhanced timezone detection with validation and normalization
+ */
+const detectAndValidateTimezone = (): string => {
+  try {
+    const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    console.log('[secureProfileService] Detected browser timezone:', browserTimezone);
+    
+    // Normalize and validate the timezone
+    const normalized = normalizeTimezone(browserTimezone);
+    const validation = validateTimezoneFormat(normalized);
+    
+    if (validation.isValid) {
+      console.log('[secureProfileService] Timezone validation successful:', normalized);
+      return normalized;
+    } else {
+      console.warn('[secureProfileService] Timezone validation failed:', validation.issues);
+      console.log('[secureProfileService] Falling back to UTC');
+      return 'UTC';
+    }
+  } catch (error) {
+    console.error('[secureProfileService] Timezone detection error:', error);
+    return 'UTC';
+  }
+};
+
+/**
+ * Validates if a user's stored timezone needs updating
+ */
+const needsTimezoneUpdate = async (user: User): Promise<string | null> => {
+  try {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('timezone')
+      .eq('id', user.id)
+      .single();
+    
+    if (!profile?.timezone) return null;
+    
+    // Check if stored timezone is suspicious (UTC when browser isn't UTC)
+    const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const normalizedBrowser = normalizeTimezone(browserTimezone);
+    
+    if (profile.timezone === 'UTC' && normalizedBrowser !== 'UTC') {
+      console.log('[secureProfileService] Suspicious UTC timezone detected, suggesting update to:', normalizedBrowser);
+      return normalizedBrowser;
+    }
+    
+    // Check if stored timezone is legacy format
+    const normalizedStored = normalizeTimezone(profile.timezone);
+    if (normalizedStored !== profile.timezone) {
+      console.log('[secureProfileService] Legacy timezone detected, suggesting update:', profile.timezone, '->', normalizedStored);
+      return normalizedStored;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('[secureProfileService] Timezone validation error:', error);
+    return null;
   }
 };
 
@@ -44,18 +107,27 @@ export const secureEnsureProfile = async (user: User | null): Promise<boolean> =
 
     if (existingProfile) {
       console.log('Profile exists for authenticated user');
+      
+      // Check if timezone needs updating for existing profiles
+      const suggestedTimezone = await needsTimezoneUpdate(user);
+      if (suggestedTimezone) {
+        console.log('[secureProfileService] Updating timezone for existing profile:', suggestedTimezone);
+        await secureUpdateProfile(user, { timezone: suggestedTimezone });
+      }
+      
       return true;
     }
 
     // Profile doesn't exist - attempt to create using RLS-enforced insert
-    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    // Enhanced timezone detection with validation and normalization
+    const detectedTimezone = detectAndValidateTimezone();
     
     const profileData = {
       id: user.id,
       email: user.email,
       full_name: user.user_metadata?.full_name || user.user_metadata?.name || null,
       avatar_url: user.user_metadata?.avatar_url || user.user_metadata?.picture || null,
-      timezone,
+      timezone: detectedTimezone,
       onboarding_completed: false,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
