@@ -1,30 +1,44 @@
 export async function executeSQLAnalysis(step: any, userId: string, supabaseClient: any, requestId: string, executionDetails: any, userTimezone: string = 'UTC') {
-  console.log(`[${requestId}] [SQL EXECUTION] Starting SQL analysis with simplified fallback`);
-  
-  // Import simplified SQL execution utilities
-  const { executeWithSimpleFallback } = await import('../_shared/sqlValidation.ts');
+  console.log(`[${requestId}] [SQL EXECUTION] Starting SQL analysis`);
   
   try {
-    const result = await executeWithSimpleFallback(
-      supabaseClient,
-      step,
-      userId,
-      userTimezone,
-      requestId
-    );
+    if (!step.sqlQuery) {
+      console.warn(`[${requestId}] No SQL query provided for step`);
+      return [];
+    }
+    
+    const sanitizedQuery = sanitizeUserIdInQuery(step.sqlQuery, userId, requestId);
+    
+    const { data, error } = await supabaseClient.rpc('execute_dynamic_query', {
+      query_text: sanitizedQuery,
+      user_timezone: userTimezone
+    });
+
+    if (error) {
+      console.error(`[${requestId}] SQL execution error:`, error);
+      executionDetails.executionError = error.message;
+      return [];
+    }
+
+    if (!data || !data.success) {
+      console.error(`[${requestId}] SQL query failed:`, data?.error || 'Unknown error');
+      executionDetails.executionError = data?.error || 'Unknown error';
+      return [];
+    }
+
+    const results = data.data || [];
+    console.log(`[${requestId}] [SQL EXECUTION] Completed - ${results.length} results`);
     
     // Update execution details
-    Object.assign(executionDetails, result.executionDetails);
-    executionDetails.fallbackUsed = result.usedFallback;
+    executionDetails.originalQuery = step.sqlQuery;
+    executionDetails.sanitizedQuery = sanitizedQuery;
+    executionDetails.validationResult = 'success';
     
-    console.log(`[${requestId}] [SQL EXECUTION] Completed - ${result.data.length} results, fallback: ${result.usedFallback}`);
-    
-    return result.data;
+    return results;
     
   } catch (error) {
     console.error(`[${requestId}] Error in SQL analysis:`, error);
     executionDetails.executionError = error.message;
-    executionDetails.fallbackUsed = true;
     
     // Return empty array rather than throwing
     return [];
