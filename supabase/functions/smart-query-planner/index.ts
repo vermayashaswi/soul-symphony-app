@@ -6,6 +6,7 @@ import {
   getEmotionAnalysisGuidelines, 
   getThemeAnalysisGuidelines 
 } from '../_shared/databaseSchemaContext.ts';
+import { executeSQLAnalysis } from './sqlExecution.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -108,8 +109,8 @@ async function testVectorOperations(supabaseClient: any, requestId: string): Pro
   }
 }
 
-async function executePlan(plan: any, userId: string, supabaseClient: any, requestId: string) {
-  console.log(`[${requestId}] Executing orchestrated plan:`, JSON.stringify(plan, null, 2));
+async function executePlan(plan: any, userId: string, supabaseClient: any, requestId: string, userTimezone: string = 'UTC') {
+  console.log(`[${requestId}] Executing orchestrated plan with timezone ${userTimezone}:`, JSON.stringify(plan, null, 2));
 
   // Initialize execution context
   const executionContext: ExecutionContext = {
@@ -137,7 +138,7 @@ async function executePlan(plan: any, userId: string, supabaseClient: any, reque
     executionContext.currentStage = parseInt(stage);
 
     // Execute sub-questions in parallel within the stage (if they're independent)
-    const stageResults = await executeStageInParallel(stageGroups[stage], userId, supabaseClient, requestId, executionContext);
+    const stageResults = await executeStageInParallel(stageGroups[stage], userId, supabaseClient, requestId, executionContext, userTimezone);
     
     // Store stage results for dependency resolution
     executionContext.stageResults.set(stage, stageResults);
@@ -175,7 +176,8 @@ async function executeStageInParallel(
   userId: string, 
   supabaseClient: any, 
   requestId: string, 
-  executionContext: ExecutionContext
+  executionContext: ExecutionContext,
+  userTimezone: string = 'UTC'
 ) {
   // Check for dependencies within the stage
   const independentQuestions = subQuestions.filter(sq => !sq.dependencies || sq.dependencies.length === 0);
@@ -188,7 +190,7 @@ async function executeStageInParallel(
   // Execute independent questions in parallel
   if (independentQuestions.length > 0) {
     const independentResults = await Promise.all(
-      independentQuestions.map(subQ => executeSubQuestion(subQ, userId, supabaseClient, requestId, executionContext))
+      independentQuestions.map(subQ => executeSubQuestion(subQ, userId, supabaseClient, requestId, executionContext, userTimezone))
     );
     results.push(...independentResults);
 
@@ -203,7 +205,7 @@ async function executeStageInParallel(
   // Execute dependent questions sequentially (they might depend on results from independent ones)
   for (const subQ of dependentQuestions) {
     console.log(`[${requestId}] Executing dependent sub-question: ${subQ.id} with dependencies: ${subQ.dependencies?.join(', ')}`);
-    const dependentResult = await executeSubQuestion(subQ, userId, supabaseClient, requestId, executionContext);
+    const dependentResult = await executeSubQuestion(subQ, userId, supabaseClient, requestId, executionContext, userTimezone);
     results.push(dependentResult);
     
     // Update context
@@ -220,7 +222,8 @@ async function executeSubQuestion(
   userId: string, 
   supabaseClient: any, 
   requestId: string, 
-  executionContext: ExecutionContext
+  executionContext: ExecutionContext,
+  userTimezone: string = 'UTC'
 ) {
   console.log(`[${requestId}] Executing sub-question: ${subQuestion.id} - ${subQuestion.question}`);
 
@@ -271,12 +274,12 @@ async function executeSubQuestion(
           if (vectorResult && vectorResult.length > 0) hasResults = true;
         } else if (enhancedStep.queryType === 'sql_analysis') {
           console.log(`[${requestId}] SQL analysis:`, enhancedStep.sqlQuery?.substring(0, 100) + '...');
-          const sqlResult = await executeSQLAnalysis(enhancedStep, userId, supabaseClient, requestId, subResults.executionResults.sqlExecutionDetails);
+          const sqlResult = await executeSQLAnalysis(enhancedStep, userId, supabaseClient, requestId, subResults.executionResults.sqlExecutionDetails, userTimezone);
           subResults.executionResults.sqlResults = sqlResult || [];
           if (sqlResult && sqlResult.length > 0) hasResults = true;
         } else if (enhancedStep.queryType === 'hybrid_search') {
           console.log(`[${requestId}] Hybrid search:`, enhancedStep.vectorSearch?.query);
-          const hybridResult = await executeHybridSearch(enhancedStep, userId, supabaseClient, requestId, subResults.executionResults.sqlExecutionDetails, subResults.executionResults.vectorExecutionDetails);
+          const hybridResult = await executeHybridSearch(enhancedStep, userId, supabaseClient, requestId, subResults.executionResults.sqlExecutionDetails, subResults.executionResults.vectorExecutionDetails, userTimezone);
           subResults.executionResults.vectorResults = hybridResult?.vectorResults || [];
           subResults.executionResults.sqlResults = hybridResult?.sqlResults || [];
           if ((hybridResult?.vectorResults && hybridResult.vectorResults.length > 0) || 
@@ -497,83 +500,7 @@ async function executeVectorSearch(step: any, userId: string, supabaseClient: an
   }
 }
 
-// REMOVED: All SQL query validations per user request - trust GPT prompt engineering
-
-async function executeSQLAnalysis(step: any, userId: string, supabaseClient: any, requestId: string, executionDetails: any) {
-  try {
-    console.log(`[${requestId}] Executing SQL query:`, step.sqlQuery);
-    
-    if (!step.sqlQuery || !step.sqlQuery.trim()) {
-      console.log(`[${requestId}] No SQL query provided, using vector search fallback`);
-      executionDetails.fallbackUsed = true;
-      return await executeVectorSearchFallback(step, userId, supabaseClient, requestId);
-    }
-
-    const originalQuery = step.sqlQuery.trim();
-    executionDetails.originalQuery = originalQuery;
-    
-    // REMOVED: All SQL validations per user request - trust GPT prompt engineering
-    
-    // Sanitize user ID in the query
-    let sanitizedQuery;
-    try {
-      sanitizedQuery = sanitizeUserIdInQuery(originalQuery, userId, requestId);
-      executionDetails.sanitizedQuery = sanitizedQuery;
-    } catch (sanitizeError) {
-      console.error(`[${requestId}] Query sanitization failed:`, sanitizeError);
-      executionDetails.executionError = sanitizeError.message;
-      executionDetails.fallbackUsed = true;
-      return await executeVectorSearchFallback(step, userId, supabaseClient, requestId);
-    }
-    
-    // Use the execute_dynamic_query function to safely run GPT-generated SQL
-    console.log(`[${requestId}] Executing sanitized query via RPC:`, sanitizedQuery.substring(0, 200) + '...');
-    
-    const { data, error } = await supabaseClient.rpc('execute_dynamic_query', {
-      query_text: sanitizedQuery
-    });
-
-    if (error) {
-      console.error(`[${requestId}] SQL execution error:`, error);
-      console.error(`[${requestId}] Failed query:`, sanitizedQuery);
-      executionDetails.executionError = error.message;
-      executionDetails.fallbackUsed = true;
-      
-      // Enhanced error logging for debugging
-      if (error.code) {
-        console.error(`[${requestId}] PostgreSQL error code: ${error.code}`);
-      }
-      if (error.details) {
-        console.error(`[${requestId}] PostgreSQL error details: ${error.details}`);
-      }
-      if (error.hint) {
-        console.error(`[${requestId}] PostgreSQL error hint: ${error.hint}`);
-      }
-      
-      // INTELLIGENT FALLBACK: Use vector search instead of basic SQL
-      console.log(`[${requestId}] SQL execution failed, falling back to vector search`);
-      return await executeVectorSearchFallback(step, userId, supabaseClient, requestId);
-    }
-
-    if (data && data.success && data.data) {
-      console.log(`[${requestId}] SQL query executed successfully, rows:`, data.data.length);
-      // REMOVED: No more fallback on 0 results - empty result sets are valid
-      return data.data;
-    } else {
-      console.warn(`[${requestId}] SQL query returned no results or failed:`, data);
-      // Return empty results instead of fallback - let sub-question level handle fallback
-      return [];
-    }
-
-  } catch (error) {
-    console.error(`[${requestId}] Error in SQL analysis:`, error);
-    executionDetails.executionError = error.message;
-    executionDetails.fallbackUsed = true;
-    // INTELLIGENT FALLBACK: Use vector search instead of basic SQL
-    console.log(`[${requestId}] SQL analysis error, falling back to vector search`);
-    return await executeVectorSearchFallback(step, userId, supabaseClient, requestId);
-  }
-}
+// SQL analysis is now imported from sqlExecution.ts with timezone support
 
 // NEW INTELLIGENT VECTOR SEARCH FALLBACK FUNCTION
 async function executeVectorSearchFallback(step: any, userId: string, supabaseClient: any, requestId: string) {
@@ -719,12 +646,12 @@ async function executeBasicSQLQuery(userId: string, supabaseClient: any, request
   return data || [];
 }
 
-async function executeHybridSearch(step: any, userId: string, supabaseClient: any, requestId: string, sqlExecutionDetails: any, vectorExecutionDetails: any) {
+async function executeHybridSearch(step: any, userId: string, supabaseClient: any, requestId: string, sqlExecutionDetails: any, vectorExecutionDetails: any, userTimezone: string = 'UTC') {
   try {
     // Execute both vector and SQL searches in parallel
     const [vectorResults, sqlResults] = await Promise.all([
       executeVectorSearch(step, userId, supabaseClient, requestId, vectorExecutionDetails),
-      executeSQLAnalysis(step, userId, supabaseClient, requestId, sqlExecutionDetails)
+      executeSQLAnalysis(step, userId, supabaseClient, requestId, sqlExecutionDetails, userTimezone)
     ]);
 
     console.log(`[${requestId}] Hybrid search results - Vector: ${vectorResults?.length || 0}, SQL: ${sqlResults?.length || 0}`);
@@ -1280,8 +1207,8 @@ serve(async (req) => {
       });
     }
 
-    // Execute the plan and return results
-    const executionResult = await executePlan(analysisResult, userId, supabaseClient, requestId);
+    // Execute the plan and return results with timezone
+    const executionResult = await executePlan(analysisResult, userId, supabaseClient, requestId, userTimezone);
     
     return new Response(JSON.stringify({
       queryPlan: analysisResult,

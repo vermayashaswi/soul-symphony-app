@@ -1,5 +1,5 @@
 
-export async function executeSQLAnalysis(step: any, userId: string, supabaseClient: any, requestId: string, executionDetails: any) {
+export async function executeSQLAnalysis(step: any, userId: string, supabaseClient: any, requestId: string, executionDetails: any, userTimezone: string = 'UTC') {
   try {
     console.log(`[${requestId}] Executing SQL query:`, step.sqlQuery);
     
@@ -29,11 +29,20 @@ export async function executeSQLAnalysis(step: any, userId: string, supabaseClie
       executionDetails.sqlQueries.push(sanitizedQuery);
     }
     
-    // Use the execute_dynamic_query function to safely run GPT-generated SQL
-    console.log(`[${requestId}] Executing sanitized query via RPC:`, sanitizedQuery.substring(0, 200) + '...');
+    // Log timezone debugging information
+    console.log(`[${requestId}] [TIMEZONE DEBUG] SQL Execution:`, {
+      userTimezone,
+      originalQuery: originalQuery.substring(0, 100) + '...',
+      hasTimeVariables: originalQuery.includes('__'),
+      queryContainsTimeZone: originalQuery.toLowerCase().includes('time zone')
+    });
+    
+    // Use the execute_dynamic_query function to safely run GPT-generated SQL with timezone
+    console.log(`[${requestId}] Executing sanitized query via RPC with timezone ${userTimezone}:`, sanitizedQuery.substring(0, 200) + '...');
     
     const { data, error } = await supabaseClient.rpc('execute_dynamic_query', {
-      query_text: sanitizedQuery
+      query_text: sanitizedQuery,
+      user_timezone: userTimezone
     });
 
     if (error) {
@@ -60,6 +69,10 @@ export async function executeSQLAnalysis(step: any, userId: string, supabaseClie
 
     if (data && data.success && data.data) {
       console.log(`[${requestId}] SQL query executed successfully, rows:`, data.data.length);
+      // Log timezone metadata from response if available
+      if (data.timezone_info) {
+        console.log(`[${requestId}] [TIMEZONE DEBUG] Response metadata:`, data.timezone_info);
+      }
       // Return data even if empty - empty results are valid!
       executionDetails.sqlResultCount = data.data.length;
       console.log(`[${requestId}] SQL execution successful - returning ${data.data.length} results`);

@@ -792,7 +792,9 @@ export type Database = {
         Returns: Json
       }
       execute_dynamic_query: {
-        Args: { query_text: string }
+        Args:
+          | { query_text: string }
+          | { query_text: string; user_timezone?: string }
         Returns: Json
       }
       extend_session_activity: {

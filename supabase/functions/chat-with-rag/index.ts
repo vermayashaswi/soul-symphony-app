@@ -161,14 +161,16 @@ serve(async (req) => {
       }
     }
     
-    // Enhanced timezone handling with validation
+    // Enhanced timezone handling with comprehensive validation
     const { normalizeUserTimezone } = await import('../_shared/timezoneUtils.ts');
-    const { safeTimezoneConversion, debugTimezoneInfo } = await import('../_shared/enhancedTimezoneUtils.ts');
+    const { validateUserTimezone, debugTimezoneInfo, logTimezoneDebug } = await import('../_shared/timezoneValidation.ts');
     
     const userTimezone = normalizeUserTimezone(userProfile);
     
-    // Validate timezone and log detailed info for debugging
-    const timezoneDebug = debugTimezoneInfo(userTimezone, 'chat-with-rag');
+    // Comprehensive timezone validation and debugging
+    const timezoneDebug = debugTimezoneInfo(userTimezone, 'chat-with-rag', req.headers.get('user-agent') || '');
+    logTimezoneDebug(timezoneDebug);
+    
     console.log(`[chat-with-rag] User timezone validation:`, {
       userTimezone,
       isValid: timezoneDebug.validation.isValid,
