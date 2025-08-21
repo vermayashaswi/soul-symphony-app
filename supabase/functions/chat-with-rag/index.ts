@@ -126,9 +126,27 @@ serve(async (req) => {
 
     console.log(`[chat-with-rag] Processing query: "${message}" for user: ${userId} (threadId: ${threadId}, messageId: ${messageId})`);
     
-    // Generate correlation ID for this request to prevent duplicates
+    // PHASE 1: REQUEST DEDUPLICATION - Prevent multiple processing of same message
+    const { acquireProcessingLock, releaseProcessingLock, getCachedClassification, setCachedClassification } = await import('../_shared/requestDeduplication.ts');
+    
     const requestCorrelationId = `req_${Date.now()}_${crypto.randomUUID().split('-')[0]}`;
+    const lockResult = await acquireProcessingLock(supabaseClient, message, userId, threadId, requestCorrelationId);
+    
+    if (!lockResult.acquired) {
+      console.log(`[chat-with-rag] DUPLICATE REQUEST DETECTED - Already processing message: ${message.substring(0, 50)}...`);
+      return new Response(JSON.stringify({
+        error: 'Request already in progress',
+        existingCorrelationId: lockResult.existingCorrelationId,
+        message: 'This message is already being processed. Please wait for the response.'
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 409
+      });
+    }
+    
     let assistantMessageId = null;
+    
+    try {
     
     // Enhanced timezone handling with comprehensive validation
     const { normalizeUserTimezone } = await import('../_shared/timezoneUtils.ts');
@@ -504,6 +522,13 @@ serve(async (req) => {
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
+    }
+
+    } finally {
+      // Always release the processing lock
+      if (lockResult.lockKey) {
+        await releaseProcessingLock(supabaseClient, lockResult.lockKey);
+      }
     }
 
   } catch (error) {

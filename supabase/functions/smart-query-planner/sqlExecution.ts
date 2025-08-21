@@ -1,95 +1,33 @@
-
 export async function executeSQLAnalysis(step: any, userId: string, supabaseClient: any, requestId: string, executionDetails: any, userTimezone: string = 'UTC') {
+  console.log(`[${requestId}] [SQL EXECUTION] Starting SQL analysis with simplified fallback`);
+  
+  // Import simplified SQL execution utilities
+  const { executeWithSimpleFallback } = await import('../_shared/sqlValidation.ts');
+  
   try {
-    console.log(`[${requestId}] Executing SQL query:`, step.sqlQuery);
-    
-    if (!step.sqlQuery || !step.sqlQuery.trim()) {
-      console.log(`[${requestId}] No SQL query provided, using vector search fallback`);
-      executionDetails.fallbackUsed = true;
-      return await executeVectorSearchFallback(step, userId, supabaseClient, requestId);
-    }
-
-    const originalQuery = step.sqlQuery.trim();
-    executionDetails.originalQuery = originalQuery;
-    
-    // Sanitize user ID in the query
-    let sanitizedQuery;
-    try {
-      sanitizedQuery = sanitizeUserIdInQuery(originalQuery, userId, requestId);
-      executionDetails.sanitizedQuery = sanitizedQuery;
-    } catch (sanitizeError) {
-      console.error(`[${requestId}] Query sanitization failed:`, sanitizeError);
-      executionDetails.executionError = sanitizeError.message;
-      executionDetails.fallbackUsed = true;
-      return await executeVectorSearchFallback(step, userId, supabaseClient, requestId);
-    }
-    
-    // Store SQL query for debugging before execution
-    if (executionDetails.sqlQueries) {
-      executionDetails.sqlQueries.push(sanitizedQuery);
-    }
-    
-    // Log timezone debugging information
-    console.log(`[${requestId}] [TIMEZONE DEBUG] SQL Execution:`, {
+    const result = await executeWithSimpleFallback(
+      supabaseClient,
+      step,
+      userId,
       userTimezone,
-      originalQuery: originalQuery.substring(0, 100) + '...',
-      hasTimeVariables: originalQuery.includes('__'),
-      queryContainsTimeZone: originalQuery.toLowerCase().includes('time zone')
-    });
+      requestId
+    );
     
-    // Use the execute_dynamic_query function to safely run GPT-generated SQL with timezone
-    console.log(`[${requestId}] Executing sanitized query via RPC with timezone ${userTimezone}:`, sanitizedQuery.substring(0, 200) + '...');
+    // Update execution details
+    Object.assign(executionDetails, result.executionDetails);
+    executionDetails.fallbackUsed = result.usedFallback;
     
-    const { data, error } = await supabaseClient.rpc('execute_dynamic_query', {
-      query_text: sanitizedQuery,
-      user_timezone: userTimezone
-    });
-
-    if (error) {
-      console.error(`[${requestId}] SQL execution error:`, error);
-      console.error(`[${requestId}] Failed query:`, sanitizedQuery);
-      executionDetails.executionError = error.message;
-      executionDetails.fallbackUsed = true;
-      
-      // Enhanced error logging for debugging
-      if (error.code) {
-        console.error(`[${requestId}] PostgreSQL error code: ${error.code}`);
-      }
-      if (error.details) {
-        console.error(`[${requestId}] PostgreSQL error details: ${error.details}`);
-      }
-      if (error.hint) {
-        console.error(`[${requestId}] PostgreSQL error hint: ${error.hint}`);
-      }
-      
-      // INTELLIGENT FALLBACK: Use vector search instead of basic SQL
-      console.log(`[${requestId}] SQL execution failed, falling back to vector search`);
-      return await executeVectorSearchFallback(step, userId, supabaseClient, requestId);
-    }
-
-    if (data && data.success && data.data) {
-      console.log(`[${requestId}] SQL query executed successfully, rows:`, data.data.length);
-      // Log timezone metadata from response if available
-      if (data.timezone_info) {
-        console.log(`[${requestId}] [TIMEZONE DEBUG] Response metadata:`, data.timezone_info);
-      }
-      // Return data even if empty - empty results are valid!
-      executionDetails.sqlResultCount = data.data.length;
-      console.log(`[${requestId}] SQL execution successful - returning ${data.data.length} results`);
-      return data.data;
-    } else {
-      console.warn(`[${requestId}] SQL query execution failed or returned invalid response:`, data);
-      executionDetails.fallbackUsed = true;
-      return await executeVectorSearchFallback(step, userId, supabaseClient, requestId);
-    }
-
+    console.log(`[${requestId}] [SQL EXECUTION] Completed - ${result.data.length} results, fallback: ${result.usedFallback}`);
+    
+    return result.data;
+    
   } catch (error) {
     console.error(`[${requestId}] Error in SQL analysis:`, error);
     executionDetails.executionError = error.message;
     executionDetails.fallbackUsed = true;
-    // INTELLIGENT FALLBACK: Use vector search instead of basic SQL
-    console.log(`[${requestId}] SQL analysis error, falling back to vector search`);
-    return await executeVectorSearchFallback(step, userId, supabaseClient, requestId);
+    
+    // Return empty array rather than throwing
+    return [];
   }
 }
 
@@ -112,10 +50,9 @@ export async function executeBasicSQLQuery(userId: string, supabaseClient: any, 
   return data || [];
 }
 
-
-// NEW INTELLIGENT VECTOR SEARCH FALLBACK FUNCTION
+// DEPRECATED - Keeping for compatibility but will be replaced by shared utilities
 async function executeVectorSearchFallback(step: any, userId: string, supabaseClient: any, requestId: string) {
-  console.log(`[${requestId}] Executing vector search fallback`);
+  console.log(`[${requestId}] Executing legacy vector search fallback`);
   
   try {
     // Extract query context from the original step
@@ -123,7 +60,6 @@ async function executeVectorSearchFallback(step: any, userId: string, supabaseCl
     if (step.description) {
       searchQuery = step.description;
     } else if (step.sqlQuery) {
-      // Extract meaningful terms from the SQL query for vector search
       searchQuery = extractSearchTermsFromSQL(step.sqlQuery);
     } else {
       searchQuery = 'personal thoughts feelings experiences';
@@ -136,7 +72,6 @@ async function executeVectorSearchFallback(step: any, userId: string, supabaseCl
     
     // Primary vector search with relaxed threshold
     const primaryThreshold = 0.2;
-    const fallbackThreshold = 0.15;
     
     let vectorResults;
     
@@ -180,10 +115,10 @@ async function executeVectorSearchFallback(step: any, userId: string, supabaseCl
     
     // If still no results, try with lower threshold
     if (!vectorResults || vectorResults.length === 0) {
-      console.log(`[${requestId}] Vector fallback with lower threshold: ${fallbackThreshold}`);
+      console.log(`[${requestId}] Vector fallback with lower threshold: 0.15`);
       const { data, error } = await supabaseClient.rpc('match_journal_entries', {
         query_embedding: embedding,
-        match_threshold: fallbackThreshold,
+        match_threshold: 0.15,
         match_count: 15,
         user_id_filter: userId
       });
