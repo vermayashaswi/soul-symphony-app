@@ -725,6 +725,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: number
       }
+      cleanup_malformed_json_messages: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       cleanup_stuck_processing_messages: {
         Args: Record<PropertyKey, never>
         Returns: Json
