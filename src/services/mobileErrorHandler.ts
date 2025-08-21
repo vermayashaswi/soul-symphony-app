@@ -1,45 +1,42 @@
 import { toast } from 'sonner';
 
-// Simple platform detection to avoid circular dependency
-const getPlatform = (): string => {
-  if (typeof window === 'undefined') return 'node';
-  
-  const { Capacitor } = (window as any);
-  if (Capacitor) {
-    const platform = Capacitor.getPlatform();
-    if (platform === 'ios' || platform === 'android') {
-      return platform;
-    }
-  }
-  
-  const ua = navigator.userAgent;
-  if (ua.includes('Android')) return 'android';
-  if (ua.includes('iPhone') || ua.includes('iPad')) return 'ios';
-  return 'web';
-};
-
 interface MobileError {
-  type: 'crash' | 'network' | 'permission' | 'storage' | 'audio' | 'android_webview' | 'capacitor' | 'swipe_conflict' | 'unknown';
+  type: 'crash' | 'android_webview' | 'permission' | 'audio' | 'storage' | 'network' | 'capacitor' | 'javascript' | 'unknown';
   message: string;
   stack?: string;
   timestamp: number;
   platform?: string;
-  appVersion?: string;
-  url?: string;
-  userAgent?: string;
+  details?: any;
   context?: string;
+}
+
+function getPlatform(): string {
+  try {
+    if (typeof window !== 'undefined' && (window as any).Capacitor) {
+      const platform = (window as any).Capacitor.getPlatform();
+      if (platform) return platform;
+    }
+  } catch {}
+  
+  if (typeof navigator !== 'undefined') {
+    const userAgent = navigator.userAgent.toLowerCase();
+    if (userAgent.includes('android')) return 'android';
+    if (userAgent.includes('iphone') || userAgent.includes('ipad')) return 'ios';
+  }
+  
+  return 'web';
 }
 
 class MobileErrorHandler {
   private static instance: MobileErrorHandler;
   private errorQueue: MobileError[] = [];
-  private isOnline: boolean = navigator.onLine;
-  private crashDetectionActive: boolean = false;
-  // Suppress noisy toasts during startup and dedupe frequent messages
-  private appStartTime: number = Date.now();
-  private suppressStartupMs: number = 7000; // Do not toast minor errors in first 7s
+  private isOnline: boolean = true;
   private lastToastAt: Record<string, number> = {};
+  private suppressNoisyToasts: boolean = true;
 
+  private constructor() {
+    this.initialize();
+  }
 
   static getInstance(): MobileErrorHandler {
     if (!MobileErrorHandler.instance) {
@@ -48,255 +45,212 @@ class MobileErrorHandler {
     return MobileErrorHandler.instance;
   }
 
-  constructor() {
+  private initialize(): void {
     this.setupGlobalErrorHandlers();
-    this.setupNetworkListeners();
+    this.setupNetworkHandlers();
+    this.setupCapacitorErrorHandlers();
     this.setupAndroidSpecificHandlers();
     this.startCrashDetection();
+    
+    // Process error queue periodically
+    setInterval(() => this.processErrorQueue(), 30000);
   }
 
   private setupGlobalErrorHandlers(): void {
-    // Catch unhandled JavaScript errors
+    // Global error handler
     window.addEventListener('error', (event) => {
-      console.error('[MobileErrorHandler] Global error:', event);
       this.handleError({
-        type: this.classifyError(event.message || event.error?.message || 'Unknown error'),
-        message: event.message || event.error?.message || 'Unknown error occurred',
+        type: 'javascript',
+        message: event.message || 'Unknown JavaScript error',
         stack: event.error?.stack,
         timestamp: Date.now(),
         platform: getPlatform(),
-        url: window.location.href,
-        userAgent: navigator.userAgent
+        details: {
+          filename: event.filename,
+          lineno: event.lineno,
+          colno: event.colno
+        }
       });
     });
 
-    // Catch unhandled promise rejections
+    // Unhandled promise rejection handler
     window.addEventListener('unhandledrejection', (event) => {
-      console.error('[MobileErrorHandler] Unhandled promise rejection:', event);
       this.handleError({
-        type: this.classifyError(event.reason?.toString() || 'Promise rejection'),
-        message: `Unhandled promise rejection: ${event.reason}`,
+        type: 'javascript',
+        message: `Unhandled Promise Rejection: ${event.reason}`,
         stack: event.reason?.stack,
-        timestamp: Date.now(),
-        platform: getPlatform(),
-        url: window.location.href,
-        userAgent: navigator.userAgent
-      });
-    });
-
-    // Capacitor-specific error handling
-    if ((window as any).Capacitor) {
-      console.log('[MobileErrorHandler] Capacitor detected, setting up native error handlers');
-      this.setupCapacitorErrorHandlers();
-    }
-  }
-
-  private setupCapacitorErrorHandlers(): void {
-    // Listen for Capacitor plugin errors
-    document.addEventListener('capacitorPluginError', (event: any) => {
-      console.error('[MobileErrorHandler] Capacitor plugin error:', event.detail);
-      this.handleError({
-        type: 'capacitor',
-        message: `Capacitor plugin error: ${event.detail.message || 'Unknown plugin error'}`,
-        stack: event.detail.stack,
         timestamp: Date.now(),
         platform: getPlatform()
       });
     });
-
-    // Monitor Capacitor app state for crashes
-    if ((window as any).Capacitor?.Plugins?.App) {
-      const { App } = (window as any).Capacitor.Plugins;
-      
-      App.addListener('appStateChange', (state: any) => {
-        console.log('[MobileErrorHandler] App state changed:', state);
-        if (!state.isActive && this.crashDetectionActive) {
-          // App went to background, could indicate a crash
-          localStorage.setItem('app_last_background', Date.now().toString());
-        }
-      });
-    }
   }
 
-  private setupAndroidSpecificHandlers(): void {
-    // Android WebView specific error handling
-    if (navigator.userAgent.includes('Android')) {
-      console.log('[MobileErrorHandler] Android detected, setting up Android-specific handlers');
-      
-      // Monitor for WebView crashes
-      let consecutiveErrors = 0;
-      const originalConsoleError = console.error;
-      
-      console.error = (...args) => {
-        originalConsoleError.apply(console, args);
-        
-        const errorMessage = args.join(' ');
-        if (this.isWebViewError(errorMessage)) {
-          consecutiveErrors++;
-          
-          if (consecutiveErrors > 3) {
-            this.handleError({
-              type: 'android_webview',
-              message: 'Multiple WebView errors detected, possible crash imminent',
-              timestamp: Date.now(),
-              platform: 'android'
-            });
-          }
-        }
-      };
-
-      // Reset consecutive error counter periodically
-      setInterval(() => {
-        consecutiveErrors = 0;
-      }, 10000);
-    }
-  }
-
-  private startCrashDetection(): void {
-    this.crashDetectionActive = true;
-    
-    // Check if app crashed on last run
-    const lastBackground = localStorage.getItem('app_last_background');
-    const lastForeground = localStorage.getItem('app_last_foreground');
-    
-    if (lastBackground && !lastForeground) {
-      const backgroundTime = parseInt(lastBackground);
-      const timeDiff = Date.now() - backgroundTime;
-      
-      // If app was backgrounded more than 30 seconds ago without coming back to foreground,
-      // it might have crashed
-      if (timeDiff > 30000) {
-        this.handleError({
-          type: 'crash',
-          message: 'Potential app crash detected on previous session',
-          timestamp: Date.now(),
-          platform: getPlatform()
-        });
-      }
-    }
-    
-    // Mark app as active
-    localStorage.setItem('app_last_foreground', Date.now().toString());
-    localStorage.removeItem('app_last_background');
-  }
-
-  private classifyError(message: string): MobileError['type'] {
-    const msg = message.toLowerCase();
-    
-    // Classify swipe conflicts early to suppress noisy toasts
-    if ((msg.includes('swipe') || msg.includes('gesture')) && (msg.includes('conflict') || msg.includes('keyboard'))) {
-      return 'swipe_conflict';
-    }
-    
-    if (msg.includes('webview') || msg.includes('chromium')) {
-      return 'android_webview';
-    }
-    if (msg.includes('capacitor') || msg.includes('plugin')) {
-      return 'capacitor';
-    }
-    if (msg.includes('permission') || msg.includes('denied')) {
-      return 'permission';
-    }
-    if (msg.includes('network') || msg.includes('fetch') || msg.includes('cors')) {
-      return 'network';
-    }
-    if (msg.includes('audio') || msg.includes('microphone') || msg.includes('recording')) {
-      return 'audio';
-    }
-    if (msg.includes('storage') || msg.includes('quota') || msg.includes('disk')) {
-      return 'storage';
-    }
-    if (msg.includes('crash') || msg.includes('segmentation fault') || msg.includes('null pointer')) {
-      return 'crash';
-    }
-    
-    return 'unknown';
-  }
-
-  private isWebViewError(message: string): boolean {
-    const webViewErrors = [
-      'webview',
-      'chromium',
-      'renderer',
-      'gpu process',
-      'out of memory',
-      'segmentation fault'
-    ];
-    
-    const msg = message.toLowerCase();
-    return webViewErrors.some(error => msg.includes(error));
-  }
-
-  private setupNetworkListeners(): void {
+  private setupNetworkHandlers(): void {
+    // Monitor network status
     window.addEventListener('online', () => {
       this.isOnline = true;
-      console.log('[MobileErrorHandler] Network connection restored');
-      toast.success('Connection restored');
       this.processErrorQueue();
     });
 
     window.addEventListener('offline', () => {
       this.isOnline = false;
-      console.log('[MobileErrorHandler] Network connection lost');
-      toast.error('Connection lost - working offline');
       this.handleError({
         type: 'network',
         message: 'Device went offline',
         timestamp: Date.now(),
-        platform: getPlatform(),
+        platform: getPlatform()
       });
     });
+  }
+
+  private setupCapacitorErrorHandlers(): void {
+    // Check if Capacitor is available using the correct path
+    if (typeof window !== 'undefined' && (window as any).Capacitor?.Plugins) {
+      try {
+        // Listen for capacitor plugin errors
+        window.addEventListener('capacitorPluginError', (event: any) => {
+          this.handleError({
+            type: 'capacitor',
+            message: `Capacitor Plugin Error: ${event.detail?.message || 'Unknown plugin error'}`,
+            timestamp: Date.now(),
+            platform: getPlatform(),
+            details: event.detail
+          });
+        });
+
+        // Monitor app state changes for potential crashes
+        const { App } = (window as any).Capacitor.Plugins;
+        if (App) {
+          App.addListener('appStateChange', (state: any) => {
+            if (!state.isActive) {
+              // App is backgrounded, save current state for crash detection
+              localStorage.setItem('app_state_backgrounded', Date.now().toString());
+            } else {
+              // App is foregrounded, check if it was a potential crash
+              const backgrounded = localStorage.getItem('app_state_backgrounded');
+              if (backgrounded) {
+                const backgroundTime = parseInt(backgrounded);
+                const elapsed = Date.now() - backgroundTime;
+                
+                // If app was backgrounded for more than 30 seconds, consider it a potential crash
+                if (elapsed > 30000) {
+                  this.handleError({
+                    type: 'crash',
+                    message: 'Potential app crash detected (long background time)',
+                    timestamp: Date.now(),
+                    platform: getPlatform(),
+                    details: { backgroundedFor: elapsed }
+                  });
+                }
+                localStorage.removeItem('app_state_backgrounded');
+              }
+            }
+          });
+        }
+      } catch (error) {
+        console.warn('[MobileErrorHandler] Failed to setup Capacitor error handlers:', error);
+      }
+    }
+  }
+
+  private setupAndroidSpecificHandlers(): void {
+    if (getPlatform() === 'android') {
+      // Override console.error to catch WebView-specific errors
+      const originalConsoleError = console.error;
+      console.error = (...args: any[]) => {
+        originalConsoleError.apply(console, args);
+        
+        const errorMessage = args.join(' ');
+        if (errorMessage.includes('WebView') || errorMessage.includes('chromium')) {
+          this.handleError({
+            type: 'android_webview',
+            message: `Android WebView Error: ${errorMessage}`,
+            timestamp: Date.now(),
+            platform: 'android'
+          });
+        }
+      };
+    }
+  }
+
+  private startCrashDetection(): void {
+    // Check if app crashed during last session
+    const lastTimestamp = localStorage.getItem('app_heartbeat');
+    const currentTime = Date.now();
+    
+    if (lastTimestamp) {
+      const lastTime = parseInt(lastTimestamp);
+      const timeDiff = currentTime - lastTime;
+      
+      // If more than 5 minutes since last heartbeat, consider it a crash
+      if (timeDiff > 300000) {
+        this.handleError({
+          type: 'crash',
+          message: 'App crash detected from previous session',
+          timestamp: currentTime,
+          platform: getPlatform(),
+          details: { timeSinceLastHeartbeat: timeDiff }
+        });
+      }
+    }
+    
+    // Set up heartbeat
+    const updateHeartbeat = () => {
+      localStorage.setItem('app_heartbeat', Date.now().toString());
+    };
+    
+    updateHeartbeat();
+    setInterval(updateHeartbeat, 60000); // Update every minute
   }
 
   handleError(error: Partial<MobileError>): void {
     const fullError: MobileError = {
       type: error.type || 'unknown',
-      message: error.message || 'An error occurred',
+      message: error.message || 'Unknown error',
       stack: error.stack,
       timestamp: error.timestamp || Date.now(),
       platform: error.platform || getPlatform(),
-      appVersion: '1.0.0',
-      url: error.url || window.location.href,
-      userAgent: error.userAgent || navigator.userAgent,
+      details: error.details,
       context: error.context
     };
 
-    console.error('[MobileErrorHandler] Error captured:', fullError);
-
-    // Add to queue for later processing if offline
+    console.log('[MobileErrorHandler] Captured error:', fullError);
+    
+    // Add to queue for processing
     this.errorQueue.push(fullError);
-
-    // Show user-friendly error message
+    
+    // Show user-friendly message
     this.showUserFriendlyError(fullError);
-
-    // Process immediately if online
-    if (this.isOnline) {
-      this.processErrorQueue();
-    }
-
-    // For critical errors, attempt recovery
+    
+    // Attempt recovery for critical errors
     if (fullError.type === 'crash' || fullError.type === 'android_webview') {
       this.attemptRecovery(fullError);
+    }
+    
+    // Process queue if online
+    if (this.isOnline) {
+      this.processErrorQueue();
     }
   }
 
   private showUserFriendlyError(error: MobileError): void {
-    // Suppress noisy non-critical toasts right after startup (especially in native)
     const now = Date.now();
-    const isStartup = now - this.appStartTime < this.suppressStartupMs;
-    if (isStartup && (error.type === 'unknown' || error.type === 'capacitor')) {
-      console.log('[MobileErrorHandler] Suppressing startup toast for minor error:', error.type);
+    
+    // Suppress streaming-related errors during normal operation
+    if (error.message?.includes('streaming') || 
+        error.message?.includes('edge function') ||
+        error.message?.includes('retry') ||
+        error.message?.includes('FunctionsError')) {
+      console.log('[MobileErrorHandler] Suppressing streaming-related error toast:', error.message);
       return;
     }
-
-    // Suppress benign keyboard swipe conflicts and minor errors while keyboard is visible
-    if (error.type === 'swipe_conflict') {
-      console.log('[MobileErrorHandler] Suppressing toast for swipe_conflict');
-      return;
-    }
-    const keyboardVisible = !!document?.body?.classList?.contains('keyboard-visible');
-    if (keyboardVisible && (error.type === 'unknown' || error.type === 'capacitor')) {
-      console.log('[MobileErrorHandler] Suppressing toast during keyboard-visible state for:', error.type);
+    
+    // Suppress noisy toasts under certain conditions
+    if (this.suppressNoisyToasts && (
+      error.type === 'network' || 
+      error.type === 'capacitor'
+    )) {
+      console.log('[MobileErrorHandler] Suppressing noisy toast for:', error.type, error.message);
       return;
     }
 
@@ -324,6 +278,7 @@ class MobileErrorHandler {
       case 'audio':
         userMessage = 'Audio recording error. Please check microphone permissions.';
         break;
+      case 'unknown':
       default:
         userMessage = 'Something went wrong. The app will try to recover.';
     }

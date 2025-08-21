@@ -686,6 +686,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      auto_cleanup_processing_messages: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       check_database_health: {
         Args: Record<PropertyKey, never>
         Returns: Json
