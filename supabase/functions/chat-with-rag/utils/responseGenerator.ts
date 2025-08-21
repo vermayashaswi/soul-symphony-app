@@ -86,7 +86,7 @@ export async function generateResponse(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4.1-nano-2025-04-14',
+        model: 'gpt-4-1106-preview',
         messages,
         max_tokens: isAnalytical ? 1000 : 600,
         temperature: 0.7,

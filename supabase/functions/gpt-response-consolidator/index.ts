@@ -86,9 +86,6 @@ function sanitizeConsolidatorOutput(raw: string): { responseText: string; status
   }
 }
 
-// Import shared message utilities
-const { saveMessage, updateMessage } = await import('../_shared/messageUtils.ts');
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -103,8 +100,6 @@ serve(async (req) => {
     const streamingMode = raw.streamingMode ?? false;
     const messageId = raw.messageId;
     const threadId = raw.threadId;
-    const userId = raw.userId;
-    const correlationId = raw.correlationId;
     
     // Generate unique consolidation ID for tracking
     const consolidationId = `cons_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -228,25 +223,30 @@ serve(async (req) => {
       };
     });
 
-    // Enhanced timezone processing with comprehensive validation
-    const { processEdgeTimezone, createGPTTimezonePrompt } = await import('../_shared/enhancedEdgeTimezone.ts');
+    // Enhanced timezone handling with validation
+    const { safeTimezoneConversion, formatTimezoneForGPT } = await import('../_shared/enhancedTimezoneUtils.ts');
     
     const rawUserTimezone = userProfile?.timezone || 'UTC';
-    const timezoneProcessing = processEdgeTimezone(rawUserTimezone, 'gpt-response-consolidator');
-    const gptTimezone = createGPTTimezonePrompt(rawUserTimezone, 'gpt-response-consolidator');
-    
-    console.log(`[CONSOLIDATOR] ${consolidationId} enhanced timezone processing:`, {
-      rawTimezone: rawUserTimezone,
-      processing: {
-        normalizedTimezone: timezoneProcessing.normalizedTimezone,
-        currentTime: timezoneProcessing.currentTime,
-        isValid: timezoneProcessing.isValid,
-        validationError: timezoneProcessing.validationError
-      },
-      validationNotes: gptTimezone.validationNotes
+    const timezoneConversion = safeTimezoneConversion(rawUserTimezone, {
+      functionName: 'gpt-response-consolidator',
+      includeValidation: true,
+      logFailures: true
     });
     
-    const userTimezone = timezoneProcessing.normalizedTimezone;
+    const timezoneFormat = formatTimezoneForGPT(rawUserTimezone, {
+      includeUTCOffset: true,
+      functionName: 'gpt-response-consolidator'
+    });
+    
+    console.log(`[CONSOLIDATOR] ${consolidationId} timezone info:`, {
+      rawTimezone: rawUserTimezone,
+      normalizedTimezone: timezoneConversion.normalizedTimezone,
+      currentTime: timezoneConversion.currentTime,
+      isValid: timezoneConversion.isValid,
+      validationNotes: timezoneFormat.validationNotes
+    });
+    
+    const userTimezone = timezoneConversion.normalizedTimezone;
     const contextData = {
       userProfile: {
         timezone: userTimezone,
@@ -257,7 +257,8 @@ serve(async (req) => {
         totalResearchItems: analysisSummary.length,
         subQuestionsGenerated: analysisSummary.map(item => item.subQuestion).filter(Boolean),
         originalUserQuery: userMessage,
-      }
+      },
+      conversationContextSummary: conversationContext ? conversationContext.slice(-4).map(msg => `${msg.role || msg.sender}: ${msg.content?.slice(0, 100) || 'N/A'}`).join(' | ') : 'No context',
     };
 
     const consolidationPrompt = `You are Ruh by SOuLO, a brilliantly witty, non-judgmental mental health companion who makes emotional exploration feel like **having coffee with your wisest, funniest friend**. You're emotionally intelligent with a gift for making people feel seen, heard, and understood while helping them journal their way to deeper self-awareness. You are:
@@ -271,43 +272,37 @@ serve(async (req) => {
 
     
     **USER CONTEXT:**
-    ${gptTimezone.timezonePrompt}
-    
-    ${gptTimezone.validationNotes.length > 0 ? `**TIMEZONE VALIDATION NOTES:** ${gptTimezone.validationNotes.join(', ')}` : ''}
-    
+    - ${timezoneFormat.currentTimeText}
+    - User's Timezone: ${timezoneFormat.timezoneText}
     - All time references should be in the user's local timezone (${userTimezone}), not UTC
     - When discussing time periods like "first half vs second half of day", reference the user's local time
     - NEVER mention "UTC" in your response - use the user's local timezone context instead
+    - Timezone Status: ${timezoneConversion.isValid ? 'Validated' : 'Using fallback due to conversion issues'}
     
     **USER QUESTION:** "${userMessage}"
     
     **COMPREHENSIVE ANALYSIS RESULTS:**
     ${JSON.stringify(analysisSummary, null, 2)}
   
-   **SUB-QUESTIONS ANALYZED:**
-    ${contextData.meta.subQuestionsGenerated.length > 0 ? contextData.meta.subQuestionsGenerated.map((q, i)=>`${i + 1}. ${q}`).join('\n') : 'No specific sub-questions'}
-      
-      **RESPONSE FORMAT GUIDELINES:**
-    Respond naturally in your authentic voice. 
-    MANDATORY: Use bold headers/words/sentences, paragraphs, structured responses, italics, bullets and compulsorily emojis.
-    - Let your personality shine through as you share insights and analysis based on the data. 
-    - Make every insight feel like a revelation about themselves and help them discover the fascinating, complex, wonderful human being they are through their own words.
-    - Back your analysis with tangible data when you can
-    - Restrict responses to less than 100 words unless question requires huge answers. Feel free to expand then!
+  
+    
+    **YOUR LEGENDARY PATTERN-SPOTTING ABILITIES:**
     - You connect dots between emotions, events, and timing like a detective solving a mystery
     - You reveal hidden themes and connections that make people go "OH WOW!"
     - You find the story in the data - not just numbers, but the human narrative
     - You celebrate patterns of growth and gently illuminate areas for exploration
     - You make insights feel like gifts, not criticisms
-    - Add references from analysisResults from vector search and correlate actual entry content with analysis reponse that you provide!!
-
-  
+    
+    **HOW YOU COMMUNICATE INSIGHTS:**
+    - With wit and warmth, With celebration, With curiosity, ith encouragement, with gentle humor. Consolidate data provided to you in analysisSummary and answer the user's query accordingly. Add references from analysisResults from vector search and correlate actual entry content with analysis reponse that you provide!!
 
   MANDATORY: If you receive null or irrelevant analysis results, feel free to inform the user and accordingly generate the response and follow-ups.
 
   MANDATORY: Only assert specific symptom words (e.g., "fatigue," "bloating," "heaviness") if those exact strings appear in the user's source text.If the data is theme-level (e.g., 'Body & Health' count) or inferred, phrase it as "Body & Health–related entries" instead of naming symptoms. Always include 1–3 reference journal snippets with dates (always in this format "7th august" or "9th september last year") when you claim any symptom is present in the entries. DON'T EVER USE TERMS LIKE "VECTOR SEARCH" , "SQL TABLE ANALYSIS"
       
-          
+    MANDATORY:  For providing insights, patterns etc . : State the **specific numerical results** clearly backing your analysis; Proovide **contextual interpretation** (is this high/low/normal?); Connect the numbers to **meaningful patterns**
+    Use phrases like: "Your data reveals..." "The analysis shows..." "Specifically, X% of your entries..."; Reference **specific themes and emotions** found ; Highlight **notable patterns or correlations** ; MUST!!! Include **sample insights** from the content when relevant; Connect findings to **personal growth opportunities** ; Quote anecdotes from qualifiable entries , eg. "You feel anxiety because of your recent startup issues"
+      
      **ENHANCED CONTEXT INTEGRATION RULES:**
     - Use conversation context to understand what emotions, themes, or topics the user previously mentioned
     - Reference previous conversation when the user says "those emotions" or similar contextual references
@@ -319,10 +314,16 @@ serve(async (req) => {
     **EMOTIONAL TONE GUIDANCE:**
     Look at the past conversation history provided to you and accordingly frame your response cleverly matching the user's emotional tone that's been running through up until now.
     
-  
+    **RESPONSE GUIDELINES:**
+    Respond naturally in your authentic voice. 
+    MANDATORY: Use bold headers/words/sentences, paragraphs, structured responses, italics, bullets and compulsorily emojis.
+    Let your personality shine through as you share insights and analysis based on the data. Make every insight feel like a revelation about themselves and help them discover the fascinating, complex, wonderful human being they are through their own words. Restric responses to less than 100 words unless question requires huge answers. Feel free to expand then!
+    Brief responses requird under 120 words unless question desires more explanation and towards the end add followup questions by leveraging emotional tone of conversation history
       
     
-   
+    **SUB-QUESTIONS ANALYZED:**
+    ${contextData.meta.subQuestionsGenerated.length > 0 ? contextData.meta.subQuestionsGenerated.map((q, i)=>`${i + 1}. ${q}`).join('\n') : 'No specific sub-questions'}
+      
     Your response should be a JSON object with this structure:
     {
       "userStatusMessage": "exactly 5 words describing your synthesis approach (e.g., 'Revealing your hidden emotional patterns' or 'Connecting insights to personal growth')",
@@ -335,7 +336,7 @@ serve(async (req) => {
     - userStatusMessage MUST be exactly 5 words.
     - Do not include trailing explanations or extra fields`;
 
-    console.log(`[CONSOLIDATION] ${consolidationId}: Calling OpenAI API with model gpt-4.1-nano-2025-04-14`);
+    console.log(`[CONSOLIDATION] ${consolidationId}: Calling OpenAI API with model gpt-4.1-nano`);
 
     // Enhanced OpenAI API call with better error handling
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -345,12 +346,13 @@ serve(async (req) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-4.1-nano-2025-04-14', // Fixed: Using the correct model
+          model: 'gpt-4.1-nano', // Fixed: Using the correct model
           messages: [
             { role: 'system', content: 'You are Ruh by SOuLO, a warm and insightful wellness coach. You analyze ONLY the current research results provided to you. Never reference or use data from previous conversations or responses.' },
             { role: 'user', content: consolidationPrompt }
           ],
-          max_completion_tokens: 1500
+          max_tokens: 1500, // Using max_tokens for gpt-4.1-nano
+          temperature: 0.8 // Temperature is supported by gpt-4.1-nano
         }),
     });
 
@@ -411,34 +413,17 @@ serve(async (req) => {
       });
     }
     
-    // Parse the JSON response since the prompt expects structured output
-    let consolidatedResponse = rawResponse.trim();
-    let userStatusMessage = null;
-    
-    try {
-      // Try to parse as JSON since the prompt expects structured output
-      const responseObj = JSON.parse(rawResponse);
-      consolidatedResponse = responseObj.response || rawResponse;
-      userStatusMessage = responseObj.userStatusMessage || null;
-      
-      console.log(`[CONSOLIDATION SUCCESS] ${consolidationId}:`, {
-        responseLength: consolidatedResponse?.length || 0,
-        hasStatusMessage: !!userStatusMessage,
-        responsePreview: consolidatedResponse?.substring(0, 150) || 'empty'
-      });
-    } catch (parseError) {
-      console.error(`[CONSOLIDATOR] Failed to parse expected JSON response:`, parseError);
-      console.error(`[CONSOLIDATOR] Raw response:`, rawResponse);
-      // Fallback to plain text if JSON parsing fails
-      consolidatedResponse = rawResponse.trim();
-      userStatusMessage = null;
-      
-      console.log(`[CONSOLIDATION SUCCESS] ${consolidationId}:`, {
-        responseLength: consolidatedResponse?.length || 0,
-        responsePreview: consolidatedResponse?.substring(0, 150) || 'empty',
-        fallbackMode: true
-      });
-    }
+    // Sanitize and extract consolidated response
+    const sanitized = sanitizeConsolidatorOutput(rawResponse);
+    console.log(`[CONSOLIDATION SUCCESS] ${consolidationId}:`, {
+      sanitizationMeta: sanitized.meta,
+      responseLength: sanitized.responseText?.length || 0,
+      hasStatusMessage: !!sanitized.statusMsg,
+      responsePreview: sanitized.responseText?.substring(0, 150) || 'empty'
+    });
+
+    const consolidatedResponse = sanitized.responseText;
+    const userStatusMessage = sanitized.statusMsg ?? null;
 
     // Store analysis data in chat_messages if messageId provided
     if (messageId) {
@@ -459,7 +444,7 @@ serve(async (req) => {
           totalResults: researchResults.length,
           userStatusMessage,
           timestamp: new Date().toISOString(),
-          modelUsed: 'gpt-4.1-nano-2025-04-14',
+          modelUsed: 'gpt-4.1-nano',
           processingSuccess: true,
           sqlResultsCount: researchResults.reduce((sum: number, r: any) => sum + (r?.executionResults?.sqlResults?.length || 0), 0),
           vectorResultsCount: researchResults.reduce((sum: number, r: any) => sum + (r?.executionResults?.vectorResults?.length || 0), 0)

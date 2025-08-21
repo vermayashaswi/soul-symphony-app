@@ -4,7 +4,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLocation } from '@/contexts/LocationContext';
 import { supabase } from '@/integrations/supabase/client';
 import { secureEnsureProfile } from '@/services/secureProfileService';
-import { needsTimezoneRevalidation, detectValidatedBrowserTimezone } from '@/services/timezoneService';
 
 export interface UserProfileData {
   displayName: string | null;
@@ -62,25 +61,16 @@ export const useUserProfile = (): UserProfileData & {
           setDisplayName(data.full_name);
         }
 
-        // Enhanced timezone handling with validation
+        // Set timezone from profile data
         if (data && data.timezone) {
-          // Check if stored timezone needs revalidation
-          const revalidation = needsTimezoneRevalidation(data.timezone);
-          
-          if (revalidation.needsUpdate) {
-            console.log('[useUserProfile] Timezone needs update:', revalidation.reason);
-            await updateTimezone(revalidation.suggestedTimezone);
-            setTimezone(revalidation.suggestedTimezone);
-          } else {
-            setTimezone(data.timezone);
-          }
+          setTimezone(data.timezone);
         } else {
-          // If profile exists but no timezone, update with validated browser timezone
-          const detection = detectValidatedBrowserTimezone();
-          console.log('[useUserProfile] Setting timezone for profile without timezone:', detection);
-          
-          await updateTimezone(detection.timezone);
-          setTimezone(detection.timezone);
+          // If profile exists but no timezone, update with browser timezone
+          const browserTimezone = getBrowserTimezone();
+          if (browserTimezone) {
+            await updateTimezone(browserTimezone);
+            setTimezone(browserTimezone);
+          }
         }
 
         // Set country from profile data
@@ -113,7 +103,26 @@ export const useUserProfile = (): UserProfileData & {
     autoUpdateCountry();
   }, [user, locationData, locationLoading, country]);
 
-  // Remove old getBrowserTimezone function - using new service instead
+  const getBrowserTimezone = (): string | null => {
+    try {
+      const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      // Normalize legacy timezones
+      const legacyMap: Record<string, string> = {
+        'Asia/Calcutta': 'Asia/Kolkata',
+        'US/Eastern': 'America/New_York',
+        'US/Central': 'America/Chicago',
+        'US/Mountain': 'America/Denver',
+        'US/Pacific': 'America/Los_Angeles',
+        'US/Alaska': 'America/Anchorage',
+        'US/Hawaii': 'Pacific/Honolulu',
+        'Europe/Kiev': 'Europe/Kyiv',
+      };
+      return legacyMap[browserTimezone] || browserTimezone;
+    } catch (error) {
+      console.error('Error detecting timezone:', error);
+      return null;
+    }
+  };
 
   const updateDisplayName = async (name: string) => {
     if (!user) return;

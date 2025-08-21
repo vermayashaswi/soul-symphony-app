@@ -68,13 +68,13 @@ export function LoadingEntryContent({ error }: { error?: string }) {
     
     stepsIntervalRef.current = stepInterval;
     
-    // Timeout for "taking too long" message (18 seconds)
+    // Reduced timeout for "taking too long" message
     const longProcessingTimeout = setTimeout(() => {
       if (isVisible) {
         console.log('[LoadingEntryContent] Processing taking longer than expected');
         setProcessingTakingTooLong(true);
       }
-    }, 18000); // 18 second timeout
+    }, 10000); // Reduced timeout
     
     longProcessingTimeoutRef.current = longProcessingTimeout;
     

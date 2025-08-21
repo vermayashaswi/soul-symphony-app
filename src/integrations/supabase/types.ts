@@ -22,9 +22,7 @@ export type Database = {
           has_numeric_result: boolean | null
           id: string
           idempotency_key: string | null
-          is_processing: boolean | null
           reference_entries: Json | null
-          request_correlation_id: string | null
           role: string | null
           sender: string
           sub_query_responses: Json | null
@@ -40,9 +38,7 @@ export type Database = {
           has_numeric_result?: boolean | null
           id?: string
           idempotency_key?: string | null
-          is_processing?: boolean | null
           reference_entries?: Json | null
-          request_correlation_id?: string | null
           role?: string | null
           sender: string
           sub_query_responses?: Json | null
@@ -58,9 +54,7 @@ export type Database = {
           has_numeric_result?: boolean | null
           id?: string
           idempotency_key?: string | null
-          is_processing?: boolean | null
           reference_entries?: Json | null
-          request_correlation_id?: string | null
           role?: string | null
           sender?: string
           sub_query_responses?: Json | null
@@ -721,10 +715,6 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: number
       }
-      cleanup_stuck_processing_messages: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
       close_user_session: {
         Args: { p_session_id: string; p_user_id: string }
         Returns: boolean
@@ -1225,10 +1215,6 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
-      thread_belongs_to_user: {
-        Args: { thread_id: string }
-        Returns: boolean
-      }
       update_session_activity: {
         Args: { p_language?: string; p_page?: string; p_session_id: string }
         Returns: undefined
@@ -1236,14 +1222,6 @@ export type Database = {
       upsert_journal_embedding: {
         Args: { embedding_vector: string; entry_id: number }
         Returns: undefined
-      }
-      validate_thread_ownership: {
-        Args: { p_thread_id: string; p_user_id: string }
-        Returns: boolean
-      }
-      verify_vector_operations: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
       }
     }
     Enums: {

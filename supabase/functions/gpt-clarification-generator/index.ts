@@ -1,7 +1,6 @@
 
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -9,9 +8,6 @@ const corsHeaders = {
 };
 
 const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
-
-// Import shared message utilities
-const { saveMessage, updateMessage } = await import('../_shared/messageUtils.ts');
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -22,10 +18,7 @@ serve(async (req) => {
     const { 
       userMessage, 
       conversationContext,
-      userProfile,
-      threadId,
-      userId,
-      correlationId
+      userProfile
     } = await req.json();
     
     console.log('GPT Clarification Generator called with:', { 
@@ -89,7 +82,7 @@ TONE: Direct, insightful, naturally warm, witty when appropriate, and focused on
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-4.1-nano-2025-04-14',
+          model: 'gpt-4.1-nano',
           messages: [
             { role: 'system', content: 'You are Ruh, the soul-centered wellness companion by SOuLO. You combine ancient wisdom with modern psychology to help people connect with their deepest truth and inner knowing.' },
             { role: 'user', content: clarificationPrompt }
@@ -122,33 +115,6 @@ TONE: Direct, insightful, naturally warm, witty when appropriate, and focused on
       }
       const statusMatch = rawContent.match(/\"userStatusMessage\"\s*:\s*\"([^\"]{0,100})\"/m);
       if (statusMatch) userStatusMessage = statusMatch[1];
-    }
-
-    // Save clarification response if threadId and userId are provided
-    if (threadId && userId && responseText) {
-      try {
-        const idempotencyKey = correlationId ? 
-          `clarification-${threadId}-${correlationId}` : 
-          `clarification-${threadId}-${Date.now()}`;
-
-        await saveMessage(
-          threadId,
-          responseText,
-          'assistant',
-          userId,
-          {
-            analysis_data: {
-              type: 'clarification',
-              timestamp: new Date().toISOString(),
-              correlationId: correlationId
-            },
-            idempotency_key: idempotencyKey
-          },
-          req
-        );
-      } catch (error) {
-        console.error('[gpt-clarification-generator] Error saving response:', error);
-      }
     }
 
     return new Response(JSON.stringify({

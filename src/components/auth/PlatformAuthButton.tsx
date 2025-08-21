@@ -165,6 +165,26 @@ const PlatformAuthButton: React.FC<PlatformAuthButtonProps> = ({
     }
   };
 
+  // For iOS devices, show Apple ID sign-in
+  if (isIOS) {
+    return (
+      <Button 
+        size="lg" 
+        className="w-full flex items-center justify-center gap-2 bg-black text-white hover:bg-gray-800"
+        onClick={handleAppleSignIn}
+        disabled={isLoading}
+      >
+        {isLoading ? (
+          <span className="animate-spin h-5 w-5 border-t-2 border-white rounded-full mr-2" />
+        ) : (
+          <svg viewBox="0 0 24 24" width="24" height="24" xmlns="http://www.w3.org/2000/svg">
+            <path fill="currentColor" d="M12.017 14.999c-1.45-.074-2.693-1.057-3.115-2.441-.422-1.384.07-2.888 1.221-3.73.65-.475 1.44-.742 2.259-.762 1.45.074 2.693 1.057 3.115 2.441.422 1.384-.07 2.888-1.221 3.73-.65.475-1.44.742-2.259.762zm7.5-1.999c0 5.523-4.477 10-10 10s-10-4.477-10-10 4.477-10 10-10 10 4.477 10 10z"/>
+          </svg>
+        )}
+        <TranslatableText text="Sign in with Apple" forceTranslate={true} />
+      </Button>
+    );
+  }
 
   // For Android devices, show Google sign-in
   if (isAndroid) {
