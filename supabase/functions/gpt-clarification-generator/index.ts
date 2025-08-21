@@ -18,7 +18,9 @@ serve(async (req) => {
     const { 
       userMessage, 
       conversationContext,
-      userProfile
+      userProfile,
+      threadId,
+      userId
     } = await req.json();
     
     console.log('GPT Clarification Generator called with:', { 
@@ -119,10 +121,41 @@ TONE: Direct, insightful, naturally warm, witty when appropriate, and focused on
 
     // Enhanced message persistence with proper metadata
     try {
-      const { saveMessage } = await import('../_shared/messageUtils.ts');
-      // Note: We would need threadId and userId from request to save message
-      // This should be added to the request payload for proper persistence
-      console.log('[GPT Clarification] Message persistence would require threadId and userId in request');
+      const { saveMessage, generateIdempotencyKey } = await import('../_shared/messageUtils.ts');
+      const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2.7.1');
+      const supabaseClient = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      );
+
+      // Extract threadId and userId from the original request body
+      const { threadId, userId } = await req.clone().json();
+      
+      if (threadId && userId) {
+        const idempotencyKey = await generateIdempotencyKey(
+          threadId,
+          responseText,
+          `clarification_${Date.now()}`
+        );
+
+        const saveResult = await saveMessage(supabaseClient, {
+          thread_id: threadId,
+          sender: 'assistant',
+          role: 'assistant',
+          content: responseText,
+          is_processing: false,
+          idempotency_key: idempotencyKey,
+          query_classification: 'GPT_CLARIFICATION'
+        });
+        
+        if (saveResult.success) {
+          console.log(`[GPT Clarification] Message saved: ${saveResult.messageId}`);
+        } else {
+          console.error('[GPT Clarification] Message save failed:', saveResult.error);
+        }
+      } else {
+        console.log('[GPT Clarification] No threadId/userId provided for message persistence');
+      }
     } catch (persistenceError) {
       console.error('[GPT Clarification] Message persistence error:', persistenceError);
     }

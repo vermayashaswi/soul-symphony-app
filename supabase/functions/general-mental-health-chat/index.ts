@@ -13,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { message, conversationContext = [], userTimezone = 'UTC' } = await req.json();
+    const { message, conversationContext = [], userTimezone = 'UTC', threadId, userId } = await req.json();
 
     if (!message) {
       return new Response(
@@ -185,15 +185,41 @@ MUST HAVE/DO: ALWAYS BE AWARE OF THE CONVERSATION HISTORY TO UNDERSTAND WHAT THE
 
     // Enhanced message persistence with proper metadata
     try {
-      const { saveMessage } = await import('../_shared/messageUtils.ts');
+      const { saveMessage, generateIdempotencyKey } = await import('../_shared/messageUtils.ts');
+      const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2.7.1');
       const supabaseClient = createClient(
         Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
       );
 
-      // Note: We would need threadId and userId from request to save message
-      // This should be added to the request payload for proper persistence
-      console.log('[General Mental Health] Message persistence would require threadId and userId in request');
+      // Extract threadId and userId from the original request body
+      const { threadId, userId } = await req.clone().json();
+      
+      if (threadId && userId) {
+        const idempotencyKey = await generateIdempotencyKey(
+          threadId,
+          content,
+          `general_health_${Date.now()}`
+        );
+
+        const saveResult = await saveMessage(supabaseClient, {
+          thread_id: threadId,
+          sender: 'assistant',
+          role: 'assistant', 
+          content: content,
+          is_processing: false,
+          idempotency_key: idempotencyKey,
+          query_classification: 'GENERAL_MENTAL_HEALTH'
+        });
+        
+        if (saveResult.success) {
+          console.log(`[General Mental Health] Message saved: ${saveResult.messageId}`);
+        } else {
+          console.error('[General Mental Health] Message save failed:', saveResult.error);
+        }
+      } else {
+        console.log('[General Mental Health] No threadId/userId provided for message persistence');
+      }
     } catch (persistenceError) {
       console.error('[General Mental Health] Message persistence error:', persistenceError);
     }

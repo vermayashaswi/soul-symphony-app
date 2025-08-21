@@ -295,8 +295,32 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
               setTimeout(() => rej(new Error('Request timed out')), timeoutMs)
             );
 
+            // Ensure threadId and userId are included for message persistence
+            const enhancedBody = {
+              ...body,
+              threadId: body.threadId || targetThreadId,
+              userId: body.userId
+            };
+
             result = (await Promise.race([
-              supabase.functions.invoke('general-mental-health-chat', { body }),
+              supabase.functions.invoke('general-mental-health-chat', { body: enhancedBody }),
+              timeoutPromise,
+            ])) as { data: any; error: any };
+          } else if (category === 'GPT_CLARIFICATION') {
+            const timeoutMs = 20000 + i * 5000;
+            const timeoutPromise = new Promise((_, rej) =>
+              setTimeout(() => rej(new Error('Request timed out')), timeoutMs)
+            );
+
+            // Ensure threadId and userId are included for message persistence
+            const enhancedBody = {
+              ...body,
+              threadId: body.threadId || targetThreadId,
+              userId: body.userId
+            };
+
+            result = (await Promise.race([
+              supabase.functions.invoke('gpt-clarification-generator', { body: enhancedBody }),
               timeoutPromise,
             ])) as { data: any; error: any };
           } else {
@@ -306,8 +330,15 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
               setTimeout(() => rej(new Error('Request timed out')), timeoutMs)
             );
 
+            // Ensure threadId and userId are included for message persistence
+            const enhancedBody = {
+              ...body,
+              threadId: body.threadId || targetThreadId,
+              userId: body.userId
+            };
+
             result = (await Promise.race([
-              supabase.functions.invoke('general-mental-health-chat', { body }),
+              supabase.functions.invoke('general-mental-health-chat', { body: enhancedBody }),
               timeoutPromise,
             ])) as { data: any; error: any };
           }

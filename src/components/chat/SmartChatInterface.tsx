@@ -598,16 +598,10 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       
       updateProcessingStage("Generating response...");
       
-      // Create processing placeholder only for non-journal-specific queries
-      if (queryClassification.category !== QueryCategory.JOURNAL_SPECIFIC) {
-        processingMessageId = await createProcessingMessage(threadId, "Processing your request...");
-        if (processingMessageId) {
-          debugLog.addEvent("Database", `Created processing message with ID: ${processingMessageId}`, "success");
-        }
-      } else if (processingMessageId) {
-        // Safety: if a placeholder exists, remove it for streaming path
-        await updateProcessingMessage(processingMessageId, null);
-        processingMessageId = null;
+      // Create processing placeholder for ALL queries to ensure assistant messages are created
+      processingMessageId = await createProcessingMessage(threadId, "Processing your request...");
+      if (processingMessageId) {
+        debugLog.addEvent("Database", `Created processing message with ID: ${processingMessageId}`, "success");
       }
       
       // Route ALL queries to chat-with-rag (restored original design)

@@ -139,51 +139,115 @@ export async function recoverMissingMessages(
  * Enhanced JSON parsing with fallback strategies
  */
 export function parseOpenAIResponse(rawResponse: string): any {
+  console.log('[parseOpenAIResponse] Starting enhanced parsing...');
+  
+  if (!rawResponse || rawResponse.trim().length === 0) {
+    console.error('[parseOpenAIResponse] Empty response provided');
+    throw new Error('Empty response from OpenAI');
+  }
+
+  // Pre-sanitize the response
+  let sanitized = rawResponse.trim();
+  
+  // Remove common wrappers that break JSON parsing
+  sanitized = sanitized.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+  sanitized = sanitized.replace(/^```\s*/, '').replace(/\s*```$/, '');
+  sanitized = sanitized.replace(/^Here's the (?:JSON )?response:\s*/i, '');
+  sanitized = sanitized.replace(/^(?:Here is|This is) the (?:JSON )?(?:response|result):\s*/i, '');
+
+  // Strategy 1: Direct JSON parsing on sanitized response
   try {
-    // Enhanced JSON sanitization and parsing with multiple fallback strategies
-    let jsonString = rawResponse.trim();
-    
-    // Remove common markdown formatting
-    if (jsonString.startsWith('```json')) {
-      jsonString = jsonString.replace(/```json\n?/, '').replace(/\n?```$/, '');
-    } else if (jsonString.startsWith('```')) {
-      jsonString = jsonString.replace(/```\n?/, '').replace(/\n?```$/, '');
-    }
-
-    // Enhanced sanitization for escaped quotes and common JSON issues
-    jsonString = jsonString
-      .replace(/\\"/g, '"')  // Fix escaped quotes
-      .replace(/"\s*:\s*\\"/g, '": "')  // Fix escaped values
-      .replace(/\\n/g, '\n')  // Fix escaped newlines
-      .replace(/\\\\/g, '\\')  // Fix double escapes
-      .trim();
-
-    // First parsing attempt
+    const directParse = JSON.parse(sanitized);
+    console.log('[parseOpenAIResponse] Direct JSON parsing successful');
+    return directParse;
+  } catch (directError) {
+    console.log('[parseOpenAIResponse] Direct parsing failed, trying advanced strategies...');
+  }
+  
+  // Strategy 2: Extract JSON from the sanitized content
+  const jsonStart = sanitized.indexOf('{');
+  const jsonEnd = sanitized.lastIndexOf('}');
+  
+  if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
+    const extractedJson = sanitized.substring(jsonStart, jsonEnd + 1);
     try {
-      return JSON.parse(jsonString);
-    } catch (firstParseError) {
-      console.log('[MessageValidation] First parse failed, trying fallback strategies...');
+      const extractedResult = JSON.parse(extractedJson);
+      console.log('[parseOpenAIResponse] JSON extraction successful');
+      return extractedResult;
+    } catch (extractError) {
+      console.log('[parseOpenAIResponse] JSON extraction failed');
+    }
+  }
+  
+  // Strategy 3: Extract from markdown code blocks
+  const codeBlockRegex = /```(?:json)?\s*(\{[\s\S]*?\})\s*```/g;
+  let match = codeBlockRegex.exec(rawResponse);
+  if (match) {
+    try {
+      const codeBlockResult = JSON.parse(match[1].trim());
+      console.log('[parseOpenAIResponse] Code block extraction successful');
+      return codeBlockResult;
+    } catch (codeBlockError) {
+      console.log('[parseOpenAIResponse] Code block parsing failed');
+    }
+  }
+  
+  // Strategy 4: Find JSON object in text and aggressively clean it
+  const jsonObjectRegex = /\{[\s\S]*\}/;
+  const jsonMatch = rawResponse.match(jsonObjectRegex);
+  if (jsonMatch) {
+    let jsonString = jsonMatch[0];
+    
+    try {
+      // Aggressive cleaning
+      jsonString = jsonString
+        .replace(/,\s*}/g, '}')  // Remove trailing commas before }
+        .replace(/,\s*]/g, ']')  // Remove trailing commas before ]
+        .replace(/([{,]\s*)(\w+)(\s*:)/g, '$1"$2"$3') // Quote unquoted keys
+        .replace(/:\s*([^",{\[\]}\s][^",{\[\]}\n]*[^",{\[\]}\s])\s*([,}])/g, ':"$1"$2') // Quote unquoted string values
+        .replace(/\\n/g, '\\n') // Fix newline escaping
+        .replace(/\\"/g, '\\"'); // Fix quote escaping
       
-      // Strategy 2: Try to extract JSON from within text
-      const jsonMatch = jsonString.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        try {
-          return JSON.parse(jsonMatch[0]);
-        } catch (secondParseError) {
-          // Strategy 3: Try fixing common quote issues
-          let fixedJson = jsonMatch[0]
-            .replace(/": "([^"]*)"([^,}\]]*)/g, '": "$1$2"')  // Fix broken quotes
-            .replace(/""([^"]*)""/g, '"$1"')  // Fix double quotes
-            .replace(/"([^"]*)""/g, '"$1"');  // Fix trailing double quotes
-          
-          return JSON.parse(fixedJson);
-        }
-      } else {
-        throw new Error(`No JSON object found in response: ${firstParseError.message}`);
+      const cleanedResult = JSON.parse(jsonString);
+      console.log('[parseOpenAIResponse] Aggressively cleaned JSON parsing successful');
+      return cleanedResult;
+    } catch (cleanError) {
+      console.log('[parseOpenAIResponse] Aggressively cleaned JSON parsing failed:', cleanError.message);
+    }
+  }
+  
+  // Strategy 5: Try to fix common JSON structural issues
+  try {
+    let structuralFix = rawResponse;
+    
+    // Fix missing opening/closing braces
+    if (!structuralFix.includes('{')) {
+      structuralFix = '{' + structuralFix + '}';
+    } else {
+      // Ensure we have balanced braces
+      const openBraces = (structuralFix.match(/\{/g) || []).length;
+      const closeBraces = (structuralFix.match(/\}/g) || []).length;
+      
+      if (openBraces > closeBraces) {
+        structuralFix += '}'.repeat(openBraces - closeBraces);
       }
     }
-  } catch (error) {
-    console.error('[MessageValidation] All parsing strategies failed:', error);
-    throw error;
+    
+    // Try parsing the structurally fixed version
+    const jsonMatch = structuralFix.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const structuralResult = JSON.parse(jsonMatch[0]);
+      console.log('[parseOpenAIResponse] Structural fix parsing successful');
+      return structuralResult;
+    }
+  } catch (structuralError) {
+    console.log('[parseOpenAIResponse] Structural fix parsing failed');
   }
+  
+  // Strategy 6: Last resort - try to extract key parts manually
+  console.error('[parseOpenAIResponse] All parsing strategies failed');
+  console.error('[parseOpenAIResponse] Raw response (first 500 chars):', rawResponse.substring(0, 500));
+  console.error('[parseOpenAIResponse] Sanitized response (first 200 chars):', sanitized.substring(0, 200));
+  
+  throw new Error('Failed to parse OpenAI response after trying all strategies. Response may not contain valid JSON.');
 }
