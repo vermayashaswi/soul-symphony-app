@@ -570,7 +570,7 @@ export default function MobileChatInterface({
         
         // Confirm realtime delivery to useStreamingChat
         if (confirmRealtimeDelivery && threadId) {
-          confirmRealtimeDelivery(threadId);
+          confirmRealtimeDelivery();
         }
       }
       
@@ -771,9 +771,10 @@ export default function MobileChatInterface({
       await startStreamingChat(
         message,
         user.id,
-        currentThreadId,
         conversationContext,
-        {}
+        {},
+        undefined, // onTypingAnimation
+        currentThreadId
       );
       
       await updateThreadProcessingStatus(currentThreadId, 'idle');

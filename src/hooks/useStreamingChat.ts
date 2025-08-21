@@ -382,7 +382,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
       }
 
       if (isEdgeFunctionError(err) || isNetworkError(err)) {
-        showEdgeFunctionRetryToast(err.message, () => retryLastMessage());
+        showEdgeFunctionRetryToast();
         setState(prev => ({ ...prev, isStreaming: false }));
       } else {
         addStreamingMessage({
@@ -424,7 +424,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
 
   // Restore streaming state
   const restoreStreamingState = useCallback((savedState: any) => {
-    if (!threadId || !savedState) return;
+    if (!threadId || !savedState) return false;
 
     setState(prev => ({
       ...prev,
@@ -436,6 +436,8 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
       queryCategory: savedState.queryCategory || '',
       abortController: new AbortController(),
     }));
+    
+    return true;
   }, [threadId]);
 
   // Dynamic message rotation effect (only when NOT using three-dot fallback)
@@ -486,6 +488,6 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     
     // Legacy methods for backward compatibility (no-op)
     extendStreamingForRealtimeDelivery: async () => true,
-    confirmRealtimeDelivery: async () => true,
+    confirmRealtimeDelivery: () => {},
   };
 };

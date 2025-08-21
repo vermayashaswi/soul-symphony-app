@@ -595,14 +595,15 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       await startStreamingChat(
         message,
         effectiveUserId,
-        threadId,
         conversationContext,
         {
           useAllEntries: queryClassification.useAllEntries || false,
           hasPersonalPronouns: message.toLowerCase().includes('i ') || message.toLowerCase().includes('my '),
           hasExplicitTimeReference: /\b(last week|yesterday|this week|last month|today|recently|lately)\b/i.test(message),
           threadMetadata: {}
-        }
+        },
+        undefined, // onTypingAnimation
+        threadId
       );
       
       // Streaming owns the lifecycle; ensure local loader is cleared immediately
@@ -844,7 +845,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
               variant="outline"
               size="sm"
               onClick={() => {
-                stopStreaming(currentThreadId);
+                stopStreaming();
                 
               }}
               aria-label="Cancel processing"
