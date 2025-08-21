@@ -46,7 +46,7 @@ export class ConversationStatePersistence {
       // Load the last few messages for context restoration
       const { data: recentMessages } = await supabase
         .from('chat_messages')
-        .select('content, sender, created_at')
+        .select('content, sender, role, created_at')
         .eq('thread_id', this.stateManager.threadId)
         .order('created_at', { ascending: false })
         .limit(5);

@@ -70,9 +70,20 @@ verify_jwt = true
 [functions.chat-with-rag]
 verify_jwt = true
 
+[functions.gpt-response-consolidator]
+verify_jwt = false
+
+[functions.ensure-chat-persistence]
+verify_jwt = true
+
+[functions.transcribe-chat-audio]
+verify_jwt = true
+
 [functions.chat-query-classifier]
 verify_jwt = true
 
 [functions.general-mental-health-chat]
 verify_jwt = true
 
+[functions.gpt-clarification-generator]
+verify_jwt = true

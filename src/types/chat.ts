@@ -12,7 +12,11 @@ export interface ChatMessage {
   analysis_data?: Json | any | null;
   has_numeric_result?: boolean | null;
   
-  // Legacy fields - removed from database but kept for compatibility
+  sub_query1?: string | null;
+  sub_query2?: string | null;
+  sub_query3?: string | null;
+  sub_query_responses?: any[] | null;
+  idempotency_key?: string | null; // For preventing duplicate messages
   isInteractive?: boolean;
   interactiveOptions?: InteractiveOption[];
   references?: any[]; // Alias for reference_entries for backward compatibility

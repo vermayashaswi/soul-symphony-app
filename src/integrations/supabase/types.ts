@@ -21,8 +21,15 @@ export type Database = {
           created_at: string
           has_numeric_result: boolean | null
           id: string
+          idempotency_key: string | null
           reference_entries: Json | null
+          request_correlation_id: string | null
+          role: string | null
           sender: string
+          sub_query_responses: Json | null
+          sub_query1: string | null
+          sub_query2: string | null
+          sub_query3: string | null
           thread_id: string
         }
         Insert: {
@@ -31,8 +38,15 @@ export type Database = {
           created_at?: string
           has_numeric_result?: boolean | null
           id?: string
+          idempotency_key?: string | null
           reference_entries?: Json | null
+          request_correlation_id?: string | null
+          role?: string | null
           sender: string
+          sub_query_responses?: Json | null
+          sub_query1?: string | null
+          sub_query2?: string | null
+          sub_query3?: string | null
           thread_id: string
         }
         Update: {
@@ -41,8 +55,15 @@ export type Database = {
           created_at?: string
           has_numeric_result?: boolean | null
           id?: string
+          idempotency_key?: string | null
           reference_entries?: Json | null
+          request_correlation_id?: string | null
+          role?: string | null
           sender?: string
+          sub_query_responses?: Json | null
+          sub_query1?: string | null
+          sub_query2?: string | null
+          sub_query3?: string | null
           thread_id?: string
         }
         Relationships: [

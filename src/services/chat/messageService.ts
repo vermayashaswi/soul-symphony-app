@@ -39,11 +39,12 @@ export const createChatMessage = async (
 
     console.log('[createChatMessage] Thread verified, inserting message');
 
-    // Prepare message data
+    // Prepare message data with idempotency key support
     const messageData = {
       thread_id: threadId,
       content,
       sender,
+      role: sender,
       created_at: new Date().toISOString(),
       ...additionalData
     };
@@ -86,11 +87,12 @@ export const createChatMessage = async (
       console.warn('[createChatMessage] Failed to update thread timestamp:', updateError);
     }
 
-    // Cast sender to proper type and add role for compatibility
+    // Cast sender and role to proper types and handle sub_query_responses
     const finalMessage = {
       ...data,
       sender: data.sender as 'user' | 'assistant' | 'error',
-      role: data.sender as 'user' | 'assistant' | 'error'
+      role: data.role as 'user' | 'assistant' | 'error',
+      sub_query_responses: Array.isArray(data.sub_query_responses) ? data.sub_query_responses : []
     };
 
     console.log('[createChatMessage] Message creation completed successfully:', {
@@ -138,11 +140,12 @@ export const getChatMessages = async (threadId: string, userId: string): Promise
       return [];
     }
 
-    // Cast sender to proper type and add role for compatibility
+    // Cast sender and role to proper types and handle sub_query_responses
     return (data || []).map(msg => ({
       ...msg,
       sender: msg.sender as 'user' | 'assistant' | 'error',
-      role: msg.sender as 'user' | 'assistant' | 'error'
+      role: msg.role as 'user' | 'assistant' | 'error',
+      sub_query_responses: Array.isArray(msg.sub_query_responses) ? msg.sub_query_responses : []
     }));
   } catch (error) {
     console.error('Exception fetching chat messages:', error);
@@ -248,6 +251,9 @@ export const saveMessage = async (
   const additionalData: Partial<ChatMessage> = {};
   if (references) additionalData.reference_entries = references;
   if (hasNumericResult !== undefined) additionalData.has_numeric_result = hasNumericResult;
+  if (isInteractive) additionalData.isInteractive = isInteractive;
+  if (interactiveOptions) additionalData.interactiveOptions = interactiveOptions;
+  if (idempotencyKey) additionalData.idempotency_key = idempotencyKey;
   if (analysisData) additionalData.analysis_data = analysisData;
 
   console.log('[saveMessage] Processed data, calling createChatMessage with retry logic');
@@ -272,8 +278,31 @@ export const saveMessage = async (
       lastError = error;
       console.error(`[saveMessage] Attempt ${attempt} failed:`, error);
 
-      // Simply log the error and continue retrying
-      console.log('[saveMessage] Error details:', error);
+      // Handle idempotency constraint violation
+      if (error instanceof Error && error.message.includes('duplicate key') && idempotencyKey) {
+        console.log('[saveMessage] Idempotency conflict detected, checking for existing message');
+        
+        try {
+          const { data: existing, error: fetchError } = await supabase
+            .from('chat_messages')
+            .select('*')
+            .eq('thread_id', threadId)
+            .eq('idempotency_key', idempotencyKey)
+            .single();
+
+          if (!fetchError && existing) {
+            console.log('[saveMessage] Found existing message with same idempotency key:', existing.id);
+            return {
+              ...existing,
+              sender: existing.sender as 'user' | 'assistant' | 'error',
+              role: existing.role as 'user' | 'assistant' | 'error',
+              sub_query_responses: Array.isArray(existing.sub_query_responses) ? existing.sub_query_responses : []
+            };
+          }
+        } catch (fetchError) {
+          console.error('[saveMessage] Failed to fetch existing message:', fetchError);
+        }
+      }
 
       if (attempt < maxRetries) {
         const delay = Math.pow(2, attempt - 1) * 1000; // Exponential backoff
