@@ -39,7 +39,14 @@ export async function saveMessage(
   const { maxRetries = 3, baseDelay = 1000, requireIdempotency = false } = options;
   
   console.log(`[messageUtils] Saving message: ${messageData.sender} to thread ${messageData.thread_id}`);
-  console.log(`[messageUtils] Content length: ${messageData.content.length}, has idempotency: ${!!messageData.idempotency_key}`);
+  console.log(`[messageUtils] Content length: ${messageData.content?.length || 0}, has idempotency: ${!!messageData.idempotency_key}`);
+  console.log(`[messageUtils] Message data:`, {
+    sender: messageData.sender,
+    role: messageData.role,
+    hasContent: !!messageData.content,
+    isProcessing: messageData.is_processing,
+    threadId: messageData.thread_id
+  });
 
   // Generate idempotency key if required but not provided
   if (requireIdempotency && !messageData.idempotency_key) {
@@ -83,6 +90,11 @@ export async function saveMessage(
         }
       }
 
+      // Validate message content before saving
+      if (!messageData.content || messageData.content.trim() === '') {
+        throw new Error('Message content cannot be empty');
+      }
+
       // Try to insert the message
       const { data, error } = await supabaseClient
         .from('chat_messages')
@@ -91,6 +103,18 @@ export async function saveMessage(
         .single();
 
       if (error) {
+        console.error(`[messageUtils] Database insert error:`, {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          messageData: {
+            sender: messageData.sender,
+            threadId: messageData.thread_id,
+            contentLength: messageData.content?.length || 0
+          }
+        });
+
         // Handle unique constraint violation for idempotency
         if (error.code === '23505' && error.message.includes('idempotency_key')) {
           console.log(`[messageUtils] Idempotency conflict on attempt ${attempt}, retrying...`);

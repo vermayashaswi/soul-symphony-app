@@ -1,146 +1,195 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface MessagePersistenceMonitorOptions {
   threadId?: string;
   onMalformedMessage?: (messageId: string, content: string) => void;
-  onPersistenceIssue?: (issue: string) => void;
+  onPersistenceIssue?: (threadId: string, issues: string[]) => void;
 }
 
-/**
- * Hook to monitor and validate message persistence health
- */
-export function useMessagePersistenceMonitor({
-  threadId,
-  onMalformedMessage,
-  onPersistenceIssue
-}: MessagePersistenceMonitorOptions = {}) {
-  const lastCheckRef = useRef<Date | null>(null);
+interface PersistenceHealthStatus {
+  isHealthy: boolean;
+  healthScore: number;
+  issues: string[];
+  lastCheck: Date | null;
+}
+
+export const useMessagePersistenceMonitor = (options: MessagePersistenceMonitorOptions = {}) => {
+  const { threadId, onMalformedMessage, onPersistenceIssue } = options;
+  const lastCheck = useRef<Date | null>(null);
+  const [healthStatus, setHealthStatus] = useState<PersistenceHealthStatus>({
+    isHealthy: true,
+    healthScore: 100,
+    issues: [],
+    lastCheck: null
+  });
+
+  const checkMessageHealth = async () => {
+    if (!threadId) return;
+    
+    try {
+      console.log(`[MessagePersistenceMonitor] Checking health for thread: ${threadId}`);
+      
+      // Use the new message persistence monitor function
+      const { data: healthResult, error } = await supabase.functions.invoke('message-persistence-monitor', {
+        body: {
+          threadId,
+          action: 'check'
+        }
+      });
+      
+      if (error) {
+        console.error('[MessagePersistenceMonitor] Error checking thread health:', error);
+        setHealthStatus(prev => ({
+          ...prev,
+          isHealthy: false,
+          issues: ['Health check failed'],
+          lastCheck: new Date()
+        }));
+        return;
+      }
+      
+      if (healthResult) {
+        const newHealthStatus = {
+          isHealthy: healthResult.isHealthy,
+          healthScore: healthResult.healthScore,
+          issues: healthResult.issues || [],
+          lastCheck: new Date()
+        };
+        
+        setHealthStatus(newHealthStatus);
+        
+        // Check for malformed assistant messages
+        const { data: recentMessages, error: messagesError } = await supabase
+          .from('chat_messages')
+          .select('id, content, sender')
+          .eq('thread_id', threadId)
+          .eq('sender', 'assistant')
+          .gt('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+          .order('created_at', { ascending: false })
+          .limit(10);
+        
+        if (!messagesError && recentMessages) {
+          for (const message of recentMessages) {
+            if (message.content && 
+                message.content.includes('"response"') && 
+                message.content.includes('"userStatusMessage"') &&
+                message.content.startsWith('{')) {
+              console.warn(`[MessagePersistenceMonitor] Found malformed message: ${message.id}`);
+              onMalformedMessage?.(message.id, message.content);
+            }
+          }
+        }
+        
+        if (!healthResult.isHealthy && healthResult.issues?.length > 0) {
+          console.warn(`[MessagePersistenceMonitor] Thread health issues:`, healthResult.issues);
+          onPersistenceIssue?.(threadId, healthResult.issues);
+        }
+      }
+      
+      lastCheck.current = new Date();
+      console.log(`[MessagePersistenceMonitor] Health check completed for thread: ${threadId}`, healthResult);
+      
+    } catch (error) {
+      console.error('[MessagePersistenceMonitor] Exception during health check:', error);
+      setHealthStatus(prev => ({
+        ...prev,
+        isHealthy: false,
+        issues: ['Exception during health check'],
+        lastCheck: new Date()
+      }));
+    }
+  };
 
   useEffect(() => {
     if (!threadId) return;
 
-    const checkMessageHealth = async () => {
-      try {
-        // Check for malformed JSON messages in the thread
-        const { data: messages, error } = await supabase
-          .from('chat_messages')
-          .select('id, content, sender, created_at')
-          .eq('thread_id', threadId)
-          .eq('sender', 'assistant')
-          .order('created_at', { ascending: false })
-          .limit(10);
-
-        if (error) {
-          console.error('[MessageMonitor] Error fetching messages:', error);
-          onPersistenceIssue?.('Failed to fetch messages for health check');
-          return;
-        }
-
-        // Check for JSON content in assistant messages
-        const malformedMessages = messages?.filter(msg => {
-          if (msg.sender === 'assistant' && msg.content) {
-            try {
-              // Check if content looks like JSON
-              if (msg.content.startsWith('{') && msg.content.includes('"response"')) {
-                const parsed = JSON.parse(msg.content);
-                return parsed.response && parsed.userStatusMessage;
-              }
-            } catch {
-              // Not JSON, which is good for message content
-            }
-          }
-          return false;
-        }) || [];
-
-        // Report malformed messages
-        malformedMessages.forEach(msg => {
-          console.warn('[MessageMonitor] Malformed JSON message detected:', {
-            messageId: msg.id,
-            contentPreview: msg.content.substring(0, 100)
-          });
-          onMalformedMessage?.(msg.id, msg.content);
-        });
-
-        // Check message persistence health using database function
-        const { data: healthResult, error: healthError } = await supabase
-          .rpc('check_message_persistence_health', {
-            thread_id_param: threadId
-          });
-
-        if (healthError) {
-          console.error('[MessageMonitor] Health check failed:', healthError);
-          onPersistenceIssue?.('Message persistence health check failed');
-        } else if (healthResult) {
-          const health = healthResult as any;
-          if (!health.is_healthy) {
-            console.warn('[MessageMonitor] Thread health issues detected:', health.issues);
-            onPersistenceIssue?.(
-              `Thread health score: ${health.health_score}/100. Issues: ${health.issues.join(', ')}`
-            );
-          } else {
-            console.log('[MessageMonitor] Thread health check passed:', {
-              score: health.health_score,
-              totalMessages: health.total_messages
-            });
-          }
-        }
-
-        lastCheckRef.current = new Date();
-      } catch (error) {
-        console.error('[MessageMonitor] Health check exception:', error);
-        onPersistenceIssue?.('Message monitoring error occurred');
-      }
-    };
-
     // Initial check
     checkMessageHealth();
 
-    // Periodic health checks every 30 seconds
+    // Periodic checks every 30 seconds
     const interval = setInterval(checkMessageHealth, 30000);
 
     return () => {
       clearInterval(interval);
     };
-  }, [threadId, onMalformedMessage, onPersistenceIssue]);
+  }, [threadId]);
 
-  // Function to manually trigger a health check
-  const triggerHealthCheck = async () => {
-    if (!threadId) return null;
-
+  const recoverMissingResponse = async (messageId: string) => {
+    if (!threadId) return { success: false, error: 'No thread ID' };
+    
     try {
-      const { data, error } = await supabase
-        .rpc('check_message_persistence_health', {
-          thread_id_param: threadId
-        });
-
-      if (error) throw error;
-      return data;
-    } catch (error) {
-      console.error('[MessageMonitor] Manual health check failed:', error);
-      return null;
-    }
-  };
-
-  // Function to clean up stuck processing messages
-  const cleanupStuckMessages = async () => {
-    try {
-      const { data, error } = await supabase
-        .rpc('cleanup_stuck_processing_messages');
-
-      if (error) throw error;
+      const { data, error } = await supabase.functions.invoke('message-persistence-monitor', {
+        body: {
+          threadId,
+          messageId,
+          action: 'recover'
+        }
+      });
       
-      console.log('[MessageMonitor] Cleanup result:', data);
-      return data;
+      if (error) {
+        console.error('[MessagePersistenceMonitor] Recovery error:', error);
+        return { success: false, error: error.message };
+      }
+      
+      return { success: true, data };
     } catch (error) {
-      console.error('[MessageMonitor] Cleanup failed:', error);
-      return null;
+      console.error('[MessagePersistenceMonitor] Recovery exception:', error);
+      return { success: false, error: (error as Error).message };
     }
   };
 
   return {
-    triggerHealthCheck,
-    cleanupStuckMessages,
-    lastCheck: lastCheckRef.current
+    healthStatus,
+    
+    triggerHealthCheck: async (targetThreadId?: string) => {
+      const checkThreadId = targetThreadId || threadId;
+      if (!checkThreadId) return { success: false, error: 'No thread ID' };
+      
+      try {
+        const { data, error } = await supabase.functions.invoke('message-persistence-monitor', {
+          body: {
+            threadId: checkThreadId,
+            action: 'check'
+          }
+        });
+        
+        if (error) {
+          console.error('[MessagePersistenceMonitor] Manual health check error:', error);
+          return { success: false, error: error.message };
+        }
+        
+        return { success: true, data };
+      } catch (error) {
+        console.error('[MessagePersistenceMonitor] Manual health check exception:', error);
+        return { success: false, error: (error as Error).message };
+      }
+    },
+    
+    cleanupStuckMessages: async () => {
+      if (!threadId) return { success: false, error: 'No thread ID' };
+      
+      try {
+        const { data, error } = await supabase.functions.invoke('message-persistence-monitor', {
+          body: {
+            threadId,
+            action: 'cleanup'
+          }
+        });
+        
+        if (error) {
+          console.error('[MessagePersistenceMonitor] Cleanup error:', error);
+          return { success: false, error: error.message };
+        }
+        
+        return { success: true, data };
+      } catch (error) {
+        console.error('[MessagePersistenceMonitor] Cleanup exception:', error);
+        return { success: false, error: (error as Error).message };
+      }
+    },
+    
+    recoverMissingResponse,
+    lastCheck
   };
-}
+};

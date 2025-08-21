@@ -131,8 +131,16 @@ serve(async (req) => {
       contextCount: conversationContext?.length || 0,
       streamingMode,
       messageId,
+      threadId,
       timestamp: new Date().toISOString()
     });
+
+    // Enhanced message persistence monitoring
+    if (messageId && threadId) {
+      console.log(`[CONSOLIDATION PERSISTENCE] ${consolidationId}: Will update message ${messageId} in thread ${threadId}`);
+    } else {
+      console.warn(`[CONSOLIDATION PERSISTENCE] ${consolidationId}: Missing messageId (${messageId}) or threadId (${threadId}) - response may not persist!`);
+    }
 
     // Enhanced data validation - check for empty research results
     if (!researchResults || researchResults.length === 0) {
@@ -551,6 +559,36 @@ serve(async (req) => {
       });
     }
 
+    // Enhanced message persistence handling
+    if (messageId && threadId) {
+      try {
+        console.log(`[CONSOLIDATION PERSISTENCE] Attempting to update message ${messageId}`);
+        
+        const supabaseClient = createClient(
+          Deno.env.get('SUPABASE_URL') ?? '',
+          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+        );
+
+        const { updateMessage } = await import('../_shared/messageUtils.ts');
+        
+        const updateResult = await updateMessage(supabaseClient, messageId, {
+          content: consolidatedResponse,
+          is_processing: false,
+          analysis_data: {
+            totalSubQuestions: researchResults.length,
+            consolidationId: consolidationId,
+            timestamp: new Date().toISOString()
+          }
+        });
+
+        if (!updateResult.success) {
+          console.error(`[CONSOLIDATION PERSISTENCE] Failed to update message:`, updateResult.error);
+        }
+      } catch (persistenceError) {
+        console.error(`[CONSOLIDATION PERSISTENCE] Exception during message update:`, persistenceError);
+      }
+    }
+
     return new Response(JSON.stringify({
       success: true,
       response: consolidatedResponse,
@@ -566,7 +604,9 @@ serve(async (req) => {
         researcherValidation: {
           totalValidationIssues: researchResults.reduce((sum: number, r: any) => sum + (r.researcherOutput?.validationIssues?.length || 0), 0),
           totalEnhancements: researchResults.reduce((sum: number, r: any) => sum + (r.researcherOutput?.enhancements?.length || 0), 0)
-        }
+        },
+        messageId: messageId,
+        persistenceStatus: messageId && threadId ? 'attempted' : 'skipped'
       }
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
