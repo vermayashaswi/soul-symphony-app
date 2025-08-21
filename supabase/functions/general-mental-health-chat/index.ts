@@ -192,19 +192,19 @@ MUST HAVE/DO: ALWAYS BE AWARE OF THE CONVERSATION HISTORY TO UNDERSTAND WHAT THE
         Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
       );
 
-      // Use the already parsed request data for threadId and userId
-      const threadId = requestData.threadId;
-      const userId = requestData.userId;
+      // Use the already parsed threadId and userId from line 16
+      const messageThreadId = threadId;
+      const messageUserId = userId;
       
-      if (threadId && userId) {
+      if (messageThreadId && messageUserId) {
         const idempotencyKey = await generateIdempotencyKey(
-          threadId,
+          messageThreadId,
           content,
           `general_health_${Date.now()}`
         );
 
         const saveResult = await saveMessage(supabaseClient, {
-          thread_id: threadId,
+          thread_id: messageThreadId,
           sender: 'assistant',
           role: 'assistant', 
           content: content,

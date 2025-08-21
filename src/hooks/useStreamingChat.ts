@@ -286,64 +286,9 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
           const category = (body as any)?.category || threadState.queryCategory;
           let result: { data: any; error: any };
 
-          if (category === 'JOURNAL_SPECIFIC') {
-            // Disable client-side timeout for long-running analysis
-            result = (await supabase.functions.invoke('chat-with-rag', { body })) as { data: any; error: any };
-          } else if (category === 'GENERAL_MENTAL_HEALTH') {
-            const timeoutMs = 20000 + i * 5000;
-            const timeoutPromise = new Promise((_, rej) =>
-              setTimeout(() => rej(new Error('Request timed out')), timeoutMs)
-            );
-
-            // Ensure threadId and userId are included for message persistence
-            const enhancedBody = {
-              ...body,
-              classification: 'GENERAL_MENTAL_HEALTH',
-              threadId: body.threadId || targetThreadId,
-              userId: body.userId
-            };
-
-            result = (await Promise.race([
-              supabase.functions.invoke('general-mental-health-chat', { body: enhancedBody }),
-              timeoutPromise,
-            ])) as { data: any; error: any };
-          } else if (category === 'GPT_CLARIFICATION') {
-            const timeoutMs = 20000 + i * 5000;
-            const timeoutPromise = new Promise((_, rej) =>
-              setTimeout(() => rej(new Error('Request timed out')), timeoutMs)
-            );
-
-            // Ensure threadId and userId are included for message persistence
-            const enhancedBody = {
-              ...body,
-              classification: 'GPT_CLARIFICATION',
-              threadId: body.threadId || targetThreadId,
-              userId: body.userId
-            };
-
-            result = (await Promise.race([
-              supabase.functions.invoke('gpt-clarification-generator', { body: enhancedBody }),
-              timeoutPromise,
-            ])) as { data: any; error: any };
-          } else {
-            // Fallback for unknown categories
-            const timeoutMs = 20000 + i * 5000;
-            const timeoutPromise = new Promise((_, rej) =>
-              setTimeout(() => rej(new Error('Request timed out')), timeoutMs)
-            );
-
-            // Ensure threadId and userId are included for message persistence
-            const enhancedBody = {
-              ...body,
-              threadId: body.threadId || targetThreadId,
-              userId: body.userId
-            };
-
-            result = (await Promise.race([
-              supabase.functions.invoke('general-mental-health-chat', { body: enhancedBody }),
-              timeoutPromise,
-            ])) as { data: any; error: any };
-          }
+          // Route ALL queries through chat-with-rag for unified message persistence
+          // Disable client-side timeout for all categories as they're handled by chat-with-rag
+          result = (await supabase.functions.invoke('chat-with-rag', { body })) as { data: any; error: any };
           if ((result as any)?.error) {
             lastErr = (result as any).error;
             if (isEdgeFunctionError(lastErr) || isNetworkError(lastErr)) {
