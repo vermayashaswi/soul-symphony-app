@@ -286,18 +286,41 @@ serve(async (req) => {
       console.log("[chat-with-rag] Successfully completed RAG pipeline with consolidation");
 
       // Update the assistant message with the final response using shared utilities
-      if (assistantMessageId && consolidationResponse.data.response) {
+      if (assistantMessageId && consolidationResponse.data) {
         try {
           const { updateMessage } = await import('../_shared/messageUtils.ts');
           
+          // Enhanced validation and extraction of response content
+          console.log('[chat-with-rag] Consolidation response structure:', {
+            hasData: !!consolidationResponse.data,
+            dataKeys: Object.keys(consolidationResponse.data || {}),
+            responseType: typeof consolidationResponse.data?.response,
+            responseLength: consolidationResponse.data?.response?.length || 0,
+            responsePreview: consolidationResponse.data?.response?.substring(0, 100) || 'none'
+          });
+          
+          let finalResponseContent = consolidationResponse.data.response;
+          
+          // Additional safety check: ensure we're not storing JSON objects as content
+          if (typeof finalResponseContent === 'object') {
+            console.error('[chat-with-rag] ERROR: Response content is an object, not a string!', finalResponseContent);
+            finalResponseContent = JSON.stringify(finalResponseContent);
+          }
+          
+          // Validate that the content is actually a readable string
+          if (!finalResponseContent || typeof finalResponseContent !== 'string') {
+            console.error('[chat-with-rag] ERROR: Invalid response content:', typeof finalResponseContent);
+            finalResponseContent = "I processed your request but encountered an issue with the response format. Please try again.";
+          }
+          
           const updateResult = await updateMessage(supabaseClient, assistantMessageId, {
-            content: consolidationResponse.data.response,
+            content: finalResponseContent,
             is_processing: false,
             analysis_data: consolidationResponse.data.analysisMetadata || null
           });
           
           if (updateResult.success) {
-            console.log(`[chat-with-rag] Updated assistant message ${assistantMessageId} with response`);
+            console.log(`[chat-with-rag] Updated assistant message ${assistantMessageId} with response (${finalResponseContent.length} chars)`);
           } else {
             console.error('[chat-with-rag] Error updating assistant message:', updateResult.error);
           }

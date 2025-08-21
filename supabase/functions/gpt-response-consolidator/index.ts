@@ -56,29 +56,50 @@ function sanitizeConsolidatorOutput(raw: string): { responseText: string; status
       console.error('[CONSOLIDATOR] Empty response from OpenAI API');
       return { responseText: 'I ran into a formatting issue preparing your insights. Let\'s try again.', statusMsg: null, meta };
     }
+    
+    console.log('[CONSOLIDATOR] Raw response for sanitization:', raw.substring(0, 300));
+    
     let s = stripCodeFences(raw);
     meta.afterStripPrefix = s.slice(0, 60);
     let parsed: any = null;
+    
+    // Enhanced JSON parsing with better error handling
     if (s.trim().startsWith('{')) {
       try {
         parsed = JSON.parse(s);
         meta.parsedDirect = true;
-      } catch {
+        console.log('[CONSOLIDATOR] Successfully parsed JSON directly:', Object.keys(parsed));
+      } catch (parseError) {
+        console.log('[CONSOLIDATOR] Direct JSON parse failed, trying extraction:', parseError.message);
         const jsonStr = extractFirstJsonObjectString(s);
         if (jsonStr) {
           try {
             parsed = JSON.parse(jsonStr);
             meta.parsedExtracted = true;
-          } catch {
-            console.error('[CONSOLIDATOR] Failed to parse extracted JSON:', jsonStr);
+            console.log('[CONSOLIDATOR] Successfully parsed extracted JSON:', Object.keys(parsed));
+          } catch (extractError) {
+            console.error('[CONSOLIDATOR] Failed to parse extracted JSON:', extractError.message);
+            console.error('[CONSOLIDATOR] Extracted JSON string was:', jsonStr);
           }
+        } else {
+          console.error('[CONSOLIDATOR] No JSON object found in response');
         }
       }
+    } else {
+      console.log('[CONSOLIDATOR] Response does not start with JSON, treating as plain text');
     }
+    
     if (parsed && typeof parsed === 'object') {
       const { responseText, statusMsg } = coalesceResponseFields(parsed, s);
+      console.log('[CONSOLIDATOR] Extracted fields:', { 
+        responseLength: responseText?.length || 0, 
+        hasStatusMsg: !!statusMsg,
+        responsePreview: responseText?.substring(0, 100) || 'empty'
+      });
       return { responseText, statusMsg, meta };
     }
+    
+    console.log('[CONSOLIDATOR] No valid JSON parsed, returning raw text');
     return { responseText: s, statusMsg: null, meta };
   } catch (e) {
     console.error('[CONSOLIDATOR] Sanitization error:', e);
@@ -502,6 +523,32 @@ serve(async (req) => {
       } catch (dbError) {
         console.error(`[${consolidationId}] Exception storing analysis data:`, dbError);
       }
+    }
+
+    // Enhanced logging for response structure
+    console.log(`[${consolidationId}] Final response structure:`, {
+      responseLength: consolidatedResponse?.length || 0,
+      hasUserStatusMessage: !!userStatusMessage,
+      responseType: typeof consolidatedResponse,
+      isValidString: typeof consolidatedResponse === 'string' && consolidatedResponse.length > 0
+    });
+
+    // Validate that we're returning a proper string, not JSON object
+    if (typeof consolidatedResponse !== 'string') {
+      console.error(`[${consolidationId}] ERROR: consolidatedResponse is not a string:`, typeof consolidatedResponse);
+      const fallbackResponse = "I processed your request but encountered a formatting issue. Please try asking again.";
+      return new Response(JSON.stringify({
+        success: true,
+        response: fallbackResponse,
+        userStatusMessage: "Formatting issue resolved",
+        analysisMetadata: {
+          totalSubQuestions: researchResults.length,
+          strategiesUsed: [],
+          dataSourcesUsed: { vectorSearch: false, sqlQueries: false, errors: true }
+        }
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     return new Response(JSON.stringify({
