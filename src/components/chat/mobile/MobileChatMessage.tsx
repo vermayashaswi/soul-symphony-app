@@ -65,7 +65,7 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({
         transition={{ duration: 0.3 }}
         className="mb-3"
       >
-        <TypingIndicator className="justify-start" message={loadingMessage} />
+        <TypingIndicator className="justify-start" />
       </motion.div>
     );
   }

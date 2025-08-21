@@ -126,7 +126,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
 
       // Keep typing indicator visible while we finalize and render the message for the active thread
       if (originThreadId === currentThreadId) {
-        startLoading("Finalizing response...");
+        startLoading();
       }
       
       // Backend persists assistant message; UI will append via realtime
@@ -497,7 +497,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     window.dispatchEvent(new Event('chat:forceScrollToBottom'));
     
     // Set local loading state for immediate UI feedback
-    startLoading("Analyzing your question...");
+    startLoading();
     
     // Ensure we stay pinned to bottom as processing begins
     window.dispatchEvent(new Event('chat:forceScrollToBottom'));

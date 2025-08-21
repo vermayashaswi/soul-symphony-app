@@ -33,6 +33,7 @@ class MobileErrorHandler {
   private isOnline: boolean = true;
   private lastToastAt: Record<string, number> = {};
   private suppressNoisyToasts: boolean = true;
+  private isGracefulShutdown: boolean = false;
 
   private constructor() {
     this.initialize();
@@ -50,6 +51,7 @@ class MobileErrorHandler {
     this.setupNetworkHandlers();
     this.setupCapacitorErrorHandlers();
     this.setupAndroidSpecificHandlers();
+    this.setupGracefulShutdownDetection();
     this.startCrashDetection();
     
     // Process error queue periodically
@@ -173,17 +175,26 @@ class MobileErrorHandler {
     }
   }
 
+  private setupGracefulShutdownDetection(): void {
+    // Track when user intentionally closes/refreshes the page
+    window.addEventListener('beforeunload', () => {
+      this.isGracefulShutdown = true;
+      localStorage.setItem('app_graceful_shutdown', Date.now().toString());
+    });
+  }
+
   private startCrashDetection(): void {
     // Check if app crashed during last session
     const lastTimestamp = localStorage.getItem('app_heartbeat');
+    const gracefulShutdown = localStorage.getItem('app_graceful_shutdown');
     const currentTime = Date.now();
     
-    if (lastTimestamp) {
+    if (lastTimestamp && !gracefulShutdown) {
       const lastTime = parseInt(lastTimestamp);
       const timeDiff = currentTime - lastTime;
       
-      // If more than 5 minutes since last heartbeat, consider it a crash
-      if (timeDiff > 300000) {
+      // Only consider it a crash if more than 30 minutes and no graceful shutdown
+      if (timeDiff > 1800000) { // 30 minutes instead of 5
         this.handleError({
           type: 'crash',
           message: 'App crash detected from previous session',
@@ -194,9 +205,14 @@ class MobileErrorHandler {
       }
     }
     
+    // Clear graceful shutdown flag after checking
+    localStorage.removeItem('app_graceful_shutdown');
+    
     // Set up heartbeat
     const updateHeartbeat = () => {
-      localStorage.setItem('app_heartbeat', Date.now().toString());
+      if (!this.isGracefulShutdown) {
+        localStorage.setItem('app_heartbeat', Date.now().toString());
+      }
     };
     
     updateHeartbeat();

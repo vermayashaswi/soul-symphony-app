@@ -577,7 +577,7 @@ export default function MobileChatInterface({
     setMessages(prev => [...prev, { role: 'user', content: message }]);
     // Force scroll to bottom on send so user sees streaming/processing
     scrollToBottom(true);
-    startLoading("Processing your request...");
+    startLoading();
     // Ensure we remain pinned to bottom as processing begins
     scrollToBottom(true);
     
