@@ -466,6 +466,7 @@ export default function MobileChatInterface({
       
       if (chatMessages && chatMessages.length > 0) {
         const uiMessages = chatMessages
+          .filter(msg => !msg.is_processing) // Filter out processing messages from UI
           .map(msg => ({
             id: msg.id,
             role: msg.sender as 'user' | 'assistant',
@@ -508,6 +509,12 @@ export default function MobileChatInterface({
     const handleRealtimeInsert = (payload: any) => {
       const newMessage = payload.new;
       console.log(`[MobileChatInterface] Real-time INSERT: ${newMessage.id} - ${newMessage.sender}`);
+      
+      // Skip processing messages from UI display
+      if (newMessage.is_processing) {
+        console.log(`[MobileChatInterface] Skipping processing message from UI: ${newMessage.id}`);
+        return;
+      }
       
       // Track message persistence
       messageLifecycleTracker.trackEvent({
@@ -761,11 +768,18 @@ export default function MobileChatInterface({
               .order('created_at', { ascending: false })
               .limit(1);
             
-            if (recentMessages && recentMessages.length > 0 && recentMessages[0].sender === 'assistant') {
-              console.log('[MobileChatInterface] Message was persisted, triggering UI sync');
-              // Trigger realtime sync by refreshing subscription
-              await loadThreadMessages(currentThreadId!);
-            }
+              if (recentMessages && recentMessages.length > 0 && recentMessages[0].sender === 'assistant') {
+                console.log('[MobileChatInterface] Message was persisted, triggering UI sync');
+                // Show subtle success toast instead of "messages synced"
+                toast({
+                  title: "Message received",
+                  description: "",
+                  duration: 1500,
+                  variant: "default"
+                });
+                // Trigger realtime sync by refreshing subscription
+                await loadThreadMessages(currentThreadId!);
+              }
           } catch (persistenceCheckError) {
             console.error('[MobileChatInterface] Error checking message persistence:', persistenceCheckError);
           }
