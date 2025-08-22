@@ -1,5 +1,5 @@
 
-export async function executeSQLAnalysis(step: any, userId: string, supabaseClient: any, requestId: string, executionDetails: any) {
+export async function executeSQLAnalysis(step: any, userId: string, supabaseClient: any, requestId: string, executionDetails: any, userTimezone: string = 'UTC') {
   try {
     console.log(`[${requestId}] Executing SQL query:`, step.sqlQuery);
     
@@ -28,7 +28,8 @@ export async function executeSQLAnalysis(step: any, userId: string, supabaseClie
     console.log(`[${requestId}] Executing sanitized query via RPC:`, sanitizedQuery.substring(0, 200) + '...');
     
     const { data, error } = await supabaseClient.rpc('execute_dynamic_query', {
-      query_text: sanitizedQuery
+      query_text: sanitizedQuery,
+      user_timezone: userTimezone
     });
 
     if (error) {

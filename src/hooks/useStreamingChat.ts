@@ -698,6 +698,25 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
       timestamp: Date.now()
     }, targetThreadId);
 
+    // Fetch user timezone from profiles table
+    let userTimezone = 'UTC';
+    try {
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('timezone')
+        .eq('id', userId)
+        .single();
+      
+      if (!profileError && profile?.timezone) {
+        userTimezone = profile.timezone;
+        console.log(`[useStreamingChat] Using user timezone: ${userTimezone}`);
+      } else {
+        console.log(`[useStreamingChat] No timezone found in profile, using UTC`);
+      }
+    } catch (error) {
+      console.error('[useStreamingChat] Error fetching user timezone:', error);
+    }
+
     // Classify message to determine streaming behavior
     let messageCategory = 'GENERAL_MENTAL_HEALTH';
     try {
@@ -744,10 +763,11 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
         userId,
         threadId: targetThreadId,
         conversationContext,
-        userProfile,
+        userProfile: { ...userProfile, timezone: userTimezone },
         streamingMode: false,
         requestId, // Include request ID for deduplication
         category: messageCategory,
+        userTimezone, // Pass timezone directly to edge functions
       }, { attempts: 3, baseDelay: 900 }, targetThreadId);
       // Check if request is still active (not superseded by another request)
       const currentThreadState = getThreadState(targetThreadId);

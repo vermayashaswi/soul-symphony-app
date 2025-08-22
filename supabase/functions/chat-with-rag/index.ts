@@ -122,7 +122,8 @@ serve(async (req) => {
       threadId = null, 
       messageId = null,
       conversationContext = [],
-      userProfile = null
+      userProfile = null,
+      userTimezone = 'UTC'
     } = await req.json();
 
     console.log(`[chat-with-rag] Processing query: "${message}" for user: ${userId} (threadId: ${threadId}, messageId: ${messageId})`);
@@ -155,15 +156,15 @@ serve(async (req) => {
     }
     
     // Enhanced timezone handling with validation
-    const { normalizeUserTimezone } = await import('../_shared/timezoneUtils.ts');
+    const { normalizeTimezone } = await import('../_shared/timezoneUtils.ts');
     const { safeTimezoneConversion, debugTimezoneInfo } = await import('../_shared/enhancedTimezoneUtils.ts');
     
-    const userTimezone = normalizeUserTimezone(userProfile);
+    const normalizedTimezone = normalizeTimezone(userTimezone);
     
     // Validate timezone and log detailed info for debugging
-    const timezoneDebug = debugTimezoneInfo(userTimezone, 'chat-with-rag');
+    const timezoneDebug = debugTimezoneInfo(normalizedTimezone, 'chat-with-rag');
     console.log(`[chat-with-rag] User timezone validation:`, {
-      userTimezone,
+      userTimezone: normalizedTimezone,
       isValid: timezoneDebug.validation.isValid,
       issues: timezoneDebug.validation.issues
     });
@@ -247,12 +248,12 @@ serve(async (req) => {
 
       // Enhanced timeframe detection with timezone support
       let timeRange = null;
-      const detectedTimeframe = detectTimeframeInQuery(message, userTimezone);
+      const detectedTimeframe = detectTimeframeInQuery(message, normalizedTimezone);
       
       if (detectedTimeframe) {
-        console.log(`[chat-with-rag] Detected timeframe with timezone ${userTimezone}:`, JSON.stringify(detectedTimeframe, null, 2));
+        console.log(`[chat-with-rag] Detected timeframe with timezone ${normalizedTimezone}:`, JSON.stringify(detectedTimeframe, null, 2));
         // Process timeframe with user's timezone for proper UTC conversion
-        timeRange = processTimeRange(detectedTimeframe, userTimezone);
+        timeRange = processTimeRange(detectedTimeframe, normalizedTimezone);
         console.log(`[chat-with-rag] Processed time range (converted to UTC):`, JSON.stringify(timeRange, null, 2));
       }
 
@@ -264,10 +265,11 @@ serve(async (req) => {
           userMessage: message,
           researchResults: executionResult || [], // Map executionResult to researchResults
           conversationContext: conversationContext,
-          userProfile: userProfile,
+          userProfile: { ...userProfile, timezone: normalizedTimezone },
           streamingMode: false,
           messageId: assistantMessageId, // Use the assistant message ID we created
-          threadId: threadId
+          threadId: threadId,
+          userTimezone: normalizedTimezone
         }
       });
 
