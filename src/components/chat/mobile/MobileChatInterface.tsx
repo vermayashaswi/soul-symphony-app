@@ -128,39 +128,71 @@ export default function MobileChatInterface({
           return;
         }
         
-         debugLog.addEvent("Streaming Response", `[Mobile] Final response received for ${originThreadId}: ${response.substring(0, 100)}...`, "success");
+        debugLog.addEvent("Streaming Response", `[Mobile] Final response received for ${originThreadId}: ${response.substring(0, 100)}...`, "success");
 
+        // Only update UI if this response is for the current thread
+        if (originThreadId === threadId) {
+          // Add assistant message to UI immediately for better UX
+          const assistantMessage: UIChatMessage = {
+            id: `assistant-${Date.now()}`, // Temporary ID until realtime updates with real ID
+            role: 'assistant',
+            content: response,
+            references: analysis?.references || undefined,
+            analysis: analysis || undefined,
+            created_at: new Date().toISOString()
+          };
 
-         // Remove optimistic UI - let backend persist and realtime handle updates
-         setShowSuggestions(false);
+          setMessages(prev => {
+            // Check if message already exists (avoid duplicates)
+            const existingMessage = prev.find(m => 
+              m.role === 'assistant' && 
+              m.content === response && 
+              Math.abs(new Date().getTime() - new Date(m.created_at || 0).getTime()) < 5000 // Within 5 seconds
+            );
+            
+            if (existingMessage) {
+              console.log('[Mobile] Assistant message already exists, skipping duplicate');
+              return prev;
+            }
+            
+            console.log('[Mobile] Adding assistant message to UI');
+            return [...prev, assistantMessage];
+          });
 
-         // Update user message with classification data if available
-         if (analysis?.classification && requestId) {
-           try {
-             // Find the most recent user message to update with classification
-             const { data: recentUserMessages } = await supabase
-               .from('chat_messages')
-               .select('id')
-               .eq('thread_id', originThreadId)
-               .eq('sender', 'user')
-               .order('created_at', { ascending: false })
-               .limit(1);
+          // Force scroll to bottom when new message arrives
+          setTimeout(() => scrollToBottom(), 100);
+        }
 
-             if (recentUserMessages && recentUserMessages.length > 0) {
-               await updateUserMessageClassification(
-                 recentUserMessages[0].id,
-                 analysis.classification,
-                 user.id
-               );
-               debugLog.addEvent("Classification", "Updated user message with classification data", "success");
-             }
-           } catch (classificationError) {
-             console.warn('[Mobile] Failed to update user message classification:', classificationError);
-           }
-         }
+        // Remove optimistic UI
+        setShowSuggestions(false);
+
+        // Update user message with classification data if available
+        if (analysis?.classification && requestId) {
+          try {
+            // Find the most recent user message to update with classification
+            const { data: recentUserMessages } = await supabase
+              .from('chat_messages')
+              .select('id')
+              .eq('thread_id', originThreadId)
+              .eq('sender', 'user')
+              .order('created_at', { ascending: false })
+              .limit(1);
+
+            if (recentUserMessages && recentUserMessages.length > 0) {
+              await updateUserMessageClassification(
+                recentUserMessages[0].id,
+                analysis.classification,
+                user.id
+              );
+              debugLog.addEvent("Classification", "Updated user message with classification data", "success");
+            }
+          } catch (classificationError) {
+            console.warn('[Mobile] Failed to update user message classification:', classificationError);
+          }
+        }
         
-        // Backend will persist assistant message; UI updates via realtime
-    },
+        // Backend persists message; realtime will update with correct ID later
+      },
      onError: (error) => {
        toast({
          title: "Error",
