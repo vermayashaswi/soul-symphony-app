@@ -838,6 +838,8 @@ async function analyzeQueryWithSubQuestions(message, conversationContext, userEn
 
     const prompt = `You are SOULo's Enhanced Analyst Agent - an intelligent query planning specialist for journal data analysis TIMEZONE-AWARE date processing.
 
+**CRITICAL DATABASE TYPE: This is a PostgreSQL database. Use PostgreSQL-specific syntax and functions.**
+
 ${databaseSchemaContext}
 
 **CRITICAL DATABASE CONTEXT ADHERENCE:**
@@ -845,6 +847,7 @@ ${databaseSchemaContext}
 - DO NOT hallucinate or invent table structures, column names, or data types
 - STICK STRICTLY to the provided database schema context
 - If uncertain about a database structure, use basic select queries instead of complex ones
+- Use PostgreSQL-compatible functions and syntax
 
 **IMPORTANT TIME RELATED QUERY PLANNING:** Note that in the "Journal Entries" table the user timestamps are in the column "created_at" and are of the data type timestamptz (example value in database: 2025-08-02 18:57:54.515+00)
 
@@ -912,10 +915,15 @@ SUB-QUESTION/QUERIES GENERATION GUIDELINE (MANDATORY):
    - Achievement/progress tracking: SQL for metrics AND vector for meaningful content
 
 3. **ENHANCED VECTOR QUERY GENERATION**:
+   - MANDATORY: When generating vector search queries, append relevant terms from the master themes and emotions lists provided in the database schema context
+   - For negative emotion queries: append negative emotions like "anxiety anger frustration sadness disappointment fear guilt shame regret loneliness pessimism overwhelm"
+   - For theme-specific queries: append related theme names from the master themes list
+   - For general queries: append contextually relevant emotions and themes from the database context
+   - Example: Original sub-question "What are negative emotions expressed?" → Enhanced vector search: "negative emotions anxiety anger frustration sadness disappointment fear guilt shame overwhelm loneliness pessimism regret personal feelings journal entries"
    - Use the user's EXACT words and emotional context in vector searches
    - For "What did I journal in August" → Vector query: "journal entries personal thoughts feelings experiences august"
-   - For achievement queries → Vector query: "achievement success accomplishment progress breakthrough proud"
-   - For emotional queries → Vector query: "emotions feelings mood emotional state [specific emotions mentioned]"
+   - For achievement queries → Vector query: "achievement success accomplishment progress breakthrough proud confidence joy satisfaction pride"
+   - For emotional queries → Vector query: "emotions feelings mood emotional state [specific emotions mentioned] [append relevant emotions from database context]"
    - Preserve user's original language patterns for better semantic matching
 
 4. **CRITICAL TIME-OF-DAY QUERY RULES**:
