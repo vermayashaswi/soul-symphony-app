@@ -27,6 +27,7 @@ import ChatErrorBoundary from "../ChatErrorBoundary";
 import { useAutoScroll } from "@/hooks/use-auto-scroll";
 import { useMobileChatSync } from "@/hooks/use-mobile-chat-sync";
 import { useEnhancedErrorRecovery } from "@/hooks/use-enhanced-error-recovery";
+import { saveChatStreamingState } from "@/utils/chatStateStorage";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -96,7 +97,8 @@ export default function MobileChatInterface({
     isOnline,
     isRealtimeConnected,
     forceSyncMessages,
-    addPendingSyncMessage
+    addPendingSyncMessage,
+    checkForMissedMessages
   } = useMobileChatSync({
     threadId,
     userId: user?.id || null,
@@ -202,9 +204,12 @@ export default function MobileChatInterface({
   });
   
   // Use streaming chat for enhanced UX
+  const streamingChat = useStreamingChat({
+      threadId: threadId
+  });
+
   const {
     isStreaming,
-    // streamingThreadId - removed as part of thread isolation
     streamingMessages,
     currentUserMessage,
     showBackendAnimation,
@@ -215,9 +220,11 @@ export default function MobileChatInterface({
     useThreeDotFallback,
     queryCategory,
     restoreStreamingState
-   } = useStreamingChat({
-      threadId: threadId,
-     onFinalResponse: async (response, analysis, originThreadId, requestId) => {
+  } = streamingChat;
+
+  // Configure streaming chat callbacks - use hook's built-in callback system
+  useEffect(() => {
+    // The useStreamingChat hook handles callbacks internally
        // Handle final streaming response scoped to its origin thread
        if (!response || !originThreadId || !user?.id) {
          debugLog.addEvent("Streaming Response", "[Mobile] Missing required data for final response", "error");
@@ -348,16 +355,8 @@ export default function MobileChatInterface({
             });
           }
         }
-    },
-     onError: (error) => {
-       console.error('[MobileChatInterface] Streaming error:', error);
-       
-       // Use enhanced error recovery for streaming errors
-       errorRecovery.handleError(new Error(error), async () => {
-         await forceSyncMessages();
-       });
-     }
-   });
+    // Remove callback assignments - useStreamingChat handles these internally
+  }, [threadId]);
   
   const suggestionQuestions = [
     {
@@ -458,6 +457,50 @@ export default function MobileChatInterface({
       window.removeEventListener('threadSelected' as any, onThreadChange);
     };
   }, []);
+
+  // Navigation and tab switching handling with enhanced state reconciliation
+  useEffect(() => {
+    if (!threadId) return;
+
+    const handleVisibilityChange = async () => {
+      if (document.hidden) {
+        console.log('[MobileChatInterface] Page hidden, saving state');
+        // Save current streaming state if active
+        if (streamingChat.isStreaming) {
+          saveChatStreamingState(threadId, {
+            isStreaming: true,
+            streamingMessages: streamingChat.streamingMessages,
+            currentUserMessage: streamingChat.currentUserMessage,
+            showBackendAnimation: streamingChat.showBackendAnimation,
+            dynamicMessages: streamingChat.dynamicMessages,
+            currentMessageIndex: streamingChat.currentMessageIndex,
+            useThreeDotFallback: streamingChat.useThreeDotFallback,
+            queryCategory: streamingChat.queryCategory,
+            expectedProcessingTime: streamingChat.expectedProcessingTime,
+            processingStartTime: streamingChat.processingStartTime,
+            activeRequestId: null,
+            pausedDueToBackground: true
+          });
+        }
+      } else {
+        console.log('[MobileChatInterface] Page visible, checking for state restoration');
+        // Enhanced state reconciliation: check for missed messages first
+        await checkForMissedMessages();
+        
+        // Then try to restore streaming state with validation
+        setTimeout(async () => {
+          const restored = await streamingChat.restoreStreamingState(threadId);
+          if (!restored) {
+            // If state wasn't restored, force sync to ensure we have latest messages
+            await forceSyncMessages();
+          }
+        }, 100);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [threadId, streamingChat, forceSyncMessages, checkForMissedMessages]);
 
   // Auto-scroll is now handled by the useAutoScroll hook
 

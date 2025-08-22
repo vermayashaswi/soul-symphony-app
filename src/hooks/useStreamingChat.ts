@@ -612,6 +612,44 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     return () => clearTimeout(timer);
   }, [threadId, state.isStreaming, state.expectedProcessingTime, state.processingStartTime, getThreadState, addStreamingMessage, updateThreadState]);
 
+  // Validate processing state against database
+  const validateSavedProcessingState = useCallback(async (targetThreadId: string, savedState: any): Promise<boolean> => {
+    try {
+      // Check if processing state is too old (more than 10 minutes)
+      const stateAge = Date.now() - (savedState.savedAt || 0);
+      if (stateAge > 10 * 60 * 1000) {
+        console.log(`[useStreamingChat] Processing state too old: ${stateAge}ms`);
+        return false;
+      }
+
+      // Query database for any assistant messages after the processing start time
+      const { data: recentMessages, error } = await supabase
+        .from('chat_messages')
+        .select('id, sender, created_at')
+        .eq('thread_id', targetThreadId)
+        .eq('sender', 'assistant')
+        .gte('created_at', new Date(savedState.processingStartTime || 0).toISOString())
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (error) {
+        console.error('[useStreamingChat] Error validating processing state:', error);
+        return false;
+      }
+
+      // If we find assistant messages after processing started, the state is stale
+      if (recentMessages && recentMessages.length > 0) {
+        console.log(`[useStreamingChat] Found assistant message after processing start, state is stale`);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('[useStreamingChat] Error in validateSavedProcessingState:', error);
+      return false;
+    }
+  }, []);
+
   const startStreamingChat = useCallback(async (
     message: string,
     userId: string,
@@ -835,13 +873,24 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     });
   }, [threadId, updateThreadState]);
 
-  const restoreStreamingState = useCallback((targetThreadId: string) => {
+  const restoreStreamingState = useCallback(async (targetThreadId: string) => {
     if (targetThreadId !== threadId) return false;
 
     try {
       const savedState: any = getChatStreamingState(targetThreadId);
       if (savedState && (savedState.isStreaming || savedState.pausedDueToBackground)) {
-        console.log(`[useStreamingChat] Restoring streaming state for thread: ${targetThreadId}`);
+        console.log(`[useStreamingChat] Validating saved streaming state for thread: ${targetThreadId}`);
+        
+        // Validate processing state against database
+        const isValidProcessingState = await validateSavedProcessingState(targetThreadId, savedState);
+        
+        if (!isValidProcessingState) {
+          console.log(`[useStreamingChat] Processing state invalid, clearing stale state`);
+          clearChatStreamingState(targetThreadId);
+          return false;
+        }
+        
+        console.log(`[useStreamingChat] Restoring valid streaming state for thread: ${targetThreadId}`);
         const updates = {
           isStreaming: true,
           streamingMessages: savedState.streamingMessages || [],

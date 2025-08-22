@@ -16,6 +16,8 @@ interface UseMobileChatSyncOptions {
   onMessagesSync: (messages: ChatMessage[]) => void;
   onConnectionRecovered: () => void;
   onError: (error: string) => void;
+  getCurrentMessageCount?: () => number;
+  onProcessingStateCleared?: () => void;
 }
 
 export function useMobileChatSync({
@@ -23,7 +25,9 @@ export function useMobileChatSync({
   userId,
   onMessagesSync,
   onConnectionRecovered,
-  onError
+  onError,
+  getCurrentMessageCount,
+  onProcessingStateCleared
 }: UseMobileChatSyncOptions) {
   const [syncState, setSyncState] = useState<MobileChatSyncState>({
     isOnline: navigator.onLine,
@@ -246,15 +250,50 @@ export function useMobileChatSync({
     return cleanupConnections;
   }, [threadId, userId, syncState.isOnline]);
 
+  // Check for missing messages and clear stale processing states
+  const checkForMissedMessages = useCallback(async () => {
+    if (!threadId || !userId) return;
+
+    try {
+      console.log('[MobileChatSync] Checking for missed messages...');
+      
+      // Get current messages count from state
+      const currentMessageCount = getCurrentMessageCount?.() || 0;
+      
+      // Query database for actual message count
+      const { count: dbMessageCount, error } = await supabase
+        .from('chat_messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('thread_id', threadId);
+
+      if (error) {
+        console.error('[MobileChatSync] Error checking message count:', error);
+        return;
+      }
+
+      // If database has more messages than UI, sync them
+      if (dbMessageCount && dbMessageCount > currentMessageCount) {
+        console.log(`[MobileChatSync] Found ${dbMessageCount - currentMessageCount} missed messages, syncing...`);
+        await syncMessagesFromDatabase();
+        
+        // Clear any stale processing states
+        onProcessingStateCleared?.();
+      }
+    } catch (error) {
+      console.error('[MobileChatSync] Error in checkForMissedMessages:', error);
+    }
+  }, [threadId, userId, getCurrentMessageCount, onProcessingStateCleared, syncMessagesFromDatabase]);
+
   // Force sync function for manual recovery
   const forceSyncMessages = useCallback(async () => {
     console.log('[MobileChatSync] Force syncing messages...');
     await syncMessagesFromDatabase();
+    await checkForMissedMessages();
     
     if (!syncState.isRealtimeConnected && syncState.isOnline) {
       reconnectRealtime();
     }
-  }, [syncMessagesFromDatabase, syncState.isRealtimeConnected, syncState.isOnline, reconnectRealtime]);
+  }, [syncMessagesFromDatabase, checkForMissedMessages, syncState.isRealtimeConnected, syncState.isOnline, reconnectRealtime]);
 
   // Add message to pending sync list
   const addPendingSyncMessage = useCallback((messageId: string) => {
@@ -268,6 +307,7 @@ export function useMobileChatSync({
     ...syncState,
     forceSyncMessages,
     addPendingSyncMessage,
-    reconnectRealtime
+    reconnectRealtime,
+    checkForMissedMessages
   };
 }
