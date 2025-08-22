@@ -280,13 +280,55 @@ serve(async (req) => {
 
       console.log("[chat-with-rag] Successfully completed RAG pipeline with consolidation");
 
+      // Parse consolidation response properly
+      let finalResponse;
+      let userStatusMessage;
+      
+      console.log("[chat-with-rag] Consolidation response structure:", {
+        hasData: !!consolidationResponse.data,
+        dataKeys: consolidationResponse.data ? Object.keys(consolidationResponse.data) : [],
+        dataType: typeof consolidationResponse.data
+      });
+
+      // Extract response from consolidation data
+      if (consolidationResponse.data) {
+        if (typeof consolidationResponse.data === 'string') {
+          // If data is a string, try to parse it as JSON
+          try {
+            const parsedData = JSON.parse(consolidationResponse.data);
+            finalResponse = parsedData.response || consolidationResponse.data;
+            userStatusMessage = parsedData.userStatusMessage;
+          } catch {
+            // If parsing fails, use the string directly
+            finalResponse = consolidationResponse.data;
+            userStatusMessage = null;
+          }
+        } else if (consolidationResponse.data.response) {
+          // If data is an object with response field
+          finalResponse = consolidationResponse.data.response;
+          userStatusMessage = consolidationResponse.data.userStatusMessage;
+        } else {
+          // Fallback to the entire data object as string
+          finalResponse = JSON.stringify(consolidationResponse.data);
+          userStatusMessage = null;
+        }
+      } else {
+        finalResponse = "I apologize, but I encountered an issue processing your request.";
+        userStatusMessage = null;
+      }
+
+      console.log("[chat-with-rag] Extracted response:", {
+        responseLength: finalResponse?.length || 0,
+        hasStatusMessage: !!userStatusMessage
+      });
+
       // Update the assistant message with the final response
-      if (assistantMessageId && consolidationResponse.data.response) {
+      if (assistantMessageId && finalResponse) {
         try {
           await supabaseClient
             .from('chat_messages')
             .update({
-              content: consolidationResponse.data.response
+              content: finalResponse
             })
             .eq('id', assistantMessageId);
           console.log(`[chat-with-rag] Updated assistant message ${assistantMessageId} with response`);
@@ -296,8 +338,8 @@ serve(async (req) => {
       }
 
       return new Response(JSON.stringify({
-        response: consolidationResponse.data.response,
-        userStatusMessage: consolidationResponse.data.userStatusMessage,
+        response: finalResponse,
+        userStatusMessage: userStatusMessage,
         assistantMessageId: assistantMessageId, // Include the assistant message ID in response
         metadata: {
           classification: classification,
