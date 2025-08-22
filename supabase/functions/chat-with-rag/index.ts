@@ -152,6 +152,13 @@ serve(async (req) => {
     const { normalizeUserTimezone } = await import('../_shared/timezoneUtils.ts');
     const { validateUserTimezone, debugTimezoneInfo, logTimezoneDebug } = await import('../_shared/timezoneValidation.ts');
     
+    // Debug user profile timezone data before normalization
+    console.log(`[chat-with-rag] [TIMEZONE DEBUG] Raw userProfile timezone data:`, {
+      userProfile: userProfile,
+      userProfile_timezone: userProfile?.timezone,
+      userProfile_user_timezone: userProfile?.user_timezone
+    });
+    
     const userTimezone = normalizeUserTimezone(userProfile);
     
     // Comprehensive timezone validation and debugging

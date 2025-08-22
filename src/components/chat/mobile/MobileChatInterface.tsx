@@ -217,8 +217,20 @@ export default function MobileChatInterface({
          description: error,
          variant: "destructive"
        });
-     }
-   });
+      }
+    });
+  
+  // Helper function to get the latest status message from streaming messages
+  const getLatestStatusMessage = useCallback(() => {
+    if (!streamingMessages || streamingMessages.length === 0) return undefined;
+    
+    // Find the latest status_update message
+    const statusMessages = streamingMessages.filter(msg => msg.type === 'status_update');
+    if (statusMessages.length === 0) return undefined;
+    
+    const latestStatus = statusMessages[statusMessages.length - 1];
+    return latestStatus.statusMessage;
+  }, [streamingMessages]);
   
   const suggestionQuestions = [
     {
@@ -1159,9 +1171,9 @@ export default function MobileChatInterface({
                 <MobileChatMessage 
                   message={{ role: 'assistant', content: '' }}
                   streamingMessage={
-                    useThreeDotFallback || dynamicMessages.length === 0
+                    useThreeDotFallback 
                       ? undefined // Show only three-dot animation
-                      : translatedDynamicMessages[currentMessageIndex] || dynamicMessages[currentMessageIndex] // Use pre-translated message
+                      : getLatestStatusMessage() || translatedDynamicMessages[currentMessageIndex] || dynamicMessages[currentMessageIndex] // Use pre-translated message
                   }
                   showStreamingDots={true}
                 />

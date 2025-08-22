@@ -5,7 +5,7 @@ import { saveChatStreamingState, getChatStreamingState, clearChatStreamingState 
 import { useTranslation } from '@/contexts/TranslationContext';
 
 export interface StreamingMessage {
-  type: 'user_message' | 'backend_task' | 'progress' | 'final_response' | 'error';
+  type: 'user_message' | 'backend_task' | 'progress' | 'final_response' | 'error' | 'status_update';
   message?: string;
   task?: string;
   description?: string;
@@ -14,6 +14,7 @@ export interface StreamingMessage {
   response?: string;
   analysis?: any;
   error?: string;
+  statusMessage?: string;
   timestamp: number;
 }
 
@@ -42,7 +43,7 @@ const createInitialState = (): StreamingState => ({
   streamingMessages: [],
   currentUserMessage: '',
   showBackendAnimation: false,
-  useThreeDotFallback: true, // Default to three dots
+  useThreeDotFallback: false, // Enable dynamic streaming by default
   queryCategory: '',
   isRetrying: false,
   retryAttempts: 0,
@@ -182,7 +183,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     }));
   }, []);
 
-  // Force three-dot fallback for ALL categories (removed dynamic streaming messages)
+  // Re-enable dynamic streaming messages from smart-query-planner
   const generateStreamingMessages = useCallback(async (
     message: string, 
     category: string, 
@@ -191,10 +192,11 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
   ) => {
     if (!threadId) return;
 
-    // Force three-dot fallback for ALL categories - clean and simple
+    // Start with three-dot fallback but enable dynamic updates from backend
     setState(prev => ({
       ...prev,
-      useThreeDotFallback: true
+      useThreeDotFallback: false, // Enable dynamic streaming
+      showBackendAnimation: true
     }));
   }, [threadId]);
 
@@ -296,7 +298,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
       streamingMessages: [],
       currentUserMessage: '',
       showBackendAnimation: false,
-      useThreeDotFallback: true, // Always use three dots initially
+      useThreeDotFallback: false, // Enable dynamic streaming
       retryAttempts: 0,
       lastFailedMessage: null,
       isRetrying: false,
@@ -362,6 +364,15 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
 
       if (result.error) {
         throw result.error;
+      }
+
+      // Check if we have a userStatusMessage to display during processing
+      if (result.data.userStatusMessage) {
+        addStreamingMessage({
+          type: 'status_update',
+          statusMessage: result.data.userStatusMessage,
+          timestamp: Date.now()
+        });
       }
 
       // Success - handle response

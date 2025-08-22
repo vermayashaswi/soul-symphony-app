@@ -111,6 +111,7 @@ async function testVectorOperations(supabaseClient: any, requestId: string): Pro
 
 async function executePlan(plan: any, userId: string, supabaseClient: any, requestId: string, userTimezone: string = 'UTC') {
   console.log(`[${requestId}] Executing orchestrated plan with timezone ${userTimezone}:`, JSON.stringify(plan, null, 2));
+  console.log(`[${requestId}] [TIMEZONE DEBUG] User timezone for SQL generation: ${userTimezone}`);
 
   // Initialize execution context
   const executionContext: ExecutionContext = {
@@ -924,15 +925,15 @@ LIMIT 10;
     - Date processing will handle conversion from user's local time to UTC for database queries
 
 USER QUERY: "${message}"
-USER TIMEZONE: "${userTimezone}"
+USER TIMEZONE: "${userTimezone}" (CRITICAL: This is the user's local timezone, NOT UTC!)
 CONTEXT: ${last.length > 0 ? last.map(m => `${m.sender}: ${m.content?.slice(0, 50) || 'N/A'}`).join(' | ') : 'None'}
 
 ANALYSIS REQUIREMENTS:
 - Content-seeking detected: ${isContentSeekingQuery}
 - Mandatory vector required: ${requiresMandatoryVector}  
-- User timezone: ${userTimezone}
+- User timezone: ${userTimezone} (India timezone if Asia/Kolkata)
 - Is follow-up query: ${isFollowUpContext}
-- User timezone: ${userTimezone}
+- TIMEZONE REMINDER: All SQL queries will be processed with user timezone "${userTimezone}" for proper time conversions
 
 Generate a comprehensive analysis plan that:
 1. MANDATES vector search for any content-seeking scenario
