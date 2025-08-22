@@ -230,6 +230,10 @@ ENHANCED ANALYSIS GUIDELINES:
       model: 'gpt-4.1-2025-04-14',
       messages: [
         { role: 'system', content: systemPrompt },
+        ...conversationContext.slice(-4).map(msg => ({ 
+          role: msg.role, 
+          content: msg.content 
+        })),
         { role: 'user', content: message }
       ],
       temperature: 0.1,
