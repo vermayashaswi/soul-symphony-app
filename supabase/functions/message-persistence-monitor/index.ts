@@ -25,7 +25,7 @@ serve(async (req) => {
       // Check message persistence health for a thread
       const { data: messages, error } = await supabaseClient
         .from('chat_messages')
-        .select('id, sender, content, created_at, is_processing, idempotency_key')
+        .select('id, sender, content, created_at, is_processing')
         .eq('thread_id', threadId)
         .order('created_at', { ascending: true });
 
@@ -36,9 +36,8 @@ serve(async (req) => {
       const userMessages = messages?.filter(m => m.sender === 'user') || [];
       const assistantMessages = messages?.filter(m => m.sender === 'assistant') || [];
       const processingMessages = messages?.filter(m => m.is_processing) || [];
-      const missingIdempotency = messages?.filter(m => !m.idempotency_key) || [];
 
-      const healthScore = Math.max(0, 100 - (processingMessages.length * 25) - (missingIdempotency.length * 10));
+      const healthScore = Math.max(0, 100 - (processingMessages.length * 25));
       
       const result = {
         threadId,
@@ -46,12 +45,10 @@ serve(async (req) => {
         userMessages: userMessages.length,
         assistantMessages: assistantMessages.length,
         processingMessages: processingMessages.length,
-        missingIdempotencyKeys: missingIdempotency.length,
         healthScore,
         isHealthy: healthScore >= 80,
         issues: [
           ...(processingMessages.length > 0 ? [`${processingMessages.length} messages stuck in processing`] : []),
-          ...(missingIdempotency.length > 0 ? [`${missingIdempotency.length} messages missing idempotency keys`] : []),
           ...(userMessages.length > assistantMessages.length + 1 ? ['Potential missing assistant responses'] : [])
         ],
         checkedAt: new Date().toISOString()
@@ -96,30 +93,25 @@ serve(async (req) => {
         throw new Error('messageId required for recovery action');
       }
 
-      const { saveMessage, generateIdempotencyKey } = await import('../_shared/messageUtils.ts');
-      
-      const idempotencyKey = await generateIdempotencyKey(
-        threadId,
-        'Response recovered by persistence monitor',
-        `recovery_${Date.now()}`
-      );
+      // Direct message insertion without idempotency
+      const { data: newMessage, error: messageError } = await supabaseClient
+        .from('chat_messages')
+        .insert({
+          thread_id: threadId,
+          sender: 'assistant',
+          content: 'I apologize, but there was an issue with my previous response. Could you please repeat your question so I can help you properly?',
+          is_processing: false,
+          request_correlation_id: `recovery_${messageId}`
+        })
+        .select()
+        .single();
 
-      const saveResult = await saveMessage(supabaseClient, {
-        thread_id: threadId,
-        sender: 'assistant',
-        role: 'assistant',
-        content: 'I apologize, but there was an issue with my previous response. Could you please repeat your question so I can help you properly?',
-        is_processing: false,
-        idempotency_key: idempotencyKey,
-        request_correlation_id: `recovery_${messageId}`
-      });
-
-      console.log(`[PERSISTENCE MONITOR] Recovery attempt for thread ${threadId}:`, saveResult);
+      console.log(`[PERSISTENCE MONITOR] Recovery attempt for thread ${threadId}:`, { success: !messageError, messageId: newMessage?.id, error: messageError });
 
       return new Response(JSON.stringify({
-        success: saveResult.success,
-        messageId: saveResult.messageId,
-        error: saveResult.error,
+        success: !messageError,
+        messageId: newMessage?.id,
+        error: messageError?.message,
         recoveredAt: new Date().toISOString()
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
