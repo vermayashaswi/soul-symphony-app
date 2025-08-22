@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Menu, Plus, Trash2 } from "lucide-react";
 import MobileChatMessage from "./MobileChatMessage";
 import MobileChatInput from "./MobileChatInput";
+import { ChatMessageErrorBoundary } from "@/components/chat/ChatMessageErrorBoundary";
 import { supabase } from "@/integrations/supabase/client";
 import { ChatThreadList } from "@/components/chat/ChatThreadList";
 import { motion } from "framer-motion";
