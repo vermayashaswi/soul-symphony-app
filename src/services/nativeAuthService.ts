@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { nativeIntegrationService } from './nativeIntegrationService';
 import { nativeNavigationService } from './nativeNavigationService';
@@ -13,6 +14,29 @@ interface GoogleAuthPlugin {
     id: string;
   }>;
   signOut(): Promise<void>;
+}
+
+// Type definitions for Apple Sign-In
+interface SignInWithAppleOptions {
+  clientId: string;
+  redirectURI: string;
+  scopes: string[];
+  state: string;
+  nonce: string;
+}
+
+interface SignInWithAppleResponse {
+  response: {
+    identityToken: string;
+    email?: string;
+    givenName?: string;
+    familyName?: string;
+    user: string;
+  };
+}
+
+interface AppleSignInPlugin {
+  authorize(options: SignInWithAppleOptions): Promise<SignInWithAppleResponse>;
 }
 
 class NativeAuthService {
@@ -304,11 +328,11 @@ class NativeAuthService {
         throw new Error('Apple sign-in only available in native apps');
       }
 
-      // Try to get Apple Sign-In plugin dynamically
-      let SignInWithApple;
+      // Try to get Apple Sign-In plugin using Capacitor
+      let SignInWithApple: AppleSignInPlugin;
       try {
-        const plugin = await import('@ionic-native/sign-in-with-apple/ngx');
-        SignInWithApple = plugin.SignInWithApple;
+        const { SignInWithApple: ApplePlugin } = await import('@capacitor-community/apple-sign-in');
+        SignInWithApple = ApplePlugin;
       } catch (importError) {
         console.warn('[NativeAuth] Apple Sign-In plugin not available, falling back to web OAuth');
         throw new Error('Apple Sign-In plugin not available on this device');
@@ -320,25 +344,30 @@ class NativeAuthService {
 
       console.log('[NativeAuth] Apple Sign-In plugin loaded');
 
+      // Generate nonce and state for security
+      const nonce = this.generateRandomString(32);
+      const state = this.generateRandomString(32);
+
       // Perform Apple sign-in
-      const appleCredential = await SignInWithApple.signin({
-        requestedScopes: [
-          'email',
-          'fullName'
-        ]
+      const result = await SignInWithApple.authorize({
+        clientId: 'online.soulo.twa', // Your app's bundle ID
+        redirectURI: 'https://571d731e-b54b-453e-9f48-a2c79a572930.supabase.co/auth/v1/callback',
+        scopes: ['email', 'name'],
+        state,
+        nonce
       });
 
       console.log('[NativeAuth] Apple sign-in response received');
 
-      if (!appleCredential.identityToken) {
+      if (!result.response?.identityToken) {
         throw new Error('No identity token received from Apple');
       }
 
       // Exchange Apple credential for Supabase session
       const { data, error } = await supabase.auth.signInWithIdToken({
         provider: 'apple',
-        token: appleCredential.identityToken,
-        nonce: appleCredential.nonce
+        token: result.response.identityToken,
+        nonce: nonce
       });
 
       if (error) {
@@ -352,13 +381,16 @@ class NativeAuthService {
 
       console.log('[NativeAuth] Apple sign-in successful:', data.user.email);
       toast.success('Signed in with Apple successfully');
+      nativeNavigationService.handleAuthSuccess();
 
     } catch (error: any) {
       console.error('[NativeAuth] Apple sign-in error:', error);
       
       // Handle specific Apple sign-in errors
-      if (error.code === 'UserCancel') {
-        throw new Error('Apple sign-in was cancelled by user');
+      if (error.code === 'UserCancel' || error.message?.includes('cancelled')) {
+        console.log('[NativeAuth] User cancelled Apple sign-in');
+        toast.info('Apple sign-in cancelled');
+        return;
       } else if (error.code === 'UserNotSignedIn') {
         throw new Error('Please sign in to your Apple ID in Settings');
       } else if (error.message?.includes('plugin')) {
@@ -367,6 +399,15 @@ class NativeAuthService {
         throw new Error(error.message || 'Apple sign-in failed');
       }
     }
+  }
+
+  private generateRandomString(length: number): string {
+    const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    for (let i = 0; i < length; i++) {
+      result += charset.charAt(Math.floor(Math.random() * charset.length));
+    }
+    return result;
   }
 
   async signOut(): Promise<void> {

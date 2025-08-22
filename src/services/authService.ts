@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { isAppRoute } from '@/routes/RouteHelpers';
@@ -96,7 +97,10 @@ export const signInWithApple = async (): Promise<void> => {
       } catch (nativeError: any) {
         console.warn('[AuthService] Native Apple sign-in failed, falling back to web OAuth:', nativeError.message);
         
-        // Don't throw here, fall back to web OAuth
+        // Only throw if user explicitly cancelled - otherwise fall back to web OAuth
+        if (nativeError.message?.includes('cancelled')) {
+          return; // Don't show error for cancellation
+        }
       }
     }
 
