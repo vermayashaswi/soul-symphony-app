@@ -944,7 +944,7 @@ SUB-QUESTION/QUERIES GENERATION GUIDELINE (MANDATORY):
 
 USER QUERY: "${message}"
 USER TIMEZONE: "${userTimezone}"
-CONTEXT: ${last.length > 0 ? last.map(m => `${m.sender}: ${m.content || 'N/A'}`).join(' | ') : 'None'}
+CONVERSATION CONTEXT (Last 6 messages): ${last.length > 0 ? last.map(m => `${m.role || m.sender}: ${m.content || 'N/A'}`).join('\n  ') : 'None'}
 
 ANALYSIS REQUIREMENTS:
 - Content-seeking detected: ${isContentSeekingQuery}
