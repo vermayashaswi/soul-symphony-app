@@ -335,7 +335,7 @@ serve(async (req) => {
           await supabaseClient
             .from('chat_messages')
             .update({
-              content: generalResponse.data
+              content: generalResponse.data.response
             })
             .eq('id', assistantMessageId);
           console.log(`[chat-with-rag] Updated assistant message ${assistantMessageId} with mental health response`);
