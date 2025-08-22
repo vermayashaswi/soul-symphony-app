@@ -26,15 +26,17 @@ export function insertMessageInOrder(
     return messages;
   }
 
-  // Check for duplicate by content and proximity (within last 3 messages)
-  const recentMessages = messages.slice(-3);
+  // Check for duplicate by content and proximity (within last 5 messages)
+  const recentMessages = messages.slice(-5);
   const isDuplicateContent = recentMessages.some(msg => 
     msg.role === newMessage.role && 
-    msg.content?.trim() === newMessage.content?.trim()
+    msg.content?.trim() === newMessage.content?.trim() &&
+    // Allow duplicates if they have different IDs (optimistic vs real)
+    (!msg.id || !newMessage.id || msg.id === newMessage.id)
   );
 
-  if (isDuplicateContent) {
-    console.log(`[MessageOrdering] Duplicate content detected, skipping`);
+  if (isDuplicateContent && newMessage.id && messages.some(msg => msg.id === newMessage.id)) {
+    console.log(`[MessageOrdering] Duplicate content with same ID detected, skipping`);
     return messages;
   }
 

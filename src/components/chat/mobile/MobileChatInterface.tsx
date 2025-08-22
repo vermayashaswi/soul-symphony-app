@@ -130,11 +130,17 @@ export default function MobileChatInterface({
          debugLog.addEvent("Streaming Response", `[Mobile] Final response received for ${originThreadId}: ${response.substring(0, 100)}...`, "success");
 
 
-          // Optimistic UI: append assistant message immediately so UI doesn't appear blank
+          // Optimistic UI: append assistant message immediately with proper ordering
           if (originThreadId === threadId) {
-            setMessages(prev => [...prev, { role: 'assistant', content: response, analysis }]);
+            const assistantMessage: UIChatMessage = { 
+              role: 'assistant', 
+              content: response, 
+              analysis,
+              created_at: new Date().toISOString(),
+              id: `assistant-${Date.now()}`
+            };
+            setMessages(prev => insertMessageInOrder(prev, assistantMessage));
             setShowSuggestions(false);
-            
           }
 
          // Update user message with classification data if available
@@ -704,7 +710,13 @@ export default function MobileChatInterface({
       isFirstMessage = !error && count === 0;
     }
     
-    setMessages(prev => [...prev, { role: 'user', content: message }]);
+    const userMessage: UIChatMessage = {
+      role: 'user',
+      content: message,
+      created_at: new Date().toISOString(),
+      id: `user-${Date.now()}`
+    };
+    setMessages(prev => insertMessageInOrder(prev, userMessage));
     // Force scroll to bottom on send so user sees streaming/processing
     scrollToBottom(true);
     
@@ -1157,12 +1169,12 @@ export default function MobileChatInterface({
         ) : (
           <div className="space-y-3">
             {messages.map((message, index) => (
-              <ChatErrorBoundary key={index}>
+              <ChatMessageErrorBoundary key={`msg-${message.id || index}`}>
                 <MobileChatMessage 
                   message={message} 
                   showAnalysis={false}
                 />
-              </ChatErrorBoundary>
+              </ChatMessageErrorBoundary>
             ))}
             
             {/* Show streaming status or basic loading */}
