@@ -846,6 +846,8 @@ ${databaseSchemaContext}
 - STICK STRICTLY to the provided database schema context
 - If uncertain about a database structure, use basic select queries instead of complex ones
 
+**IMPORTANT TIME RELATED QUERY PLANNING:** Note that in the "Journal Entries" table the user timestamps are in the column "created_at" and are of the data type timestamptz (example value in database: 2025-08-02 18:57:54.515+00)
+
 SUB-QUESTION/QUERIES GENERATION GUIDELINE (MANDATORY): 
 - Break down user query (MANDATORY: remember that current user message might not be a direct query, so you'll have to look in to the conversation context provided to you and look at last user messages to guess the "ASK" and accordingly frame the sub-questions) into ATLEAST 2 sub-questions or more such that all sub-questions can be consolidated to answer the user's ASK 
 - CRITICAL: When analyzing vague queries like "I'm confused between these two options" or "help me decide", look at the FULL conversation context to understand what the two options are (e.g., "jobs vs startup", "career choices", etc.) and generate specific sub-questions about those topics
