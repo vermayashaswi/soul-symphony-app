@@ -6,7 +6,6 @@ import {
   getEmotionAnalysisGuidelines, 
   getThemeAnalysisGuidelines 
 } from '../_shared/databaseSchemaContext.ts';
-import { executeSQLAnalysis } from './sqlExecution.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -109,9 +108,8 @@ async function testVectorOperations(supabaseClient: any, requestId: string): Pro
   }
 }
 
-async function executePlan(plan: any, userId: string, supabaseClient: any, requestId: string, userTimezone: string = 'UTC') {
-  console.log(`[${requestId}] Executing orchestrated plan with timezone ${userTimezone}:`, JSON.stringify(plan, null, 2));
-  console.log(`[${requestId}] [TIMEZONE DEBUG] User timezone for SQL generation: ${userTimezone}`);
+async function executePlan(plan: any, userId: string, supabaseClient: any, requestId: string) {
+  console.log(`[${requestId}] Executing orchestrated plan:`, JSON.stringify(plan, null, 2));
 
   // Initialize execution context
   const executionContext: ExecutionContext = {
@@ -139,7 +137,7 @@ async function executePlan(plan: any, userId: string, supabaseClient: any, reque
     executionContext.currentStage = parseInt(stage);
 
     // Execute sub-questions in parallel within the stage (if they're independent)
-    const stageResults = await executeStageInParallel(stageGroups[stage], userId, supabaseClient, requestId, executionContext, userTimezone);
+    const stageResults = await executeStageInParallel(stageGroups[stage], userId, supabaseClient, requestId, executionContext);
     
     // Store stage results for dependency resolution
     executionContext.stageResults.set(stage, stageResults);
@@ -177,8 +175,7 @@ async function executeStageInParallel(
   userId: string, 
   supabaseClient: any, 
   requestId: string, 
-  executionContext: ExecutionContext,
-  userTimezone: string = 'UTC'
+  executionContext: ExecutionContext
 ) {
   // Check for dependencies within the stage
   const independentQuestions = subQuestions.filter(sq => !sq.dependencies || sq.dependencies.length === 0);
@@ -191,7 +188,7 @@ async function executeStageInParallel(
   // Execute independent questions in parallel
   if (independentQuestions.length > 0) {
     const independentResults = await Promise.all(
-      independentQuestions.map(subQ => executeSubQuestion(subQ, userId, supabaseClient, requestId, executionContext, userTimezone))
+      independentQuestions.map(subQ => executeSubQuestion(subQ, userId, supabaseClient, requestId, executionContext))
     );
     results.push(...independentResults);
 
@@ -206,7 +203,7 @@ async function executeStageInParallel(
   // Execute dependent questions sequentially (they might depend on results from independent ones)
   for (const subQ of dependentQuestions) {
     console.log(`[${requestId}] Executing dependent sub-question: ${subQ.id} with dependencies: ${subQ.dependencies?.join(', ')}`);
-    const dependentResult = await executeSubQuestion(subQ, userId, supabaseClient, requestId, executionContext, userTimezone);
+    const dependentResult = await executeSubQuestion(subQ, userId, supabaseClient, requestId, executionContext);
     results.push(dependentResult);
     
     // Update context
@@ -223,8 +220,7 @@ async function executeSubQuestion(
   userId: string, 
   supabaseClient: any, 
   requestId: string, 
-  executionContext: ExecutionContext,
-  userTimezone: string = 'UTC'
+  executionContext: ExecutionContext
 ) {
   console.log(`[${requestId}] Executing sub-question: ${subQuestion.id} - ${subQuestion.question}`);
 
@@ -258,66 +254,27 @@ async function executeSubQuestion(
       console.log(`[${requestId}] Dependency context for ${subQuestion.id}:`, Object.keys(subResults.executionResults.dependencyContext));
     }
 
-    let allStepsSucceeded = true;
-    let hasResults = false;
-
     for (const step of subQuestion.analysisSteps) {
       console.log(`[${requestId}] Executing analysis step: ${step.step} - ${step.description}`);
 
       // Apply dependency context to step if needed
       const enhancedStep = applyDependencyContext(step, subResults.executionResults.dependencyContext, requestId);
 
-      try {
-        if (enhancedStep.queryType === 'vector_search') {
-          console.log(`[${requestId}] Vector search:`, enhancedStep.vectorSearch?.query);
-          const vectorResult = await executeVectorSearch(enhancedStep, userId, supabaseClient, requestId, subResults.executionResults.vectorExecutionDetails);
-          subResults.executionResults.vectorResults = vectorResult || [];
-          if (vectorResult && vectorResult.length > 0) hasResults = true;
-        } else if (enhancedStep.queryType === 'sql_analysis') {
-          console.log(`[${requestId}] SQL analysis:`, enhancedStep.sqlQuery?.substring(0, 100) + '...');
-          const sqlResult = await executeSQLAnalysis(enhancedStep, userId, supabaseClient, requestId, subResults.executionResults.sqlExecutionDetails, userTimezone);
-          subResults.executionResults.sqlResults = sqlResult || [];
-          if (sqlResult && sqlResult.length > 0) hasResults = true;
-        } else if (enhancedStep.queryType === 'hybrid_search') {
-          console.log(`[${requestId}] Hybrid search:`, enhancedStep.vectorSearch?.query);
-          const hybridResult = await executeHybridSearch(enhancedStep, userId, supabaseClient, requestId, subResults.executionResults.sqlExecutionDetails, subResults.executionResults.vectorExecutionDetails, userTimezone);
-          subResults.executionResults.vectorResults = hybridResult?.vectorResults || [];
-          subResults.executionResults.sqlResults = hybridResult?.sqlResults || [];
-          if ((hybridResult?.vectorResults && hybridResult.vectorResults.length > 0) || 
-              (hybridResult?.sqlResults && hybridResult.sqlResults.length > 0)) {
-            hasResults = true;
-          }
-        }
-      } catch (stepExecutionError) {
-        console.error(`[${requestId}] Step ${step.step} execution failed:`, stepExecutionError);
-        allStepsSucceeded = false;
+      if (enhancedStep.queryType === 'vector_search') {
+        console.log(`[${requestId}] Vector search:`, enhancedStep.vectorSearch?.query);
+        const vectorResult = await executeVectorSearch(enhancedStep, userId, supabaseClient, requestId, subResults.executionResults.vectorExecutionDetails);
+        subResults.executionResults.vectorResults = vectorResult || [];
+      } else if (enhancedStep.queryType === 'sql_analysis') {
+        console.log(`[${requestId}] SQL analysis:`, enhancedStep.sqlQuery?.substring(0, 100) + '...');
+        const sqlResult = await executeSQLAnalysis(enhancedStep, userId, supabaseClient, requestId, subResults.executionResults.sqlExecutionDetails);
+        subResults.executionResults.sqlResults = sqlResult || [];
+      } else if (enhancedStep.queryType === 'hybrid_search') {
+        console.log(`[${requestId}] Hybrid search:`, enhancedStep.vectorSearch?.query);
+        const hybridResult = await executeHybridSearch(enhancedStep, userId, supabaseClient, requestId, subResults.executionResults.sqlExecutionDetails, subResults.executionResults.vectorExecutionDetails);
+        subResults.executionResults.vectorResults = hybridResult?.vectorResults || [];
+        subResults.executionResults.sqlResults = hybridResult?.sqlResults || [];
       }
     }
-
-    // NEW: Per sub-question vector fallback if ALL steps failed to produce results
-    if (!hasResults && !allStepsSucceeded) {
-      console.log(`[${requestId}] All steps failed for sub-question ${subQuestion.id}, attempting vector fallback`);
-      try {
-        const fallbackStep = {
-          description: `Vector fallback for sub-question: ${subQuestion.question}`,
-          vectorSearch: {
-            query: `${subQuestion.question} personal journal content experiences thoughts feelings`,
-            threshold: 0.2,
-            limit: 15
-          },
-          timeRange: subQuestion.analysisSteps[0]?.timeRange || null
-        };
-        
-        const vectorFallbackResult = await executeVectorSearchFallback(fallbackStep, userId, supabaseClient, requestId);
-        subResults.executionResults.vectorResults = vectorFallbackResult || [];
-        subResults.executionResults.vectorExecutionDetails.fallbackUsed = true;
-        console.log(`[${requestId}] Vector fallback for sub-question ${subQuestion.id} found ${vectorFallbackResult?.length || 0} results`);
-      } catch (fallbackError) {
-        console.error(`[${requestId}] Vector fallback also failed for sub-question ${subQuestion.id}:`, fallbackError);
-        subResults.executionResults.error = `All execution methods failed: ${fallbackError.message}`;
-      }
-    }
-
   } catch (stepError) {
     console.error(`[${requestId}] Error executing sub-question ${subQuestion.id}:`, stepError);
     subResults.executionResults.error = stepError.message;
@@ -501,7 +458,127 @@ async function executeVectorSearch(step: any, userId: string, supabaseClient: an
   }
 }
 
-// SQL analysis is now imported from sqlExecution.ts with timezone support
+function validateSQLQuery(query: string, requestId: string): { isValid: boolean; errors: string[] } {
+  const restrictedColumns = [
+    '"transcription text"',
+    'transcription text',
+    '"foreign key"', 
+    'foreign key',
+    '"audio_url"',
+    'audio_url',
+    '"user_feedback"',
+    'user_feedback', 
+    '"edit_status"',
+    'edit_status',
+    '"translation_status"',
+    'translation_status'
+  ];
+  
+  const errors: string[] = [];
+  const queryLower = query.toLowerCase();
+  
+  for (const restrictedCol of restrictedColumns) {
+    if (queryLower.includes(restrictedCol.toLowerCase())) {
+      errors.push(`Restricted column detected: ${restrictedCol}`);
+      console.error(`[${requestId}] COLUMN RESTRICTION VIOLATION: ${restrictedCol} found in query`);
+    }
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
+}
+
+async function executeSQLAnalysis(step: any, userId: string, supabaseClient: any, requestId: string, executionDetails: any) {
+  try {
+    console.log(`[${requestId}] Executing SQL query:`, step.sqlQuery);
+    
+    if (!step.sqlQuery || !step.sqlQuery.trim()) {
+      console.log(`[${requestId}] No SQL query provided, using vector search fallback`);
+      executionDetails.fallbackUsed = true;
+      return await executeVectorSearchFallback(step, userId, supabaseClient, requestId);
+    }
+
+    const originalQuery = step.sqlQuery.trim();
+    executionDetails.originalQuery = originalQuery;
+    
+    // Validate SQL query for restricted columns
+    const validation = validateSQLQuery(originalQuery, requestId);
+    executionDetails.validationResult = validation;
+    
+    if (!validation.isValid) {
+      console.error(`[${requestId}] SQL query validation failed:`, validation.errors);
+      executionDetails.executionError = `Query contains restricted columns: ${validation.errors.join(', ')}`;
+      executionDetails.fallbackUsed = true;
+      return await executeVectorSearchFallback(step, userId, supabaseClient, requestId);
+    }
+    
+    // Sanitize user ID in the query
+    let sanitizedQuery;
+    try {
+      sanitizedQuery = sanitizeUserIdInQuery(originalQuery, userId, requestId);
+      executionDetails.sanitizedQuery = sanitizedQuery;
+    } catch (sanitizeError) {
+      console.error(`[${requestId}] Query sanitization failed:`, sanitizeError);
+      executionDetails.executionError = sanitizeError.message;
+      executionDetails.fallbackUsed = true;
+      return await executeVectorSearchFallback(step, userId, supabaseClient, requestId);
+    }
+    
+    // Use the execute_dynamic_query function to safely run GPT-generated SQL
+    console.log(`[${requestId}] Executing sanitized query via RPC:`, sanitizedQuery.substring(0, 200) + '...');
+    
+    const { data, error } = await supabaseClient.rpc('execute_dynamic_query', {
+      query_text: sanitizedQuery
+    });
+
+    if (error) {
+      console.error(`[${requestId}] SQL execution error:`, error);
+      console.error(`[${requestId}] Failed query:`, sanitizedQuery);
+      executionDetails.executionError = error.message;
+      executionDetails.fallbackUsed = true;
+      
+      // Enhanced error logging for debugging
+      if (error.code) {
+        console.error(`[${requestId}] PostgreSQL error code: ${error.code}`);
+      }
+      if (error.details) {
+        console.error(`[${requestId}] PostgreSQL error details: ${error.details}`);
+      }
+      if (error.hint) {
+        console.error(`[${requestId}] PostgreSQL error hint: ${error.hint}`);
+      }
+      
+      // INTELLIGENT FALLBACK: Use vector search instead of basic SQL
+      console.log(`[${requestId}] SQL execution failed, falling back to vector search`);
+      return await executeVectorSearchFallback(step, userId, supabaseClient, requestId);
+    }
+
+    if (data && data.success && data.data) {
+      console.log(`[${requestId}] SQL query executed successfully, rows:`, data.data.length);
+      // If SQL query executed but returned 0 results, try vector fallback
+      if (data.data.length === 0) {
+        console.log(`[${requestId}] SQL query returned 0 results, falling back to vector search`);
+        executionDetails.fallbackUsed = true;
+        return await executeVectorSearchFallback(step, userId, supabaseClient, requestId);
+      }
+      return data.data;
+    } else {
+      console.warn(`[${requestId}] SQL query returned no results or failed:`, data);
+      executionDetails.fallbackUsed = true;
+      return await executeVectorSearchFallback(step, userId, supabaseClient, requestId);
+    }
+
+  } catch (error) {
+    console.error(`[${requestId}] Error in SQL analysis:`, error);
+    executionDetails.executionError = error.message;
+    executionDetails.fallbackUsed = true;
+    // INTELLIGENT FALLBACK: Use vector search instead of basic SQL
+    console.log(`[${requestId}] SQL analysis error, falling back to vector search`);
+    return await executeVectorSearchFallback(step, userId, supabaseClient, requestId);
+  }
+}
 
 // NEW INTELLIGENT VECTOR SEARCH FALLBACK FUNCTION
 async function executeVectorSearchFallback(step: any, userId: string, supabaseClient: any, requestId: string) {
@@ -647,12 +724,12 @@ async function executeBasicSQLQuery(userId: string, supabaseClient: any, request
   return data || [];
 }
 
-async function executeHybridSearch(step: any, userId: string, supabaseClient: any, requestId: string, sqlExecutionDetails: any, vectorExecutionDetails: any, userTimezone: string = 'UTC') {
+async function executeHybridSearch(step: any, userId: string, supabaseClient: any, requestId: string, sqlExecutionDetails: any, vectorExecutionDetails: any) {
   try {
     // Execute both vector and SQL searches in parallel
     const [vectorResults, sqlResults] = await Promise.all([
       executeVectorSearch(step, userId, supabaseClient, requestId, vectorExecutionDetails),
-      executeSQLAnalysis(step, userId, supabaseClient, requestId, sqlExecutionDetails, userTimezone)
+      executeSQLAnalysis(step, userId, supabaseClient, requestId, sqlExecutionDetails)
     ]);
 
     console.log(`[${requestId}] Hybrid search results - Vector: ${vectorResults?.length || 0}, SQL: ${sqlResults?.length || 0}`);
@@ -699,7 +776,7 @@ async function generateEmbedding(text: string): Promise<number[]> {
  */
 async function analyzeQueryWithSubQuestions(message, conversationContext, userEntryCount, isFollowUp = false, supabaseClient, userTimezone = 'UTC') {
   try {
-    const last = Array.isArray(conversationContext) ? conversationContext.slice(-5) : [];
+    const last = Array.isArray(conversationContext) ? conversationContext.slice(-6) : [];
     
     console.log(`[Analyst Agent] Processing query with user timezone: ${userTimezone}`);
     
@@ -745,10 +822,16 @@ async function analyzeQueryWithSubQuestions(message, conversationContext, userEn
 
     const requiresMandatoryVector = mandatoryVectorPatterns.some(pattern => pattern.test(message.toLowerCase()));
 
+    // Detect personal pronouns for personalized queries
+    const hasPersonalPronouns = /\b(i|me|my|mine|myself)\b/i.test(message.toLowerCase());
+
+    // Enhanced time reference detection
+    const hasExplicitTimeReference = /\b(last week|yesterday|this week|last month|today|recently|lately|this morning|last night|august|january|february|march|april|may|june|july|september|october|november|december)\b/i.test(message.toLowerCase());
+
     // Detect follow-up context queries
     const isFollowUpContext = isFollowUp || /\b(that|those|it|this|these|above|mentioned|said|talked about)\b/i.test(message.toLowerCase());
     
-    console.log(`[Analyst Agent] Enhanced analysis - Content-seeking: ${isContentSeekingQuery}, Mandatory vector: ${requiresMandatoryVector}, Follow-up: ${isFollowUpContext}`);
+    console.log(`[Analyst Agent] Enhanced analysis - Content-seeking: ${isContentSeekingQuery}, Mandatory vector: ${requiresMandatoryVector}, Personal: ${hasPersonalPronouns}, Time ref: ${hasExplicitTimeReference}, Follow-up: ${isFollowUpContext}`);
 
     const prompt = `You are SOULo's Enhanced Analyst Agent - an intelligent query planning specialist for journal data analysis TIMEZONE-AWARE date processing.
 
@@ -761,8 +844,10 @@ ${databaseSchemaContext}
 - If uncertain about a database structure, use basic select queries instead of complex ones
 
 SUB-QUESTION/QUERIES GENERATION GUIDELINE (MANDATORY): 
-- Break down user query into ATLEAST 2 sub-questions or more such that all sub-questions can be consolidated to answer the user's ASK 
-- If user's query is vague, look back at last 2 user queries to derive what user wants to know and then frame sub-questions accordingly and hence, the pertinent query for it 
+- Break down user query (MANDATORY: remember that current user message might not be a direct query, so you'll have to look in to the conversation context provided to you and look at last user messages to guess the "ASK" and accordingly frame the sub-questions) into ATLEAST 2 sub-questions or more such that all sub-questions can be consolidated to answer the user's ASK 
+- CRITICAL: When analyzing vague queries like "I'm confused between these two options" or "help me decide", look at the FULL conversation context to understand what the two options are (e.g., "jobs vs startup", "career choices", etc.) and generate specific sub-questions about those topics
+- If user's query is vague, examine the complete conversation history to derive what the user wants to know and frame sub-questions that address their specific decision or dilemma
+- For career/life decisions: Generate sub-questions about patterns, emotions, and insights related to the specific options being considered
 - For eg. user asks (What % of entries contain the emotion confidence (and is it the dominant one?) when I deal with family matters that also concern health issues? -> sub question 1: How many entries concern family and health both? sub question 2: What are all the emotions and their avg scores ? sub question 3: Rank the emotions)
 
 **ENHANCED SQL QUERY GENERATION GUIDELINES:**
@@ -783,18 +868,17 @@ SUB-QUESTION/QUERIES GENERATION GUIDELINE (MANDATORY):
    - For entities: jsonb_each(entities) for types, jsonb_array_elements_text() for values
    - Example: SELECT emotion_key, AVG((emotion_value::text)::numeric) FROM "Journal Entries", jsonb_each(emotions) WHERE user_id = auth.uid() GROUP BY emotion_key
 
-4. **Enhanced Time Variable Support:**
-   - Use time variables for dynamic date calculations instead of hardcoded dates
-   - Available variables: __NOW__, __TODAY__, __YESTERDAY__, __CURRENT_WEEK_START__, __CURRENT_WEEK_END__, __LAST_WEEK_START__, __LAST_WEEK_END__, __CURRENT_MONTH_START__, __CURRENT_MONTH_END__, __LAST_MONTH_START__, __LAST_MONTH_END__, __30_DAYS_AGO__, __7_DAYS_AGO__
-   - Example: WHERE created_at >= __LAST_WEEK_START__ AND created_at <= __LAST_WEEK_END__
-   - When timeRange is provided, ALWAYS include date filters in SQL queries
+4. **MANDATORY TIME RANGE INTEGRATION:**
+   - When timeRange is provided in the step, SQL queries MUST include the date filters
+   - Use proper timestamp with time zone format: '2024-08-01T00:00:00Z'::timestamp with time zone
+   - ALWAYS include both start and end date filters when timeRange exists
+   - Example: AND created_at >= 'START_DATE' AND created_at <= 'END_DATE'
 
 5. **Safe Query Patterns:**
    - Always include user_id = auth.uid() in WHERE clause
    - Use proper PostgreSQL syntax with double quotes for table/column names with spaces
-   - Prefer simple queries over complex nested ones - prioritize reliability
+   - Avoid complex nested queries - keep it simple and working
    - Use standard aggregation functions: COUNT, AVG, MAX, MIN, SUM
-   - Remember: Empty results are VALID - don't avoid queries that might return zero rows
 
 **WORKING SQL EXAMPLES FOR REFERENCE:**
 
@@ -833,45 +917,30 @@ ORDER BY created_at DESC
 LIMIT 5;
 \`\`\`
 
-4. **Time Variable Usage Examples:**
+4. **Date Range Query with Timezone Conversion:**
 \`\`\`sql
--- Last week's entries
-SELECT COUNT(*) as entry_count
+SELECT COUNT(*) as entry_count,
+       AVG(CASE WHEN sentiment = 'positive' THEN 1 WHEN sentiment = 'negative' THEN -1 ELSE 0 END) as avg_sentiment
 FROM "Journal Entries" 
 WHERE user_id = auth.uid() 
-  AND created_at >= __LAST_WEEK_START__ 
-  AND created_at <= __LAST_WEEK_END__;
+  AND created_at >= '2024-01-01T00:00:00Z'::timestamp with time zone
+  AND created_at <= '2024-01-01T23:59:59Z'::timestamp with time zone;
 \`\`\`
 
+5. **Emotion Analysis with Time Range:**
 \`\`\`sql
--- Current month emotions
 SELECT 
   emotion_key,
-  AVG((emotion_value::text)::numeric) as avg_score
+  AVG((emotion_value::text)::numeric) as avg_score,
+  COUNT(*) as frequency
 FROM "Journal Entries", 
      jsonb_each(emotions) as e(emotion_key, emotion_value)
 WHERE user_id = auth.uid() 
   AND emotions IS NOT NULL
-  AND created_at >= __CURRENT_MONTH_START__
-  AND created_at <= __CURRENT_MONTH_END__
+  AND created_at >= '2024-08-01T00:00:00Z'::timestamp with time zone
+  AND created_at <= '2024-08-31T23:59:59Z'::timestamp with time zone
 GROUP BY emotion_key
 ORDER BY avg_score DESC;
-\`\`\`
-
-5. **Complex Analysis Example:**
-\`\`\`sql
--- Entries with specific emotion above threshold
-SELECT 
-  "refined text" as content,
-  created_at,
-  (emotions->>'confidence')::numeric as confidence_score
-FROM "Journal Entries" 
-WHERE user_id = auth.uid() 
-  AND emotions ? 'confidence'
-  AND (emotions->>'confidence')::numeric > 0.5
-  AND created_at >= __30_DAYS_AGO__
-ORDER BY confidence_score DESC
-LIMIT 10;
 \`\`\`
 
 **CRITICAL TIMEZONE HANDLING RULES:**
@@ -925,15 +994,16 @@ LIMIT 10;
     - Date processing will handle conversion from user's local time to UTC for database queries
 
 USER QUERY: "${message}"
-USER TIMEZONE: "${userTimezone}" (CRITICAL: This is the user's local timezone, NOT UTC!)
-CONTEXT: ${last.length > 0 ? last.map(m => `${m.sender}: ${m.content?.slice(0, 50) || 'N/A'}`).join(' | ') : 'None'}
+USER TIMEZONE: "${userTimezone}"
+CONTEXT: ${last.length > 0 ? last.map(m => `${m.sender}: ${m.content || 'N/A'}`).join(' | ') : 'None'}
 
 ANALYSIS REQUIREMENTS:
 - Content-seeking detected: ${isContentSeekingQuery}
 - Mandatory vector required: ${requiresMandatoryVector}  
-- User timezone: ${userTimezone} (India timezone if Asia/Kolkata)
+- Has personal pronouns: ${hasPersonalPronouns}
+- Has time reference: ${hasExplicitTimeReference}
 - Is follow-up query: ${isFollowUpContext}
-- TIMEZONE REMINDER: All SQL queries will be processed with user timezone "${userTimezone}" for proper time conversions
+- User timezone: ${userTimezone}
 
 Generate a comprehensive analysis plan that:
 1. MANDATES vector search for any content-seeking scenario
@@ -947,6 +1017,7 @@ Generate a comprehensive analysis plan that:
 
 Response format (MUST be valid JSON):
 {
+  "queryType": "journal_specific|general_inquiry|mental_health",
   "strategy": "intelligent_sub_query|comprehensive_hybrid|vector_mandatory",
   "userStatusMessage": "Brief status for user",
   "subQuestions": [
@@ -980,6 +1051,8 @@ Response format (MUST be valid JSON):
   "confidence": 0.8,
   "reasoning": "Explanation of strategy with emphasis on dependency management and execution orchestration",
   "useAllEntries": boolean,
+  "hasPersonalPronouns": ${hasPersonalPronouns},
+  "hasExplicitTimeReference": ${hasExplicitTimeReference},
   "inferredTimeContext": null or timeframe_object_with_timezone,
   "userTimezone": "${userTimezone}"
 }`;
@@ -995,8 +1068,7 @@ Response format (MUST be valid JSON):
       body: JSON.stringify({
         model: 'gpt-4.1-mini-2025-04-14', // Using gpt-4.1-mini for faster planning
         messages: [{ role: 'user', content: prompt }],
-        max_tokens: 2000,
-        temperature: 0.1 // Lower temperature for more consistent JSON output and better SQL generation
+        max_completion_tokens: 2000
       }),
     });
 
@@ -1018,19 +1090,18 @@ Response format (MUST be valid JSON):
         return createEnhancedFallbackPlan(message, isContentSeekingQuery || requiresMandatoryVector, null, supabaseClient, userTimezone);
       }
 
-      // Enhanced JSON sanitization and parsing with multiple fallback strategies
-      const { parseOpenAIResponse } = await import('../_shared/messageValidation.ts');
-      
-      try {
-        analysisResult = parseOpenAIResponse(rawResponse);
-        console.log("[Analyst Agent] Successfully parsed JSON response");
-      } catch (enhancedParseError) {
-        console.error("Failed to parse Analyst Agent response after all strategies:", enhancedParseError);
-        console.error("Raw response:", rawResponse);
-        return createEnhancedFallbackPlan(message, isContentSeekingQuery || requiresMandatoryVector, null, supabaseClient, userTimezone);
+      // Try to extract JSON from response if wrapped in markdown
+      let jsonString = rawResponse.trim();
+      if (jsonString.startsWith('```json')) {
+        jsonString = jsonString.replace(/```json\n?/, '').replace(/\n?```$/, '');
+      } else if (jsonString.startsWith('```')) {
+        jsonString = jsonString.replace(/```\n?/, '').replace(/\n?```$/, '');
       }
+
+      analysisResult = JSON.parse(jsonString);
+      console.log("[Analyst Agent] Successfully parsed JSON response");
     } catch (parseError) {
-      console.error("Critical parsing error in Analyst Agent:", parseError);
+      console.error("Failed to parse Analyst Agent response:", parseError);
       console.error("Raw response:", rawResponse);
       return createEnhancedFallbackPlan(message, isContentSeekingQuery || requiresMandatoryVector, null, supabaseClient, userTimezone);
     }
@@ -1067,6 +1138,8 @@ Response format (MUST be valid JSON):
     const finalResult = {
       ...analysisResult,
       useAllEntries: analysisResult.useAllEntries !== false,
+      hasPersonalPronouns,
+      hasExplicitTimeReference: false, // Override to false to prevent time-only strategies
       inferredTimeContext: null,
       userTimezone
     };
@@ -1142,6 +1215,8 @@ function createEnhancedFallbackPlan(originalMessage, isContentSeekingQuery, infe
     confidence: 0.7,
     reasoning: `Enhanced fallback plan using mandatory vector search for content-seeking query: "${originalMessage}". This ensures semantic understanding and comprehensive content retrieval with proper timezone handling.`,
     useAllEntries: true,
+    hasPersonalPronouns: /\b(i|me|my|mine|myself)\b/i.test(lowerMessage),
+    hasExplicitTimeReference: false, // Override to ensure vector search
     inferredTimeContext: inferredTimeContext,
     userTimezone
   };
@@ -1201,7 +1276,6 @@ serve(async (req) => {
       // Return just the plan without execution
       return new Response(JSON.stringify({
         queryPlan: analysisResult,
-        userStatusMessage: analysisResult.userStatusMessage || "Planning your journal analysis...",
         timestamp: new Date().toISOString(),
         requestId
       }), {
@@ -1209,13 +1283,12 @@ serve(async (req) => {
       });
     }
 
-    // Execute the plan and return results with timezone
-    const executionResult = await executePlan(analysisResult, userId, supabaseClient, requestId, userTimezone);
+    // Execute the plan and return results
+    const executionResult = await executePlan(analysisResult, userId, supabaseClient, requestId);
     
     return new Response(JSON.stringify({
       queryPlan: analysisResult,
       executionResult,
-      userStatusMessage: analysisResult.userStatusMessage || "Analyzing your journal entries...",
       timestamp: new Date().toISOString(),
       requestId
     }), {

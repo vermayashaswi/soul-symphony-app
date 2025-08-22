@@ -135,7 +135,7 @@ Latest user message: "${message}"${contextString}`;
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4.1-mini',
+        model: 'gpt-4.1-mini-2025-04-14',
         messages: [
           { role: 'system', content: 'You are a strict JSON classifier. Respond with a single JSON object only that matches the provided schema. No code fences, no commentary.' },
           { role: 'user', content: classificationPrompt }

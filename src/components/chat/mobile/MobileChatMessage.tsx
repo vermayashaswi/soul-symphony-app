@@ -12,15 +12,12 @@ import { getSanitizedFinalContent } from "@/utils/messageParser";
  
  interface MobileChatMessageProps {
   message: {
-    id?: string;
     role: 'user' | 'assistant' | 'error';
     content: string;
     analysis?: any;
     references?: any[];
     diagnostics?: any;
     hasNumericResult?: boolean;
-    isProcessing?: boolean;
-    created_at?: string;
   };
   showAnalysis?: boolean;
   isLoading?: boolean;
@@ -33,7 +30,7 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({
   showAnalysis = false, 
   isLoading = false, 
   streamingMessage,
-  showStreamingDots = false
+  showStreamingDots = false 
 }) => {
   // CRITICAL FIX: Always call all hooks before any conditional logic
   const { user } = useAuth();
@@ -47,7 +44,7 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({
   }, [message]);
   
   // Determine what type of content to render
-  const shouldShowLoading = (isLoading || message.isProcessing) && !streamingMessage;
+  const shouldShowLoading = isLoading && !streamingMessage;
   const shouldShowStreaming = !!streamingMessage;
   const shouldShowMessage = !shouldShowLoading && !shouldShowStreaming;
   

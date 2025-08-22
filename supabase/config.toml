@@ -61,104 +61,32 @@ enabled = true
 port = 54327
 inspector_port = 54328
 
-[functions.analyze-emotions]
-verify_jwt = true
-
-[functions.analyze-sentiment]
-verify_jwt = true
-
-[functions.batch-analyze-sentiment]
-verify_jwt = true
-
-[functions.batch-extract-entities]
-verify_jwt = true
-
-[functions.chat-query-classifier]
-verify_jwt = true
-
-[functions.chat-rag]
-verify_jwt = true
-
-[functions.chat-with-rag]
-verify_jwt = true
-
-[functions.combine-segment-responses]
-verify_jwt = true
-
-[functions.debug-rag-pipeline]
-verify_jwt = true
-
-[functions.ensure-chat-persistence]
-verify_jwt = true
-
-[functions.general-mental-health-chat]
-verify_jwt = true
-
-[functions.generate-missing-embeddings]
-verify_jwt = true
-
-[functions.generate-streaming-messages]
-verify_jwt = true
-
-[functions.generate-themes]
-verify_jwt = true
-
-[functions.gpt-clarification-generator]
-verify_jwt = true
-
-[functions.gpt-master-orchestrator]
-verify_jwt = true
-
-[functions.gpt-response-consolidator]
-verify_jwt = false
-
-[functions.gpt-search-orchestrator]
-verify_jwt = true
-
-[functions.inspirational-quotes]
-verify_jwt = false
-
-[functions.intelligent-query-planner]
-verify_jwt = true
-
-[functions.journal-summary]
-verify_jwt = true
-
-[functions.message-classification-monitor]
-verify_jwt = true
-
-[functions.message-persistence-monitor]
-verify_jwt = true
-
-[functions.revenuecat-init]
-verify_jwt = true
-
-[functions.revenuecat-purchase]
-verify_jwt = true
-
-[functions.revenuecat-webhook]
-verify_jwt = false
-
-[functions.segment-complex-query]
-verify_jwt = true
-
-[functions.set-api-key]
+[functions.transcribe-audio]
 verify_jwt = true
 
 [functions.smart-query-planner]
 verify_jwt = true
 
-[functions.temporary]
+[functions.chat-with-rag]
+verify_jwt = true
+
+[functions.gpt-response-consolidator]
 verify_jwt = false
 
-[functions.transcribe-audio]
+[functions.ensure-chat-persistence]
 verify_jwt = true
 
 [functions.transcribe-chat-audio]
 verify_jwt = true
 
-[functions.translate-static-content]
+[functions.chat-query-classifier]
 verify_jwt = true
 
-[functions.translate-text]
+[functions.general-mental-health-chat]
 verify_jwt = true
+
+[functions.gpt-clarification-generator]
+verify_jwt = true
+
+[functions.test-vector-fix]
+verify_jwt = false

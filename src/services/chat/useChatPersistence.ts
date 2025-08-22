@@ -85,20 +85,14 @@ export const useChatPersistence = (userId: string | undefined) => {
   useEffect(() => {
     const loadMessages = async () => {
       if (!activeThread || !userId) {
-        console.log('[useChatPersistence] 📭 No active thread or user, clearing messages');
         setMessages([]);
         return;
       }
       
-      console.log(`[useChatPersistence] 📥 Loading messages for thread: ${activeThread}`);
       setLoading(true);
       try {
         const threadMessages = await getChatMessages(activeThread, userId);
         if (threadMessages) {
-          console.log(`[useChatPersistence] ✅ Loaded ${threadMessages.length} messages for thread ${activeThread}:`, 
-            threadMessages.map(m => ({ id: m.id, sender: m.sender, content: m.content?.substring(0, 50) + '...' }))
-          );
-          
           // Convert ChatMessage to ChatMessagePersistence
           const persistenceMessages: ChatMessagePersistence[] = threadMessages.map(msg => ({
             ...msg,
@@ -109,11 +103,9 @@ export const useChatPersistence = (userId: string | undefined) => {
             sub_query_responses: Array.isArray(msg.sub_query_responses) ? msg.sub_query_responses : []
           }));
           setMessages(persistenceMessages);
-        } else {
-          console.log(`[useChatPersistence] ⚠️ No messages returned for thread ${activeThread}`);
         }
       } catch (error) {
-        console.error(`[useChatPersistence] ❌ Error loading thread messages for ${activeThread}:`, error);
+        console.error("Error loading thread messages:", error);
       } finally {
         setLoading(false);
       }
@@ -124,37 +116,16 @@ export const useChatPersistence = (userId: string | undefined) => {
 
   // Set up real-time subscription to thread messages
   useEffect(() => {
-    if (!activeThread) {
-      console.log('[useChatPersistence] No active thread, skipping subscription setup');
-      return;
-    }
+    if (!activeThread) return;
     
-    console.log(`[useChatPersistence] 🔥 Setting up real-time subscription for thread: ${activeThread}`);
-    console.log(`[useChatPersistence] Subscription details: channel=thread:${activeThread}, filter=thread_id=eq.${activeThread}`);
-    
-    const channelName = `thread:${activeThread}`;
     const subscription = supabase
-      .channel(channelName)
+      .channel(`thread:${activeThread}`)
       .on('postgres_changes', { 
         event: 'INSERT', 
         schema: 'public', 
         table: 'chat_messages',
         filter: `thread_id=eq.${activeThread}` 
       }, (payload) => {
-        console.log(`[useChatPersistence] 📨 REAL-TIME INSERT received for thread ${activeThread}:`, {
-          messageId: payload.new.id,
-          sender: payload.new.sender,
-          content: payload.new.content?.substring(0, 100) + '...',
-          threadId: payload.new.thread_id,
-          timestamp: new Date().toISOString()
-        });
-        
-        // Validate thread ID matches
-        if (payload.new.thread_id !== activeThread) {
-          console.warn(`[useChatPersistence] ⚠️ Thread ID mismatch! Expected: ${activeThread}, Received: ${payload.new.thread_id}`);
-          return;
-        }
-        
         const newMessage = payload.new as any;
         // Convert to ChatMessagePersistence
         const persistenceMessage: ChatMessagePersistence = {
@@ -166,18 +137,7 @@ export const useChatPersistence = (userId: string | undefined) => {
           reference_entries: Array.isArray(newMessage.reference_entries) ? newMessage.reference_entries : [],
           sub_query_responses: Array.isArray(newMessage.sub_query_responses) ? newMessage.sub_query_responses : []
         };
-        
-        setMessages(prev => {
-          // Check for duplicates
-          const exists = prev.find(msg => msg.id === persistenceMessage.id);
-          if (exists) {
-            console.log(`[useChatPersistence] Duplicate message detected, ignoring: ${persistenceMessage.id}`);
-            return prev;
-          }
-          
-          console.log(`[useChatPersistence] ✅ Adding message to UI state: ${persistenceMessage.id} (${persistenceMessage.sender})`);
-          return [...prev, persistenceMessage];
-        });
+        setMessages(prev => [...prev, persistenceMessage]);
       })
       .on('postgres_changes', { 
         event: 'DELETE', 
@@ -186,24 +146,12 @@ export const useChatPersistence = (userId: string | undefined) => {
         filter: `thread_id=eq.${activeThread}` 
       }, (payload) => {
         const deletedMessage = payload.old as any;
-        console.log(`[useChatPersistence] 🗑️ REAL-TIME DELETE received for thread ${activeThread}: ${deletedMessage.id}`);
+        console.log(`[useChatPersistence] Message deleted in thread ${activeThread}:`, deletedMessage.id);
         
         // Remove deleted message from local state
         setMessages(prev => prev.filter(msg => msg.id !== deletedMessage.id));
       })
-      .subscribe((status) => {
-        console.log(`[useChatPersistence] 🔔 Subscription status changed for thread ${activeThread}:`, status);
-        
-        if (status === 'SUBSCRIBED') {
-          console.log(`[useChatPersistence] ✅ Successfully subscribed to real-time updates for thread: ${activeThread}`);
-        } else if (status === 'CHANNEL_ERROR') {
-          console.error(`[useChatPersistence] ❌ Channel error for thread ${activeThread}`);
-        } else if (status === 'TIMED_OUT') {
-          console.error(`[useChatPersistence] ⏱️ Subscription timed out for thread ${activeThread}`);
-        } else if (status === 'CLOSED') {
-          console.log(`[useChatPersistence] 🔒 Subscription closed for thread ${activeThread}`);
-        }
-      });
+      .subscribe();
 
     // Listen for custom deletion events from other components
     const handleMessageDeletion = (event: CustomEvent) => {
@@ -289,60 +237,36 @@ export const useChatPersistence = (userId: string | undefined) => {
     // Add to local state immediately
     setMessages(prev => [...prev, tempMessage]);
     
-    // Enhanced save with retry logic and better error handling
-    const maxRetries = 3;
-    let lastError = null;
-    
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        console.log(`[useChatPersistence] Message save attempt ${attempt}/${maxRetries}`);
+    try {
+      const savedMessage = await createChatMessage(activeThread, content, 'user', userId);
+      
+      if (savedMessage) {
+        // Convert to ChatMessagePersistence to avoid type mismatch
+        const persistenceMessage: ChatMessagePersistence = {
+          ...savedMessage,
+          references: Array.isArray(savedMessage.reference_entries) ? savedMessage.reference_entries : [],
+          analysis: savedMessage.analysis_data,
+          hasNumericResult: savedMessage.has_numeric_result as boolean,
+          reference_entries: Array.isArray(savedMessage.reference_entries) ? savedMessage.reference_entries : [],
+          sub_query_responses: Array.isArray(savedMessage.sub_query_responses) ? savedMessage.sub_query_responses : []
+        };
         
-        const savedMessage = await createChatMessage(activeThread, content, 'user', userId);
-        
-        if (savedMessage) {
-          // Convert to ChatMessagePersistence to avoid type mismatch
-          const persistenceMessage: ChatMessagePersistence = {
-            ...savedMessage,
-            references: Array.isArray(savedMessage.reference_entries) ? savedMessage.reference_entries : [],
-            analysis: savedMessage.analysis_data,
-            hasNumericResult: savedMessage.has_numeric_result as boolean,
-            reference_entries: Array.isArray(savedMessage.reference_entries) ? savedMessage.reference_entries : [],
-            sub_query_responses: Array.isArray(savedMessage.sub_query_responses) ? savedMessage.sub_query_responses : []
-          };
-          
-          // Replace temp message with saved one
-          setMessages(prev => 
-            prev.map(msg => msg.id === tempId ? persistenceMessage : msg)
-          );
-          console.log(`[useChatPersistence] Message saved successfully: ${savedMessage.id}`);
-          return persistenceMessage;
-        } else {
-          throw new Error('createChatMessage returned null');
-        }
-      } catch (error) {
-        lastError = error;
-        console.error(`[useChatPersistence] Save attempt ${attempt} failed:`, error);
-        
-        if (attempt < maxRetries) {
-          const delay = Math.pow(2, attempt - 1) * 1000;
-          console.log(`[useChatPersistence] Retrying in ${delay}ms...`);
-          await new Promise(resolve => setTimeout(resolve, delay));
-        }
+        // Replace temp message with saved one
+        setMessages(prev => 
+          prev.map(msg => msg.id === tempId ? persistenceMessage : msg)
+        );
+        return persistenceMessage;
       }
+      return null;
+    } catch (error) {
+      console.error("Error saving message:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save your message",
+        variant: "destructive"
+      });
+      return null;
     }
-    
-    // All attempts failed
-    console.error("[useChatPersistence] All save attempts failed. Last error:", lastError);
-    
-    // Remove temp message from UI to avoid confusion
-    setMessages(prev => prev.filter(msg => msg.id !== tempId));
-    
-    toast({
-      title: "Error",
-      description: "Failed to save your message after multiple attempts. Please try again.",
-      variant: "destructive"
-    });
-    return null;
   };
 
   const updateTitle = async (threadId: string, title: string) => {

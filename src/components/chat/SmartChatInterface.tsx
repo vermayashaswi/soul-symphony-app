@@ -24,7 +24,7 @@ import { BugIcon, HelpCircleIcon, InfoIcon, MessagesSquareIcon, Trash } from 'lu
 import DebugPanel from "@/components/debug/DebugPanel";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "@/contexts/TranslationContext";
-
+import { useChatRealtime } from "@/hooks/use-chat-realtime";
 import { updateThreadProcessingStatus, createProcessingMessage, updateProcessingMessage, generateThreadTitle } from "@/utils/chat/threadUtils";
 import { MentalHealthInsights } from "@/hooks/use-mental-health-insights";
 
@@ -126,83 +126,66 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
 
       // Keep typing indicator visible while we finalize and render the message for the active thread
       if (originThreadId === currentThreadId) {
+        setLocalLoading(true, "Finalizing response...");
+        updateProcessingStage("Finalizing response...");
       }
       
       // Backend persists assistant message; UI will append via realtime
       if (originThreadId === currentThreadId) {
-          // Enhanced watchdog: if realtime insert doesn't arrive, persist client-side after a short delay
-          try {
-            setTimeout(async () => {
-              // Double-check still on same thread
-              if (!currentThreadIdRef.current || currentThreadIdRef.current !== originThreadId) return;
+        // Watchdog: if realtime insert doesn't arrive, persist client-side after a short delay
+        try {
+          setTimeout(async () => {
+            // Double-check still on same thread
+            if (!currentThreadIdRef.current || currentThreadIdRef.current !== originThreadId) return;
 
-              // Has an assistant message with same content arrived?
-              const { data: recent, error: recentErr } = await supabase
-                .from('chat_messages')
-                .select('id, content, sender, created_at, idempotency_key')
-                .eq('thread_id', originThreadId)
-                .order('created_at', { ascending: false })
-                .limit(10);
+            // Has an assistant message with same content arrived?
+            const { data: recent, error: recentErr } = await supabase
+              .from('chat_messages')
+              .select('id, content, sender, created_at')
+              .eq('thread_id', originThreadId)
+              .order('created_at', { ascending: false })
+              .limit(5);
 
-              if (recentErr) {
-                console.warn('[Streaming Watchdog] Failed to fetch recent messages:', recentErr.message);
+            if (recentErr) {
+              console.warn('[Streaming Watchdog] Failed to fetch recent messages:', recentErr.message);
+            }
+
+            const alreadyExists = (recent || []).some(m => (m as any).sender === 'assistant' && (m as any).content?.trim() === response.trim());
+            if (!alreadyExists) {
+              // Persist safely with an idempotency_key derived from threadId + response
+              try {
+                const enc = new TextEncoder();
+                const keySource = requestId || `${originThreadId}:${response}`;
+                const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
+                const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+                const idempotencyKey = hex.slice(0, 32);
+
+                await supabase.from('chat_messages').upsert({
+                  thread_id: originThreadId,
+                  content: response,
+                  sender: 'assistant',
+                  role: 'assistant',
+                  idempotency_key: idempotencyKey
+                }, { onConflict: 'thread_id,idempotency_key' });
+              } catch (e) {
+                console.warn('[Streaming Watchdog] Persist fallback failed:', (e as any)?.message || e);
               }
+            }
 
-              // Check for exact content match or similar response
-              const contentTrim = response.trim();
-              const alreadyExists = (recent || []).some(m => 
-                (m as any).sender === 'assistant' && 
-                ((m as any).content?.trim() === contentTrim ||
-                 (m as any).content?.trim().includes(contentTrim.substring(0, 100)))
-              );
-
-              if (!alreadyExists) {
-                console.log('[Streaming Watchdog] Assistant message missing, creating fallback message');
-                
-                try {
-                  // Enhanced persistence with improved idempotency
-                  const enc = new TextEncoder();
-                  const keySource = requestId || `${originThreadId}:${response}:${Date.now()}`;
-                  const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
-                  const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
-                  const idempotencyKey = `watchdog_${hex.slice(0, 24)}`;
-
-                  const { data: savedMessage, error: saveError } = await supabase
-                    .from('chat_messages')
-                    .upsert({
-                      thread_id: originThreadId,
-                      content: response,
-                      sender: 'assistant',
-                      role: 'assistant',
-                      idempotency_key: idempotencyKey,
-                      analysis_data: analysis || null
-                    }, { 
-                      onConflict: 'thread_id,idempotency_key',
-                      ignoreDuplicates: false 
-                    })
-                    .select('id')
-                    .single();
-
-                  if (saveError) {
-                    console.warn('[Streaming Watchdog] Fallback persist failed:', saveError.message);
-                  } else {
-                    console.log('[Streaming Watchdog] Successfully created fallback message:', savedMessage?.id);
-                  }
-                } catch (e) {
-                  console.warn('[Streaming Watchdog] Persist fallback exception:', (e as any)?.message || e);
-                }
-              } else {
-                console.log('[Streaming Watchdog] Assistant message found, no fallback needed');
-              }
-
-            }, 1500); // Increased delay to allow for edge function processing
-          } catch (e) {
-            console.warn('[Streaming Watchdog] Exception scheduling fallback:', (e as any)?.message || e);
-          }
+            setLocalLoading(false);
+            updateProcessingStage(null);
+          }, 1200);
+        } catch (e) {
+          console.warn('[Streaming Watchdog] Exception scheduling fallback:', (e as any)?.message || e);
+          setLocalLoading(false);
+          updateProcessingStage(null);
+        }
       }
     },
     onError: (error) => {
       // Ensure UI never gets stuck on loader after errors
+      setLocalLoading(false);
+      updateProcessingStage(null);
       toast({
         title: "Error",
         description: error,
@@ -211,11 +194,19 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     }
   });
   
-  // Use simple loading state management
+  // Use our enhanced realtime hook to track processing status
+  const {
+    isLoading,
+    isProcessing,
+    processingStage,
+    processingStatus,
+    updateProcessingStage,
+    setLocalLoading
+  } = useChatRealtime(currentThreadId);
   
   // Use unified auto-scroll hook
   const { scrollElementRef, scrollToBottom } = useAutoScroll({
-    dependencies: [chatHistory, isStreaming, streamingMessages],
+    dependencies: [chatHistory, isLoading, isProcessing, isStreaming, streamingMessages],
     delay: 50,
     scrollThreshold: 100
   });
@@ -462,7 +453,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     }
     
     // Prevent multiple concurrent requests
-    if (isStreaming) {
+    if (isProcessing || isLoading) {
       toast({
         title: "Please wait",
         description: "Another request is currently being processed.",
@@ -487,7 +478,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     window.dispatchEvent(new Event('chat:forceScrollToBottom'));
     
     // Set local loading state for immediate UI feedback
-    
+    setLocalLoading(true, "Analyzing your question...");
     
     // Ensure we stay pinned to bottom as processing begins
     window.dispatchEvent(new Event('chat:forceScrollToBottom'));
@@ -563,7 +554,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       
       // Use GPT-based query classification with conversation context
       debugLog.addEvent("Query Classification", `Classifying query: "${message.substring(0, 30)}${message.length > 30 ? '...' : ''}"`, "info");
-      // Processing message stage is now handled by loading state
+      updateProcessingStage("Analyzing your question...");
       
       // Get conversation context for better classification
       const conversationContext = chatHistory.slice(-5).map(msg => ({
@@ -580,12 +571,18 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
         reasoning: queryClassification.reasoning
       })}` , "success");
       
-      // Processing message stage is now handled by loading state
+      updateProcessingStage("Generating response...");
       
-      // Create processing placeholder for ALL queries to ensure assistant messages are created
-      processingMessageId = await createProcessingMessage(threadId, "Processing your request...");
-      if (processingMessageId) {
-        debugLog.addEvent("Database", `Created processing message with ID: ${processingMessageId}`, "success");
+      // Create processing placeholder only for non-journal-specific queries
+      if (queryClassification.category !== QueryCategory.JOURNAL_SPECIFIC) {
+        processingMessageId = await createProcessingMessage(threadId, "Processing your request...");
+        if (processingMessageId) {
+          debugLog.addEvent("Database", `Created processing message with ID: ${processingMessageId}`, "success");
+        }
+      } else if (processingMessageId) {
+        // Safety: if a placeholder exists, remove it for streaming path
+        await updateProcessingMessage(processingMessageId, null);
+        processingMessageId = null;
       }
       
       // Route ALL queries to chat-with-rag (restored original design)
@@ -595,18 +592,19 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       await startStreamingChat(
         message,
         effectiveUserId,
+        threadId,
         conversationContext,
         {
           useAllEntries: queryClassification.useAllEntries || false,
           hasPersonalPronouns: message.toLowerCase().includes('i ') || message.toLowerCase().includes('my '),
           hasExplicitTimeReference: /\b(last week|yesterday|this week|last month|today|recently|lately)\b/i.test(message),
           threadMetadata: {}
-        },
-        undefined, // onTypingAnimation
-        threadId
+        }
       );
       
       // Streaming owns the lifecycle; ensure local loader is cleared immediately
+      setLocalLoading(false);
+      updateProcessingStage(null);
       
       // Skip the rest since streaming handles the response
       return;
@@ -677,6 +675,8 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     } finally {
       // Clear local loading state - only if still on originating thread
       if (threadId === currentThreadIdRef.current) {
+        setLocalLoading(false);
+        updateProcessingStage(null);
       }
     }
   };
@@ -727,7 +727,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     }
 
     // Prevent deletion if currently processing
-    if (isStreaming) {
+    if (isProcessing || processingStatus === 'processing') {
       toast({
         title: "Cannot delete conversation",
         description: "Please wait for the current request to complete before deleting this conversation.",
@@ -828,11 +828,11 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     }
   };
 
-  // Check if deletion should be disabled - use loading state
-  const isDeletionDisabled = isStreaming;
+  // Check if deletion should be disabled - use realtime processing state
+  const isDeletionDisabled = isProcessing || processingStatus === 'processing' || isLoading;
 
   // Thread-scoped loading indicator: during streaming, only show for current thread
-  const showLoadingForThisThread = isStreaming;
+  const showLoadingForThisThread = isLoading || isProcessing || isStreaming;
 
   return (
     <div className="chat-interface flex flex-col h-full">
@@ -845,8 +845,9 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
               variant="outline"
               size="sm"
               onClick={() => {
-                stopStreaming();
-                
+                stopStreaming(currentThreadId);
+                setLocalLoading(false);
+                updateProcessingStage(null);
               }}
               aria-label="Cancel processing"
             >
@@ -897,7 +898,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
           <ChatArea 
             chatMessages={chatHistory}
             isLoading={showLoadingForThisThread}
-            processingStage={undefined}
+            processingStage={processingStage || undefined}
             threadId={currentThreadId}
             onInteractiveOptionClick={handleInteractiveOptionClick}
           />

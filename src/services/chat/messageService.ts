@@ -194,7 +194,7 @@ export const getThreadMessages = getChatMessages;
 // Export classification helper
 export { updateUserMessageClassification } from '@/utils/chat/classificationHelpers';
 
-// Enhanced saveMessage function with improved error handling and idempotency
+// Updated saveMessage function with correct signature and idempotency support
 export const saveMessage = async (
   threadId: string, 
   content: string, 
@@ -204,21 +204,21 @@ export const saveMessage = async (
   hasNumericResult?: boolean,
   isInteractive?: boolean,
   interactiveOptions?: any[],
+  idempotencyKey?: string,
   analysisData?: any
 ) => {
-  console.log('[saveMessage] Starting enhanced message save:', {
+  console.log('[saveMessage] Starting message save:', {
     threadId,
     sender,
     userId,
-    contentLength: content.length
+    contentLength: content.length,
+    hasIdempotencyKey: !!idempotencyKey
   });
 
   if (!userId) {
     console.error('[saveMessage] User ID is required for saveMessage');
     return null;
   }
-
-  // Simplified message processing without idempotency complexity
 
   // Process content for assistant messages to handle JSON responses
   let processedContent = content;
@@ -241,41 +241,19 @@ export const saveMessage = async (
   if (hasNumericResult !== undefined) additionalData.has_numeric_result = hasNumericResult;
   if (isInteractive) additionalData.isInteractive = isInteractive;
   if (interactiveOptions) additionalData.interactiveOptions = interactiveOptions;
-  // Remove idempotency_key from additional data
+  if (idempotencyKey) additionalData.idempotency_key = idempotencyKey;
   if (analysisData) additionalData.analysis_data = analysisData;
 
-  console.log('[saveMessage] Processed data, calling createChatMessage with retry logic');
-
-  // Enhanced retry logic for message creation
-  const maxRetries = 3;
-  let lastError = null;
-
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    console.log(`[saveMessage] Save attempt ${attempt}/${maxRetries}`);
-    
-    try {
-      const result = await createChatMessage(threadId, processedContent, sender, userId, additionalData);
-      
-      if (result) {
-        console.log('[saveMessage] Message saved successfully:', result.id);
-        return result;
-      } else {
-        throw new Error('createChatMessage returned null');
-      }
-    } catch (error) {
-      lastError = error;
-      console.error(`[saveMessage] Attempt ${attempt} failed:`, error);
-
-      if (attempt < maxRetries) {
-        const delay = Math.pow(2, attempt - 1) * 1000; // Exponential backoff
-        console.log(`[saveMessage] Retrying in ${delay}ms...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
-    }
+  console.log('[saveMessage] Processed data, calling createChatMessage');
+  const result = await createChatMessage(threadId, processedContent, sender, userId, additionalData);
+  
+  if (result) {
+    console.log('[saveMessage] Message saved successfully:', result.id);
+  } else {
+    console.error('[saveMessage] Failed to save message');
   }
-
-  console.error('[saveMessage] All save attempts failed. Last error:', lastError);
-  return null;
+  
+  return result;
 };
 
 // Update message with classification data

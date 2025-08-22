@@ -1,47 +1,80 @@
-export async function executeSQLAnalysis(step: any, userId: string, supabaseClient: any, requestId: string, executionDetails: any, userTimezone: string = 'UTC') {
-  console.log(`[${requestId}] [SQL EXECUTION] Starting SQL analysis`);
-  
+
+export async function executeSQLAnalysis(step: any, userId: string, supabaseClient: any, requestId: string, executionDetails: any) {
   try {
-    if (!step.sqlQuery) {
-      console.warn(`[${requestId}] No SQL query provided for step`);
-      return [];
+    console.log(`[${requestId}] Executing SQL query:`, step.sqlQuery);
+    
+    if (!step.sqlQuery || !step.sqlQuery.trim()) {
+      console.log(`[${requestId}] No SQL query provided, using vector search fallback`);
+      executionDetails.fallbackUsed = true;
+      return await executeVectorSearchFallback(step, userId, supabaseClient, requestId);
+    }
+
+    const originalQuery = step.sqlQuery.trim();
+    executionDetails.originalQuery = originalQuery;
+    
+    // Sanitize user ID in the query
+    let sanitizedQuery;
+    try {
+      sanitizedQuery = sanitizeUserIdInQuery(originalQuery, userId, requestId);
+      executionDetails.sanitizedQuery = sanitizedQuery;
+    } catch (sanitizeError) {
+      console.error(`[${requestId}] Query sanitization failed:`, sanitizeError);
+      executionDetails.executionError = sanitizeError.message;
+      executionDetails.fallbackUsed = true;
+      return await executeVectorSearchFallback(step, userId, supabaseClient, requestId);
     }
     
-    const sanitizedQuery = sanitizeUserIdInQuery(step.sqlQuery, userId, requestId);
+    // Use the execute_dynamic_query function to safely run GPT-generated SQL
+    console.log(`[${requestId}] Executing sanitized query via RPC:`, sanitizedQuery.substring(0, 200) + '...');
     
     const { data, error } = await supabaseClient.rpc('execute_dynamic_query', {
-      query_text: sanitizedQuery,
-      user_timezone: userTimezone
+      query_text: sanitizedQuery
     });
 
     if (error) {
       console.error(`[${requestId}] SQL execution error:`, error);
+      console.error(`[${requestId}] Failed query:`, sanitizedQuery);
       executionDetails.executionError = error.message;
-      return [];
+      executionDetails.fallbackUsed = true;
+      
+      // Enhanced error logging for debugging
+      if (error.code) {
+        console.error(`[${requestId}] PostgreSQL error code: ${error.code}`);
+      }
+      if (error.details) {
+        console.error(`[${requestId}] PostgreSQL error details: ${error.details}`);
+      }
+      if (error.hint) {
+        console.error(`[${requestId}] PostgreSQL error hint: ${error.hint}`);
+      }
+      
+      // INTELLIGENT FALLBACK: Use vector search instead of basic SQL
+      console.log(`[${requestId}] SQL execution failed, falling back to vector search`);
+      return await executeVectorSearchFallback(step, userId, supabaseClient, requestId);
     }
 
-    if (!data || !data.success) {
-      console.error(`[${requestId}] SQL query failed:`, data?.error || 'Unknown error');
-      executionDetails.executionError = data?.error || 'Unknown error';
-      return [];
+    if (data && data.success && data.data) {
+      console.log(`[${requestId}] SQL query executed successfully, rows:`, data.data.length);
+      // If SQL query executed but returned 0 results, try vector fallback
+      if (data.data.length === 0) {
+        console.log(`[${requestId}] SQL query returned 0 results, falling back to vector search`);
+        executionDetails.fallbackUsed = true;
+        return await executeVectorSearchFallback(step, userId, supabaseClient, requestId);
+      }
+      return data.data;
+    } else {
+      console.warn(`[${requestId}] SQL query returned no results or failed:`, data);
+      executionDetails.fallbackUsed = true;
+      return await executeVectorSearchFallback(step, userId, supabaseClient, requestId);
     }
 
-    const results = data.data || [];
-    console.log(`[${requestId}] [SQL EXECUTION] Completed - ${results.length} results`);
-    
-    // Update execution details
-    executionDetails.originalQuery = step.sqlQuery;
-    executionDetails.sanitizedQuery = sanitizedQuery;
-    executionDetails.validationResult = 'success';
-    
-    return results;
-    
   } catch (error) {
     console.error(`[${requestId}] Error in SQL analysis:`, error);
     executionDetails.executionError = error.message;
-    
-    // Return empty array rather than throwing
-    return [];
+    executionDetails.fallbackUsed = true;
+    // INTELLIGENT FALLBACK: Use vector search instead of basic SQL
+    console.log(`[${requestId}] SQL analysis error, falling back to vector search`);
+    return await executeVectorSearchFallback(step, userId, supabaseClient, requestId);
   }
 }
 
@@ -64,9 +97,10 @@ export async function executeBasicSQLQuery(userId: string, supabaseClient: any, 
   return data || [];
 }
 
-// DEPRECATED - Keeping for compatibility but will be replaced by shared utilities
+
+// NEW INTELLIGENT VECTOR SEARCH FALLBACK FUNCTION
 async function executeVectorSearchFallback(step: any, userId: string, supabaseClient: any, requestId: string) {
-  console.log(`[${requestId}] Executing legacy vector search fallback`);
+  console.log(`[${requestId}] Executing vector search fallback`);
   
   try {
     // Extract query context from the original step
@@ -74,6 +108,7 @@ async function executeVectorSearchFallback(step: any, userId: string, supabaseCl
     if (step.description) {
       searchQuery = step.description;
     } else if (step.sqlQuery) {
+      // Extract meaningful terms from the SQL query for vector search
       searchQuery = extractSearchTermsFromSQL(step.sqlQuery);
     } else {
       searchQuery = 'personal thoughts feelings experiences';
@@ -86,6 +121,7 @@ async function executeVectorSearchFallback(step: any, userId: string, supabaseCl
     
     // Primary vector search with relaxed threshold
     const primaryThreshold = 0.2;
+    const fallbackThreshold = 0.15;
     
     let vectorResults;
     
@@ -129,10 +165,10 @@ async function executeVectorSearchFallback(step: any, userId: string, supabaseCl
     
     // If still no results, try with lower threshold
     if (!vectorResults || vectorResults.length === 0) {
-      console.log(`[${requestId}] Vector fallback with lower threshold: 0.15`);
+      console.log(`[${requestId}] Vector fallback with lower threshold: ${fallbackThreshold}`);
       const { data, error } = await supabaseClient.rpc('match_journal_entries', {
         query_embedding: embedding,
-        match_threshold: 0.15,
+        match_threshold: fallbackThreshold,
         match_count: 15,
         user_id_filter: userId
       });

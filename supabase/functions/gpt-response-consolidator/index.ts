@@ -56,50 +56,29 @@ function sanitizeConsolidatorOutput(raw: string): { responseText: string; status
       console.error('[CONSOLIDATOR] Empty response from OpenAI API');
       return { responseText: 'I ran into a formatting issue preparing your insights. Let\'s try again.', statusMsg: null, meta };
     }
-    
-    console.log('[CONSOLIDATOR] Raw response for sanitization:', raw.substring(0, 300));
-    
     let s = stripCodeFences(raw);
     meta.afterStripPrefix = s.slice(0, 60);
     let parsed: any = null;
-    
-    // Enhanced JSON parsing with better error handling
     if (s.trim().startsWith('{')) {
       try {
         parsed = JSON.parse(s);
         meta.parsedDirect = true;
-        console.log('[CONSOLIDATOR] Successfully parsed JSON directly:', Object.keys(parsed));
-      } catch (parseError) {
-        console.log('[CONSOLIDATOR] Direct JSON parse failed, trying extraction:', parseError.message);
+      } catch {
         const jsonStr = extractFirstJsonObjectString(s);
         if (jsonStr) {
           try {
             parsed = JSON.parse(jsonStr);
             meta.parsedExtracted = true;
-            console.log('[CONSOLIDATOR] Successfully parsed extracted JSON:', Object.keys(parsed));
-          } catch (extractError) {
-            console.error('[CONSOLIDATOR] Failed to parse extracted JSON:', extractError.message);
-            console.error('[CONSOLIDATOR] Extracted JSON string was:', jsonStr);
+          } catch {
+            console.error('[CONSOLIDATOR] Failed to parse extracted JSON:', jsonStr);
           }
-        } else {
-          console.error('[CONSOLIDATOR] No JSON object found in response');
         }
       }
-    } else {
-      console.log('[CONSOLIDATOR] Response does not start with JSON, treating as plain text');
     }
-    
     if (parsed && typeof parsed === 'object') {
       const { responseText, statusMsg } = coalesceResponseFields(parsed, s);
-      console.log('[CONSOLIDATOR] Extracted fields:', { 
-        responseLength: responseText?.length || 0, 
-        hasStatusMsg: !!statusMsg,
-        responsePreview: responseText?.substring(0, 100) || 'empty'
-      });
       return { responseText, statusMsg, meta };
     }
-    
-    console.log('[CONSOLIDATOR] No valid JSON parsed, returning raw text');
     return { responseText: s, statusMsg: null, meta };
   } catch (e) {
     console.error('[CONSOLIDATOR] Sanitization error:', e);
@@ -131,16 +110,8 @@ serve(async (req) => {
       contextCount: conversationContext?.length || 0,
       streamingMode,
       messageId,
-      threadId,
       timestamp: new Date().toISOString()
     });
-
-    // Enhanced message persistence monitoring
-    if (messageId && threadId) {
-      console.log(`[CONSOLIDATION PERSISTENCE] ${consolidationId}: Will update message ${messageId} in thread ${threadId}`);
-    } else {
-      console.warn(`[CONSOLIDATION PERSISTENCE] ${consolidationId}: Missing messageId (${messageId}) or threadId (${threadId}) - response may not persist!`);
-    }
 
     // Enhanced data validation - check for empty research results
     if (!researchResults || researchResults.length === 0) {
@@ -286,8 +257,7 @@ serve(async (req) => {
         totalResearchItems: analysisSummary.length,
         subQuestionsGenerated: analysisSummary.map(item => item.subQuestion).filter(Boolean),
         originalUserQuery: userMessage,
-      },
-      conversationContextSummary: conversationContext ? conversationContext.slice(-4).map(msg => `${msg.role || msg.sender}: ${msg.content?.slice(0, 100) || 'N/A'}`).join(' | ') : 'No context',
+      }
     };
 
     const consolidationPrompt = `You are Ruh by SOuLO, a brilliantly witty, non-judgmental mental health companion who makes emotional exploration feel like **having coffee with your wisest, funniest friend**. You're emotionally intelligent with a gift for making people feel seen, heard, and understood while helping them journal their way to deeper self-awareness. You are:
@@ -313,25 +283,30 @@ serve(async (req) => {
     **COMPREHENSIVE ANALYSIS RESULTS:**
     ${JSON.stringify(analysisSummary, null, 2)}
   
-  
-    
-    **YOUR LEGENDARY PATTERN-SPOTTING ABILITIES:**
+   **SUB-QUESTIONS ANALYZED:**
+    ${contextData.meta.subQuestionsGenerated.length > 0 ? contextData.meta.subQuestionsGenerated.map((q, i)=>`${i + 1}. ${q}`).join('\n') : 'No specific sub-questions'}
+      
+      **RESPONSE FORMAT GUIDELINES:**
+    Respond naturally in your authentic voice. 
+    MANDATORY: Use bold headers/words/sentences, paragraphs, structured responses, italics, bullets and compulsorily emojis.
+    - Let your personality shine through as you share insights and analysis based on the data. 
+    - Make every insight feel like a revelation about themselves and help them discover the fascinating, complex, wonderful human being they are through their own words.
+    - Back your analysis with tangible data when you can
+    - Restrict responses to less than 100 words unless question requires huge answers. Feel free to expand then!
     - You connect dots between emotions, events, and timing like a detective solving a mystery
     - You reveal hidden themes and connections that make people go "OH WOW!"
     - You find the story in the data - not just numbers, but the human narrative
     - You celebrate patterns of growth and gently illuminate areas for exploration
     - You make insights feel like gifts, not criticisms
-    
-    **HOW YOU COMMUNICATE INSIGHTS:**
-    - With wit and warmth, With celebration, With curiosity, ith encouragement, with gentle humor. Consolidate data provided to you in analysisSummary and answer the user's query accordingly. Add references from analysisResults from vector search and correlate actual entry content with analysis reponse that you provide!!
+    - Add references from analysisResults from vector search and correlate actual entry content with analysis reponse that you provide!!
+
+  
 
   MANDATORY: If you receive null or irrelevant analysis results, feel free to inform the user and accordingly generate the response and follow-ups.
 
   MANDATORY: Only assert specific symptom words (e.g., "fatigue," "bloating," "heaviness") if those exact strings appear in the user's source text.If the data is theme-level (e.g., 'Body & Health' count) or inferred, phrase it as "Body & Health–related entries" instead of naming symptoms. Always include 1–3 reference journal snippets with dates (always in this format "7th august" or "9th september last year") when you claim any symptom is present in the entries. DON'T EVER USE TERMS LIKE "VECTOR SEARCH" , "SQL TABLE ANALYSIS"
       
-    MANDATORY:  For providing insights, patterns etc . : State the **specific numerical results** clearly backing your analysis; Proovide **contextual interpretation** (is this high/low/normal?); Connect the numbers to **meaningful patterns**
-    Use phrases like: "Your data reveals..." "The analysis shows..." "Specifically, X% of your entries..."; Reference **specific themes and emotions** found ; Highlight **notable patterns or correlations** ; MUST!!! Include **sample insights** from the content when relevant; Connect findings to **personal growth opportunities** ; Quote anecdotes from qualifiable entries , eg. "You feel anxiety because of your recent startup issues"
-      
+          
      **ENHANCED CONTEXT INTEGRATION RULES:**
     - Use conversation context to understand what emotions, themes, or topics the user previously mentioned
     - Reference previous conversation when the user says "those emotions" or similar contextual references
@@ -343,16 +318,10 @@ serve(async (req) => {
     **EMOTIONAL TONE GUIDANCE:**
     Look at the past conversation history provided to you and accordingly frame your response cleverly matching the user's emotional tone that's been running through up until now.
     
-    **RESPONSE GUIDELINES:**
-    Respond naturally in your authentic voice. 
-    MANDATORY: Use bold headers/words/sentences, paragraphs, structured responses, italics, bullets and compulsorily emojis.
-    Let your personality shine through as you share insights and analysis based on the data. Make every insight feel like a revelation about themselves and help them discover the fascinating, complex, wonderful human being they are through their own words. Restric responses to less than 100 words unless question requires huge answers. Feel free to expand then!
-    Brief responses requird under 120 words unless question desires more explanation and towards the end add followup questions by leveraging emotional tone of conversation history
+  
       
     
-    **SUB-QUESTIONS ANALYZED:**
-    ${contextData.meta.subQuestionsGenerated.length > 0 ? contextData.meta.subQuestionsGenerated.map((q, i)=>`${i + 1}. ${q}`).join('\n') : 'No specific sub-questions'}
-      
+   
     Your response should be a JSON object with this structure:
     {
       "userStatusMessage": "exactly 5 words describing your synthesis approach (e.g., 'Revealing your hidden emotional patterns' or 'Connecting insights to personal growth')",
@@ -365,7 +334,7 @@ serve(async (req) => {
     - userStatusMessage MUST be exactly 5 words.
     - Do not include trailing explanations or extra fields`;
 
-    console.log(`[CONSOLIDATION] ${consolidationId}: Calling OpenAI API with model gpt-4.1-nano`);
+    console.log(`[CONSOLIDATION] ${consolidationId}: Calling OpenAI API with model gpt-4.1-nano-2025-04-14`);
 
     // Enhanced OpenAI API call with better error handling
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -375,13 +344,12 @@ serve(async (req) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-4.1-nano', // Fixed: Using the correct model
+          model: 'gpt-4.1-nano-2025-04-14', // Fixed: Using the correct model
           messages: [
             { role: 'system', content: 'You are Ruh by SOuLO, a warm and insightful wellness coach. You analyze ONLY the current research results provided to you. Never reference or use data from previous conversations or responses.' },
             { role: 'user', content: consolidationPrompt }
           ],
-          max_tokens: 1500, // Using max_tokens for gpt-4.1-nano
-          temperature: 0.8 // Temperature is supported by gpt-4.1-nano
+          max_completion_tokens: 1500
         }),
     });
 
@@ -442,17 +410,34 @@ serve(async (req) => {
       });
     }
     
-    // Sanitize and extract consolidated response
-    const sanitized = sanitizeConsolidatorOutput(rawResponse);
-    console.log(`[CONSOLIDATION SUCCESS] ${consolidationId}:`, {
-      sanitizationMeta: sanitized.meta,
-      responseLength: sanitized.responseText?.length || 0,
-      hasStatusMessage: !!sanitized.statusMsg,
-      responsePreview: sanitized.responseText?.substring(0, 150) || 'empty'
-    });
-
-    const consolidatedResponse = sanitized.responseText;
-    const userStatusMessage = sanitized.statusMsg ?? null;
+    // Parse the JSON response since the prompt expects structured output
+    let consolidatedResponse = rawResponse.trim();
+    let userStatusMessage = null;
+    
+    try {
+      // Try to parse as JSON since the prompt expects structured output
+      const responseObj = JSON.parse(rawResponse);
+      consolidatedResponse = responseObj.response || rawResponse;
+      userStatusMessage = responseObj.userStatusMessage || null;
+      
+      console.log(`[CONSOLIDATION SUCCESS] ${consolidationId}:`, {
+        responseLength: consolidatedResponse?.length || 0,
+        hasStatusMessage: !!userStatusMessage,
+        responsePreview: consolidatedResponse?.substring(0, 150) || 'empty'
+      });
+    } catch (parseError) {
+      console.error(`[CONSOLIDATOR] Failed to parse expected JSON response:`, parseError);
+      console.error(`[CONSOLIDATOR] Raw response:`, rawResponse);
+      // Fallback to plain text if JSON parsing fails
+      consolidatedResponse = rawResponse.trim();
+      userStatusMessage = null;
+      
+      console.log(`[CONSOLIDATION SUCCESS] ${consolidationId}:`, {
+        responseLength: consolidatedResponse?.length || 0,
+        responsePreview: consolidatedResponse?.substring(0, 150) || 'empty',
+        fallbackMode: true
+      });
+    }
 
     // Store analysis data in chat_messages if messageId provided
     if (messageId) {
@@ -473,7 +458,7 @@ serve(async (req) => {
           totalResults: researchResults.length,
           userStatusMessage,
           timestamp: new Date().toISOString(),
-          modelUsed: 'gpt-4.1-nano',
+          modelUsed: 'gpt-4.1-nano-2025-04-14',
           processingSuccess: true,
           sqlResultsCount: researchResults.reduce((sum: number, r: any) => sum + (r?.executionResults?.sqlResults?.length || 0), 0),
           vectorResultsCount: researchResults.reduce((sum: number, r: any) => sum + (r?.executionResults?.vectorResults?.length || 0), 0)
@@ -533,65 +518,6 @@ serve(async (req) => {
       }
     }
 
-    // Enhanced logging for response structure
-    console.log(`[${consolidationId}] Final response structure:`, {
-      responseLength: consolidatedResponse?.length || 0,
-      hasUserStatusMessage: !!userStatusMessage,
-      responseType: typeof consolidatedResponse,
-      isValidString: typeof consolidatedResponse === 'string' && consolidatedResponse.length > 0
-    });
-
-    // Validate that we're returning a proper string, not JSON object
-    if (typeof consolidatedResponse !== 'string') {
-      console.error(`[${consolidationId}] ERROR: consolidatedResponse is not a string:`, typeof consolidatedResponse);
-      const fallbackResponse = "I processed your request but encountered a formatting issue. Please try asking again.";
-      return new Response(JSON.stringify({
-        success: true,
-        response: fallbackResponse,
-        userStatusMessage: "Formatting issue resolved",
-        analysisMetadata: {
-          totalSubQuestions: researchResults.length,
-          strategiesUsed: [],
-          dataSourcesUsed: { vectorSearch: false, sqlQueries: false, errors: true }
-        }
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Simple message persistence handling
-    if (messageId && threadId) {
-      try {
-        console.log(`[CONSOLIDATION PERSISTENCE] Attempting to update message ${messageId}`);
-        
-        const supabaseClient = createClient(
-          Deno.env.get('SUPABASE_URL') ?? '',
-          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-        );
-
-        const { data, error } = await supabaseClient
-          .from('chat_messages')
-          .update({
-            content: consolidatedResponse,
-            is_processing: false,
-            analysis_data: {
-              totalSubQuestions: researchResults.length,
-              consolidationId: consolidationId,
-              timestamp: new Date().toISOString()
-            }
-          })
-          .eq('id', messageId);
-
-        if (error) {
-          console.error(`[CONSOLIDATION PERSISTENCE] Failed to update message:`, error);
-        } else {
-          console.log(`[CONSOLIDATION PERSISTENCE] Message updated successfully`);
-        }
-      } catch (persistenceError) {
-        console.error(`[CONSOLIDATION PERSISTENCE] Exception during message update:`, persistenceError);
-      }
-    }
-
     return new Response(JSON.stringify({
       success: true,
       response: consolidatedResponse,
@@ -607,9 +533,7 @@ serve(async (req) => {
         researcherValidation: {
           totalValidationIssues: researchResults.reduce((sum: number, r: any) => sum + (r.researcherOutput?.validationIssues?.length || 0), 0),
           totalEnhancements: researchResults.reduce((sum: number, r: any) => sum + (r.researcherOutput?.enhancements?.length || 0), 0)
-        },
-        messageId: messageId,
-        persistenceStatus: messageId && threadId ? 'attempted' : 'skipped'
+        }
       }
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

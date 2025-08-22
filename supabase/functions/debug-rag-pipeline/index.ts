@@ -198,13 +198,13 @@ serve(async (req) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-4.1-nano',
+          model: 'gpt-4.1-nano-2025-04-14',
           messages: [
             { role: 'system', content: 'You are a helpful assistant. Respond with a simple JSON object containing a "message" field.' },
             { role: 'user', content: 'Say hello in JSON format' }
           ],
           max_tokens: 100,
-          temperature: 0.5
+          temperature: 0.7
         }),
       });
 
@@ -215,7 +215,7 @@ serve(async (req) => {
       
       debugResults.tests.gptModel = {
         success: true,
-        model: 'gpt-4.1-nano',
+        model: 'gpt-4.1-nano-2025-04-14',
         responseLength: gptContent?.length || 0,
         responsePreview: gptContent?.substring(0, 100)
       };

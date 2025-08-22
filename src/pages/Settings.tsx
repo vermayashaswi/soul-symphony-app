@@ -34,6 +34,8 @@ import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { useTutorial } from '@/contexts/TutorialContext';
 import { DeleteAllEntriesSection } from '@/components/settings/DeleteAllEntriesSection';
+import { EnhancedAvatarImage } from '@/components/ui/EnhancedAvatarImage';
+import { avatarSyncService } from '@/services/avatarSyncService';
 
 
 interface SettingItemProps {
@@ -119,6 +121,7 @@ function SettingsContent() {
   const [isEditingName, setIsEditingName] = useState(false);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [nameError, setNameError] = useState<string | null>(null);
+  const [avatarRefreshing, setAvatarRefreshing] = useState(false);
   
   
   const MAX_NAME_LENGTH = 25;
@@ -300,6 +303,21 @@ function SettingsContent() {
     fetchUserProfile();
   }, [user]);
 
+  // Refresh avatar on Settings page load
+  useEffect(() => {
+    const refreshAvatarOnLoad = async () => {
+      if (user?.id) {
+        try {
+          await avatarSyncService.syncUserAvatar(user);
+        } catch (error) {
+          console.warn('[Settings] Failed to sync avatar on load:', error);
+        }
+      }
+    };
+
+    refreshAvatarOnLoad();
+  }, [user?.id]);
+
   const handleContactSupport = () => {
     const subject = encodeURIComponent("Help me, I don't want to be SOuLO right now");
     const mailtoLink = `mailto:support@soulo.online?subject=${subject}`;
@@ -366,6 +384,26 @@ function SettingsContent() {
     setDisplayName(originalDisplayName);
     setIsEditingName(false);
     setNameError(null);
+  };
+
+  const handleRefreshAvatar = async () => {
+    if (!user?.id) return;
+    
+    try {
+      setAvatarRefreshing(true);
+      const result = await avatarSyncService.refreshFromAuth(user.id);
+      
+      if (result.success) {
+        toast.success(<TranslatableText text="Avatar refreshed successfully" forceTranslate={true} />);
+      } else {
+        toast.error(<TranslatableText text="Failed to refresh avatar" forceTranslate={true} />);
+      }
+    } catch (error) {
+      console.error('Error refreshing avatar:', error);
+      toast.error(<TranslatableText text="Failed to refresh avatar" forceTranslate={true} />);
+    } finally {
+      setAvatarRefreshing(false);
+    }
   };
   
   const handleToggleNotifications = async (checked: boolean) => {

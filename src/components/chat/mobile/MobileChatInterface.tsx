@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Menu, Plus, Trash2 } from "lucide-react";
 import MobileChatMessage from "./MobileChatMessage";
 import MobileChatInput from "./MobileChatInput";
-
 import { supabase } from "@/integrations/supabase/client";
 import { ChatThreadList } from "@/components/chat/ChatThreadList";
 import { motion } from "framer-motion";
@@ -18,8 +17,7 @@ import { getThreadMessages, saveMessage, updateUserMessageClassification } from 
 import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
 import { processChatMessage } from "@/services/chatService";
 import { MentalHealthInsights } from "@/hooks/use-mental-health-insights";
-import { ensureMessageOrder, deduplicateMessages, UIChatMessage } from "@/utils/chat/messageOrdering";
-
+import { useChatRealtime } from "@/hooks/use-chat-realtime";
 import { updateThreadProcessingStatus, generateThreadTitle } from "@/utils/chat/threadUtils";
 import { useUnifiedKeyboard } from "@/hooks/use-unified-keyboard";
 import { useEnhancedSwipeGestures } from "@/hooks/use-enhanced-swipe-gestures";
@@ -38,7 +36,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-// UIChatMessage interface is now imported from messageOrdering utils
+interface UIChatMessage {
+  role: 'user' | 'assistant' | 'error';
+  content: string;
+  references?: any[];
+  analysis?: any;
+  hasNumericResult?: boolean;
+}
 
 interface MobileChatInterfaceProps {
   currentThreadId: string | null;
@@ -65,7 +69,6 @@ export default function MobileChatInterface({
   
   // Track active thread for safety manager
   useEffect(() => {
-    console.log(`[MobileChatInterface] 🔧 Setting active thread in safety manager: ${threadId}`);
     threadSafetyManager.setActiveThread(threadId || null);
   }, [threadId]);
   
@@ -75,6 +78,12 @@ export default function MobileChatInterface({
     currentThreadIdRef.current = threadId;
   }, [threadId]);
   
+  const {
+    isLoading,
+    isProcessing,
+    processingStatus,
+    setLocalLoading
+  } = useChatRealtime(threadId);
   
   const { isKeyboardVisible } = useUnifiedKeyboard();
   
@@ -116,121 +125,110 @@ export default function MobileChatInterface({
     currentMessageIndex,
     useThreeDotFallback,
     queryCategory,
-    restoreStreamingState,
-    extendStreamingForRealtimeDelivery,
-    confirmRealtimeDelivery
+    restoreStreamingState
    } = useStreamingChat({
       threadId: threadId,
-      onFinalResponse: async (response, analysis, originThreadId, requestId) => {
-        // Handle final streaming response scoped to its origin thread
-        if (!response || !originThreadId || !user?.id) {
-          debugLog.addEvent("Streaming Response", "[Mobile] Missing required data for final response", "error");
-          console.error("[Mobile] [Streaming] Missing response data:", { response: !!response, originThreadId: !!originThreadId, userId: !!user?.id });
-          return;
-        }
-        
-        console.log(`[MobileChatInterface] 🎯 onFinalResponse called:`, {
-          responseLength: response.length,
-          originThreadId,
-          currentThreadId: threadId,
-          threadMatch: originThreadId === threadId,
-          requestId,
-          analysisPresent: !!analysis,
-          timestamp: new Date().toISOString()
-        });
-        
+     onFinalResponse: async (response, analysis, originThreadId, requestId) => {
+       // Handle final streaming response scoped to its origin thread
+       if (!response || !originThreadId || !user?.id) {
+         debugLog.addEvent("Streaming Response", "[Mobile] Missing required data for final response", "error");
+         console.error("[Mobile] [Streaming] Missing response data:", { response: !!response, originThreadId: !!originThreadId, userId: !!user?.id });
+         return;
+       }
+       
         debugLog.addEvent("Streaming Response", `[Mobile] Final response received for ${originThreadId}: ${response.substring(0, 100)}...`, "success");
 
-        // Only update UI if this response is for the current thread
-        if (originThreadId === threadId) {
-          console.log(`[MobileChatInterface] ✅ Thread IDs match, adding message to UI immediately`);
-        } else {
-          console.warn(`[MobileChatInterface] ⚠️ Thread ID mismatch! Origin: ${originThreadId}, Current: ${threadId} - skipping UI update`);
-          return;
-        }
+         // Optimistic UI: append assistant message immediately so UI doesn't appear blank
+         if (originThreadId === threadId) {
+           setMessages(prev => [...prev, { role: 'assistant', content: response, analysis }]);
+           setShowSuggestions(false);
+           setLocalLoading(false);
+         }
+
+         // Update user message with classification data if available
+         if (analysis?.classification && requestId) {
+           try {
+             // Find the most recent user message to update with classification
+             const { data: recentUserMessages } = await supabase
+               .from('chat_messages')
+               .select('id')
+               .eq('thread_id', originThreadId)
+               .eq('sender', 'user')
+               .order('created_at', { ascending: false })
+               .limit(1);
+
+             if (recentUserMessages && recentUserMessages.length > 0) {
+               await updateUserMessageClassification(
+                 recentUserMessages[0].id,
+                 analysis.classification,
+                 user.id
+               );
+               debugLog.addEvent("Classification", "Updated user message with classification data", "success");
+             }
+           } catch (classificationError) {
+             console.warn('[Mobile] Failed to update user message classification:', classificationError);
+           }
+         }
         
+        // Let backend persist assistant message; UI will also update via realtime when it arrives
         if (originThreadId === threadId) {
-          // Add assistant message to UI immediately for better UX
-          const assistantMessage: UIChatMessage = {
-            id: `assistant-${Date.now()}`, // Temporary ID until realtime updates with real ID
-            role: 'assistant',
-            content: response,
-            references: analysis?.references || undefined,
-            analysis: analysis || undefined,
-            created_at: new Date().toISOString()
-          };
+         // Watchdog fallback: if realtime insert doesn't arrive, persist client-side after a short delay
+         try {
+           setTimeout(async () => {
+             // Double-check still on same thread
+             if (!currentThreadIdRef.current || currentThreadIdRef.current !== originThreadId) return;
 
-          setMessages(prev => {
-            // Check if message already exists (avoid duplicates)
-            const existingMessage = prev.find(m => 
-              m.role === 'assistant' && 
-              m.content === response && 
-              Math.abs(new Date().getTime() - new Date(m.created_at || 0).getTime()) < 5000 // Within 5 seconds
-            );
-            
-            if (existingMessage) {
-              console.log('[Mobile] Assistant message already exists, skipping duplicate');
-              return prev;
-            }
-            
-            console.log('[Mobile] Adding assistant message to UI');
-            return [...prev, assistantMessage];
-          });
+             // Has an assistant message with same content arrived?
+             const { data: recent, error: recentErr } = await supabase
+               .from('chat_messages')
+               .select('id, content, sender, created_at')
+               .eq('thread_id', originThreadId)
+               .order('created_at', { ascending: false })
+               .limit(5);
 
-          // Force scroll to bottom when new message arrives
-          setTimeout(() => scrollToBottom(), 100);
-        }
+             if (recentErr) {
+               console.warn('[Mobile Streaming Watchdog] Failed to fetch recent messages:', recentErr.message);
+             }
 
-        // Remove optimistic UI
-        setShowSuggestions(false);
+             const alreadyExists = (recent || []).some(m => (m as any).sender === 'assistant' && (m as any).content?.trim() === response.trim());
+             if (!alreadyExists) {
+               // Persist safely with an idempotency_key derived from threadId + response
+               try {
+                 const enc = new TextEncoder();
+                 const keySource = requestId || `${originThreadId}:${response}`;
+                 const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
+                 const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+                 const idempotencyKey = hex.slice(0, 32);
 
-        // Update user message with classification data if available
-        if (analysis?.classification && requestId) {
-          try {
-            // Find the most recent user message to update with classification
-            const { data: recentUserMessages } = await supabase
-              .from('chat_messages')
-              .select('id')
-              .eq('thread_id', originThreadId)
-              .eq('sender', 'user')
-              .order('created_at', { ascending: false })
-              .limit(1);
+                  await supabase.from('chat_messages').upsert({
+                    thread_id: originThreadId,
+                    content: response,
+                    sender: 'assistant',
+                    role: 'assistant',
+                    idempotency_key: idempotencyKey,
+                    analysis_data: analysis || null
+                  }, { onConflict: 'thread_id,idempotency_key' });
+               } catch (e) {
+                 console.warn('[Mobile Streaming Watchdog] Persist fallback failed:', (e as any)?.message || e);
+               }
+             }
 
-            if (recentUserMessages && recentUserMessages.length > 0) {
-              await updateUserMessageClassification(
-                recentUserMessages[0].id,
-                analysis.classification,
-                user.id
-              );
-              debugLog.addEvent("Classification", "Updated user message with classification data", "success");
-            }
-          } catch (classificationError) {
-            console.warn('[Mobile] Failed to update user message classification:', classificationError);
-          }
-        }
-        
-        // Backend persists message; realtime will update with correct ID later
-      },
+             setLocalLoading(false);
+           }, 1200);
+         } catch (e) {
+           console.warn('[Mobile Streaming Watchdog] Exception scheduling fallback:', (e as any)?.message || e);
+           setLocalLoading(false);
+         }
+       }
+    },
      onError: (error) => {
        toast({
          title: "Error",
          description: error,
          variant: "destructive"
        });
-      }
-    });
-  
-  // Helper function to get the latest status message from streaming messages
-  const getLatestStatusMessage = useCallback(() => {
-    if (!streamingMessages || streamingMessages.length === 0) return undefined;
-    
-    // Find the latest status_update message
-    const statusMessages = streamingMessages.filter(msg => msg.type === 'status_update');
-    if (statusMessages.length === 0) return undefined;
-    
-    const latestStatus = statusMessages[statusMessages.length - 1];
-    return latestStatus.statusMessage;
-  }, [streamingMessages]);
+     }
+   });
   
   const suggestionQuestions = [
     {
@@ -262,18 +260,14 @@ export default function MobileChatInterface({
   
   // Use unified auto-scroll hook
   const { scrollElementRef, scrollToBottom } = useAutoScroll({
-    dependencies: [messages, isStreaming],
+    dependencies: [messages, isLoading, isProcessing, isStreaming],
     delay: 50,
     scrollThreshold: 100
   });
 
-
   // Realtime: append assistant messages saved by backend
   useEffect(() => {
     if (!threadId) return;
-    
-    console.log('[MobileChatInterface] Setting up realtime subscription for thread:', threadId);
-    
     const channel = supabase
       .channel(`mobile-thread-assistant-append-${threadId}`)
       .on('postgres_changes',
@@ -285,36 +279,54 @@ export default function MobileChatInterface({
         },
         (payload) => {
           const m: any = payload.new;
-          console.log('[MobileChatInterface] Realtime message received:', { sender: m.sender, contentLength: m.content?.length });
-          
           if (m.sender === 'assistant') {
             setMessages(prev => {
+              // Avoid duplicates by simple heuristic
+              const last = prev[prev.length - 1];
+              if (last && last.role === 'assistant' && last.content === m.content) return prev;
               const uiMsg: UIChatMessage = {
-                id: m.id,
                 role: 'assistant',
                 content: m.content,
                 references: m.reference_entries || undefined,
                 analysis: m.analysis_data || undefined,
-                hasNumericResult: m.has_numeric_result || false,
-                created_at: m.created_at
+                hasNumericResult: m.has_numeric_result || false
               };
-              
-              console.log('[MobileChatInterface] Adding new assistant message');
               return [...prev, uiMsg];
             });
-            
-            // Force scroll to bottom when new message arrives
-            setTimeout(() => scrollToBottom(), 100);
+          }
+        }
+      )
+      .on('postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'chat_messages',
+          filter: `thread_id=eq.${threadId}`
+        },
+        (payload) => {
+          const m: any = payload.new;
+          if (m.sender === 'assistant') {
+            setMessages(prev => {
+              // If last assistant message already matches, skip; else append updated
+              const last = prev[prev.length - 1];
+              if (last && last.role === 'assistant' && last.content === m.content) return prev;
+              const uiMsg: UIChatMessage = {
+                role: 'assistant',
+                content: m.content,
+                references: m.reference_entries || undefined,
+                analysis: m.analysis_data || undefined,
+                hasNumericResult: m.has_numeric_result || false
+              };
+              return [...prev, uiMsg];
+            });
           }
         }
       )
       .subscribe();
-      
     return () => {
-      console.log('[MobileChatInterface] Cleaning up realtime subscription for thread:', threadId);
       supabase.removeChannel(channel);
     };
-  }, [threadId, scrollToBottom]);
+  }, [threadId]);
 
   useEffect(() => {
     if (threadId) {
@@ -392,24 +404,18 @@ export default function MobileChatInterface({
       }
       
       const chatMessages = await getThreadMessages(currentThreadId, user.id);
-      console.log(`[MobileChatInterface] Loaded ${chatMessages?.length || 0} messages for thread ${currentThreadId}`);
       
       if (chatMessages && chatMessages.length > 0) {
-        const uiMessages: UIChatMessage[] = chatMessages
+        const uiMessages = chatMessages
+          .filter(msg => !msg.is_processing)
           .map(msg => ({
-            id: msg.id,
             role: msg.sender as 'user' | 'assistant',
             content: msg.content,
             references: msg.reference_entries ? Array.isArray(msg.reference_entries) ? msg.reference_entries : [] : undefined,
-            hasNumericResult: msg.has_numeric_result,
-            created_at: msg.created_at
+            hasNumericResult: msg.has_numeric_result
           }));
         
-        // Ensure proper ordering and remove duplicates
-        const orderedMessages = deduplicateMessages(ensureMessageOrder(uiMessages));
-        
-        console.log(`[MobileChatInterface] Displaying ${orderedMessages.length} messages`);
-        setMessages(orderedMessages);
+        setMessages(uiMessages);
         setShowSuggestions(false);
         loadedThreadRef.current = currentThreadId;
       } else {
@@ -430,20 +436,6 @@ export default function MobileChatInterface({
     }
   };
 
-  // Simple cleanup when thread changes
-  useEffect(() => {
-    return () => {
-      // Simple cleanup
-    };
-  }, [threadId]);
-
-  // Simple cleanup when thread changes
-  useEffect(() => {
-    return () => {
-      // Simple cleanup
-    };
-  }, [threadId]);
-
   const handleSendMessage = async (message: string) => {
     if (!message.trim()) return;
     if (!user?.id) {
@@ -455,7 +447,7 @@ export default function MobileChatInterface({
       return;
     }
 
-    if (isStreaming) {
+    if (isProcessing || isLoading) {
       toast({
         title: "Please wait",
         description: "Another request is currently being processed.",
@@ -509,16 +501,10 @@ export default function MobileChatInterface({
       isFirstMessage = !error && count === 0;
     }
     
-    const userMessage: UIChatMessage = {
-      role: 'user',
-      content: message,
-      created_at: new Date().toISOString(),
-      id: `user-${Date.now()}`
-    };
-    setMessages(prev => [...prev, userMessage]);
+    setMessages(prev => [...prev, { role: 'user', content: message }]);
     // Force scroll to bottom on send so user sees streaming/processing
     scrollToBottom(true);
-    
+    setLocalLoading(true, "Processing your request...");
     // Ensure we remain pinned to bottom as processing begins
     scrollToBottom(true);
     
@@ -560,16 +546,13 @@ export default function MobileChatInterface({
         content: msg.content
       }));
       
-      // Removed message persistence tracking - keep simple
-      
       // Start streaming chat with conversation context
       await startStreamingChat(
         message,
         user.id,
+        currentThreadId,
         conversationContext,
-        {},
-        undefined, // onTypingAnimation
-        currentThreadId
+        {}
       );
       
       await updateThreadProcessingStatus(currentThreadId, 'idle');
@@ -578,55 +561,20 @@ export default function MobileChatInterface({
         await updateThreadProcessingStatus(currentThreadId, 'failed');
       }
       
-      // Check if this error occurred during streaming - if so, don't clear optimistic UI
-      const isStreamingError = streamingMessages && streamingMessages.length > 0;
+      const errorMessageContent = "I'm having trouble processing your request. Please try again later. " + 
+                 (error?.message ? `Error: ${error.message}` : "");
       
-      if (!isStreamingError) {
-        const errorMessageContent = "I'm having trouble processing your request. Please try again later. " + 
-                   (error?.message ? `Error: ${error.message}` : "");
-        
-        if (currentThreadId === currentThreadIdRef.current) {
-          setMessages(prev => [
-            ...prev, 
-            { 
-              role: 'assistant', 
-              content: errorMessageContent
-            }
-          ]);
-        }
-      } else {
-        // During streaming, log error but don't interfere with optimistic UI
-        console.error('[MobileChatInterface] Streaming error (preserving UI):', error);
-        
-        // Check if message was actually persisted despite the error
-        setTimeout(async () => {
-          try {
-            const { data: recentMessages } = await supabase
-              .from('chat_messages')
-              .select('*')
-              .eq('thread_id', currentThreadId!)
-              .order('created_at', { ascending: false })
-              .limit(1);
-            
-              if (recentMessages && recentMessages.length > 0 && recentMessages[0].sender === 'assistant') {
-                console.log('[MobileChatInterface] Message was persisted, triggering UI sync');
-                // Show subtle success toast instead of "messages synced"
-                toast({
-                  title: "Message received",
-                  description: "",
-                  duration: 1500,
-                  variant: "default"
-                });
-                // Trigger realtime sync by refreshing subscription
-                await loadThreadMessages(currentThreadId!);
-              }
-          } catch (persistenceCheckError) {
-            console.error('[MobileChatInterface] Error checking message persistence:', persistenceCheckError);
+      if (currentThreadId === currentThreadIdRef.current) {
+        setMessages(prev => [
+          ...prev, 
+          { 
+            role: 'assistant', 
+            content: errorMessageContent
           }
-        }, 2000);
+        ]);
       }
     } finally {
-      // Loading state is now managed by useStreamingChat
+      setLocalLoading(false);
     }
   };
 
@@ -704,7 +652,7 @@ export default function MobileChatInterface({
       return;
     }
 
-    if (isStreaming) {
+    if (isProcessing || processingStatus === 'processing') {
       console.log('[MobileChat] Cannot delete thread while processing');
       toast({
         title: "Cannot delete conversation",
@@ -803,7 +751,7 @@ export default function MobileChatInterface({
     }
   };
 
-  const isDeletionDisabled = isStreaming;
+  const isDeletionDisabled = isProcessing || processingStatus === 'processing' || isLoading;
 
   return (
     <div className="mobile-chat-interface">
@@ -950,7 +898,7 @@ export default function MobileChatInterface({
                       size="sm"
                       className="px-3 py-2 h-auto justify-start text-sm text-left bg-muted/50 hover:bg-muted w-full"
                       onClick={() => handleSendMessage(question.text)}
-                      disabled={isStreaming}
+                      disabled={isLoading || isProcessing}
                     >
                       <div className="flex items-start w-full">
                         <span className="mr-2">{question.icon}</span>
@@ -967,11 +915,12 @@ export default function MobileChatInterface({
         ) : (
           <div className="space-y-3">
             {messages.map((message, index) => (
-              <MobileChatMessage 
-                key={`msg-${message.id || index}`}
-                message={message} 
-                showAnalysis={false}
-              />
+              <ChatErrorBoundary key={index}>
+                <MobileChatMessage 
+                  message={message} 
+                  showAnalysis={false}
+                />
+              </ChatErrorBoundary>
             ))}
             
             {/* Show streaming status or basic loading */}
@@ -980,11 +929,18 @@ export default function MobileChatInterface({
                 <MobileChatMessage 
                   message={{ role: 'assistant', content: '' }}
                   streamingMessage={
-                    useThreeDotFallback 
+                    useThreeDotFallback || dynamicMessages.length === 0
                       ? undefined // Show only three-dot animation
-                      : getLatestStatusMessage() || translatedDynamicMessages[currentMessageIndex] || dynamicMessages[currentMessageIndex] // Use pre-translated message
+                      : translatedDynamicMessages[currentMessageIndex] || dynamicMessages[currentMessageIndex] // Use pre-translated message
                   }
                   showStreamingDots={true}
+                />
+              </ChatErrorBoundary>
+            ) : (!isStreaming && (isLoading || isProcessing)) ? (
+              <ChatErrorBoundary>
+                <MobileChatMessage 
+                  message={{ role: 'assistant', content: '' }}
+                  isLoading={true}
                 />
               </ChatErrorBoundary>
             ) : null}
@@ -998,7 +954,7 @@ export default function MobileChatInterface({
       {/* Chat Input */}
       <MobileChatInput 
         onSendMessage={handleSendMessage} 
-        isLoading={isStreaming}
+        isLoading={isLoading || isProcessing}
         userId={userId || user?.id}
       />
       

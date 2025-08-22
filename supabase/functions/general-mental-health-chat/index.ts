@@ -13,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { message, conversationContext = [], userTimezone = 'UTC', threadId, userId } = await req.json();
+    const { message, conversationContext = [], userTimezone = 'UTC' } = await req.json();
 
     if (!message) {
       return new Response(
@@ -146,9 +146,9 @@ MUST HAVE/DO: ALWAYS BE AWARE OF THE CONVERSATION HISTORY TO UNDERSTAND WHAT THE
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: 'gpt-4.1-nano',
+            model: 'gpt-4.1-nano-2025-04-14',
             messages,
-            max_tokens: 800
+            max_completion_tokens: 800
           }),
         });
 
@@ -183,46 +183,8 @@ MUST HAVE/DO: ALWAYS BE AWARE OF THE CONVERSATION HISTORY TO UNDERSTAND WHAT THE
     
     console.log(`[General Mental Health] Generated response`);
 
-    // Simple message persistence
-    if (threadId && userId) {
-      try {
-        const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2.7.1');
-        const supabaseClient = createClient(
-          Deno.env.get('SUPABASE_URL') ?? '',
-          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-        );
-
-        const { data, error } = await supabaseClient
-          .from('chat_messages')
-          .insert({
-            thread_id: threadId,
-            sender: 'assistant',
-            role: 'assistant', 
-            content: content,
-            is_processing: false,
-            query_classification: 'GENERAL_MENTAL_HEALTH'
-          });
-        
-        if (error) {
-          console.error('[General Mental Health] Message save failed:', error);
-        } else {
-          console.log('[General Mental Health] Message saved successfully');
-        }
-      } catch (persistenceError) {
-        console.error('[General Mental Health] Message persistence error:', persistenceError);
-      }
-    }
-
     return new Response(
-      JSON.stringify({ 
-        response: content,
-        queryClassification: 'GENERAL_MENTAL_HEALTH',
-        messageMetadata: {
-          model: 'gpt-4.1-nano',
-          timezone: normalizedTimezone,
-          timestamp: new Date().toISOString()
-        }
-      }),
+      JSON.stringify({ response: content }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 

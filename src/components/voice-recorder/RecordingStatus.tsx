@@ -2,6 +2,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { formatTime } from '@/utils/format-time';
+import { RECORDING_LIMITS } from '@/utils/audio/recording-config';
 
 interface RecordingStatusProps {
   isRecording: boolean;
@@ -13,6 +14,8 @@ export function RecordingStatus({ isRecording, recordingTime }: RecordingStatusP
   const displayTime = typeof recordingTime === 'string' 
     ? recordingTime 
     : formatTime(typeof recordingTime === 'number' ? recordingTime / 1000 : 0);
+  
+  const maxDurationDisplay = formatTime(RECORDING_LIMITS.MAX_DURATION);
   
   return (
     <motion.div
@@ -33,7 +36,7 @@ export function RecordingStatus({ isRecording, recordingTime }: RecordingStatusP
           ease: "easeInOut"
         }}
       />
-      <span className="text-xl font-medium">{displayTime}</span>
+      <span className="text-xl font-medium">{displayTime}/{maxDurationDisplay}</span>
     </motion.div>
   );
 }

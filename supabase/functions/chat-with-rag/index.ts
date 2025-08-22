@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
@@ -103,7 +104,7 @@ serve(async (req) => {
   }
 
   try {
-    console.log("[chat-with-rag] Starting simplified RAG processing");
+    console.log("[chat-with-rag] Starting enhanced RAG processing with classification");
 
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -124,44 +125,97 @@ serve(async (req) => {
       userProfile = null
     } = await req.json();
 
-    console.log(`[chat-with-rag] Processing query: "${message}" for user: ${userId} (threadId: ${threadId})`);
+    console.log(`[chat-with-rag] Processing query: "${message}" for user: ${userId} (threadId: ${threadId}, messageId: ${messageId})`);
     
-    // Enhanced timezone handling with comprehensive validation
+    // Create assistant message for journal-specific queries
+    let assistantMessageId = null;
+    if (threadId) {
+      try {
+        console.log(`[chat-with-rag] Creating assistant message for thread: ${threadId}`);
+        const { data: assistantMessage, error: messageError } = await supabaseClient
+          .from('chat_messages')
+          .insert({
+            thread_id: threadId,
+            sender: 'assistant',
+            role: 'assistant',
+            content: 'Processing your journal query...'
+          })
+          .select('id')
+          .single();
+          
+        if (messageError) {
+          console.error('[chat-with-rag] Error creating assistant message:', messageError);
+        } else {
+          assistantMessageId = assistantMessage?.id;
+          console.log(`[chat-with-rag] Created assistant message: ${assistantMessageId}`);
+        }
+      } catch (error) {
+        console.error('[chat-with-rag] Exception creating assistant message:', error);
+      }
+    }
+    
+    // Enhanced timezone handling with validation
     const { normalizeUserTimezone } = await import('../_shared/timezoneUtils.ts');
-    const { validateUserTimezone, debugTimezoneInfo, logTimezoneDebug } = await import('../_shared/timezoneValidation.ts');
+    const { safeTimezoneConversion, debugTimezoneInfo } = await import('../_shared/enhancedTimezoneUtils.ts');
     
     const userTimezone = normalizeUserTimezone(userProfile);
     
-    // Comprehensive timezone validation and debugging
-    const timezoneDebug = debugTimezoneInfo(userTimezone, 'chat-with-rag', req.headers.get('user-agent') || '');
-    logTimezoneDebug(timezoneDebug);
-    
+    // Validate timezone and log detailed info for debugging
+    const timezoneDebug = debugTimezoneInfo(userTimezone, 'chat-with-rag');
     console.log(`[chat-with-rag] User timezone validation:`, {
       userTimezone,
       isValid: timezoneDebug.validation.isValid,
       issues: timezoneDebug.validation.issues
     });
 
-    // Step 1: Query Classification
+    // Step 1: Query Classification with retry logic
     console.log("[chat-with-rag] Step 1: Query Classification");
     
-    const classificationResponse = await supabaseClient.functions.invoke('chat-query-classifier', {
-      body: { message, conversationContext }
-    });
+    const maxRetries = 3;
+    let classification = null;
+    let lastError = null;
     
-    if (classificationResponse.error) {
-      console.error("[chat-with-rag] Classification failed:", classificationResponse.error);
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      console.log(`[chat-with-rag] Classification attempt ${attempt}/${maxRetries}`);
+      
+      const classificationResponse = await supabaseClient.functions.invoke('chat-query-classifier', {
+        body: { message, conversationContext }
+      });
+      
+      if (!classificationResponse.error && classificationResponse.data) {
+        classification = classificationResponse.data;
+        break;
+      }
+      
+      lastError = classificationResponse.error;
+      console.error(`[chat-with-rag] Classification attempt ${attempt} failed:`, lastError);
+      
+      if (attempt < maxRetries) {
+        const delay = Math.pow(2, attempt - 1) * 1000; // Exponential backoff: 1s, 2s, 4s
+        console.log(`[chat-with-rag] Retrying classification in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+    
+    if (!classification) {
+      console.error("[chat-with-rag] All classification attempts failed. Last error:", lastError);
       return new Response(
         JSON.stringify({ 
           error: 'Classification service unavailable. Please try again.',
-          details: classificationResponse.error
+          details: lastError
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 503 }
       );
     }
 
-    const classification = classificationResponse.data;
     console.log(`[chat-with-rag] Query classified as: ${classification.category} (confidence: ${classification.confidence})`);
+
+    // Enhanced classification override for debugging
+    if (req.headers.get('x-classification-hint')) {
+      const hintCategory = req.headers.get('x-classification-hint');
+      console.error(`[chat-with-rag] CLIENT HINT: Overriding classification to ${hintCategory}`);
+      classification.category = hintCategory;
+    }
 
     if (classification.category === 'JOURNAL_SPECIFIC') {
       console.log("[chat-with-rag] EXECUTING: JOURNAL_SPECIFIC pipeline - full RAG processing");
@@ -174,7 +228,7 @@ serve(async (req) => {
           conversationContext,
           threadId,
           messageId,
-          userTimezone
+          userTimezone // Pass user timezone to planner
         }
       });
 
@@ -184,9 +238,12 @@ serve(async (req) => {
 
       const queryPlan = queryPlanResponse.data.queryPlan;
       const executionResult = queryPlanResponse.data.executionResult;
-      const userStatusMessageFromPlanner = queryPlanResponse.data.userStatusMessage;
       
       console.log(`[chat-with-rag] Query plan strategy: ${queryPlan.strategy}, complexity: ${queryPlan.queryComplexity}`);
+      console.log(`[chat-with-rag] Execution result summary:`, {
+        resultCount: executionResult?.length || 0,
+        hasResults: !!executionResult && executionResult.length > 0
+      });
 
       // Enhanced timeframe detection with timezone support
       let timeRange = null;
@@ -194,21 +251,22 @@ serve(async (req) => {
       
       if (detectedTimeframe) {
         console.log(`[chat-with-rag] Detected timeframe with timezone ${userTimezone}:`, JSON.stringify(detectedTimeframe, null, 2));
+        // Process timeframe with user's timezone for proper UTC conversion
         timeRange = processTimeRange(detectedTimeframe, userTimezone);
         console.log(`[chat-with-rag] Processed time range (converted to UTC):`, JSON.stringify(timeRange, null, 2));
       }
 
-      // Step 3: Generate consolidated response
+      // Step 3: Generate consolidated response using gpt-response-consolidator
       console.log("[chat-with-rag] Step 3: Calling gpt-response-consolidator");
       
       const consolidationResponse = await supabaseClient.functions.invoke('gpt-response-consolidator', {
         body: {
           userMessage: message,
-          researchResults: executionResult || [],
+          researchResults: executionResult || [], // Map executionResult to researchResults
           conversationContext: conversationContext,
           userProfile: userProfile,
           streamingMode: false,
-          messageId: messageId,
+          messageId: assistantMessageId, // Use the assistant message ID we created
           threadId: threadId
         }
       });
@@ -220,48 +278,25 @@ serve(async (req) => {
 
       console.log("[chat-with-rag] Successfully completed RAG pipeline with consolidation");
 
-      // Create assistant message with simple INSERT
-      if (threadId && consolidationResponse.data) {
+      // Update the assistant message with the final response
+      if (assistantMessageId && consolidationResponse.data.response) {
         try {
-          console.log('[chat-with-rag] Creating assistant message with final response');
-          
-          let finalResponseContent = consolidationResponse.data.response;
-          
-          // Validate that the content is actually a readable string
-          if (!finalResponseContent || typeof finalResponseContent !== 'string') {
-            console.error('[chat-with-rag] ERROR: Invalid response content:', typeof finalResponseContent);
-            finalResponseContent = "I processed your request but encountered an issue with the response format. Please try again.";
-          }
-          
-          // Simple INSERT without deduplication complexity
-          const { data: newMessage, error: messageError } = await supabaseClient
+          await supabaseClient
             .from('chat_messages')
-            .insert({
-              thread_id: threadId,
-              content: finalResponseContent,
-              sender: 'assistant',
-              role: 'assistant',
-              analysis_data: consolidationResponse.data.analysisMetadata || null
+            .update({
+              content: consolidationResponse.data.response
             })
-            .select()
-            .single();
-          
-          if (!messageError && newMessage) {
-            console.log(`[chat-with-rag] Created assistant message ${newMessage.id} with response (${finalResponseContent.length} chars)`);
-          } else {
-            console.error('[chat-with-rag] Error creating assistant message:', messageError);
-          }
-        } catch (error) {
-          console.error('[chat-with-rag] Exception creating assistant message:', error);
+            .eq('id', assistantMessageId);
+          console.log(`[chat-with-rag] Updated assistant message ${assistantMessageId} with response`);
+        } catch (updateError) {
+          console.error('[chat-with-rag] Error updating assistant message:', updateError);
         }
       }
 
       return new Response(JSON.stringify({
         response: consolidationResponse.data.response,
-        userStatusMessage: userStatusMessageFromPlanner || consolidationResponse.data.userStatusMessage,
-        queryClassification: classification.category,
-        queryComplexity: queryPlan?.complexity || 'standard',
-        executionStrategy: queryPlan?.strategy || 'unknown',
+        userStatusMessage: consolidationResponse.data.userStatusMessage,
+        assistantMessageId: assistantMessageId, // Include the assistant message ID in response
         metadata: {
           classification: classification,
           queryPlan: queryPlan,
@@ -270,22 +305,21 @@ serve(async (req) => {
           userTimezone: userTimezone,
           strategy: queryPlan.strategy,
           confidence: queryPlan.confidence,
-          analysisMetadata: consolidationResponse.data.analysisMetadata,
-          timestamp: new Date().toISOString()
+          analysisMetadata: consolidationResponse.data.analysisMetadata
         }
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
 
     } else if (classification.category === 'GENERAL_MENTAL_HEALTH') {
-      // Handle general mental health queries
-      console.log(`[chat-with-rag] EXECUTING: GENERAL_MENTAL_HEALTH pipeline`);
+      // Handle general mental health queries using dedicated function
+      console.log(`[chat-with-rag] EXECUTING: GENERAL_MENTAL_HEALTH pipeline - general mental health chat`);
       
       const generalResponse = await supabaseClient.functions.invoke('general-mental-health-chat', {
         body: {
           message: message,
           conversationContext: conversationContext,
-          userTimezone: userTimezone
+          userTimezone: userTimezone  // Pass validated timezone
         }
       });
 
@@ -293,32 +327,24 @@ serve(async (req) => {
         throw new Error(`General mental health response failed: ${generalResponse.error.message}`);
       }
 
-      // Create assistant message with mental health response
-      if (threadId && generalResponse.data) {
+      // Update the assistant message with the mental health response
+      if (assistantMessageId && generalResponse.data) {
         try {
-          const { data: newMessage, error: messageError } = await supabaseClient
+          await supabaseClient
             .from('chat_messages')
-            .insert({
-              thread_id: threadId,
-              content: generalResponse.data,
-              sender: 'assistant',
-              role: 'assistant'
+            .update({
+              content: generalResponse.data
             })
-            .select()
-            .single();
-          
-          if (messageError) {
-            console.error('[chat-with-rag] Error creating assistant message:', messageError);
-          } else {
-            console.log(`[chat-with-rag] Created assistant message ${newMessage.id} with mental health response`);
-          }
-        } catch (error) {
-          console.error('[chat-with-rag] Exception creating assistant message:', error);
+            .eq('id', assistantMessageId);
+          console.log(`[chat-with-rag] Updated assistant message ${assistantMessageId} with mental health response`);
+        } catch (updateError) {
+          console.error('[chat-with-rag] Error updating assistant message:', updateError);
         }
       }
 
       return new Response(JSON.stringify({
         response: generalResponse.data,
+        assistantMessageId: assistantMessageId,
         metadata: {
           classification: classification,
           strategy: 'general_mental_health',
@@ -330,7 +356,7 @@ serve(async (req) => {
 
     } else if (classification.category === 'JOURNAL_SPECIFIC_NEEDS_CLARIFICATION') {
       // Handle queries that need clarification
-      console.log(`[chat-with-rag] EXECUTING: JOURNAL_SPECIFIC_NEEDS_CLARIFICATION pipeline`);
+      console.log(`[chat-with-rag] EXECUTING: JOURNAL_SPECIFIC_NEEDS_CLARIFICATION pipeline - clarification request`);
       
       const clarificationResponse = await supabaseClient.functions.invoke('gpt-clarification-generator', {
         body: {
@@ -344,35 +370,72 @@ serve(async (req) => {
         throw new Error(`Clarification generation failed: ${clarificationResponse.error.message}`);
       }
 
-      // Create assistant message with clarification response
-      if (threadId && clarificationResponse.data) {
+      // Update the assistant message with the clarification response
+      if (assistantMessageId && clarificationResponse.data.response) {
         try {
-          const { data: newMessage, error: messageError } = await supabaseClient
+          await supabaseClient
             .from('chat_messages')
-            .insert({
-              thread_id: threadId,
-              content: clarificationResponse.data,
-              sender: 'assistant',
-              role: 'assistant'
+            .update({
+              content: clarificationResponse.data.response
             })
-            .select()
-            .single();
-          
-          if (messageError) {
-            console.error('[chat-with-rag] Error creating assistant message:', messageError);
-          } else {
-            console.log(`[chat-with-rag] Created assistant message ${newMessage.id} with clarification response`);
-          }
-        } catch (error) {
-          console.error('[chat-with-rag] Exception creating assistant message:', error);
+            .eq('id', assistantMessageId);
+          console.log(`[chat-with-rag] Updated assistant message ${assistantMessageId} with clarification response`);
+        } catch (updateError) {
+          console.error('[chat-with-rag] Error updating assistant message:', updateError);
         }
       }
 
       return new Response(JSON.stringify({
-        response: clarificationResponse.data,
+        response: clarificationResponse.data.response,
+        userStatusMessage: clarificationResponse.data.userStatusMessage,
+        assistantMessageId: assistantMessageId,
         metadata: {
           classification: classification,
           strategy: 'clarification',
+          type: clarificationResponse.data.type,
+          userTimezone: userTimezone
+        }
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+
+    } else if (classification.category === 'UNRELATED') {
+      // Handle unrelated queries with witty rejection messages
+      console.log(`[chat-with-rag] EXECUTING: UNRELATED pipeline - witty rejection`);
+      
+      // Array of witty rejection responses
+      const unrelatedResponses = [
+        "Haha, you caught me! I'm basically a one-trick pony, but it's a really GOOD trick! 🐴✨ Think of me as your personal feelings detective, journal whisperer, and emotional GPS all rolled into one. I can't help with that question, but I'd love to hear what's been stirring in your world today! 🌍💫",
+        "Whoops! Looks like you've found the edge of my brain! 🤯 I'm like that friend who's AMAZING at deep 2am conversations about life but terrible at trivia night. I live for your thoughts, feelings, journal entries, and all things emotional wellbeing - that's where I absolutely shine! ✨ What's your heart been up to lately? 💛",
+        "Oops! You just wandered into my 'does not compute' zone! 🤖💫 I'm basically a specialist who speaks fluent emotion and journal-ese, but that question is outside my wheelhouse. How about we dive into something I'm actually brilliant at - like exploring what's been on your mind recently? 🧠✨",
+        "Plot twist! You stumbled upon the one thing I can't chat about! 😄 I'm like a really passionate therapist friend who only knows how to talk about feelings, patterns, and personal growth. But hey, that's not so bad, right? What's been weighing on your heart lately? 💭💙"
+      ];
+      
+      // Randomly select a response
+      const selectedResponse = unrelatedResponses[Math.floor(Math.random() * unrelatedResponses.length)];
+      
+      // Update the assistant message with the rejection response
+      if (assistantMessageId) {
+        try {
+          await supabaseClient
+            .from('chat_messages')
+            .update({
+              content: selectedResponse
+            })
+            .eq('id', assistantMessageId);
+          console.log(`[chat-with-rag] Updated assistant message ${assistantMessageId} with unrelated response`);
+        } catch (updateError) {
+          console.error('[chat-with-rag] Error updating assistant message:', updateError);
+        }
+      }
+
+      return new Response(JSON.stringify({
+        response: selectedResponse,
+        userStatusMessage: "Politely redirecting with humor",
+        assistantMessageId: assistantMessageId,
+        metadata: {
+          classification: classification,
+          strategy: 'unrelated_rejection',
           userTimezone: userTimezone
         }
       }), {
@@ -380,55 +443,50 @@ serve(async (req) => {
       });
 
     } else {
-      // Handle other categories with simple response
-      console.log(`[chat-with-rag] EXECUTING: ${classification.category} pipeline - simple response`);
+      // Handle unexpected classification categories with fallback
+      console.log(`[chat-with-rag] UNKNOWN CLASSIFICATION: ${classification.category} - using fallback response`);
       
-      const simpleResponse = "I understand your message. Could you please provide more specific details about what you'd like to know from your journal entries?";
-
-      // Create assistant message with simple response
-      if (threadId) {
+      const fallbackResponse = "I'm having trouble understanding your request right now. Could you try rephrasing it? I'm here to help with your journal insights and emotional wellbeing! 💙";
+      
+      // Update the assistant message with fallback response
+      if (assistantMessageId) {
         try {
-          const { data: newMessage, error: messageError } = await supabaseClient
+          await supabaseClient
             .from('chat_messages')
-            .insert({
-              thread_id: threadId,
-              content: simpleResponse,
-              sender: 'assistant',
-              role: 'assistant'
+            .update({
+              content: fallbackResponse
             })
-            .select()
-            .single();
-          
-          if (messageError) {
-            console.error('[chat-with-rag] Error creating assistant message:', messageError);
-          } else {
-            console.log(`[chat-with-rag] Created assistant message ${newMessage.id} with simple response`);
-          }
-        } catch (error) {
-          console.error('[chat-with-rag] Exception creating assistant message:', error);
+            .eq('id', assistantMessageId);
+          console.log(`[chat-with-rag] Updated assistant message ${assistantMessageId} with fallback response`);
+        } catch (updateError) {
+          console.error('[chat-with-rag] Error updating assistant message:', updateError);
         }
       }
 
       return new Response(JSON.stringify({
-        response: simpleResponse,
+        response: fallbackResponse,
+        userStatusMessage: "Handling unknown request type",
+        assistantMessageId: assistantMessageId,
         metadata: {
           classification: classification,
-          strategy: 'simple_response',
+          strategy: 'fallback_response',
           userTimezone: userTimezone
         }
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-    
+
   } catch (error) {
     console.error('[chat-with-rag] Error:', error);
-    return new Response(JSON.stringify({ 
-      error: 'Internal server error', 
-      details: error.message 
+    
+    return new Response(JSON.stringify({
+      error: 'Failed to process query with RAG pipeline',
+      details: error.message,
+      fallbackResponse: "I apologize, but I'm having trouble processing your request right now. Please try rephrasing your question or try again later."
     }), {
+      status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 500
     });
   }
 });
