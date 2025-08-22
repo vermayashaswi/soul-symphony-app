@@ -855,98 +855,34 @@ SUB-QUESTION/QUERIES GENERATION GUIDELINE (MANDATORY):
 - For career/life decisions: Generate sub-questions about patterns, emotions, and insights related to the specific options being considered
 - For eg. user asks (What % of entries contain the emotion confidence (and is it the dominant one?) when I deal with family matters that also concern health issues? -> sub question 1: How many entries concern family and health both? sub question 2: What are all the emotions and their avg scores ? sub question 3: Rank the emotions)
 
-**ENHANCED SQL QUERY GENERATION GUIDELINES:**
+**SIMPLIFIED SQL QUERY GENERATION GUIDELINES:**
 
 1. **UUID and User ID Requirements:**
    - ALWAYS use auth.uid() for user filtering (it will be replaced with the actual UUID)
    - NEVER hardcode user IDs or generate fake UUIDs
-   - Example: WHERE user_id = auth.uid()
 
 2. **Table and Column References:**
    - Use "Journal Entries" (with quotes) for the table name
    - FORBIDDEN COLUMNS (NEVER USE): "transcription text", "foreign key", "audio_url", "user_feedback", "edit_status", "translation_status"
    - Valid columns: user_id, created_at, "refined text", emotions, master_themes, entities, sentiment, themeemotion, themes, duration
-   - Use "refined text" for content analysis (NEVER use transcription text)
+   - Avoid using "refined text" in SQL queries unless absolutely necessary (it's just text content)
 
-3. **JSON Operations on emotions/entities columns:**
-   - For emotions: jsonb_each(emotions) to expand, emotions->>'emotion_name' for specific values
-   - For entities: jsonb_each(entities) for types, jsonb_array_elements_text() for values
-   - Example: SELECT emotion_key, AVG((emotion_value::text)::numeric) FROM "Journal Entries", jsonb_each(emotions) WHERE user_id = auth.uid() GROUP BY emotion_key
+3. **Simplified JSONB Operations:**
+   - For emotions: Use emotions->>'emotion_name' for specific emotion values only when needed
+   - Avoid complex JSONB operations unless absolutely necessary for the user's specific request
+   - When possible, use master_themes array instead of complex emotion JSONB queries
 
 4. **MANDATORY TIME RANGE INTEGRATION:**
    - When timeRange is provided in the step, SQL queries MUST include the date filters
    - Use proper timestamp with time zone format: '2024-08-01T00:00:00Z'::timestamp with time zone
    - ALWAYS include both start and end date filters when timeRange exists
-   - Example: AND created_at >= 'START_DATE' AND created_at <= 'END_DATE'
 
-5. **Safe Query Patterns:**
+5. **Simplified Query Guidelines:**
+   - Generate basic SELECT queries focusing on simple columns: user_id, created_at, master_themes, sentiment
    - Always include user_id = auth.uid() in WHERE clause
    - Use proper PostgreSQL syntax with double quotes for table/column names with spaces
    - Avoid complex nested queries - keep it simple and working
    - Use standard aggregation functions: COUNT, AVG, MAX, MIN, SUM
-
-**WORKING SQL EXAMPLES FOR REFERENCE:**
-
-1. **Basic Entry Query:**
-\`\`\`sql
-SELECT user_id, created_at, "refined text" as content, emotions, master_themes 
-FROM "Journal Entries" 
-WHERE user_id = auth.uid() 
-ORDER BY created_at DESC 
-LIMIT 10;
-\`\`\`
-
-2. **Emotion Analysis:**
-\`\`\`sql
-SELECT 
-  emotion_key,
-  AVG((emotion_value::text)::numeric) as avg_score,
-  COUNT(*) as frequency
-FROM "Journal Entries", 
-     jsonb_each(emotions) as e(emotion_key, emotion_value)
-WHERE user_id = auth.uid() 
-  AND emotions IS NOT NULL
-GROUP BY emotion_key
-ORDER BY avg_score DESC
-LIMIT 5;
-\`\`\`
-
-3. **Theme-based Query:**
-\`\`\`sql
-SELECT created_at, "refined text" as content, master_themes
-FROM "Journal Entries" 
-WHERE user_id = auth.uid() 
-  AND master_themes IS NOT NULL 
-  AND 'Work' = ANY(master_themes)
-ORDER BY created_at DESC 
-LIMIT 5;
-\`\`\`
-
-4. **Date Range Query with Timezone Conversion:**
-\`\`\`sql
-SELECT COUNT(*) as entry_count,
-       AVG(CASE WHEN sentiment = 'positive' THEN 1 WHEN sentiment = 'negative' THEN -1 ELSE 0 END) as avg_sentiment
-FROM "Journal Entries" 
-WHERE user_id = auth.uid() 
-  AND created_at >= '2024-01-01T00:00:00Z'::timestamp with time zone
-  AND created_at <= '2024-01-01T23:59:59Z'::timestamp with time zone;
-\`\`\`
-
-5. **Emotion Analysis with Time Range:**
-\`\`\`sql
-SELECT 
-  emotion_key,
-  AVG((emotion_value::text)::numeric) as avg_score,
-  COUNT(*) as frequency
-FROM "Journal Entries", 
-     jsonb_each(emotions) as e(emotion_key, emotion_value)
-WHERE user_id = auth.uid() 
-  AND emotions IS NOT NULL
-  AND created_at >= '2024-08-01T00:00:00Z'::timestamp with time zone
-  AND created_at <= '2024-08-31T23:59:59Z'::timestamp with time zone
-GROUP BY emotion_key
-ORDER BY avg_score DESC;
-\`\`\`
 
 **CRITICAL TIMEZONE HANDLING RULES:**
 
