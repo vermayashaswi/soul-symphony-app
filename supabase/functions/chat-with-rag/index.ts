@@ -2,99 +2,25 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 
-// Import date-fns functions directly since we can't import from other edge function files
-import { format, parseISO, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfDay, endOfDay } from 'https://esm.sh/date-fns@4.1.0';
-import { toZonedTime } from 'https://esm.sh/date-fns-tz@3.2.0';
-
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Copy the essential functions from dateProcessor.ts directly into this file
-function detectTimeframeInQuery(message: string, userTimezone: string = 'UTC'): any {
-  const lowerMessage = message.toLowerCase();
-  
-  // Simple timeframe detection logic
-  if (lowerMessage.includes('this week') || lowerMessage.includes('current week')) {
-    return { type: 'week' };
-  } else if (lowerMessage.includes('last week') || lowerMessage.includes('previous week')) {
-    return { type: 'lastWeek' };
-  } else if (lowerMessage.includes('this month') || lowerMessage.includes('current month')) {
-    return { type: 'month' };
-  } else if (lowerMessage.includes('last month') || lowerMessage.includes('previous month')) {
-    return { type: 'lastMonth' };
-  }
-  
-  // Check for specific month names
-  const months = ['january', 'february', 'march', 'april', 'may', 'june', 
-                  'july', 'august', 'september', 'october', 'november', 'december'];
-  
-  for (const month of months) {
-    if (lowerMessage.includes(month)) {
-      return { type: 'specificMonth', monthName: month };
-    }
-  }
-  
-  return null;
+interface ChatRequest {
+  message: string;
+  userId: string;
+  threadId: string;
+  conversationContext?: any[];
+  userProfile?: any;
+  category?: string;
 }
 
-function processTimeRange(timeRange: any, userTimezone: string = 'UTC'): { startDate?: string; endDate?: string } {
-  if (!timeRange) return {};
-  
-  console.log("Processing time range:", timeRange);
-  console.log(`Using user timezone: ${userTimezone}`);
-  
-  const result: { startDate?: string; endDate?: string } = {};
-  
-  try {
-    // Calculate current date in user's timezone
-    const now = userTimezone ? toZonedTime(new Date(), userTimezone) : new Date();
-    console.log(`Current date in timezone ${userTimezone}: ${now.toISOString()}`);
-    
-    // Handle special time range cases
-    if (timeRange.type === 'week') {
-      const weekStart = startOfWeek(now, { weekStartsOn: 1 });
-      const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
-      
-      result.startDate = weekStart.toISOString();
-      result.endDate = weekEnd.toISOString();
-      
-      console.log(`Generated 'this week' date range: ${result.startDate} to ${result.endDate}`);
-    } else if (timeRange.type === 'lastWeek') {
-      const thisWeekMonday = startOfWeek(now, { weekStartsOn: 1 });
-      const lastWeekMonday = subDays(thisWeekMonday, 7);
-      const lastWeekSunday = subDays(thisWeekMonday, 1);
-      
-      result.startDate = lastWeekMonday.toISOString();
-      result.endDate = lastWeekSunday.toISOString();
-      
-      console.log(`Generated 'last week' date range: ${result.startDate} to ${result.endDate}`);
-    } else if (timeRange.type === 'month') {
-      const monthStart = startOfMonth(now);
-      const monthEnd = endOfMonth(now);
-      
-      result.startDate = monthStart.toISOString();
-      result.endDate = monthEnd.toISOString();
-      
-      console.log(`Generated 'this month' date range: ${result.startDate} to ${result.endDate}`);
-    } else if (timeRange.type === 'lastMonth') {
-      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const lastMonthStart = startOfMonth(lastMonth);
-      const lastMonthEnd = endOfMonth(lastMonth);
-      
-      result.startDate = lastMonthStart.toISOString();
-      result.endDate = lastMonthEnd.toISOString();
-      
-      console.log(`Generated 'last month' date range: ${result.startDate} to ${result.endDate}`);
-    }
-    
-    console.log("Final processed time range:", result);
-    return result;
-  } catch (error) {
-    console.error("Error processing time range:", error);
-    return {};
-  }
+interface SupabaseClient {
+  from: (table: string) => any;
+  functions: {
+    invoke: (functionName: string, options: { body: any }) => Promise<{ data: any; error: any }>;
+  };
 }
 
 serve(async (req) => {
@@ -103,332 +29,145 @@ serve(async (req) => {
   }
 
   try {
-    console.log("[chat-with-rag] Starting simplified RAG processing");
+    const { message, userId, threadId, conversationContext = [], userProfile = {}, category }: ChatRequest = await req.json();
 
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
-        },
-      }
-    );
+    console.log(`[chat-with-rag] Processing message for user ${userId}, thread ${threadId}, category: ${category}`);
 
-    const { 
-      message, 
-      userId, 
-      threadId = null, 
-      messageId = null,
-      conversationContext = [],
-      userProfile = null
-    } = await req.json();
-
-    console.log(`[chat-with-rag] Processing query: "${message}" for user: ${userId} (threadId: ${threadId})`);
-    
-    // Enhanced timezone handling with comprehensive validation
-    const { normalizeUserTimezone } = await import('../_shared/timezoneUtils.ts');
-    const { validateUserTimezone, debugTimezoneInfo, logTimezoneDebug } = await import('../_shared/timezoneValidation.ts');
-    
-    const userTimezone = normalizeUserTimezone(userProfile);
-    
-    // Comprehensive timezone validation and debugging
-    const timezoneDebug = debugTimezoneInfo(userTimezone, 'chat-with-rag', req.headers.get('user-agent') || '');
-    logTimezoneDebug(timezoneDebug);
-    
-    console.log(`[chat-with-rag] User timezone validation:`, {
-      userTimezone,
-      isValid: timezoneDebug.validation.isValid,
-      issues: timezoneDebug.validation.issues
-    });
-
-    // Step 1: Query Classification
-    console.log("[chat-with-rag] Step 1: Query Classification");
-    
-    const classificationResponse = await supabaseClient.functions.invoke('chat-query-classifier', {
-      body: { message, conversationContext }
-    });
-    
-    if (classificationResponse.error) {
-      console.error("[chat-with-rag] Classification failed:", classificationResponse.error);
-      return new Response(
-        JSON.stringify({ 
-          error: 'Classification service unavailable. Please try again.',
-          details: classificationResponse.error
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 503 }
-      );
+    if (!message || !userId || !threadId) {
+      return new Response(JSON.stringify({ 
+        error: 'Missing required fields: message, userId, threadId' 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
-    const classification = classificationResponse.data;
-    console.log(`[chat-with-rag] Query classified as: ${classification.category} (confidence: ${classification.confidence})`);
+    // Initialize Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey) as SupabaseClient;
 
-    if (classification.category === 'JOURNAL_SPECIFIC') {
-      console.log("[chat-with-rag] EXECUTING: JOURNAL_SPECIFIC pipeline - full RAG processing");
+    // Save user message immediately
+    const { error: saveMessageError } = await supabase.from('chat_messages').insert({
+      thread_id: threadId,
+      content: message,
+      sender: 'user',
+      user_id: userId,
+      created_at: new Date().toISOString()
+    });
+
+    if (saveMessageError) {
+      console.error('[chat-with-rag] Error saving user message:', saveMessageError);
+    }
+
+    let response = '';
+    let userStatusMessage = '';
+    let metadata = {};
+
+    // Route based on category
+    if (category === 'JOURNAL_SPECIFIC_NEEDS_CLARIFICATION') {
+      console.log('[chat-with-rag] Handling clarification request');
       
-      // Step 2: Enhanced Query Planning with timezone support
-      const queryPlanResponse = await supabaseClient.functions.invoke('smart-query-planner', {
+      const { data: clarificationData, error: clarificationError } = await supabase.functions.invoke('gpt-clarification-generator', {
         body: { 
           message, 
-          userId, 
           conversationContext,
-          threadId,
-          messageId,
-          userTimezone
+          userProfile 
         }
       });
 
-      if (queryPlanResponse.error) {
-        throw new Error(`Query planning failed: ${queryPlanResponse.error.message}`);
+      if (clarificationError) {
+        console.error('[chat-with-rag] Clarification error:', clarificationError);
+        response = "I need more details to help you with your journal analysis. Could you please provide more specific information about what you'd like to explore?";
+      } else {
+        response = clarificationData.clarificationPrompt || clarificationData.response || "Could you please provide more details about what you'd like to explore in your journal entries?";
       }
 
-      const queryPlan = queryPlanResponse.data.queryPlan;
-      const executionResult = queryPlanResponse.data.executionResult;
-      const userStatusMessageFromPlanner = queryPlanResponse.data.userStatusMessage;
+    } else if (category === 'JOURNAL_SPECIFIC') {
+      console.log('[chat-with-rag] Processing journal-specific query');
       
-      console.log(`[chat-with-rag] Query plan strategy: ${queryPlan.strategy}, complexity: ${queryPlan.queryComplexity}`);
+      // Set user status message for journal processing
+      userStatusMessage = "Analyzing your journal entries...";
 
-      // Enhanced timeframe detection with timezone support
-      let timeRange = null;
-      const detectedTimeframe = detectTimeframeInQuery(message, userTimezone);
-      
-      if (detectedTimeframe) {
-        console.log(`[chat-with-rag] Detected timeframe with timezone ${userTimezone}:`, JSON.stringify(detectedTimeframe, null, 2));
-        timeRange = processTimeRange(detectedTimeframe, userTimezone);
-        console.log(`[chat-with-rag] Processed time range (converted to UTC):`, JSON.stringify(timeRange, null, 2));
-      }
-
-      // Step 3: Generate consolidated response
-      console.log("[chat-with-rag] Step 3: Calling gpt-response-consolidator");
-      
-      const consolidationResponse = await supabaseClient.functions.invoke('gpt-response-consolidator', {
+      // Process with smart query planner
+      const { data: plannerData, error: plannerError } = await supabase.functions.invoke('smart-query-planner', {
         body: {
-          userMessage: message,
-          researchResults: executionResult || [],
-          conversationContext: conversationContext,
-          userProfile: userProfile,
-          streamingMode: false,
-          messageId: messageId,
-          threadId: threadId
+          message,
+          userId,
+          conversationContext,
+          userProfile
         }
       });
 
-      if (consolidationResponse.error) {
-        console.error("[chat-with-rag] Consolidation error:", consolidationResponse.error);
-        throw new Error(`Response consolidation failed: ${consolidationResponse.error.message}`);
+      if (plannerError) {
+        console.error('[chat-with-rag] Smart query planner error:', plannerError);
+        response = "I encountered an issue analyzing your journal entries. Please try again or rephrase your question.";
+      } else {
+        response = plannerData.response || plannerData.consolidatedResponse || "I've analyzed your journal entries but couldn't generate a complete response.";
+        metadata = plannerData.metadata || {};
       }
 
-      console.log("[chat-with-rag] Successfully completed RAG pipeline with consolidation");
-
-      // Create assistant message with simple INSERT
-      if (threadId && consolidationResponse.data) {
-        try {
-          console.log('[chat-with-rag] Creating assistant message with final response');
-          
-          let finalResponseContent = consolidationResponse.data.response;
-          
-          // Validate that the content is actually a readable string
-          if (!finalResponseContent || typeof finalResponseContent !== 'string') {
-            console.error('[chat-with-rag] ERROR: Invalid response content:', typeof finalResponseContent);
-            finalResponseContent = "I processed your request but encountered an issue with the response format. Please try again.";
-          }
-          
-          // Simple INSERT without deduplication complexity
-          const { data: newMessage, error: messageError } = await supabaseClient
-            .from('chat_messages')
-            .insert({
-              thread_id: threadId,
-              content: finalResponseContent,
-              sender: 'assistant',
-              role: 'assistant',
-              analysis_data: consolidationResponse.data.analysisMetadata || null
-            })
-            .select()
-            .single();
-          
-          if (!messageError && newMessage) {
-            console.log(`[chat-with-rag] Created assistant message ${newMessage.id} with response (${finalResponseContent.length} chars)`);
-          } else {
-            console.error('[chat-with-rag] Error creating assistant message:', messageError);
-          }
-        } catch (error) {
-          console.error('[chat-with-rag] Exception creating assistant message:', error);
-        }
-      }
-
-      return new Response(JSON.stringify({
-        response: consolidationResponse.data.response,
-        userStatusMessage: userStatusMessageFromPlanner || consolidationResponse.data.userStatusMessage,
-        queryClassification: classification.category,
-        queryComplexity: queryPlan?.complexity || 'standard',
-        executionStrategy: queryPlan?.strategy || 'unknown',
-        metadata: {
-          classification: classification,
-          queryPlan: queryPlan,
-          searchResults: executionResult,
-          timeRange: timeRange,
-          userTimezone: userTimezone,
-          strategy: queryPlan.strategy,
-          confidence: queryPlan.confidence,
-          analysisMetadata: consolidationResponse.data.analysisMetadata,
-          timestamp: new Date().toISOString()
-        }
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-
-    } else if (classification.category === 'GENERAL_MENTAL_HEALTH') {
-      // Handle general mental health queries
-      console.log(`[chat-with-rag] EXECUTING: GENERAL_MENTAL_HEALTH pipeline`);
+    } else if (category === 'GENERAL_MENTAL_HEALTH') {
+      console.log('[chat-with-rag] Handling general mental health query');
       
-      const generalResponse = await supabaseClient.functions.invoke('general-mental-health-chat', {
+      const { data: mentalHealthData, error: mentalHealthError } = await supabase.functions.invoke('general-mental-health-chat', {
         body: {
-          message: message,
-          conversationContext: conversationContext,
-          userTimezone: userTimezone
+          message,
+          conversationContext,
+          userProfile
         }
       });
 
-      if (generalResponse.error) {
-        throw new Error(`General mental health response failed: ${generalResponse.error.message}`);
+      if (mentalHealthError) {
+        console.error('[chat-with-rag] Mental health chat error:', mentalHealthError);
+        response = "I'm here to support you. Could you tell me more about what's on your mind?";
+      } else {
+        response = mentalHealthData.response || "I'm here to support you. Could you tell me more about what's on your mind?";
       }
-
-      // Create assistant message with mental health response
-      if (threadId && generalResponse.data) {
-        try {
-          const { data: newMessage, error: messageError } = await supabaseClient
-            .from('chat_messages')
-            .insert({
-              thread_id: threadId,
-              content: generalResponse.data,
-              sender: 'assistant',
-              role: 'assistant'
-            })
-            .select()
-            .single();
-          
-          if (messageError) {
-            console.error('[chat-with-rag] Error creating assistant message:', messageError);
-          } else {
-            console.log(`[chat-with-rag] Created assistant message ${newMessage.id} with mental health response`);
-          }
-        } catch (error) {
-          console.error('[chat-with-rag] Exception creating assistant message:', error);
-        }
-      }
-
-      return new Response(JSON.stringify({
-        response: generalResponse.data,
-        metadata: {
-          classification: classification,
-          strategy: 'general_mental_health',
-          userTimezone: userTimezone
-        }
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-
-    } else if (classification.category === 'JOURNAL_SPECIFIC_NEEDS_CLARIFICATION') {
-      // Handle queries that need clarification
-      console.log(`[chat-with-rag] EXECUTING: JOURNAL_SPECIFIC_NEEDS_CLARIFICATION pipeline`);
-      
-      const clarificationResponse = await supabaseClient.functions.invoke('gpt-clarification-generator', {
-        body: {
-          userMessage: message,
-          conversationContext: conversationContext,
-          userProfile: userProfile
-        }
-      });
-
-      if (clarificationResponse.error) {
-        throw new Error(`Clarification generation failed: ${clarificationResponse.error.message}`);
-      }
-
-      // Create assistant message with clarification response
-      if (threadId && clarificationResponse.data) {
-        try {
-          const { data: newMessage, error: messageError } = await supabaseClient
-            .from('chat_messages')
-            .insert({
-              thread_id: threadId,
-              content: clarificationResponse.data,
-              sender: 'assistant',
-              role: 'assistant'
-            })
-            .select()
-            .single();
-          
-          if (messageError) {
-            console.error('[chat-with-rag] Error creating assistant message:', messageError);
-          } else {
-            console.log(`[chat-with-rag] Created assistant message ${newMessage.id} with clarification response`);
-          }
-        } catch (error) {
-          console.error('[chat-with-rag] Exception creating assistant message:', error);
-        }
-      }
-
-      return new Response(JSON.stringify({
-        response: clarificationResponse.data,
-        metadata: {
-          classification: classification,
-          strategy: 'clarification',
-          userTimezone: userTimezone
-        }
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
 
     } else {
-      // Handle other categories with simple response
-      console.log(`[chat-with-rag] EXECUTING: ${classification.category} pipeline - simple response`);
-      
-      const simpleResponse = "I understand your message. Could you please provide more specific details about what you'd like to know from your journal entries?";
-
-      // Create assistant message with simple response
-      if (threadId) {
-        try {
-          const { data: newMessage, error: messageError } = await supabaseClient
-            .from('chat_messages')
-            .insert({
-              thread_id: threadId,
-              content: simpleResponse,
-              sender: 'assistant',
-              role: 'assistant'
-            })
-            .select()
-            .single();
-          
-          if (messageError) {
-            console.error('[chat-with-rag] Error creating assistant message:', messageError);
-          } else {
-            console.log(`[chat-with-rag] Created assistant message ${newMessage.id} with simple response`);
-          }
-        } catch (error) {
-          console.error('[chat-with-rag] Exception creating assistant message:', error);
-        }
-      }
-
-      return new Response(JSON.stringify({
-        response: simpleResponse,
-        metadata: {
-          classification: classification,
-          strategy: 'simple_response',
-          userTimezone: userTimezone
-        }
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      // Default fallback for unrelated or unclassified
+      console.log('[chat-with-rag] Using default fallback response');
+      response = "I'm focused on helping with mental health and journal insights. Is there something specific about your wellbeing or journal entries you'd like to explore?";
     }
-    
+
+    // Save assistant response
+    const { error: saveResponseError } = await supabase.from('chat_messages').insert({
+      thread_id: threadId,
+      content: response,
+      sender: 'assistant',
+      user_id: userId,
+      created_at: new Date().toISOString(),
+      analysis_data: metadata
+    });
+
+    if (saveResponseError) {
+      console.error('[chat-with-rag] Error saving assistant response:', saveResponseError);
+    }
+
+    // Return response with metadata
+    const result = {
+      response,
+      userStatusMessage,
+      metadata,
+      category,
+      threadId
+    };
+
+    console.log(`[chat-with-rag] Successfully processed message for thread ${threadId}`);
+
+    return new Response(JSON.stringify(result), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+
   } catch (error) {
-    console.error('[chat-with-rag] Error:', error);
+    console.error('[chat-with-rag] Unexpected error:', error);
     return new Response(JSON.stringify({ 
-      error: 'Internal server error', 
+      error: 'Internal server error',
       details: error.message 
     }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 500
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
 });
