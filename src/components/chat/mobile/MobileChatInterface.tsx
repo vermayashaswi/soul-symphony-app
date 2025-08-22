@@ -25,6 +25,8 @@ import { useStreamingChat } from "@/hooks/useStreamingChat";
 import { threadSafetyManager } from "@/utils/threadSafetyManager";
 import ChatErrorBoundary from "../ChatErrorBoundary";
 import { useAutoScroll } from "@/hooks/use-auto-scroll";
+import { useMobileChatSync } from "@/hooks/use-mobile-chat-sync";
+import { useEnhancedErrorRecovery } from "@/hooks/use-enhanced-error-recovery";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -84,6 +86,93 @@ export default function MobileChatInterface({
     processingStatus,
     setLocalLoading
   } = useChatRealtime(threadId);
+
+  const { toast } = useToast();
+  const { user } = useAuth();
+  const { translate } = useTranslation();
+  
+  // Enhanced mobile chat synchronization with fallback
+  const {
+    isOnline,
+    isRealtimeConnected,
+    forceSyncMessages,
+    addPendingSyncMessage
+  } = useMobileChatSync({
+    threadId,
+    userId: user?.id || null,
+    onMessagesSync: (syncedMessages) => {
+      console.log('[MobileChatInterface] Received synced messages:', syncedMessages.length);
+      
+      // Convert to UI messages and merge with existing ones
+      const uiMessages = syncedMessages
+        .filter(msg => !msg.is_processing)
+        .map(msg => ({
+          role: msg.sender as 'user' | 'assistant',
+          content: msg.content,
+          references: msg.reference_entries ? Array.isArray(msg.reference_entries) ? msg.reference_entries : [] : undefined,
+          hasNumericResult: msg.has_numeric_result
+        }));
+      
+      // Merge with existing messages, avoiding duplicates
+      setMessages(prevMessages => {
+        const messageMap = new Map();
+        
+        // Add existing messages
+        prevMessages.forEach((msg, index) => {
+          const key = `${msg.role}-${msg.content.substring(0, 50)}`;
+          messageMap.set(key, { msg, index });
+        });
+        
+        // Add/update with synced messages
+        uiMessages.forEach(msg => {
+          const key = `${msg.role}-${msg.content.substring(0, 50)}`;
+          messageMap.set(key, { msg, index: -1 });
+        });
+        
+        return Array.from(messageMap.values())
+          .sort((a, b) => a.index - b.index)
+          .map(item => item.msg);
+      });
+      
+      if (uiMessages.length > 0) {
+        setShowSuggestions(false);
+      }
+    },
+    onConnectionRecovered: () => {
+      console.log('[MobileChatInterface] Real-time connection recovered');
+      errorRecovery.resetRecoveryState();
+    },
+    onError: (error) => {
+      console.error('[MobileChatInterface] Sync error:', error);
+      errorRecovery.handleError(new Error(error), async () => {
+        await forceSyncMessages();
+      });
+    }
+  });
+
+  // Enhanced error recovery with automatic retry
+  const errorRecovery = useEnhancedErrorRecovery({
+    maxRetries: 3,
+    retryDelay: 2000,
+    onRecoveryStart: () => {
+      console.log('[MobileChatInterface] Starting error recovery...');
+      setLocalLoading(true, 'Recovering connection...');
+    },
+    onRecoverySuccess: () => {
+      console.log('[MobileChatInterface] Error recovery successful');
+      setLocalLoading(false);
+    },
+    onRecoveryFailed: () => {
+      console.log('[MobileChatInterface] Error recovery failed');
+      setLocalLoading(false);
+      toast({
+        title: "Connection issues persist",
+        description: "Please refresh the page to continue",
+        variant: "destructive",
+        duration: 5000,
+      });
+    }
+  });
   
   const { isKeyboardVisible } = useUnifiedKeyboard();
   
@@ -170,62 +259,102 @@ export default function MobileChatInterface({
            }
          }
         
-        // Let backend persist assistant message; UI will also update via realtime when it arrives
-        if (originThreadId === threadId) {
-         // Watchdog fallback: if realtime insert doesn't arrive, persist client-side after a short delay
-         try {
-           setTimeout(async () => {
-             // Double-check still on same thread
-             if (!currentThreadIdRef.current || currentThreadIdRef.current !== originThreadId) return;
+          // Enhanced mobile sync handling - persist message and trigger sync verification
+         if (originThreadId === threadId) {
+          // Track this message for sync verification
+          const messageId = requestId || `${originThreadId}:${Date.now()}`;
+          addPendingSyncMessage(messageId);
+          
+          // Enhanced watchdog with better error handling and sync verification
+          try {
+            setTimeout(async () => {
+              // Double-check still on same thread
+              if (!currentThreadIdRef.current || currentThreadIdRef.current !== originThreadId) return;
 
-             // Has an assistant message with same content arrived?
-             const { data: recent, error: recentErr } = await supabase
-               .from('chat_messages')
-               .select('id, content, sender, created_at')
-               .eq('thread_id', originThreadId)
-               .order('created_at', { ascending: false })
-               .limit(5);
+              try {
+                // Verify if message appeared via real-time
+                const { data: recent, error: recentErr } = await supabase
+                  .from('chat_messages')
+                  .select('id, content, sender, created_at')
+                  .eq('thread_id', originThreadId)
+                  .order('created_at', { ascending: false })
+                  .limit(10);
 
-             if (recentErr) {
-               console.warn('[Mobile Streaming Watchdog] Failed to fetch recent messages:', recentErr.message);
-             }
+                if (recentErr) {
+                  console.warn('[Mobile Enhanced Watchdog] Failed to fetch recent messages:', recentErr.message);
+                  
+                  // Trigger force sync on database error
+                  errorRecovery.handleError(recentErr, async () => {
+                    await forceSyncMessages();
+                  });
+                  return;
+                }
 
-             const alreadyExists = (recent || []).some(m => (m as any).sender === 'assistant' && (m as any).content?.trim() === response.trim());
-             if (!alreadyExists) {
-               // Persist safely with an idempotency_key derived from threadId + response
-               try {
-                 const enc = new TextEncoder();
-                 const keySource = requestId || `${originThreadId}:${response}`;
-                 const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
-                 const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
-                 const idempotencyKey = hex.slice(0, 32);
+                const alreadyExists = (recent || []).some(m => 
+                  (m as any).sender === 'assistant' && 
+                  (m as any).content?.trim() === response.trim()
+                );
+                
+                if (!alreadyExists) {
+                  console.log('[Mobile Enhanced Watchdog] Message not synced, persisting and triggering recovery');
+                  
+                  // Persist safely with an idempotency_key
+                  try {
+                    const enc = new TextEncoder();
+                    const keySource = requestId || `${originThreadId}:${response}`;
+                    const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
+                    const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+                    const idempotencyKey = hex.slice(0, 32);
 
-                  await supabase.from('chat_messages').upsert({
-                    thread_id: originThreadId,
-                    content: response,
-                    sender: 'assistant',
-                    role: 'assistant',
-                    idempotency_key: idempotencyKey,
-                    analysis_data: analysis || null
-                  }, { onConflict: 'thread_id,idempotency_key' });
-               } catch (e) {
-                 console.warn('[Mobile Streaming Watchdog] Persist fallback failed:', (e as any)?.message || e);
-               }
-             }
-
-             setLocalLoading(false);
-           }, 1200);
-         } catch (e) {
-           console.warn('[Mobile Streaming Watchdog] Exception scheduling fallback:', (e as any)?.message || e);
-           setLocalLoading(false);
-         }
-       }
+                     await supabase.from('chat_messages').upsert({
+                       thread_id: originThreadId,
+                       content: response,
+                       sender: 'assistant',
+                       role: 'assistant',
+                       idempotency_key: idempotencyKey,
+                       analysis_data: analysis || null
+                     }, { onConflict: 'thread_id,idempotency_key' });
+                     
+                     // Force sync to ensure UI is updated
+                     await forceSyncMessages();
+                  } catch (persistError) {
+                    console.error('[Mobile Enhanced Watchdog] Persist fallback failed:', persistError);
+                    
+                    // Trigger error recovery
+                    errorRecovery.handleError(persistError, async () => {
+                      await forceSyncMessages();
+                    });
+                  }
+                } else {
+                  console.log('[Mobile Enhanced Watchdog] Message successfully synced via real-time');
+                }
+              } catch (syncError) {
+                console.error('[Mobile Enhanced Watchdog] Sync verification failed:', syncError);
+                
+                errorRecovery.handleError(syncError, async () => {
+                  await forceSyncMessages();
+                });
+              } finally {
+                setLocalLoading(false);
+              }
+            }, 1500); // Slightly longer timeout for mobile
+          } catch (e) {
+            console.warn('[Mobile Enhanced Watchdog] Exception scheduling fallback:', (e as any)?.message || e);
+            setLocalLoading(false);
+            
+            // Trigger recovery even on exception
+            errorRecovery.handleError(e, async () => {
+              await forceSyncMessages();
+            });
+          }
+        }
     },
      onError: (error) => {
-       toast({
-         title: "Error",
-         description: error,
-         variant: "destructive"
+       console.error('[MobileChatInterface] Streaming error:', error);
+       
+       // Use enhanced error recovery for streaming errors
+       errorRecovery.handleError(new Error(error), async () => {
+         await forceSyncMessages();
        });
      }
    });
@@ -253,9 +382,6 @@ export default function MobileChatInterface({
     }
   ];
   
-  const { toast } = useToast();
-  const { user } = useAuth();
-  const { translate } = useTranslation();
   const loadedThreadRef = useRef<string | null>(null);
   
   // Use unified auto-scroll hook
@@ -265,68 +391,30 @@ export default function MobileChatInterface({
     scrollThreshold: 100
   });
 
-  // Realtime: append assistant messages saved by backend
+  // Connection status monitoring and recovery triggers
   useEffect(() => {
-    if (!threadId) return;
-    const channel = supabase
-      .channel(`mobile-thread-assistant-append-${threadId}`)
-      .on('postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'chat_messages',
-          filter: `thread_id=eq.${threadId}`
-        },
-        (payload) => {
-          const m: any = payload.new;
-          if (m.sender === 'assistant') {
-            setMessages(prev => {
-              // Avoid duplicates by simple heuristic
-              const last = prev[prev.length - 1];
-              if (last && last.role === 'assistant' && last.content === m.content) return prev;
-              const uiMsg: UIChatMessage = {
-                role: 'assistant',
-                content: m.content,
-                references: m.reference_entries || undefined,
-                analysis: m.analysis_data || undefined,
-                hasNumericResult: m.has_numeric_result || false
-              };
-              return [...prev, uiMsg];
-            });
-          }
+    if (!isOnline) {
+      console.log('[MobileChatInterface] Device offline, stopping real-time');
+      return;
+    }
+
+    if (!isRealtimeConnected && threadId && user?.id) {
+      console.log('[MobileChatInterface] Real-time disconnected, will use polling fallback');
+      
+      // Show connection status in UI
+      const connectionTimer = setTimeout(() => {
+        if (!isRealtimeConnected) {
+          toast({
+            title: "Connection unstable",
+            description: "Using backup sync method...",
+            duration: 3000,
+          });
         }
-      )
-      .on('postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'chat_messages',
-          filter: `thread_id=eq.${threadId}`
-        },
-        (payload) => {
-          const m: any = payload.new;
-          if (m.sender === 'assistant') {
-            setMessages(prev => {
-              // If last assistant message already matches, skip; else append updated
-              const last = prev[prev.length - 1];
-              if (last && last.role === 'assistant' && last.content === m.content) return prev;
-              const uiMsg: UIChatMessage = {
-                role: 'assistant',
-                content: m.content,
-                references: m.reference_entries || undefined,
-                analysis: m.analysis_data || undefined,
-                hasNumericResult: m.has_numeric_result || false
-              };
-              return [...prev, uiMsg];
-            });
-          }
-        }
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [threadId]);
+      }, 5000);
+
+      return () => clearTimeout(connectionTimer);
+    }
+  }, [isOnline, isRealtimeConnected, threadId, user?.id, toast]);
 
   useEffect(() => {
     if (threadId) {
