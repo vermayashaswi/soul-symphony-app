@@ -15,6 +15,8 @@ import { TranslatableText } from "@/components/translation/TranslatableText";
 import { v4 as uuidv4 } from "uuid";
 import { useDebugLog } from "@/utils/debug/DebugContext";
 import { getThreadMessages, saveMessage, updateUserMessageClassification } from "@/services/chat";
+import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
+import { processChatMessage } from "@/services/chatService";
 import { MentalHealthInsights } from "@/hooks/use-mental-health-insights";
 import { ensureMessageOrder, deduplicateMessages, UIChatMessage } from "@/utils/chat/messageOrdering";
 

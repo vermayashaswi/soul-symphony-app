@@ -99,8 +99,8 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
         }
 
         try {
-        // Route ALL queries through chat-with-rag for unified message persistence
-        const result = (await supabase.functions.invoke('chat-with-rag', { body })) as { data: any; error: any };
+          // Route ALL queries through chat-with-rag for unified message persistence
+          const result = (await supabase.functions.invoke('chat-with-rag', { body })) as { data: any; error: any };
           if (result?.error) {
             lastErr = result.error;
             if (isEdgeFunctionError(lastErr) || isNetworkError(lastErr)) {

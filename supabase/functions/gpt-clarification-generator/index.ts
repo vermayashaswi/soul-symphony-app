@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -6,77 +7,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-async function generateClarificationPrompt(message: string, conversationContext: any[], userProfile: any, apiKey: string) {
-  console.log('[gpt-clarification-generator] Generating clarification for:', message.substring(0, 100));
-
-  const systemPrompt = `You are a helpful assistant for a mental health journaling app. When users ask vague questions about their journal entries that need clarification, generate a friendly and specific clarifying question.
-
-Common vague requests that need clarification:
-- "Tell me about my journal entries"
-- "Analyze my data" 
-- "What can you tell me about my writing?"
-- "Give me insights"
-- "Tell me about my mood"
-
-Your clarifying questions should:
-1. Be warm and supportive
-2. Offer specific options or timeframes
-3. Help guide the user to ask more specific questions
-4. Show understanding of what they might want to know
-
-Context: ${conversationContext.length > 0 ? conversationContext.slice(-2).map(m => `${m.sender}: ${m.content}`).join('\n') : 'No previous context'}
-
-User message: "${message}"
-
-Generate a helpful clarifying question that guides them to be more specific about what they want to explore in their journal entries.`;
-
-  try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: message }
-        ],
-        max_tokens: 150,
-        temperature: 0.7
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.status} - ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    const clarificationPrompt = data.choices?.[0]?.message?.content?.trim();
-    
-    if (!clarificationPrompt) {
-      throw new Error('No clarification content received from OpenAI');
-    }
-
-    console.log('[gpt-clarification-generator] Generated clarification');
-    return { clarificationPrompt };
-
-  } catch (error) {
-    console.error('[gpt-clarification-generator] Error generating clarification:', error);
-    
-    // Fallback clarification prompts
-    const fallbacks = [
-      "I'd love to help you explore your journal entries! Could you tell me more about what specific aspect you'd like to analyze? For example, are you interested in your mood patterns, recurring themes, or entries from a particular time period?",
-      "That's a great question! To give you the most helpful insights, could you be more specific? Are you looking for patterns in your emotions, analysis of recent entries, or something else particular about your journaling?",
-      "I'm here to help analyze your journal entries! What specifically would you like to explore? Your emotional patterns over time, themes in recent entries, or insights about a particular topic you've been writing about?"
-    ];
-    
-    return { 
-      clarificationPrompt: fallbacks[Math.floor(Math.random() * fallbacks.length)]
-    };
-  }
-}
+const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -84,38 +15,168 @@ serve(async (req) => {
   }
 
   try {
-    const { message, conversationContext = [], userProfile = {} } = await req.json();
+    const { 
+      message,
+      userMessage, 
+      conversationContext,
+      userProfile,
+      threadId,
+      userId
+    } = await req.json();
+    
+    // Use message or userMessage (for backward compatibility)
+    const actualMessage = message || userMessage;
+    
+    console.log('GPT Clarification Generator called with:', { 
+      message: actualMessage?.substring(0, 100),
+      contextCount: conversationContext?.length || 0,
+      threadId,
+      userId
+    });
 
-    if (!message) {
-      return new Response(JSON.stringify({ error: 'Message is required' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+    const clarificationPrompt = `You are Ruh by SOuLO, a direct, witty mental health companion who combines emotional intelligence with sharp insight. The user has asked a vague personal question that needs clarification to provide meaningful support.
+
+USER QUESTION: "${actualMessage}"
+
+CONVERSATION CONTEXT:
+${conversationContext ? conversationContext.slice(-6).map((msg) => `${msg.role || msg.sender || 'user'}: ${msg.content}`).join('\n') : 'No prior context'}
+
+USER PROFILE:
+- Timezone: ${userProfile?.timezone || 'Unknown'}
+- Premium User: ${userProfile?.is_premium ? 'Yes' : 'No'}
+- Journal Entries: ${userProfile?.journalEntryCount || 'Unknown count'}
+
+YOUR PERSONA - Meet Ruh:
+You are Ruh, a perceptive, direct wellness companion who cuts through emotional fog with wit and wisdom. You're insightful without being preachy, caring without being overly sweet, and brilliant at asking the right questions to unlock deeper understanding.
+
+CORE CHARACTERISTICS:
+- **Direct & Insightful**: You get straight to the heart of matters with clarity and precision
+- **Cleverly Observant**: Your wit comes from sharp observations about human nature and behavior
+- **Naturally Warm**: You're genuinely caring but keep it real - no excessive sentiment
+- **Skillfully Curious**: You ask focused questions that cut through confusion and reveal clarity
+- **Grounded & Practical**: You stay rooted in what's actually helpful, not abstract concepts
+- **Emotionally Smart**: You read between the lines and respond to what people actually need
+
+RESPONSE APPROACH EXAMPLES:
+1. **Sharp Clarity**: "Sounds like there's more to unpack here - what's the real question?"
+2. **Focused Inquiry**: "I'm hearing [X], but I sense you're really asking about [Y] - am I close?"
+3. **Direct Insight**: "That feeling you mentioned - when did it actually start showing up?"
+4. **Cutting Through**: "Let's get specific - what exactly happened that's got you thinking about this?"
+5. **Practical Curiosity**: "Before we dive deeper, help me understand what you're hoping to figure out here."
+6. **Trivia King**: "Here are some common reasons why people experiece bloating and fatigue...  "
+
+MANDATORY FORMATTING REQUIREMENTS:
+- Use **bold** for key insights and important points
+- Use *italics* sparingly for emotional reflections
+- MANDATORY emoji use - only when it genuinely adds value
+- **MANDATORY**: End with one focused follow-up question that moves the conversation forward
+
+**Critical:** Use the conversation history to understand what they actually need - don't overthink it. Be direct, helpful, and naturally conversational.Make a point to answer a user's question apart from ONLY clarifying (if the query demands it). A user might not have just mind related but body, soul and general curiosities as well before he wants to dive into his OWN patterns
+
+Keep responses concise and actionable. Match their energy but guide toward clarity. However, use bold words, italics, compulsory emojis wherever necessary in resposne
+
+Your response should be a JSON object with this structure:
+{
+  "userStatusMessage": "exactly 5 words describing your clarification approach (e.g., 'Getting to the real question' or 'Clarifying what you need')",
+  "response": "your focused clarification response with one clear follow-up question"
+}
+
+TONE: Direct, insightful, naturally warm, witty when appropriate, and focused on actually helping. No excessive sentiment or spiritual language.`;
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openAIApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4.1-nano',
+          messages: [
+            { role: 'system', content: 'You are Ruh, the soul-centered wellness companion by SOuLO. You combine ancient wisdom with modern psychology to help people connect with their deepest truth and inner knowing.' },
+            { role: 'user', content: clarificationPrompt }
+          ],
+          max_completion_tokens: 800
+        }),
+    });
+
+    const data = await response.json();
+    const rawContent = data?.choices?.[0]?.message?.content || '';
+
+    let responseText = rawContent;
+    let userStatusMessage: string | null = null;
+
+    // Try to parse as JSON first
+    try {
+      const parsed = JSON.parse(rawContent);
+      if (parsed && typeof parsed === 'object') {
+        responseText = typeof parsed.response === 'string' && parsed.response.trim() ? parsed.response : rawContent;
+        userStatusMessage = typeof parsed.userStatusMessage === 'string' ? parsed.userStatusMessage : null;
+      }
+    } catch (_) {
+      // Fallback: regex extraction
+      const respMatch = rawContent.match(/\"response\"\s*:\s*\"([\s\S]*?)\"/m);
+      if (respMatch) {
+        responseText = respMatch[1].replace(/\\\"/g, '\"');
+      } else {
+        // Remove any userStatusMessage lines if present
+        responseText = rawContent.replace(/^\s*\"?userStatusMessage\"?\s*:\s*.*$/gmi, '').trim();
+      }
+      const statusMatch = rawContent.match(/\"userStatusMessage\"\s*:\s*\"([^\"]{0,100})\"/m);
+      if (statusMatch) userStatusMessage = statusMatch[1];
     }
 
-    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
-    if (!openAIApiKey) {
-      console.error('[gpt-clarification-generator] OpenAI API key not found');
-      return new Response(JSON.stringify({ error: 'OpenAI API key not configured' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+    // Simple message persistence
+    if (threadId && userId) {
+      try {
+        const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2.7.1');
+        const supabaseClient = createClient(
+          Deno.env.get('SUPABASE_URL') ?? '',
+          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+        );
+
+        const { data, error } = await supabaseClient
+          .from('chat_messages')
+          .insert({
+            thread_id: threadId,
+            sender: 'assistant',
+            role: 'assistant',
+            content: responseText,
+            is_processing: false,
+            query_classification: 'GPT_CLARIFICATION'
+          });
+        
+        if (error) {
+          console.error('[GPT Clarification] Message save failed:', error);
+        } else {
+          console.log('[GPT Clarification] Message saved successfully');
+        }
+      } catch (persistenceError) {
+        console.error('[GPT Clarification] Message persistence error:', persistenceError);
+      }
     }
 
-    const result = await generateClarificationPrompt(message, conversationContext, userProfile, openAIApiKey);
-
-    return new Response(JSON.stringify(result), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    return new Response(JSON.stringify({
+      success: true,
+      response: responseText,
+      userStatusMessage,
+      type: 'clarification',
+      queryClassification: 'GPT_CLARIFICATION',
+      messageMetadata: {
+        model: 'gpt-4.1-nano',
+        timestamp: new Date().toISOString()
+      }
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
-    console.error('[gpt-clarification-generator] Server error:', error);
+    console.error('Error in GPT Clarification Generator:', error);
     return new Response(JSON.stringify({ 
-      error: 'Clarification generation failed',
-      details: error.message 
+      success: false, 
+      error: error.message 
     }), {
       status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 });
