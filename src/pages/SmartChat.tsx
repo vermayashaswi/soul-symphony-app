@@ -21,12 +21,18 @@ const SmartChat = () => {
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
   const isMobile = useIsMobile();
 
-  // Redirect to login if not authenticated
+  // Redirect to login if not authenticated - with iOS browser handling
   useEffect(() => {
     if (!user) {
-      navigate('/app/auth');
+      console.log('[SmartChat] No user found, redirecting to auth');
+      // For iOS Safari/Chrome browsers, use location.href to prevent navigation issues
+      if (isMobile.isIOS) {
+        window.location.href = '/app/auth';
+      } else {
+        navigate('/app/auth');
+      }
     }
-  }, [user, navigate]);
+  }, [user, navigate, isMobile.isIOS]);
 
   // Load the last active thread on component mount
   useEffect(() => {
