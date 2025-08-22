@@ -467,8 +467,8 @@ serve(async (req) => {
         const subQueryResponses = analysisSummary.map((r: any) => ({
           subQuestion: r.subQuestion?.question || 'Unknown question',
           searchStrategy: r.subQuestion?.searchStrategy || 'unknown',
-          sqlResultCount: r.executionResults?.sqlResultCount || 0,
-          vectorResultCount: r.executionResults?.vectorResultCount || 0,
+          sqlResultCount: r.executionResults?.sqlResults?.length || 0,
+          vectorResultCount: r.executionResults?.vectorResults?.length || 0,
           hasError: !!r.error,
           executionSummary: {
             sqlSuccess: (r.executionResults?.sqlResults?.length || 0) > 0,
