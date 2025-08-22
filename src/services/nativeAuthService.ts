@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { nativeIntegrationService } from './nativeIntegrationService';
 import { nativeNavigationService } from './nativeNavigationService';
@@ -14,29 +13,6 @@ interface GoogleAuthPlugin {
     id: string;
   }>;
   signOut(): Promise<void>;
-}
-
-// Type definitions for Apple Sign-In
-interface SignInWithAppleOptions {
-  clientId: string;
-  redirectURI: string;
-  scopes: string[];
-  state: string;
-  nonce: string;
-}
-
-interface SignInWithAppleResponse {
-  response: {
-    identityToken: string;
-    email?: string;
-    givenName?: string;
-    familyName?: string;
-    user: string;
-  };
-}
-
-interface AppleSignInPlugin {
-  authorize(options: SignInWithAppleOptions): Promise<SignInWithAppleResponse>;
 }
 
 class NativeAuthService {
@@ -88,7 +64,6 @@ class NativeAuthService {
         // Keep isInitialized false so we can retry if environment changes
         return;
       }
-
 
       const clientId = this.getGoogleClientId();
       console.log('[NativeAuth] Initializing GoogleAuth plugin with configuration:', {
@@ -329,7 +304,7 @@ class NativeAuthService {
       }
 
       // Try to get Apple Sign-In plugin using Capacitor
-      let SignInWithApple: AppleSignInPlugin;
+      let SignInWithApple;
       try {
         const { SignInWithApple: ApplePlugin } = await import('@capacitor-community/apple-sign-in');
         SignInWithApple = ApplePlugin;
@@ -348,11 +323,11 @@ class NativeAuthService {
       const nonce = this.generateRandomString(32);
       const state = this.generateRandomString(32);
 
-      // Perform Apple sign-in
+      // Use the correct type signature for the Capacitor plugin
       const result = await SignInWithApple.authorize({
         clientId: 'online.soulo.twa', // Your app's bundle ID
         redirectURI: 'https://571d731e-b54b-453e-9f48-a2c79a572930.supabase.co/auth/v1/callback',
-        scopes: ['email', 'name'],
+        scopes: 'email name', // String, not array - this was the issue!
         state,
         nonce
       });
