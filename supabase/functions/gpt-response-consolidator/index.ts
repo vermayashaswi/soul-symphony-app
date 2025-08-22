@@ -428,9 +428,30 @@ serve(async (req) => {
     } catch (parseError) {
       console.error(`[CONSOLIDATOR] Failed to parse expected JSON response:`, parseError);
       console.error(`[CONSOLIDATOR] Raw response:`, rawResponse);
-      // Fallback to plain text if JSON parsing fails
-      consolidatedResponse = rawResponse.trim();
-      userStatusMessage = null;
+      
+      // Enhanced fallback: Try to extract content from malformed JSON
+      try {
+        // Look for response field in the raw text using regex
+        const responseMatch = rawResponse.match(/"response"\s*:\s*"([^"]+)"/);
+        const userStatusMatch = rawResponse.match(/"userStatusMessage"\s*:\s*"([^"]+)"/);
+        
+        if (responseMatch) {
+          consolidatedResponse = responseMatch[1];
+          userStatusMessage = userStatusMatch ? userStatusMatch[1] : null;
+          console.log(`[CONSOLIDATOR] Extracted from malformed JSON:`, {
+            responseLength: consolidatedResponse?.length || 0,
+            hasStatusMessage: !!userStatusMessage
+          });
+        } else {
+          // Final fallback to plain text
+          consolidatedResponse = rawResponse.trim();
+          userStatusMessage = null;
+        }
+      } catch (extractError) {
+        // Final fallback to plain text
+        consolidatedResponse = rawResponse.trim();
+        userStatusMessage = null;
+      }
       
       console.log(`[CONSOLIDATION SUCCESS] ${consolidationId}:`, {
         responseLength: consolidatedResponse?.length || 0,
