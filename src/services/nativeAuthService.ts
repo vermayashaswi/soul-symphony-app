@@ -298,12 +298,74 @@ class NativeAuthService {
 
   async signInWithApple(): Promise<void> {
     try {
-      console.log('[NativeAuth] Apple sign-in not implemented for native');
-      throw new Error('Apple sign-in not available in native app');
+      console.log('[NativeAuth] Starting Apple sign-in process...');
+      
+      if (!this.isRunningNatively()) {
+        throw new Error('Apple sign-in only available in native apps');
+      }
+
+      // Try to get Apple Sign-In plugin dynamically
+      let SignInWithApple;
+      try {
+        const plugin = await import('@ionic-native/sign-in-with-apple/ngx');
+        SignInWithApple = plugin.SignInWithApple;
+      } catch (importError) {
+        console.warn('[NativeAuth] Apple Sign-In plugin not available, falling back to web OAuth');
+        throw new Error('Apple Sign-In plugin not available on this device');
+      }
+
+      if (!SignInWithApple) {
+        throw new Error('Apple Sign-In plugin not available');
+      }
+
+      console.log('[NativeAuth] Apple Sign-In plugin loaded');
+
+      // Perform Apple sign-in
+      const appleCredential = await SignInWithApple.signin({
+        requestedScopes: [
+          'email',
+          'fullName'
+        ]
+      });
+
+      console.log('[NativeAuth] Apple sign-in response received');
+
+      if (!appleCredential.identityToken) {
+        throw new Error('No identity token received from Apple');
+      }
+
+      // Exchange Apple credential for Supabase session
+      const { data, error } = await supabase.auth.signInWithIdToken({
+        provider: 'apple',
+        token: appleCredential.identityToken,
+        nonce: appleCredential.nonce
+      });
+
+      if (error) {
+        console.error('[NativeAuth] Supabase Apple auth error:', error);
+        throw new Error(`Apple authentication failed: ${error.message}`);
+      }
+
+      if (!data.user) {
+        throw new Error('No user data received from Apple authentication');
+      }
+
+      console.log('[NativeAuth] Apple sign-in successful:', data.user.email);
+      toast.success('Signed in with Apple successfully');
+
     } catch (error: any) {
-      console.error('[NativeAuth] Apple sign-in failed:', error);
-      this.handleAuthError(error, 'Apple');
-      throw error;
+      console.error('[NativeAuth] Apple sign-in error:', error);
+      
+      // Handle specific Apple sign-in errors
+      if (error.code === 'UserCancel') {
+        throw new Error('Apple sign-in was cancelled by user');
+      } else if (error.code === 'UserNotSignedIn') {
+        throw new Error('Please sign in to your Apple ID in Settings');
+      } else if (error.message?.includes('plugin')) {
+        throw new Error('Apple Sign-In not available on this device');
+      } else {
+        throw new Error(error.message || 'Apple sign-in failed');
+      }
     }
   }
 

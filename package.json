@@ -25,6 +25,7 @@
     "@capacitor/status-bar": "^7.0.1",
     "@codetrix-studio/capacitor-google-auth": "^3.4.0-rc.4",
     "@hookform/resolvers": "^3.9.0",
+    "@ionic-native/sign-in-with-apple": "^5.36.0",
     "@radix-ui/react-accordion": "^1.2.0",
     "@radix-ui/react-alert-dialog": "^1.1.1",
     "@radix-ui/react-aspect-ratio": "^1.1.0",

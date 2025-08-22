@@ -12,11 +12,13 @@ const ProtectedRoute: React.FC = () => {
   useEffect(() => {
     const checkAuth = async () => {
       try {
+        console.log('[ProtectedRoute] Checking authentication...');
         const { data } = await supabase.auth.getSession();
+        console.log('[ProtectedRoute] Session status:', data.session ? 'authenticated' : 'not authenticated');
         setUser(data.session?.user || null);
         setIsLoading(false);
       } catch (error) {
-        console.error('Error checking authentication in ProtectedRoute:', error);
+        console.error('[ProtectedRoute] Error checking authentication:', error);
         setIsLoading(false);
       }
     };
@@ -24,6 +26,7 @@ const ProtectedRoute: React.FC = () => {
     checkAuth();
     
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('[ProtectedRoute] Auth state changed:', event, session ? 'authenticated' : 'not authenticated');
       setUser(session?.user || null);
       setIsLoading(false);
     });
@@ -48,14 +51,23 @@ const ProtectedRoute: React.FC = () => {
   
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          <p className="text-sm text-muted-foreground">Checking authentication...</p>
+        </div>
       </div>
     );
   }
   
   if (!user) {
-    console.log("[ProtectedRoute] REDIRECTING to auth from protected route:", location.pathname);
+    console.log("[ProtectedRoute] User not authenticated, redirecting to auth page");
+    
+    // Add additional debug info for iOS devices
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    if (isIOS) {
+      console.log('[ProtectedRoute] iOS device detected, authentication may require Apple ID or improved Google OAuth');
+    }
     
     // Store redirect path and go to auth
     localStorage.setItem('authRedirectTo', location.pathname);

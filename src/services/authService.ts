@@ -83,17 +83,35 @@ export const signInWithApple = async (): Promise<void> => {
 
     // Check if we should use native authentication
     if (nativeIntegrationService.isRunningNatively()) {
-      console.log('[AuthService] Native environment - Apple sign-in not implemented natively');
-      throw new Error('Apple sign-in not available in native app');
+      console.log('[AuthService] Native environment detected - attempting native Apple sign-in');
+      
+      try {
+        // Initialize native auth service first
+        await nativeAuthService.initialize();
+        
+        // Try native Apple sign-in
+        await nativeAuthService.signInWithApple();
+        console.log('[AuthService] Native Apple sign-in successful');
+        return;
+      } catch (nativeError: any) {
+        console.warn('[AuthService] Native Apple sign-in failed, falling back to web OAuth:', nativeError.message);
+        
+        // Don't throw here, fall back to web OAuth
+      }
     }
 
-    // Web Apple Sign-In
+    // Web Apple Sign-In fallback
     console.log('[AuthService] Using web OAuth Apple sign-in');
     const redirectUrl = getRedirectUrl();
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'apple',
       options: {
         redirectTo: redirectUrl,
+        queryParams: {
+          // Add iOS-specific parameters for better compatibility
+          response_mode: 'form_post',
+          scope: 'name email'
+        }
       },
     });
 
