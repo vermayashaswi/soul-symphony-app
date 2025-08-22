@@ -133,42 +133,14 @@ export async function processChatMessage(
       useAllEntries: classification.useAllEntries
     };
 
-    // Handle general mental health with conversational SOULo personality
-    if (classification.category === 'GENERAL_MENTAL_HEALTH') {
-      console.log('[ChatService] Handling general mental health question');
-      
-      const generalResponse = await handleGeneralQuestion(message, conversationContext, userId);
-      return {
-        content: generalResponse,
-        role: 'assistant',
-        analysis: {
-          method: 'general_mental_health',
-          classification: classificationMetadata
-        }
-      };
-    }
+    // ALL categories now route through chat-with-rag as the single orchestrator
+    console.log('[ChatService] Routing all messages through chat-with-rag orchestrator');
+    
+    // For ALL query types (JOURNAL_SPECIFIC, GENERAL_MENTAL_HEALTH, UNRELATED, CLARIFICATION)
+    // Route through chat-with-rag which will handle classification and proper routing
 
-    // Handle unrelated queries with random playful responses
-    if (classification.category === 'UNRELATED') {
-      console.log('[ChatService] Handling unrelated query');
-      
-      const unrelatedResponses = [
-        "Oops! 🤖 I think my emotional intelligence wires got crossed with my general knowledge circuits there! I'm like a really enthusiastic therapist who only knows about feelings, journals, and the beautiful chaos of human emotions. Try asking me about your mood, your day, or that thing that's been bouncing around in your head! 🧠✨",
-        "Ah, you've stumbled upon my one weakness! 😅 I'm basically a feelings expert who failed at everything else in AI school. I can help you decode your emotions, dive into your journal patterns, and figure out what your heart is trying to tell you... but ask me about the weather and I'll probably suggest you journal about how clouds make you feel! 🌤️💭",
-        "Whoops! Looks like you've found the edge of my brain! 🤯 I'm like that friend who's AMAZING at deep 2am conversations about life but terrible at trivia night. I live for your thoughts, feelings, journal entries, and all things emotional wellbeing - that's where I absolutely shine! ✨ What's your heart been up to lately? 💛",
-        "Haha, you caught me! I'm basically a one-trick pony, but it's a really GOOD trick! 🐴✨ Think of me as your personal feelings detective, journal whisperer, and emotional GPS all rolled into one. I can't help with that question, but I'd love to hear what's been stirring in your world today! 🌍💫"
-      ];
-      
-      const randomResponse = unrelatedResponses[Math.floor(Math.random() * unrelatedResponses.length)];
-      
-      return {
-        content: randomResponse,
-        role: 'assistant'
-      };
-    }
-
-    // For journal-specific questions, use enhanced database-aware dual-search conversational analysis
-    console.log('[ChatService] Processing journal-specific question with enhanced database-aware dual-search SOULo');
+    // Process ALL query types through chat-with-rag orchestrator
+    console.log('[ChatService] Processing ALL queries through chat-with-rag orchestrator for proper classification routing');
     
     // Get current session for authentication
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -226,31 +198,42 @@ export async function processChatMessage(
       userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
     }
 
-    // Get intelligent query plan with enhanced database-aware dual-search requirements
-    const queryPlanResponse = await supabase.functions.invoke('smart-query-planner', {
-      body: {
-        message,
-        userId,
-        conversationContext,
-        isFollowUp: isFollowUpMessage,
-        preserveTopicContext: true,
-        threadMetadata: {},
-        requireDualSearch: true,
-        requireDatabaseValidation: true, // Enhanced requirement for database-validated themes/emotions
-        confidenceThreshold: 0.9,
-        userTimezone // Add timezone to request body
-      }
-    });
-
-    if (queryPlanResponse.error) {
-      throw new Error(`Query planner error: ${queryPlanResponse.error.message}`);
-    }
-
-    const queryPlan = queryPlanResponse.data?.queryPlan || {};
+    // Query planning is now handled within chat-with-rag orchestrator
+    // Only perform query planning for JOURNAL_SPECIFIC queries (others are handled by chat-with-rag directly)
+    let queryPlan: any = {
+      useAllEntries: false,
+      hasPersonalPronouns: false,
+      hasExplicitTimeReference: false,
+      searchConfidence: 1.0,
+      themeFilters: [],
+      emotionFilters: []
+    };
     
-    // Log database-aware dual-search enforcement
-    if (queryPlan.searchConfidence <= 0.9) {
-      console.log(`[ChatService] DATABASE-AWARE DUAL SEARCH ENFORCED - Confidence: ${queryPlan.searchConfidence} <= 90%`);
+    if (classification.category === 'JOURNAL_SPECIFIC') {
+      const queryPlanResponse = await supabase.functions.invoke('smart-query-planner', {
+        body: {
+          message,
+          userId,
+          conversationContext,
+          isFollowUp: isFollowUpMessage,
+          preserveTopicContext: true,
+          threadMetadata: {},
+          requireDualSearch: true,
+          requireDatabaseValidation: true,
+          confidenceThreshold: 0.9,
+          userTimezone
+        }
+      });
+
+      if (queryPlanResponse.error) {
+        throw new Error(`Query planner error: ${queryPlanResponse.error.message}`);
+      }
+
+      queryPlan = queryPlanResponse.data?.queryPlan || queryPlan;
+      
+      if (queryPlan.searchConfidence <= 0.9) {
+        console.log(`[ChatService] DATABASE-AWARE DUAL SEARCH ENFORCED - Confidence: ${queryPlan.searchConfidence} <= 90%`);
+      }
     }
 
     // PHASE 3: Optimize search strategy based on route and context
@@ -262,7 +245,7 @@ export async function processChatMessage(
       userContext: parameters
     });
 
-    // Use enhanced conversational RAG with optimized parameters
+    // Use chat-with-rag as single orchestrator for ALL message types
     const ragStartTime = Date.now();
     const ragResponse = await supabase.functions.invoke('chat-with-rag', {
       body: {
@@ -270,6 +253,7 @@ export async function processChatMessage(
         userId,
         threadId,
         conversationContext,
+        classification, // Pass classification so chat-with-rag can route properly
         queryPlan,
         useAllEntries: queryPlan.useAllEntries || false,
         hasPersonalPronouns: queryPlan.hasPersonalPronouns || false,
@@ -280,7 +264,8 @@ export async function processChatMessage(
         emotionFilters: queryPlan.emotionFilters || [],
         threadMetadata: {},
         databaseAware: true,
-        // PHASE 1 & 3: Pass optimization parameters
+        userTimezone,
+        // Pass optimization parameters
         optimizationConfig: {
           searchStrategy: searchStrategy.name,
           maxEntries: searchStrategy.maxEntries,
@@ -288,7 +273,7 @@ export async function processChatMessage(
           complexityLevel: complexityAnalysis.complexityLevel,
           route: routingResult.primaryRoute.routeName
         },
-        // PHASE 2 & 4: Pass flow recommendations
+        // Pass flow recommendations
         flowConfig: {
           suggestedTone: flowRecommendation.suggestedTone,
           urgencyLevel: flowRecommendation.urgencyLevel,
