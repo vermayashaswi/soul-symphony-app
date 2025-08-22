@@ -204,15 +204,13 @@ export const saveMessage = async (
   hasNumericResult?: boolean,
   isInteractive?: boolean,
   interactiveOptions?: any[],
-  idempotencyKey?: string,
   analysisData?: any
 ) => {
   console.log('[saveMessage] Starting enhanced message save:', {
     threadId,
     sender,
     userId,
-    contentLength: content.length,
-    hasIdempotencyKey: !!idempotencyKey
+    contentLength: content.length
   });
 
   if (!userId) {
@@ -220,17 +218,7 @@ export const saveMessage = async (
     return null;
   }
 
-  // Generate idempotency key if not provided
-  if (!idempotencyKey && sender === 'assistant') {
-    const timestamp = Date.now();
-    const encoder = new TextEncoder();
-    const data = encoder.encode(`${threadId}:${content}:${timestamp}`);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const hash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 16);
-    idempotencyKey = `${timestamp}_${hash}`;
-    console.log('[saveMessage] Generated idempotency key:', idempotencyKey);
-  }
+  // Simplified message processing without idempotency complexity
 
   // Process content for assistant messages to handle JSON responses
   let processedContent = content;
@@ -253,7 +241,7 @@ export const saveMessage = async (
   if (hasNumericResult !== undefined) additionalData.has_numeric_result = hasNumericResult;
   if (isInteractive) additionalData.isInteractive = isInteractive;
   if (interactiveOptions) additionalData.interactiveOptions = interactiveOptions;
-  if (idempotencyKey) additionalData.idempotency_key = idempotencyKey;
+  // Remove idempotency_key from additional data
   if (analysisData) additionalData.analysis_data = analysisData;
 
   console.log('[saveMessage] Processed data, calling createChatMessage with retry logic');
@@ -277,32 +265,6 @@ export const saveMessage = async (
     } catch (error) {
       lastError = error;
       console.error(`[saveMessage] Attempt ${attempt} failed:`, error);
-
-      // Handle idempotency constraint violation
-      if (error instanceof Error && error.message.includes('duplicate key') && idempotencyKey) {
-        console.log('[saveMessage] Idempotency conflict detected, checking for existing message');
-        
-        try {
-          const { data: existing, error: fetchError } = await supabase
-            .from('chat_messages')
-            .select('*')
-            .eq('thread_id', threadId)
-            .eq('idempotency_key', idempotencyKey)
-            .single();
-
-          if (!fetchError && existing) {
-            console.log('[saveMessage] Found existing message with same idempotency key:', existing.id);
-            return {
-              ...existing,
-              sender: existing.sender as 'user' | 'assistant' | 'error',
-              role: existing.role as 'user' | 'assistant' | 'error',
-              sub_query_responses: Array.isArray(existing.sub_query_responses) ? existing.sub_query_responses : []
-            };
-          }
-        } catch (fetchError) {
-          console.error('[saveMessage] Failed to fetch existing message:', fetchError);
-        }
-      }
 
       if (attempt < maxRetries) {
         const delay = Math.pow(2, attempt - 1) * 1000; // Exponential backoff

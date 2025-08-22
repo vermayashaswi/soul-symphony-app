@@ -21,7 +21,6 @@ export type Database = {
           created_at: string
           has_numeric_result: boolean | null
           id: string
-          idempotency_key: string | null
           is_processing: boolean | null
           reference_entries: Json | null
           request_correlation_id: string | null
@@ -39,7 +38,6 @@ export type Database = {
           created_at?: string
           has_numeric_result?: boolean | null
           id?: string
-          idempotency_key?: string | null
           is_processing?: boolean | null
           reference_entries?: Json | null
           request_correlation_id?: string | null
@@ -57,7 +55,6 @@ export type Database = {
           created_at?: string
           has_numeric_result?: boolean | null
           id?: string
-          idempotency_key?: string | null
           is_processing?: boolean | null
           reference_entries?: Json | null
           request_correlation_id?: string | null
@@ -740,16 +737,6 @@ export type Database = {
       comprehensive_cleanup: {
         Args: Record<PropertyKey, never>
         Returns: Json
-      }
-      create_chat_message_with_dedup: {
-        Args: {
-          p_content: string
-          p_idempotency_key?: string
-          p_role?: string
-          p_sender: string
-          p_thread_id: string
-        }
-        Returns: string
       }
       debug_user_auth: {
         Args: { target_user_id: string }

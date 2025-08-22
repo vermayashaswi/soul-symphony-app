@@ -380,203 +380,19 @@ export default function MobileChatInterface({
     }
   };
 
-  // Clear any existing intervals when component unmounts
+  // Simple cleanup when thread changes
   useEffect(() => {
     return () => {
-      if (pendingMessageTracker.pollingInterval) {
-        clearInterval(pendingMessageTracker.pollingInterval);
-      }
+      // Simple cleanup
     };
   }, [threadId]);
 
-  // Backup polling mechanism for message persistence checking
-  const startMessagePersistenceTracking = useCallback((expectedMessageType: 'assistant' = 'assistant') => {
-    console.log(`[MobileChatInterface] Starting message persistence tracking for ${expectedMessageType} message`);
-    
-    // Clear any existing tracking
-    if (pendingMessageTracker.pollingInterval) {
-      clearInterval(pendingMessageTracker.pollingInterval);
-    }
-
-    const startTime = Date.now();
-    const pollingInterval = setInterval(async () => {
-      const elapsed = Date.now() - startTime;
-      
-      // Stop polling after 15 seconds
-      if (elapsed > 15000) {
-        console.log(`[MobileChatInterface] Message persistence tracking timeout`);
-        clearInterval(pollingInterval);
-        setPendingMessageTracker({
-          messageId: null,
-          expectedAt: 0,
-          pollingInterval: null
-        });
-        return;
-      }
-
-      try {
-        // Check for new assistant messages
-        const { data: recentMessages } = await supabase
-          .from('chat_messages')
-          .select('*')
-          .eq('thread_id', threadId!)
-          .eq('sender', expectedMessageType)
-          .order('created_at', { ascending: false })
-          .limit(1);
-
-        if (recentMessages && recentMessages.length > 0) {
-          const latestMessage = recentMessages[0];
-          const messageAge = Date.now() - new Date(latestMessage.created_at).getTime();
-          
-          // If message is newer than our tracking start and not in UI yet
-          if (messageAge < elapsed + 2000) {
-            console.log(`[MobileChatInterface] Found persisted message via polling: ${latestMessage.id}`);
-            
-            // Check if message is already in UI
-            setMessages(prevMessages => {
-              const exists = prevMessages.some(msg => msg.id === latestMessage.id);
-              if (!exists) {
-                console.log(`[MobileChatInterface] Adding persisted message to UI: ${latestMessage.id}`);
-                
-                const uiMessage = {
-                  id: latestMessage.id,
-                  role: latestMessage.sender as 'user' | 'assistant' | 'error',
-                  content: latestMessage.content,
-                  references: latestMessage.reference_entries ? Array.isArray(latestMessage.reference_entries) ? latestMessage.reference_entries : [] : undefined,
-                  hasNumericResult: latestMessage.has_numeric_result,
-                  created_at: latestMessage.created_at,
-                  analysis: latestMessage.analysis_data
-                };
-                
-                // Force scroll to bottom
-                setTimeout(() => scrollToBottom(), 100);
-                
-                return insertMessageInOrder(prevMessages, uiMessage);
-              }
-              return prevMessages;
-            });
-
-            // Clear tracking
-            clearInterval(pollingInterval);
-            setPendingMessageTracker({
-              messageId: null,
-              expectedAt: 0,
-              pollingInterval: null
-            });
-          }
-        }
-      } catch (error) {
-        console.error('[MobileChatInterface] Error in message persistence polling:', error);
-      }
-    }, 2000); // Poll every 2 seconds
-
-    setPendingMessageTracker({
-      messageId: null,
-      expectedAt: startTime,
-      pollingInterval: pollingInterval
-    });
-  }, [threadId, scrollToBottom]);
-
-  // Real-time subscription for message updates
+  // Simple cleanup when thread changes
   useEffect(() => {
-    if (!threadId || !user?.id) return;
-
-    console.log(`[MobileChatInterface] Setting up real-time subscription for thread: ${threadId}`);
-    
-    const handleRealtimeInsert = (payload: any) => {
-      const newMessage = payload.new;
-      console.log(`[MobileChatInterface] Real-time INSERT: ${newMessage.id} - ${newMessage.sender}`);
-      
-      // Clear persistence tracking and confirm realtime delivery if this is an assistant message
-      if (newMessage.sender === 'assistant') {
-        console.log(`[MobileChatInterface] Received assistant message, confirming realtime delivery`);
-        
-        // Clear polling tracker
-        if (pendingMessageTracker.pollingInterval) {
-          clearInterval(pendingMessageTracker.pollingInterval);
-          setPendingMessageTracker({
-            messageId: null,
-            expectedAt: 0,
-            pollingInterval: null
-          });
-        }
-        
-        // Confirm realtime delivery to useStreamingChat
-        if (confirmRealtimeDelivery && threadId) {
-          confirmRealtimeDelivery();
-        }
-      }
-      
-      setMessages(prevMessages => {
-        const uiMessage: UIChatMessage = {
-          id: newMessage.id,
-          role: newMessage.sender as 'user' | 'assistant' | 'error',
-          content: newMessage.content,
-          references: newMessage.reference_entries ? Array.isArray(newMessage.reference_entries) ? newMessage.reference_entries : [] : undefined,
-          hasNumericResult: newMessage.has_numeric_result,
-          created_at: newMessage.created_at,
-          analysis: newMessage.analysis_data
-        };
-        
-        // Force scroll to bottom for assistant messages
-        if (newMessage.sender === 'assistant') {
-          setTimeout(() => scrollToBottom(), 100);
-        }
-        
-        return insertMessageInOrder(prevMessages, uiMessage);
-      });
-    };
-
-    const handleRealtimeUpdate = (payload: any) => {
-      const updatedMessage = payload.new;
-      console.log(`[MobileChatInterface] Real-time UPDATE: ${updatedMessage.id}`);
-      
-      setMessages(prevMessages => {
-        return prevMessages.map(msg => 
-          msg.id === updatedMessage.id 
-            ? {
-                ...msg,
-                content: updatedMessage.content,
-                references: updatedMessage.reference_entries ? Array.isArray(updatedMessage.reference_entries) ? updatedMessage.reference_entries : [] : undefined,
-                hasNumericResult: updatedMessage.has_numeric_result,
-                analysis: updatedMessage.analysis_data
-              }
-            : msg
-        );
-      });
-    };
-
-    const channel = supabase
-      .channel(`chat_messages_${threadId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'chat_messages',
-          filter: `thread_id=eq.${threadId}`
-        },
-        handleRealtimeInsert
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'chat_messages',
-          filter: `thread_id=eq.${threadId}`
-        },
-        handleRealtimeUpdate
-      )
-      .subscribe((status) => {
-        console.log(`[MobileChatInterface] Subscription status: ${status}`);
-      });
-
     return () => {
-      console.log(`[MobileChatInterface] Cleaning up real-time subscription for thread: ${threadId}`);
-      supabase.removeChannel(channel);
+      // Simple cleanup
     };
-  }, [threadId, user?.id]);
+  }, [threadId]);
 
   const handleSendMessage = async (message: string) => {
     if (!message.trim()) return;
@@ -649,7 +465,7 @@ export default function MobileChatInterface({
       created_at: new Date().toISOString(),
       id: `user-${Date.now()}`
     };
-    setMessages(prev => insertMessageInOrder(prev, userMessage));
+    setMessages(prev => [...prev, userMessage]);
     // Force scroll to bottom on send so user sees streaming/processing
     scrollToBottom(true);
     
@@ -694,8 +510,7 @@ export default function MobileChatInterface({
         content: msg.content
       }));
       
-      // Start message persistence tracking
-      startMessagePersistenceTracking('assistant');
+      // Removed message persistence tracking - keep simple
       
       // Start streaming chat with conversation context
       await startStreamingChat(
@@ -1102,12 +917,11 @@ export default function MobileChatInterface({
         ) : (
           <div className="space-y-3">
             {messages.map((message, index) => (
-              <ChatMessageErrorBoundary key={`msg-${message.id || index}`}>
-                <MobileChatMessage 
-                  message={message} 
-                  showAnalysis={false}
-                />
-              </ChatMessageErrorBoundary>
+              <MobileChatMessage 
+                key={`msg-${message.id || index}`}
+                message={message} 
+                showAnalysis={false}
+              />
             ))}
             
             {/* Show streaming status or basic loading */}
