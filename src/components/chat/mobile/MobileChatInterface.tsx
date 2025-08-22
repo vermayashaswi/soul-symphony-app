@@ -65,7 +65,6 @@ export default function MobileChatInterface({
   
   // Track active thread for safety manager
   useEffect(() => {
-    console.log(`[MobileChatInterface] 🔧 Setting active thread in safety manager: ${threadId}`);
     threadSafetyManager.setActiveThread(threadId || null);
   }, [threadId]);
   
@@ -129,26 +128,9 @@ export default function MobileChatInterface({
           return;
         }
         
-        console.log(`[MobileChatInterface] 🎯 onFinalResponse called:`, {
-          responseLength: response.length,
-          originThreadId,
-          currentThreadId: threadId,
-          threadMatch: originThreadId === threadId,
-          requestId,
-          analysisPresent: !!analysis,
-          timestamp: new Date().toISOString()
-        });
-        
         debugLog.addEvent("Streaming Response", `[Mobile] Final response received for ${originThreadId}: ${response.substring(0, 100)}...`, "success");
 
         // Only update UI if this response is for the current thread
-        if (originThreadId === threadId) {
-          console.log(`[MobileChatInterface] ✅ Thread IDs match, adding message to UI immediately`);
-        } else {
-          console.warn(`[MobileChatInterface] ⚠️ Thread ID mismatch! Origin: ${originThreadId}, Current: ${threadId} - skipping UI update`);
-          return;
-        }
-        
         if (originThreadId === threadId) {
           // Add assistant message to UI immediately for better UX
           const assistantMessage: UIChatMessage = {
