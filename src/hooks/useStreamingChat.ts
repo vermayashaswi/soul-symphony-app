@@ -341,18 +341,27 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
         updates.showBackendAnimation = true;
         break;
       case 'final_response':
+        console.log(`[useStreamingChat] Final response received, clearing all streaming state for thread: ${activeThreadId}`);
         updates.isStreaming = false;
         updates.showBackendAnimation = false;
         updates.retryAttempts = 0;
         updates.lastFailedMessage = null;
         updates.isRetrying = false;
         updates.activeRequestId = null;
+        updates.dynamicMessages = [];
+        updates.translatedDynamicMessages = [];
+        updates.useThreeDotFallback = false;
         
         // Clear persisted state and abort controller
         clearChatStreamingState(activeThreadId);
         if (threadState.abortController) {
           threadState.abortController = null;
         }
+        
+        // Dispatch event to notify UI components
+        window.dispatchEvent(new CustomEvent('streamingComplete', {
+          detail: { threadId: activeThreadId }
+        }));
         
         onFinalResponse?.(message.response || '', message.analysis, activeThreadId, message.requestId || null);
         break;
@@ -812,6 +821,18 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
           timestamp: Date.now(),
           requestId
         }, targetThreadId);
+        
+        // Clear streaming state and messages immediately after final response
+        console.log(`[useStreamingChat] Final response received, clearing streaming state for thread: ${targetThreadId}`);
+        updateThreadState(targetThreadId, {
+          isStreaming: false,
+          streamingMessages: [],
+          dynamicMessages: [],
+          translatedDynamicMessages: [],
+          showBackendAnimation: false,
+          useThreeDotFallback: false,
+          activeRequestId: null
+        });
       } else {
         throw new Error('No response received from chat service');
       }

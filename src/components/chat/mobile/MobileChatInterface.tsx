@@ -924,7 +924,7 @@ export default function MobileChatInterface({
               </ChatErrorBoundary>
             ))}
             
-            {/* Show streaming status or basic loading */}
+            {/* Show only streaming status - remove redundant loading indicator */}
             {isStreaming ? (
               <ChatErrorBoundary>
                 <MobileChatMessage 
@@ -935,13 +935,6 @@ export default function MobileChatInterface({
                       : translatedDynamicMessages[currentMessageIndex] || dynamicMessages[currentMessageIndex] // Use pre-translated message
                   }
                   showStreamingDots={true}
-                />
-              </ChatErrorBoundary>
-            ) : (!isStreaming && (isLoading || isProcessing)) ? (
-              <ChatErrorBoundary>
-                <MobileChatMessage 
-                  message={{ role: 'assistant', content: '' }}
-                  isLoading={true}
                 />
               </ChatErrorBoundary>
             ) : null}
