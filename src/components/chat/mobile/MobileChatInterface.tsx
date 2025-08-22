@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Menu, Plus, Trash2 } from "lucide-react";
 import MobileChatMessage from "./MobileChatMessage";
 import MobileChatInput from "./MobileChatInput";
-import { ChatMessageErrorBoundary } from "@/components/chat/ChatMessageErrorBoundary";
+
 import { supabase } from "@/integrations/supabase/client";
 import { ChatThreadList } from "@/components/chat/ChatThreadList";
 import { motion } from "framer-motion";
@@ -18,7 +18,7 @@ import { getThreadMessages, saveMessage, updateUserMessageClassification } from 
 import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
 import { processChatMessage } from "@/services/chatService";
 import { MentalHealthInsights } from "@/hooks/use-mental-health-insights";
-import { insertMessageInOrder, ensureMessageOrder, deduplicateMessages, UIChatMessage } from "@/utils/chat/messageOrdering";
+import { ensureMessageOrder, deduplicateMessages, UIChatMessage } from "@/utils/chat/messageOrdering";
 
 import { updateThreadProcessingStatus, generateThreadTitle } from "@/utils/chat/threadUtils";
 import { useUnifiedKeyboard } from "@/hooks/use-unified-keyboard";
@@ -131,18 +131,8 @@ export default function MobileChatInterface({
          debugLog.addEvent("Streaming Response", `[Mobile] Final response received for ${originThreadId}: ${response.substring(0, 100)}...`, "success");
 
 
-          // Optimistic UI: append assistant message immediately with proper ordering
-          if (originThreadId === threadId) {
-            const assistantMessage: UIChatMessage = { 
-              role: 'assistant', 
-              content: response, 
-              analysis,
-              created_at: new Date().toISOString(),
-              id: `assistant-${Date.now()}`
-            };
-            setMessages(prev => insertMessageInOrder(prev, assistantMessage));
-            setShowSuggestions(false);
-          }
+         // Remove optimistic UI - let backend persist and realtime handle updates
+         setShowSuggestions(false);
 
          // Update user message with classification data if available
          if (analysis?.classification && requestId) {
@@ -169,54 +159,7 @@ export default function MobileChatInterface({
            }
          }
         
-        // Let backend persist assistant message; UI will also update via realtime when it arrives
-        if (originThreadId === threadId) {
-         // Watchdog fallback: if realtime insert doesn't arrive, persist client-side after a short delay
-         try {
-           setTimeout(async () => {
-             // Double-check still on same thread
-             if (!currentThreadIdRef.current || currentThreadIdRef.current !== originThreadId) return;
-
-             // Has an assistant message with same content arrived?
-             const { data: recent, error: recentErr } = await supabase
-               .from('chat_messages')
-               .select('id, content, sender, created_at')
-               .eq('thread_id', originThreadId)
-               .order('created_at', { ascending: false })
-               .limit(5);
-
-             if (recentErr) {
-               console.warn('[Mobile Streaming Watchdog] Failed to fetch recent messages:', recentErr.message);
-             }
-
-             const alreadyExists = (recent || []).some(m => (m as any).sender === 'assistant' && (m as any).content?.trim() === response.trim());
-             if (!alreadyExists) {
-               // Persist safely with an idempotency_key derived from threadId + response
-               try {
-                 const enc = new TextEncoder();
-                 const keySource = requestId || `${originThreadId}:${response}`;
-                 const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
-                 const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
-                 const idempotencyKey = hex.slice(0, 32);
-
-                  await supabase.from('chat_messages').upsert({
-                    thread_id: originThreadId,
-                    content: response,
-                    sender: 'assistant',
-                    role: 'assistant',
-                    idempotency_key: idempotencyKey,
-                    analysis_data: analysis || null
-                  }, { onConflict: 'thread_id,idempotency_key' });
-               } catch (e) {
-                 console.warn('[Mobile Streaming Watchdog] Persist fallback failed:', (e as any)?.message || e);
-               }
-             }
-
-           }, 1200);
-         } catch (e) {
-           console.warn('[Mobile Streaming Watchdog] Exception scheduling fallback:', (e as any)?.message || e);
-         }
-       }
+        // Backend will persist assistant message; UI updates via realtime
     },
      onError: (error) => {
        toast({
@@ -306,8 +249,8 @@ export default function MobileChatInterface({
                 created_at: m.created_at
               };
               
-              console.log('[MobileChatInterface] Adding new assistant message with proper ordering');
-              return insertMessageInOrder(prev, uiMsg);
+              console.log('[MobileChatInterface] Adding new assistant message');
+              return [...prev, uiMsg];
             });
             
             // Force scroll to bottom when new message arrives
@@ -437,18 +380,7 @@ export default function MobileChatInterface({
     }
   };
 
-  // Enhanced real-time subscription with message persistence tracking
-  const [pendingMessageTracker, setPendingMessageTracker] = useState<{
-    messageId: string | null;
-    expectedAt: number;
-    pollingInterval: NodeJS.Timeout | null;
-  }>({
-    messageId: null,
-    expectedAt: 0,
-    pollingInterval: null
-  });
-
-  // Clear any existing polling when component unmounts or thread changes
+  // Clear any existing intervals when component unmounts
   useEffect(() => {
     return () => {
       if (pendingMessageTracker.pollingInterval) {
