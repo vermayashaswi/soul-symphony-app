@@ -40,21 +40,8 @@ serve(async (req) => {
       );
     }
 
-    // PHASE 1: Check cached classification for consistency
-    const { getCachedClassification, setCachedClassification } = await import('../_shared/requestDeduplication.ts');
-    
-    let classification = getCachedClassification(message, 'system'); // Use system cache for classification
-    
-    if (classification) {
-      console.log(`[Query Classifier] Using cached classification: ${classification.category}`);
-    } else {
-      // Use GPT for natural conversation flow classification
-      classification = await gptClassifyMessage(message, conversationContext, openAiApiKey);
-      
-      // Cache the classification for consistency
-      setCachedClassification(message, 'system', classification);
-      console.log(`[Query Classifier] Classification cached for future requests`);
-    }
+    // Use GPT for natural conversation flow classification
+    const classification = await gptClassifyMessage(message, conversationContext, openAiApiKey);
 
     console.log(`[Query Classifier] Result: ${classification.category}`);
 

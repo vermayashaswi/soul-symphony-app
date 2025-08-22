@@ -559,7 +559,7 @@ serve(async (req) => {
       });
     }
 
-    // Enhanced message persistence handling
+    // Simple message persistence handling
     if (messageId && threadId) {
       try {
         console.log(`[CONSOLIDATION PERSISTENCE] Attempting to update message ${messageId}`);
@@ -569,20 +569,23 @@ serve(async (req) => {
           Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
         );
 
-        const { updateMessage } = await import('../_shared/messageUtils.ts');
-        
-        const updateResult = await updateMessage(supabaseClient, messageId, {
-          content: consolidatedResponse,
-          is_processing: false,
-          analysis_data: {
-            totalSubQuestions: researchResults.length,
-            consolidationId: consolidationId,
-            timestamp: new Date().toISOString()
-          }
-        });
+        const { data, error } = await supabaseClient
+          .from('chat_messages')
+          .update({
+            content: consolidatedResponse,
+            is_processing: false,
+            analysis_data: {
+              totalSubQuestions: researchResults.length,
+              consolidationId: consolidationId,
+              timestamp: new Date().toISOString()
+            }
+          })
+          .eq('id', messageId);
 
-        if (!updateResult.success) {
-          console.error(`[CONSOLIDATION PERSISTENCE] Failed to update message:`, updateResult.error);
+        if (error) {
+          console.error(`[CONSOLIDATION PERSISTENCE] Failed to update message:`, error);
+        } else {
+          console.log(`[CONSOLIDATION PERSISTENCE] Message updated successfully`);
         }
       } catch (persistenceError) {
         console.error(`[CONSOLIDATION PERSISTENCE] Exception during message update:`, persistenceError);
