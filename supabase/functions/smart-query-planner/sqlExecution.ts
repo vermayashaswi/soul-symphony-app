@@ -1,7 +1,8 @@
 
 export async function executeSQLAnalysis(step: any, userId: string, supabaseClient: any, requestId: string, executionDetails: any, userTimezone: string = 'UTC') {
   try {
-    console.log(`[${requestId}] Executing SQL query:`, step.sqlQuery);
+    console.log(`[${requestId}] Executing SQL query (${step.sqlQueryType || 'unknown'}):`, step.sqlQuery);
+    executionDetails.queryType = step.sqlQueryType;
     
     if (!step.sqlQuery || !step.sqlQuery.trim()) {
       console.log(`[${requestId}] No SQL query provided, using vector search fallback`);
@@ -56,13 +57,21 @@ export async function executeSQLAnalysis(step: any, userId: string, supabaseClie
 
     if (data && data.success && data.data) {
       console.log(`[${requestId}] SQL query executed successfully, rows:`, data.data.length);
-      // If SQL query executed but returned 0 results, try vector fallback
-      if (data.data.length === 0) {
-        console.log(`[${requestId}] SQL query returned 0 results, falling back to vector search`);
-        executionDetails.fallbackUsed = true;
-        return await executeVectorSearchFallback(step, userId, supabaseClient, requestId);
+      
+      // Different handling for analysis vs filtering queries
+      if (step.sqlQueryType === 'analysis') {
+        // For analysis queries (COUNT, SUM, etc.), return the computed results even if empty
+        console.log(`[${requestId}] Analysis query completed with ${data.data.length} result rows`);
+        return data.data;
+      } else {
+        // For filtering queries, fall back to vector search if no results found
+        if (data.data.length === 0) {
+          console.log(`[${requestId}] Filtering query returned 0 results, falling back to vector search`);
+          executionDetails.fallbackUsed = true;
+          return await executeVectorSearchFallback(step, userId, supabaseClient, requestId);
+        }
+        return data.data;
       }
-      return data.data;
     } else {
       console.warn(`[${requestId}] SQL query returned no results or failed:`, data);
       executionDetails.fallbackUsed = true;

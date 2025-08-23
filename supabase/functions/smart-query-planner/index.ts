@@ -41,6 +41,7 @@ interface AnalysisStep {
   step: number;
   description: string;
   queryType: string;
+  sqlQueryType?: 'filtering' | 'analysis'; // NEW: Distinguish between filtering and analysis queries
   sqlQuery?: string;
   vectorSearch?: {
     query: string;
@@ -153,7 +154,35 @@ async function executePlan(plan: any, userId: string, supabaseClient: any, reque
   }
 
   console.log(`[${requestId}] Orchestrated execution complete. Total results: ${allResults.length}`);
-  return allResults;
+  
+  // Process results to present analysis data rather than raw SQL rows
+  const processedResults = allResults.map(result => {
+    if (result.executionResults?.analysisResults?.length > 0) {
+      // For analysis queries, highlight the computed results
+      const analysis = result.executionResults.analysisResults[0];
+      if (analysis?.total_entries !== undefined) {
+        // Format count results specifically
+        result.formattedSummary = `Total entries: ${analysis.total_entries}`;
+        result.resultType = 'count_analysis';
+      } else {
+        result.formattedSummary = `Analysis completed with ${result.executionResults.analysisResults.length} results`;
+        result.resultType = 'statistical_analysis';
+      }
+    } else if (result.executionResults?.sqlResults?.length > 0) {
+      // For filtering queries, summarize the filtered data
+      result.formattedSummary = `Found ${result.executionResults.sqlResults.length} matching entries`;
+      result.resultType = 'filtered_entries';
+    } else if (result.executionResults?.vectorResults?.length > 0) {
+      result.formattedSummary = `Found ${result.executionResults.vectorResults.length} relevant entries via semantic search`;
+      result.resultType = 'semantic_search';
+    } else {
+      result.formattedSummary = 'No results found';
+      result.resultType = 'no_results';
+    }
+    return result;
+  });
+  
+  return processedResults;
 }
 
 function groupByExecutionStage(subQuestions: SubQuestion[]): { [stage: number]: SubQuestion[] } {
@@ -232,6 +261,7 @@ async function executeSubQuestion(
     executionResults: {
       sqlResults: [],
       vectorResults: [],
+      analysisResults: [], // NEW: Store computed analysis results separately
       error: null,
       dependencyContext: {},
       sqlExecutionDetails: {
@@ -239,7 +269,8 @@ async function executeSubQuestion(
         sanitizedQuery: null,
         validationResult: null,
         executionError: null,
-        fallbackUsed: false
+        fallbackUsed: false,
+        queryType: null // Track whether this was filtering or analysis
       },
       vectorExecutionDetails: {
         testPassed: false,
@@ -836,11 +867,9 @@ async function analyzeQueryWithSubQuestions(message, conversationContext, userEn
     
     console.log(`[Analyst Agent] Enhanced analysis - Content-seeking: ${isContentSeekingQuery}, Mandatory vector: ${requiresMandatoryVector}, Personal: ${hasPersonalPronouns}, Time ref: ${hasExplicitTimeReference}, Follow-up: ${isFollowUpContext}`);
 
-    const prompt = `You are SOULo's Enhanced Analyst Agent - an intelligent query planning specialist for journal data analysis TIMEZONE-AWARE date processing.
+    const prompt = `You are SOULo's Enhanced Analyst Agent - an intelligent query planning specialist for a voice journaling app called SOuLO. You are the core responder for users asking journal specific queries in the chatbot called "Ruh" on the app, SOuLO, for journal data analysis TIMEZONE-AWARE date processing.
 
-**CRITICAL DATABASE TYPE: This is a PostgreSQL database. Use PostgreSQL-specific syntax and functions.**
-
-${databaseSchemaContext}
+You are provided with this: ${databaseSchemaContext} **CRITICAL DATABASE TYPE: This is a PostgreSQL database. Use PostgreSQL-specific syntax and functions.**
 
 **CRITICAL DATABASE CONTEXT ADHERENCE:**
 - You MUST ONLY use table names, column names, and data types that exist in the database schema above
@@ -851,12 +880,16 @@ ${databaseSchemaContext}
 
 **IMPORTANT TIME RELATED QUERY PLANNING:** Note that in the "Journal Entries" table the user timestamps are in the column "created_at" and are of the data type timestamptz (example value in database: 2025-08-02 18:57:54.515+00)
 
-SUB-QUESTION/QUERIES GENERATION GUIDELINE (MANDATORY): 
+**SUB-QUESTION/QUERIES GENERATION GUIDELINE (MANDATORY):**
 - Break down user query (MANDATORY: remember that current user message might not be a direct query, so you'll have to look in to the conversation context provided to you and look at last user messages to guess the "ASK" and accordingly frame the sub-questions) into ATLEAST 2 sub-questions or more such that all sub-questions can be consolidated to answer the user's ASK 
 - CRITICAL: When analyzing vague queries like "I'm confused between these two options" or "help me decide", look at the FULL conversation context to understand what the two options are (e.g., "jobs vs startup", "career choices", etc.) and generate specific sub-questions about those topics
 - If user's query is vague, examine the complete conversation history to derive what the user wants to know and frame sub-questions that address their specific decision or dilemma
 - For career/life decisions: Generate sub-questions about patterns, emotions, and insights related to the specific options being considered
-- For eg. user asks (What % of entries contain the emotion confidence (and is it the dominant one?) when I deal with family matters that also concern health issues? -> sub question 1: How many entries concern family and health both? sub question 2: What are all the emotions and their avg scores ? sub question 3: Rank the emotions)
+- Each sub-question you provide should also contain a sub-query that you provide that will be either executed on vector search or postgresql search on the database 
+- Your first sub-question/query (no. 1) should ALWAYS be about first filtering out and fetching the right entries from the database for analysis
+- Your next few subquestions (no.2,3,4 ....so on) should ALWAYS be about executing analysis on the sub-set of data you generated in sub-question 1
+- These questions 2,3,4.. and so on can either run in parallel or synchronously (depending) on the research plan you devise because it could be possible that step2's analysis is required by 3 or maybe 2,3,4 are independent and can run synchronously. It could also happen that sub question 2 also required further filtering and not analysis
+- For eg. user asks "What % of entries contain the emotion confidence (and is it the dominant one?) when I deal with family matters that also concern health issues?" -> sub question 1: "Filter entries that mention both family and health topics" (sqlQueryType: "filtering") -> sub question 2: "Calculate emotion confidence percentages from filtered entries" (sqlQueryType: "analysis") -> sub question 3: "Rank emotions by dominance in filtered entries" (sqlQueryType: "analysis")
 
 **SIMPLIFIED SQL QUERY GENERATION GUIDELINES:**
 
@@ -880,12 +913,16 @@ SUB-QUESTION/QUERIES GENERATION GUIDELINE (MANDATORY):
    - Use proper timestamp with time zone format: '2024-08-01T00:00:00Z'::timestamp with time zone
    - ALWAYS include both start and end date filters when timeRange exists
 
-5. **Simplified Query Guidelines:**
-   - Generate basic SELECT queries focusing on simple columns: user_id, created_at, master_themes, sentiment
+5. **Enhanced Query Guidelines with sqlQueryType:**
+   - FILTERING queries (sqlQueryType: "filtering"): Use SELECT * or SELECT specific columns to retrieve entry data for next stage analysis
+   - ANALYSIS queries (sqlQueryType: "analysis"): Use COUNT, SUM, AVG, PERCENTAGE calculations for statistical analysis
+   - COUNT queries: For questions like "How many entries", ALWAYS use SELECT COUNT(*) AS total_entries, NOT SELECT *
+   - PERCENTAGE queries: Use proper percentage calculations like (COUNT(condition)::float / COUNT(*)::float) * 100.0 AS percentage
    - Always include user_id = auth.uid() in WHERE clause
    - Use proper PostgreSQL syntax with double quotes for table/column names with spaces
-   - Avoid complex nested queries - keep it simple and working
-   - Use standard aggregation functions: COUNT, AVG, MAX, MIN, SUM
+   - CRITICAL: For count queries like "How many entries do I have", use SELECT COUNT(*) AS total_entries, NOT SELECT *
+   - CRITICAL: For percentage queries, use proper calculations: (COUNT(condition)::float / COUNT(*)::float) * 100.0 AS percentage
+   - Use standard aggregation functions: COUNT, AVG, MAX, MIN, SUM for analysis queries
 
 **CRITICAL TIMEZONE HANDLING RULES:**
 
@@ -984,6 +1021,7 @@ Response format (MUST be valid JSON):
           "step": 1,
           "description": "What this step does",
           "queryType": "vector_search|sql_analysis|hybrid_search",
+          "sqlQueryType": "filtering|analysis",
           "sqlQuery": "COMPLETE EXECUTABLE SQL QUERY using only existing database schema and working patterns" or null,
           "vectorSearch": {
             "query": "Semantically rich search query using user's words",
@@ -1110,9 +1148,15 @@ function createEnhancedFallbackPlan(originalMessage, isContentSeekingQuery, infe
   const isEmotionQuery = /emotion|feel|mood|happy|sad|anxious|stressed|emotional/.test(lowerMessage);
   const isThemeQuery = /work|relationship|family|health|goal|travel|career|friendship/.test(lowerMessage);
   const isAchievementQuery = /achievement|progress|accomplishment|success|breakthrough|growth|proud/.test(lowerMessage);
+  const isCountQuery = /how many|count|total|number of/.test(lowerMessage);
 
-  // Always use vector search for content-seeking queries
-  const searchStrategy = isContentSeekingQuery ? 'vector_mandatory' : 'hybrid_parallel';
+  // Enhanced search strategy based on query type
+  let searchStrategy = 'hybrid_parallel';
+  if (isContentSeekingQuery) {
+    searchStrategy = 'vector_mandatory';
+  } else if (isCountQuery) {
+    searchStrategy = 'sql_primary';
+  }
   
   // Create semantically rich vector query
   let vectorQuery = originalMessage;
@@ -1131,34 +1175,57 @@ function createEnhancedFallbackPlan(originalMessage, isContentSeekingQuery, infe
     inferredTimeContext.timezone = userTimezone;
   }
 
+  // Create analysis steps based on query type
+  let analysisSteps = [];
+  
+  if (isCountQuery) {
+    // For count queries, use SQL analysis with proper COUNT syntax
+    analysisSteps = [
+      {
+        step: 1,
+        description: "Count total journal entries for the user",
+        queryType: "sql_analysis",
+        sqlQueryType: "analysis",
+        sqlQuery: `SELECT COUNT(*) AS total_entries FROM "Journal Entries" WHERE user_id = auth.uid()`,
+        vectorSearch: null,
+        timeRange: inferredTimeContext ? { ...inferredTimeContext, timezone: userTimezone } : null,
+        dependencies: []
+      }
+    ];
+  } else {
+    // Use vector search for content queries
+    analysisSteps = [
+      {
+        step: 1,
+        description: "Enhanced vector semantic search with user's exact query context",
+        queryType: "vector_search",
+        sqlQueryType: null,
+        sqlQuery: null,
+        vectorSearch: {
+          query: vectorQuery,
+          threshold: 0.3,
+          limit: 15
+        },
+        timeRange: inferredTimeContext ? { ...inferredTimeContext, timezone: userTimezone } : null,
+        dependencies: []
+      }
+    ];
+  }
+
   return {
     queryType: "journal_specific",
-    strategy: "enhanced_fallback_with_vector",
-    userStatusMessage: isContentSeekingQuery ? "Semantic content search with enhanced vector analysis" : "Intelligent hybrid search strategy",
+    strategy: "enhanced_fallback_with_structured_approach",
+    userStatusMessage: isCountQuery ? "Counting your journal entries for accurate totals" : (isContentSeekingQuery ? "Semantic content search with enhanced vector analysis" : "Intelligent hybrid search strategy"),
     subQuestions: [
       {
         id: "sq1",
         question: `Enhanced analysis for: ${originalMessage}`,
-        purpose: "Comprehensive content retrieval using vector semantic search for accurate results",
+        purpose: isCountQuery ? "Get accurate count of journal entries using SQL" : "Comprehensive content retrieval using semantic search for accurate results",
         searchStrategy: searchStrategy,
         executionStage: 1,
         dependencies: [],
         executionMode: "parallel",
-        analysisSteps: [
-          {
-            step: 1,
-            description: "Enhanced vector semantic search with user's exact query context",
-            queryType: "vector_search",
-            sqlQuery: null,
-            vectorSearch: {
-              query: vectorQuery,
-              threshold: 0.3,
-              limit: 15
-            },
-            timeRange: inferredTimeContext ? { ...inferredTimeContext, timezone: userTimezone } : null,
-            dependencies: []
-          }
-        ]
+        analysisSteps: analysisSteps
       }
     ],
     confidence: 0.7,
