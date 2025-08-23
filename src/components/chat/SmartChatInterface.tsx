@@ -76,6 +76,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
   const [userMessageSent, setUserMessageSent] = useState(false);
+  const [userJustSentMessage, setUserJustSentMessage] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
   const { translate } = useTranslation();
@@ -488,8 +489,9 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     // Set local loading state for immediate UI feedback
     setLocalLoading(true, "Analyzing your question...");
     
-    // Ensure we stay pinned to bottom as processing begins
-    window.dispatchEvent(new Event('chat:forceScrollToBottom'));
+    // Trigger immediate auto-scroll for user message
+    setUserJustSentMessage(true);
+    setTimeout(() => setUserJustSentMessage(false), 100);
     try {
       // Update thread processing status to 'processing'
       await updateThreadProcessingStatus(threadId, 'processing');
@@ -614,11 +616,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       setLocalLoading(false);
       updateProcessingStage(null);
       
-      // Trigger scroll to bottom when user sends message
-      setTimeout(() => {
-        const event = new CustomEvent('chat:forceScrollToBottom');
-        window.dispatchEvent(event);
-      }, 100);
+      // Auto-scroll handled by ChatArea component
       
       // Skip the rest since streaming handles the response
       return;

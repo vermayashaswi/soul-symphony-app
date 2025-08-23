@@ -23,6 +23,7 @@ interface ChatAreaProps {
   onInteractiveOptionClick?: (option: any) => void;
   onUserMessageSent?: boolean;
   isStreaming?: boolean;
+  className?: string;
 }
 
 const ChatArea: React.FC<ChatAreaProps> = ({ 
@@ -32,7 +33,8 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   threadId,
   onInteractiveOptionClick,
   onUserMessageSent,
-  isStreaming
+  isStreaming,
+  className
 }) => {
   // Use unified auto-scroll hook with smart threshold management
   const { scrollElementRef, scrollToBottom } = useAutoScroll({
@@ -44,7 +46,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   // Auto-scroll when user sends a message (always scroll, ignore threshold)
   useEffect(() => {
     if (onUserMessageSent) {
-      setTimeout(() => scrollToBottom(true), 100);
+      setTimeout(() => scrollToBottom(true), 50);
     }
   }, [onUserMessageSent, scrollToBottom]);
 
@@ -76,19 +78,9 @@ const ChatArea: React.FC<ChatAreaProps> = ({
     }
   }, [chatMessages, threadId]);
 
-  // Listen for global force-scroll events
-  useEffect(() => {
-    const handleForceScroll = () => {
-      scrollToBottom(true);
-    };
-    window.addEventListener('chat:forceScrollToBottom' as any, handleForceScroll);
-    return () => {
-      window.removeEventListener('chat:forceScrollToBottom' as any, handleForceScroll);
-    };
-  }, [scrollToBottom]);
 
   return (
-    <div ref={scrollElementRef} className="flex flex-col p-4 overflow-y-auto h-full pb-20">
+    <div ref={scrollElementRef} className={`flex flex-col p-4 overflow-y-auto h-full pb-20 ${className || ''}`}>
       {chatMessages.filter(msg => !msg.is_processing).map((message, index) => (
         <div
           key={index}

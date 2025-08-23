@@ -24,7 +24,7 @@ import { useEnhancedSwipeGestures } from "@/hooks/use-enhanced-swipe-gestures";
 import { useStreamingChat } from "@/hooks/useStreamingChat";
 import { threadSafetyManager } from "@/utils/threadSafetyManager";
 import ChatErrorBoundary from "../ChatErrorBoundary";
-import { useAutoScroll } from "@/hooks/use-auto-scroll";
+import ChatArea from "@/components/chat/ChatArea";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -319,12 +319,8 @@ export default function MobileChatInterface({
     };
   }, [isIOSDevice, user]);
 
-  // Use unified auto-scroll hook
-  const { scrollElementRef, scrollToBottom } = useAutoScroll({
-    dependencies: [messages, isLoading, isProcessing, isStreaming],
-    delay: 50,
-    scrollThreshold: 100
-  });
+  // Track user message sending for auto-scroll
+  const [userJustSentMessage, setUserJustSentMessage] = useState(false);
 
   // Realtime: append assistant messages saved by backend
   useEffect(() => {
@@ -445,7 +441,11 @@ export default function MobileChatInterface({
     };
   }, []);
 
-  // Auto-scroll is now handled by the useAutoScroll hook
+  // Handle user message sent callback
+  const handleUserMessageSent = () => {
+    setUserJustSentMessage(true);
+    setTimeout(() => setUserJustSentMessage(false), 100);
+  };
 
   const loadThreadMessages = async (currentThreadId: string) => {
     if (!currentThreadId || !user?.id) {
@@ -608,8 +608,8 @@ export default function MobileChatInterface({
 
     debugLog.addEvent("Message Sending", `[Mobile] Adding user message to UI: ${message.substring(0, 50)}...`, "info");
 
-    // Scroll to bottom after adding user message
-    setTimeout(scrollToBottom, 100);
+    // Trigger scroll to bottom after adding user message
+    handleUserMessageSent();
 
     // PHASE 3: Async user message saving (non-blocking)
     const saveUserMessageAsync = async () => {
@@ -662,11 +662,7 @@ export default function MobileChatInterface({
         {}
       );
 
-      // Trigger scroll to bottom when user sends message
-      setTimeout(() => {
-        const event = new CustomEvent('chat:forceScrollToBottom');
-        window.dispatchEvent(event);
-      }, 100);
+      // Auto-scroll handled by ChatArea component
 
       // PHASE 5: Background operations (don't block streaming)
       if (isFirstMessage) {
@@ -1015,11 +1011,7 @@ export default function MobileChatInterface({
       </div>
       
       {/* Chat Content */}
-      <div 
-        className={`mobile-chat-content ${isKeyboardVisible ? 'keyboard-visible' : ''}`} 
-        ref={scrollElementRef}
-      >
-        {initialLoading ? (
+      {initialLoading ? (
           <div className="flex items-center justify-center py-10">
             <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></div>
             <span className="ml-2 text-muted-foreground">
@@ -1065,43 +1057,22 @@ export default function MobileChatInterface({
             </div>
           </div>
         ) : (
-          <div className="space-y-3">
-            {messages.map((message, index) => (
-              <ChatErrorBoundary key={index}>
-                <MobileChatMessage 
-                  message={message} 
-                  showAnalysis={false}
-                />
-              </ChatErrorBoundary>
-            ))}
-            
-            {/* Show streaming status or basic loading */}
-            {isStreaming ? (
-              <ChatErrorBoundary>
-                <MobileChatMessage 
-                  message={{ role: 'assistant', content: '' }}
-                  streamingMessage={
-                    useThreeDotFallback || dynamicMessages.length === 0
-                      ? undefined // Show only three-dot animation
-                      : translatedDynamicMessages[currentMessageIndex] || dynamicMessages[currentMessageIndex] // Use pre-translated message
-                  }
-                  showStreamingDots={true}
-                />
-              </ChatErrorBoundary>
-            ) : (!isStreaming && (isLoading || isProcessing)) ? (
-              <ChatErrorBoundary>
-                <MobileChatMessage 
-                  message={{ role: 'assistant', content: '' }}
-                  isLoading={true}
-                />
-              </ChatErrorBoundary>
-            ) : null}
-            
-            {/* Spacer for auto-scroll */}
-            <div className="pb-5" />
+          <div className={`mobile-chat-content ${isKeyboardVisible ? 'keyboard-visible' : ''}`}>
+            <ChatArea
+              chatMessages={messages.map(msg => ({
+                ...msg,
+                sender: msg.role,
+                id: Math.random().toString(),
+                thread_id: threadId || '',
+                created_at: new Date().toISOString()
+              }))}
+              isLoading={isLoading || isProcessing}
+              isStreaming={isStreaming}
+              threadId={threadId}
+              onUserMessageSent={userJustSentMessage}
+            />
           </div>
         )}
-      </div>
       
       {/* Chat Input */}
       <MobileChatInput 

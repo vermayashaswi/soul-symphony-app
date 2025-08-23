@@ -17,11 +17,6 @@ interface UseAutoScrollOptions {
   delay?: number;
   
   /**
-   * Scroll behavior
-   */
-  behavior?: ScrollBehavior;
-  
-  /**
    * Whether to use smooth scrolling
    */
   smooth?: boolean;
@@ -40,10 +35,9 @@ export const useAutoScroll = (options: UseAutoScrollOptions) => {
   const {
     dependencies,
     enabled = true,
-    delay = 100,
-    behavior = 'smooth',
+    delay = 50,
     smooth = true,
-    scrollThreshold = 150
+    scrollThreshold = 50
   } = options;
 
   const scrollElementRef = useRef<HTMLDivElement>(null);
