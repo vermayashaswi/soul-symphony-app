@@ -151,11 +151,14 @@ async function executePlan(plan: any, userId: string, supabaseClient: any, reque
  * NEW: Enhanced result processing to convert raw SQL/vector data into meaningful summaries
  */
 async function processExecutionResults(allResults: any[], userId: string, totalEntries: number, requestId: string) {
-  console.log(`[${requestId}] Processing ${allResults.length} sub-question results with total entries context: ${totalEntries}`);
+  console.log(`[${requestId}] [RESULT PROCESSING START] Processing ${allResults.length} sub-question results with total entries context: ${totalEntries}`);
   
   const processedResults = [];
   
-  for (const result of allResults) {
+  for (let i = 0; i < allResults.length; i++) {
+    const result = allResults[i];
+    console.log(`[${requestId}] [RESULT PROCESSING ${i + 1}/${allResults.length}] Processing sub-question:`, result.subQuestion?.question?.substring(0, 100));
+    
     const processedResult = {
       subQuestion: result.subQuestion,
       executionSummary: {
@@ -174,8 +177,23 @@ async function processExecutionResults(allResults: any[], userId: string, totalE
     const firstStep = result.subQuestion?.analysisSteps?.[0];
     const sqlQueryType = firstStep?.sqlQueryType;
     
-    if (result.executionResults?.sqlResults?.length > 0) {
+    // Enhanced debugging for execution results
+    const hasSQL = result.executionResults?.sqlResults?.length > 0;
+    const hasVector = result.executionResults?.vectorResults?.length > 0;
+    const hasError = result.executionResults?.error;
+    
+    console.log(`[${requestId}] [RESULT PROCESSING ${i + 1}] Data availability:`, {
+      sqlCount: result.executionResults?.sqlResults?.length || 0,
+      vectorCount: result.executionResults?.vectorResults?.length || 0,
+      hasError: !!hasError,
+      queryType: sqlQueryType,
+      fallbackUsed: result.executionResults?.sqlExecutionDetails?.fallbackUsed,
+      resultType: result.executionResults?.sqlExecutionDetails?.resultType
+    });
+    
+    if (hasSQL) {
       const sqlResults = result.executionResults.sqlResults;
+      console.log(`[${requestId}] [RESULT PROCESSING ${i + 1}] Processing SQL results:`, sqlResults.length, 'rows');
       
       if (sqlQueryType === 'analysis') {
         // ANALYSIS QUERIES: Process computed statistics
@@ -187,26 +205,64 @@ async function processExecutionResults(allResults: any[], userId: string, totalE
         // UNKNOWN SQL TYPE: Determine based on content
         processedResult.executionSummary = await autoDetectSQLResultType(sqlResults, totalEntries, requestId);
       }
-    } else if (result.executionResults?.vectorResults?.length > 0) {
+    } else if (hasVector) {
       // VECTOR SEARCH: Sample entries with semantic relevance
+      console.log(`[${requestId}] [RESULT PROCESSING ${i + 1}] Processing vector results:`, result.executionResults.vectorResults.length, 'entries');
       processedResult.executionSummary = await processVectorResults(result.executionResults.vectorResults, totalEntries, requestId);
     } else {
-      // NO RESULTS
-      processedResult.executionSummary = {
-        resultType: 'no_results',
-        dataType: 'none',
-        summary: 'No matching entries found',
-        count: 0,
-        analysis: {},
-        sampleEntries: [],
-        totalEntriesContext: totalEntries
-      };
+      // NO RESULTS - This is the "fake success" issue we need to fix
+      console.warn(`[${requestId}] [RESULT PROCESSING ${i + 1}] NO RESULTS FOUND - SQL: ${hasSQL}, Vector: ${hasVector}, Error: ${!!hasError}`);
+      
+      if (hasError) {
+        processedResult.executionSummary = {
+          resultType: 'execution_error',
+          dataType: 'error',
+          summary: `Query execution failed: ${hasError}`,
+          count: 0,
+          analysis: { error: hasError },
+          sampleEntries: [],
+          totalEntriesContext: totalEntries
+        };
+      } else {
+        processedResult.executionSummary = {
+          resultType: 'no_results',
+          dataType: 'none',
+          summary: 'No matching entries found for this specific query',
+          count: 0,
+          analysis: { 
+            searchAttempted: true, 
+            fallbackUsed: result.executionResults?.sqlExecutionDetails?.fallbackUsed || false,
+            queryType: sqlQueryType || 'unknown'
+          },
+          sampleEntries: [],
+          totalEntriesContext: totalEntries
+        };
+      }
     }
+
+    console.log(`[${requestId}] [RESULT PROCESSING ${i + 1}] Final summary:`, {
+      resultType: processedResult.executionSummary.resultType,
+      dataType: processedResult.executionSummary.dataType,
+      count: processedResult.executionSummary.count,
+      summaryLength: processedResult.executionSummary.summary?.length || 0
+    });
 
     processedResults.push(processedResult);
   }
   
-  console.log(`[${requestId}] Result processing complete. Processed ${processedResults.length} sub-questions`);
+  console.log(`[${requestId}] [RESULT PROCESSING COMPLETE] Processed ${processedResults.length} sub-questions`);
+  
+  // Enhanced validation to catch "fake success" issues
+  const processingSummary = {
+    totalSubQuestions: processedResults.length,
+    withSQL: processedResults.filter(r => r.executionSummary.resultType.includes('analysis') || r.executionSummary.resultType.includes('filtering')).length,
+    withVector: processedResults.filter(r => r.executionSummary.resultType === 'semantic_search').length,
+    withNoResults: processedResults.filter(r => r.executionSummary.resultType === 'no_results').length,
+    withErrors: processedResults.filter(r => r.executionSummary.resultType === 'execution_error').length
+  };
+  
+  console.log(`[${requestId}] [RESULT PROCESSING SUMMARY]`, processingSummary);
+  
   return processedResults;
 }
 
