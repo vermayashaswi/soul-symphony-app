@@ -266,6 +266,14 @@ export default function MobileChatInterface({
     clearStreamingMessages
   } = streamingChat;
 
+  // ============= Combined Processing State =============
+  const isBackendProcessing = 
+    isStreaming || 
+    isProcessing || 
+    processingStatus === 'processing' || 
+    initialLoading || 
+    streamingChat.isStreaming;
+
   // Configure streaming chat - useStreamingChat handles callbacks internally
   useEffect(() => {
     // The streaming chat hook manages all response handling internally
@@ -803,10 +811,28 @@ export default function MobileChatInterface({
       {/* Header */}
       <div className="sticky top-0 z-40 w-full bg-background border-b">
         <div className="container flex h-14 max-w-screen-lg items-center">
-          <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+          <Sheet 
+            open={sheetOpen && !isBackendProcessing} 
+            onOpenChange={(open) => {
+              if (!isBackendProcessing) {
+                setSheetOpen(open);
+              }
+            }}
+          >
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="mr-2">
-                <Menu className="h-5 w-5" />
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className={`mr-2 ${isBackendProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                disabled={isBackendProcessing}
+                onClick={(e) => {
+                  if (isBackendProcessing) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }
+                }}
+              >
+                <Menu className={`h-5 w-5 ${isBackendProcessing ? 'text-muted-foreground' : ''}`} />
                 <span className="sr-only">
                   <TranslatableText text="Toggle Menu" />
                 </span>
