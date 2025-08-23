@@ -284,6 +284,70 @@ serve(async (req) => {
     });
     
     const userTimezone = timezoneConversion.normalizedTimezone;
+    
+    // Get user's journal timeline data for proper time context
+    let timelineContext = '';
+    try {
+      const supabaseClient = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+        {
+          global: {
+            headers: { Authorization: req.headers.get('Authorization')! },
+          },
+        }
+      );
+      
+      const { data: timelineData, error: timelineError } = await supabaseClient
+        .from('Journal Entries')
+        .select('created_at')
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .single();
+        
+      const { data: latestData, error: latestError } = await supabaseClient
+        .from('Journal Entries')
+        .select('created_at')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+        
+      if (timelineData && latestData) {
+        const firstEntryDate = new Date(timelineData.created_at);
+        const lastEntryDate = new Date(latestData.created_at);
+        const currentTime = new Date();
+        
+        // Format dates in user's timezone
+        const firstEntryFormatted = firstEntryDate.toLocaleDateString('en-US', { 
+          timeZone: userTimezone, 
+          month: 'long', 
+          day: 'numeric',
+          year: 'numeric'
+        });
+        const lastEntryFormatted = lastEntryDate.toLocaleDateString('en-US', { 
+          timeZone: userTimezone, 
+          month: 'long', 
+          day: 'numeric',
+          year: 'numeric'
+        });
+        
+        // Calculate days since last entry
+        const daysSinceLastEntry = Math.floor((currentTime.getTime() - lastEntryDate.getTime()) / (1000 * 60 * 60 * 24));
+        
+        timelineContext = `
+    **CRITICAL TIMELINE CONTEXT:**
+    - User's first journal entry: ${firstEntryFormatted}
+    - User's most recent journal entry: ${lastEntryFormatted} (${daysSinceLastEntry} days ago)
+    - NEVER use temporal words like "tonight", "today", "this evening" unless entries exist for the current date
+    - When referencing time periods, be specific about the actual dates from the data
+    - The user's last activity was ${daysSinceLastEntry} days ago, not recent
+        `;
+      }
+    } catch (error) {
+      console.warn(`[${consolidationId}] Could not fetch timeline data:`, error);
+      timelineContext = '- No timeline data available, avoid specific time references';
+    }
+    
     const contextData = {
       userProfile: {
         timezone: userTimezone,
@@ -297,15 +361,18 @@ serve(async (req) => {
       }
     };
 
-    const consolidationPrompt = `You are Ruh by SOuLO, a brilliantly witty, non-judgmental mental health companion who makes emotional exploration feel like **having coffee with your wisest, funniest friend**. You're emotionally intelligent with a gift for making people feel seen, heard, and understood while helping them journal their way to deeper self-awareness. You are:
+    const consolidationPrompt = `You are Ruh by SOuLO, a brilliantly witty, non-judgmental mental health companion who makes emotional exploration feel like **having coffee with your wisest, funniest friend**. You're emotionally intelligent with a gift for making people feel seen, heard, and understood while helping them journal their way to deeper self-awareness.
 
-**YOUR COFFEE-WITH-YOUR-WISEST-FRIEND PERSONALITY:**
-- **Brilliantly witty** but never at someone's expense - your humor comes from keen observations about the human condition 😊
-- **Warm, relatable, and refreshingly honest** - you keep it real while staying supportive ☕
-- **Emotionally intelligent** with a knack for reading between the lines and *truly understanding* what people need 💫
-- You speak like a *trusted friend* who just happens to be incredibly insightful about emotions
-- You make people feel like they're chatting with someone who **really gets them** 🤗
+**MANDATORY STRUCTURAL REQUIREMENTS (NON-NEGOTIABLE):**
+Your response MUST be structured with:
+- **Bold main headers** for key sections (e.g., **Key Insights**, **Emotional Patterns**, **What This Means**)
+- **Sub-headers** or bullet points for different aspects
+- **Short paragraphs** (2-3 sentences max) with clear breaks
+- **Emphasis** on important words/phrases using *italics* and **bold**
+- **Emojis** to add warmth and personality
+- **Data references** with specific numbers when available
 
+    ${timelineContext}
     
     **USER CONTEXT:**
     - ${timezoneFormat.currentTimeText}
@@ -373,22 +440,55 @@ serve(async (req) => {
 
     console.log(`[CONSOLIDATION] ${consolidationId}: Calling OpenAI API with model gpt-4.1-nano-2025-04-14`);
 
-    // Enhanced OpenAI API call with better error handling
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${openAIApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gpt-4.1-nano-2025-04-14', // Fixed: Using the correct model
-          messages: [
-            { role: 'system', content: 'You are Ruh by SOuLO, a warm and insightful wellness coach. You analyze ONLY the current research results provided to you. Never reference or use data from previous conversations or responses.' },
-            { role: 'user', content: consolidationPrompt }
-          ],
-          max_completion_tokens: 1500
-        }),
-    });
+    // Enhanced OpenAI API call with better error handling and retry mechanism
+    let response;
+    let rawResponse = '';
+    let apiRetryCount = 0;
+    const maxRetries = 2;
+    
+    while (apiRetryCount <= maxRetries) {
+      try {
+        response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${openAIApiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'gpt-4.1-nano-2025-04-14',
+              messages: [
+                { role: 'system', content: 'You are Ruh by SOuLO, a warm and insightful wellness coach. You MUST return a valid JSON object with exactly two fields: "userStatusMessage" (exactly 5 words) and "response" (your complete analysis). NO other format is acceptable.' },
+                { role: 'user', content: consolidationPrompt }
+              ],
+              max_completion_tokens: 1500,
+              temperature: 0.7 // Add temperature for consistency
+            }),
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          rawResponse = data?.choices?.[0]?.message?.content || '';
+          
+          // Validate response length and content
+          if (rawResponse.trim().length > 50 && rawResponse.includes('"response"')) {
+            break; // Success
+          } else if (apiRetryCount < maxRetries) {
+            console.warn(`[${consolidationId}] Response too short or missing content, retrying... (attempt ${apiRetryCount + 1})`);
+            apiRetryCount++;
+            continue;
+          }
+        }
+        break;
+      } catch (fetchError) {
+        console.error(`[${consolidationId}] API call failed on attempt ${apiRetryCount + 1}:`, fetchError);
+        if (apiRetryCount < maxRetries) {
+          apiRetryCount++;
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
+        } else {
+          throw fetchError;
+        }
+      }
+    }
 
     // Enhanced error handling for OpenAI API responses
     if (!response.ok) {
@@ -418,9 +518,6 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-
-    const data = await response.json();
-    const rawResponse = data?.choices?.[0]?.message?.content || '';
     
     console.log(`[${consolidationId}] OpenAI raw response length:`, rawResponse.length);
     console.log(`[${consolidationId}] OpenAI raw response preview:`, rawResponse.substring(0, 200));
@@ -468,16 +565,41 @@ serve(async (req) => {
       
       // Enhanced fallback: Try to extract content from malformed JSON
       try {
-        // Look for response field in the raw text using regex
+        // Multiple extraction strategies for malformed JSON
+        let extractedResponse = null;
+        let extractedStatus = null;
+        
+        // Strategy 1: Simple quoted field extraction
         const responseMatch = rawResponse.match(/"response"\s*:\s*"([^"]+)"/);
         const userStatusMatch = rawResponse.match(/"userStatusMessage"\s*:\s*"([^"]+)"/);
         
         if (responseMatch) {
-          consolidatedResponse = responseMatch[1];
-          userStatusMessage = userStatusMatch ? userStatusMatch[1] : null;
+          extractedResponse = responseMatch[1];
+          extractedStatus = userStatusMatch ? userStatusMatch[1] : null;
+        } else {
+          // Strategy 2: Extract multi-line response content (handles escaped quotes)
+          const multiLineResponseMatch = rawResponse.match(/"response"\s*:\s*"((?:[^"\\]|\\.)*)"/s);
+          const multiLineStatusMatch = rawResponse.match(/"userStatusMessage"\s*:\s*"((?:[^"\\]|\\.)*)"/s);
+          
+          if (multiLineResponseMatch) {
+            extractedResponse = multiLineResponseMatch[1].replace(/\\"/g, '"').replace(/\\n/g, '\n');
+            extractedStatus = multiLineStatusMatch ? multiLineStatusMatch[1].replace(/\\"/g, '"') : null;
+          } else {
+            // Strategy 3: Extract everything between response field markers
+            const responseContentMatch = rawResponse.match(/"response"\s*:\s*"([^"]*(?:\\.[^"]*)*)"/);
+            if (responseContentMatch) {
+              extractedResponse = responseContentMatch[1].replace(/\\"/g, '"').replace(/\\n/g, '\n');
+            }
+          }
+        }
+        
+        if (extractedResponse) {
+          consolidatedResponse = extractedResponse;
+          userStatusMessage = extractedStatus;
           console.log(`[CONSOLIDATOR] Extracted from malformed JSON:`, {
             responseLength: consolidatedResponse?.length || 0,
-            hasStatusMessage: !!userStatusMessage
+            hasStatusMessage: !!userStatusMessage,
+            extractionStrategy: responseMatch ? 'simple' : 'multi-line'
           });
         } else {
           // Final fallback to plain text
