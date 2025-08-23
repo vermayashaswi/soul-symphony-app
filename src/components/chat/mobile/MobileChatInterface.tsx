@@ -201,22 +201,18 @@ export default function MobileChatInterface({
 
               const alreadyExists = (recent || []).some(m => (m as any).sender === 'assistant' && (m as any).content?.trim() === response.trim());
               if (!alreadyExists) {
-                // Enhanced persistence with better error handling
-                try {
-                  const enc = new TextEncoder();
-                  const keySource = requestId || `${originThreadId}:${response}`;
-                  const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
-                  const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
-                  const idempotencyKey = hex.slice(0, 32);
+                 // Enhanced persistence with proper database interaction
+                 try {
+                   const correlationId = requestId || `assistant-${originThreadId}-${Date.now()}`;
 
-                   const { data: savedMsg, error: saveError } = await supabase.from('chat_messages').upsert({
+                   const { data: savedMsg, error: saveError } = await supabase.from('chat_messages').insert({
                      thread_id: originThreadId,
                      content: response,
                      sender: 'assistant',
                      role: 'assistant',
-                     idempotency_key: idempotencyKey,
+                     request_correlation_id: correlationId,
                      analysis_data: analysis || null
-                   }, { onConflict: 'thread_id,idempotency_key' }).select().single();
+                   }).select().single();
                    
                    if (saveError) {
                      console.warn('[Mobile Streaming Watchdog] Persist failed:', saveError);
