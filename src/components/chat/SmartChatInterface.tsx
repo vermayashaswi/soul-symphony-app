@@ -606,6 +606,12 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       setLocalLoading(false);
       updateProcessingStage(null);
       
+      // Trigger scroll to bottom when user sends message
+      setTimeout(() => {
+        const event = new CustomEvent('chat:forceScrollToBottom');
+        window.dispatchEvent(event);
+      }, 100);
+      
       // Skip the rest since streaming handles the response
       return;
     } catch (error: any) {

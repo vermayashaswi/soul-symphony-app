@@ -662,6 +662,12 @@ export default function MobileChatInterface({
         {}
       );
 
+      // Trigger scroll to bottom when user sends message
+      setTimeout(() => {
+        const event = new CustomEvent('chat:forceScrollToBottom');
+        window.dispatchEvent(event);
+      }, 100);
+
       // PHASE 5: Background operations (don't block streaming)
       if (isFirstMessage) {
         // Defer title generation to prevent interference with first response
