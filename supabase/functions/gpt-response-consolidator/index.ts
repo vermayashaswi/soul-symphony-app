@@ -130,105 +130,47 @@ serve(async (req) => {
       });
     }
 
-    // Enhanced data integrity validation - check for processed research results
+    // Data integrity validation - check for processed research results
     if (researchResults && researchResults.length > 0) {
-      const detailedValidation = researchResults.map((r: any, i: number) => ({
-        index: i,
-        question: r?.subQuestion?.question?.substring(0, 50) || 'unknown',
-        hasExecutionSummary: !!r?.executionSummary,
-        summaryType: r?.executionSummary?.resultType || 'unknown',
-        summaryDataType: r?.executionSummary?.dataType || 'unknown',
-        summaryCount: r?.executionSummary?.count || 0,
-        hasError: !!r?.executionResults?.error || !!r?.error,
-        hasSQL: !!(r?.executionResults?.sqlResults?.length > 0),
-        hasVector: !!(r?.executionResults?.vectorResults?.length > 0),
-        sqlCount: r?.executionResults?.sqlResults?.length || 0,
-        vectorCount: r?.executionResults?.vectorResults?.length || 0,
-        fallbackUsed: r?.executionResults?.sqlExecutionDetails?.fallbackUsed || false
-      }));
-      
       console.log(`[RESEARCH DATA VALIDATION] ${consolidationId}:`, {
         totalResults: researchResults.length,
-        resultTypes: detailedValidation
+        resultTypes: researchResults.map((r: any, i: number) => ({
+          index: i,
+          question: r?.subQuestion?.question?.substring(0, 50) || 'unknown',
+          hasExecutionSummary: !!r?.executionSummary,
+          summaryType: r?.executionSummary?.resultType || 'unknown',
+          summaryDataType: r?.executionSummary?.dataType || 'unknown',
+          hasError: !!r?.executionResults?.error || !!r?.error
+        }))
       });
       
       // Check for processed summaries vs raw data
       const hasProcessedSummaries = researchResults.some((r: any) => r?.executionSummary);
       const hasRawResults = researchResults.some((r: any) => 
-        r?.executionResults?.sqlResults?.length > 0 || r?.executionResults?.vectorResults?.length > 0);
-      
-      // Enhanced check for meaningful data
-      const hasMeaningfulData = researchResults.some((r: any) => {
-        if (r?.executionSummary) {
-          return r.executionSummary.count > 0 || 
-                 r.executionSummary.resultType === 'count_analysis' ||
-                 r.executionSummary.resultType === 'distribution_analysis' ||
-                 r.executionSummary.resultType === 'sentiment_analysis' ||
-                 (r.executionSummary.sampleEntries && r.executionSummary.sampleEntries.length > 0);
-        }
-        return false;
-      });
-      
-      // Count actual data vs "no results" responses
-      const actualDataCount = researchResults.filter((r: any) => 
-        r?.executionSummary?.count > 0 || 
-        (r?.executionResults?.sqlResults?.length > 0) ||
-        (r?.executionResults?.vectorResults?.length > 0)
-      ).length;
-      
-      const noResultsCount = researchResults.filter((r: any) => 
-        r?.executionSummary?.resultType === 'no_results' ||
-        r?.executionSummary?.resultType === 'execution_error'
-      ).length;
+        r?.executionResults?.sqlResults || r?.executionResults?.vectorResults);
         
       console.log(`[DATA SUMMARY] ${consolidationId}:`, {
         hasProcessedSummaries,
         hasRawResults,
-        hasMeaningfulData,
-        actualDataCount,
-        noResultsCount,
         userQuestion: userMessage,
         dataStructureType: hasProcessedSummaries ? 'processed_summaries' : 'raw_results'
       });
 
-      // Enhanced check for empty/failed results
-      if (!hasMeaningfulData && actualDataCount === 0) {
-        console.warn(`[${consolidationId}] [EMPTY RESULTS DETECTED] All sub-questions returned no meaningful data`);
-        
-        const allFallbacksUsed = researchResults.every((r: any) => 
-          r?.executionResults?.sqlExecutionDetails?.fallbackUsed === true
-        );
-        
-        if (allFallbacksUsed) {
-          console.error(`[${consolidationId}] [SQL FAILURE PATTERN] All SQL queries failed and fell back to vector search, but vector search also returned no results`);
-          return new Response(JSON.stringify({
-            success: true,
-            response: "I encountered some technical difficulties while searching through your journal entries. This might be due to database query issues. Could you try rephrasing your question or asking about a different topic?",
-            userStatusMessage: "Technical search difficulties encountered",
-            analysisMetadata: {
-              totalSubQuestions: researchResults.length,
-              strategiesUsed: ['vector_search_fallback'],
-              dataSourcesUsed: { vectorSearch: true, sqlQueries: false, errors: true },
-              debugInfo: { allSQLFailed: true, vectorSearchEmpty: true }
-            }
-          }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
-        } else {
-          return new Response(JSON.stringify({
-            success: true,
-            response: "I searched through your journal entries but couldn't find specific content that matches your question. This might be because you haven't written about this topic yet, or the topic might be phrased differently in your entries. Could you try asking about it in a different way?",
-            userStatusMessage: "Search completed, no matches",
-            analysisMetadata: {
-              totalSubQuestions: researchResults.length,
-              strategiesUsed: [],
-              dataSourcesUsed: { vectorSearch: false, sqlQueries: false, errors: false },
-              debugInfo: { noMeaningfulData: true }
-            }
-          }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
-        }
+      // If no processed summaries and no raw results, provide informative response
+      if (!hasProcessedSummaries && !hasRawResults) {
+        console.warn(`[${consolidationId}] No processed summaries or raw results found despite research execution`);
+        return new Response(JSON.stringify({
+          success: true,
+          response: "I searched through your journal entries but couldn't find specific content that matches your question. This might be because you haven't written about this topic yet, or the topic might be phrased differently in your entries. Could you try asking about it in a different way?",
+          userStatusMessage: "Search completed, no matches",
+          analysisMetadata: {
+            totalSubQuestions: researchResults.length,
+            strategiesUsed: [],
+            dataSourcesUsed: { vectorSearch: false, sqlQueries: false, errors: false }
+          }
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
     }
 
