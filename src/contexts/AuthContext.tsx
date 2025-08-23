@@ -98,8 +98,9 @@ const location = useLocation();
     const checkMobile = () => {
       const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
       const isMobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent.toLowerCase());
+      const isIOS = /iphone|ipad|ipod/i.test(userAgent.toLowerCase());
       setIsMobileDevice(isMobile);
-      logInfo(`Detected ${isMobile ? 'mobile' : 'desktop'} device`, 'AuthContext');
+      logInfo(`Detected ${isMobile ? 'mobile' : 'desktop'} device${isIOS ? ' (iOS)' : ''}`, 'AuthContext');
     };
 
     checkMobile();
@@ -368,10 +369,13 @@ const location = useLocation();
         userMetadataKeys: currentUser.user_metadata ? Object.keys(currentUser.user_metadata) : []
       });
       
-      // Increased delay for mobile stability
+      // Increased delay for mobile stability, extra delay for iOS
       if (isMobileDevice) {
-        logProfile('Mobile device detected, adding stabilization delay', 'AuthContext');
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
+        const isIOS = /iphone|ipad|ipod/i.test(userAgent.toLowerCase());
+        const delay = isIOS ? 3500 : 2000; // Extended delay for iOS browsers
+        logProfile(`Mobile device detected (${isIOS ? 'iOS' : 'other'}), adding ${delay}ms stabilization delay`, 'AuthContext');
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
       
       const profileCreated = await ensureProfileExistsService(currentUser);
@@ -505,8 +509,10 @@ const location = useLocation();
             }, 100); // Minimal delay for native
             
           } else {
-            // Web: Use existing logic with longer delays for stability
-            const initialDelay = isMobileDevice ? 3000 : 2000;
+            // Web: Use existing logic with longer delays for stability, extra delay for iOS
+            const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
+            const isIOS = /iphone|ipad|ipod/i.test(userAgent.toLowerCase());
+            const initialDelay = isIOS ? 4000 : (isMobileDevice ? 3000 : 2000);
             
             logProfile(`WEB: Scheduling profile creation in ${initialDelay}ms for platform stability`, 'AuthContext');
             
@@ -604,8 +610,10 @@ const location = useLocation();
           }, 100);
           
         } else {
-          // Web: Use existing logic with stability delays
-          const initialDelay = isMobileDevice ? 3000 : 2000;
+          // Web: Use existing logic with stability delays, extra delay for iOS
+          const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
+          const isIOS = /iphone|ipad|ipod/i.test(userAgent.toLowerCase());
+          const initialDelay = isIOS ? 4000 : (isMobileDevice ? 3000 : 2000);
           
           logProfile(`WEB: Scheduling initial profile creation in ${initialDelay}ms for platform stability`, 'AuthContext');
           

@@ -65,6 +65,7 @@ export default function MobileChatInterface({
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [isIOSDevice, setIsIOSDevice] = useState(false);
   const debugLog = useDebugLog();
   
   // Track active thread for safety manager
@@ -270,7 +271,54 @@ export default function MobileChatInterface({
   const { user } = useAuth();
   const { translate } = useTranslation();
   const loadedThreadRef = useRef<string | null>(null);
+  const userVerificationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
+  // Detect iOS device for specific handling
+  useEffect(() => {
+    const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
+    const isiOS = /iphone|ipad|ipod/i.test(userAgent.toLowerCase());
+    setIsIOSDevice(isiOS);
+    debugLog.addEvent("Platform Detection", `iOS device detected: ${isiOS}`, "info");
+  }, []);
+
+  // iOS-specific user verification with retry logic
+  useEffect(() => {
+    if (!isIOSDevice || user) return;
+
+    let retryCount = 0;
+    const maxRetries = 5;
+    const retryDelay = 1000;
+
+    const verifyUser = () => {
+      if (user) {
+        debugLog.addEvent("iOS User Verification", "User verified successfully", "success");
+        return;
+      }
+
+      retryCount++;
+      if (retryCount <= maxRetries) {
+        debugLog.addEvent("iOS User Verification", `Retry ${retryCount}/${maxRetries} - User not yet available`, "warning");
+        userVerificationTimeoutRef.current = setTimeout(verifyUser, retryDelay);
+      } else {
+        debugLog.addEvent("iOS User Verification", "Max retries reached - user verification failed", "error");
+        toast({
+          title: "Authentication Issue",
+          description: "Please refresh the page if the chat doesn't load.",
+          variant: "destructive"
+        });
+      }
+    };
+
+    // Start verification after a brief delay for iOS session stabilization
+    userVerificationTimeoutRef.current = setTimeout(verifyUser, 2000);
+
+    return () => {
+      if (userVerificationTimeoutRef.current) {
+        clearTimeout(userVerificationTimeoutRef.current);
+      }
+    };
+  }, [isIOSDevice, user]);
+
   // Use unified auto-scroll hook
   const { scrollElementRef, scrollToBottom } = useAutoScroll({
     dependencies: [messages, isLoading, isProcessing, isStreaming],
@@ -342,31 +390,44 @@ export default function MobileChatInterface({
   }, [threadId]);
 
   useEffect(() => {
-    if (threadId) {
-      loadThreadMessages(threadId);
-      // Try to restore streaming state for this thread
-      const restored = restoreStreamingState(threadId);
-      if (restored) {
-        debugLog.addEvent("Thread Initialization", `Restored streaming state for thread: ${threadId}`, "info");
-      }
-      debugLog.addEvent("Thread Initialization", `Loading current thread: ${threadId}`, "info");
-    } else {
-      const storedThreadId = localStorage.getItem("lastActiveChatThreadId");
-      if (storedThreadId && user?.id) {
-        setThreadId(storedThreadId);
-        loadThreadMessages(storedThreadId);
-        // Try to restore streaming state for stored thread
-        const restored = restoreStreamingState(storedThreadId);
+    // iOS-specific delay before thread loading
+    const loadWithIOSDelay = () => {
+      if (threadId) {
+        loadThreadMessages(threadId);
+        // Try to restore streaming state for this thread
+        const restored = restoreStreamingState(threadId);
         if (restored) {
-          debugLog.addEvent("Thread Initialization", `Restored streaming state for stored thread: ${storedThreadId}`, "info");
+          debugLog.addEvent("Thread Initialization", `Restored streaming state for thread: ${threadId}`, "info");
         }
-        debugLog.addEvent("Thread Initialization", `Loading stored thread: ${storedThreadId}`, "info");
+        debugLog.addEvent("Thread Initialization", `Loading current thread: ${threadId}`, "info");
       } else {
-        setInitialLoading(false);
-        debugLog.addEvent("Thread Initialization", "No stored thread found", "info");
+        const storedThreadId = localStorage.getItem("lastActiveChatThreadId");
+        if (storedThreadId && user?.id) {
+          setThreadId(storedThreadId);
+          loadThreadMessages(storedThreadId);
+          // Try to restore streaming state for stored thread
+          const restored = restoreStreamingState(storedThreadId);
+          if (restored) {
+            debugLog.addEvent("Thread Initialization", `Restored streaming state for stored thread: ${storedThreadId}`, "info");
+          }
+          debugLog.addEvent("Thread Initialization", `Loading stored thread: ${storedThreadId}`, "info");
+        } else {
+          setInitialLoading(false);
+          debugLog.addEvent("Thread Initialization", "No stored thread found", "info");
+        }
       }
+    };
+
+    if (isIOSDevice && !user) {
+      // For iOS, wait longer for user authentication to stabilize
+      debugLog.addEvent("Thread Initialization", "iOS device - waiting for user authentication", "info");
+      const timeout = setTimeout(loadWithIOSDelay, 3000);
+      return () => clearTimeout(timeout);
+    } else {
+      // For non-iOS or when user is available, load immediately
+      loadWithIOSDelay();
     }
-  }, [threadId, user?.id, restoreStreamingState]);
+  }, [threadId, user?.id, restoreStreamingState, isIOSDevice]);
   
   useEffect(() => {
     const onThreadChange = (event: CustomEvent) => {
@@ -388,7 +449,15 @@ export default function MobileChatInterface({
 
   const loadThreadMessages = async (currentThreadId: string) => {
     if (!currentThreadId || !user?.id) {
-      setInitialLoading(false);
+      // iOS-specific timeout for loader - prevent infinite loading
+      if (isIOSDevice) {
+        setTimeout(() => {
+          setInitialLoading(false);
+          debugLog.addEvent("iOS Loading Timeout", "Loader timeout triggered for iOS", "warning");
+        }, 8000);
+      } else {
+        setInitialLoading(false);
+      }
       return;
     }
     
