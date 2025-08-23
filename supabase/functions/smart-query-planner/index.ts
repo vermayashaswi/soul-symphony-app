@@ -126,6 +126,12 @@ async function executePlan(plan: any, userId: string, supabaseClient: any, reque
     }
   });
 
+  // Get total entries count for percentage calculations
+  const { count: totalEntries } = await supabaseClient
+    .from('Journal Entries')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', userId);
+
   // Group sub-questions by execution stage
   const stageGroups = groupByExecutionStage(plan.subQuestions);
   console.log(`[${requestId}] Execution stages:`, Object.keys(stageGroups).map(k => `Stage ${k}: ${stageGroups[k].length} sub-questions`));
@@ -155,34 +161,243 @@ async function executePlan(plan: any, userId: string, supabaseClient: any, reque
 
   console.log(`[${requestId}] Orchestrated execution complete. Total results: ${allResults.length}`);
   
-  // Process results to present analysis data rather than raw SQL rows
-  const processedResults = allResults.map(result => {
-    if (result.executionResults?.analysisResults?.length > 0) {
-      // For analysis queries, highlight the computed results
-      const analysis = result.executionResults.analysisResults[0];
-      if (analysis?.total_entries !== undefined) {
-        // Format count results specifically
-        result.formattedSummary = `Total entries: ${analysis.total_entries}`;
-        result.resultType = 'count_analysis';
-      } else {
-        result.formattedSummary = `Analysis completed with ${result.executionResults.analysisResults.length} results`;
-        result.resultType = 'statistical_analysis';
-      }
-    } else if (result.executionResults?.sqlResults?.length > 0) {
-      // For filtering queries, summarize the filtered data
-      result.formattedSummary = `Found ${result.executionResults.sqlResults.length} matching entries`;
-      result.resultType = 'filtered_entries';
-    } else if (result.executionResults?.vectorResults?.length > 0) {
-      result.formattedSummary = `Found ${result.executionResults.vectorResults.length} relevant entries via semantic search`;
-      result.resultType = 'semantic_search';
-    } else {
-      result.formattedSummary = 'No results found';
-      result.resultType = 'no_results';
-    }
-    return result;
-  });
+  // ENHANCED RESULT PROCESSING: Transform raw data into processed summaries
+  const processedResults = await processExecutionResults(allResults, userId, totalEntries || 0, requestId);
   
   return processedResults;
+}
+
+/**
+ * NEW: Enhanced result processing to convert raw SQL/vector data into meaningful summaries
+ */
+async function processExecutionResults(allResults: any[], userId: string, totalEntries: number, requestId: string) {
+  console.log(`[${requestId}] Processing ${allResults.length} sub-question results with total entries context: ${totalEntries}`);
+  
+  const processedResults = [];
+  
+  for (const result of allResults) {
+    const processedResult = {
+      subQuestion: result.subQuestion,
+      executionSummary: {
+        resultType: 'unknown',
+        dataType: 'none',
+        summary: '',
+        count: 0,
+        analysis: {},
+        sampleEntries: [],
+        totalEntriesContext: totalEntries
+      },
+      executionDetails: result.executionResults
+    };
+
+    // Extract step type from the first analysis step
+    const firstStep = result.subQuestion?.analysisSteps?.[0];
+    const sqlQueryType = firstStep?.sqlQueryType;
+    
+    if (result.executionResults?.sqlResults?.length > 0) {
+      const sqlResults = result.executionResults.sqlResults;
+      
+      if (sqlQueryType === 'analysis') {
+        // ANALYSIS QUERIES: Process computed statistics
+        processedResult.executionSummary = await processAnalysisResults(sqlResults, totalEntries, requestId);
+      } else if (sqlQueryType === 'filtering') {
+        // FILTERING QUERIES: Count and sample entries
+        processedResult.executionSummary = await processFilteringResults(sqlResults, totalEntries, requestId);
+      } else {
+        // UNKNOWN SQL TYPE: Determine based on content
+        processedResult.executionSummary = await autoDetectSQLResultType(sqlResults, totalEntries, requestId);
+      }
+    } else if (result.executionResults?.vectorResults?.length > 0) {
+      // VECTOR SEARCH: Sample entries with semantic relevance
+      processedResult.executionSummary = await processVectorResults(result.executionResults.vectorResults, totalEntries, requestId);
+    } else {
+      // NO RESULTS
+      processedResult.executionSummary = {
+        resultType: 'no_results',
+        dataType: 'none',
+        summary: 'No matching entries found',
+        count: 0,
+        analysis: {},
+        sampleEntries: [],
+        totalEntriesContext: totalEntries
+      };
+    }
+
+    processedResults.push(processedResult);
+  }
+  
+  console.log(`[${requestId}] Result processing complete. Processed ${processedResults.length} sub-questions`);
+  return processedResults;
+}
+
+/**
+ * Process SQL analysis results (COUNT, AVG, SUM, etc.)
+ */
+async function processAnalysisResults(sqlResults: any[], totalEntries: number, requestId: string) {
+  console.log(`[${requestId}] Processing analysis results: ${sqlResults.length} rows`);
+  
+  // Check for count queries
+  if (sqlResults.length === 1 && sqlResults[0].total_entries !== undefined) {
+    return {
+      resultType: 'count_analysis',
+      dataType: 'count',
+      summary: `Total journal entries: ${sqlResults[0].total_entries}`,
+      count: sqlResults[0].total_entries,
+      analysis: { totalEntries: sqlResults[0].total_entries },
+      sampleEntries: [],
+      totalEntriesContext: totalEntries
+    };
+  }
+  
+  // Check for percentage/distribution queries
+  if (sqlResults.some(row => row.percentage !== undefined || row.entry_count !== undefined)) {
+    const distributionAnalysis = {};
+    let summaryText = '';
+    
+    sqlResults.forEach(row => {
+      if (row.bucket && row.entry_count !== undefined) {
+        distributionAnalysis[row.bucket] = {
+          count: row.entry_count,
+          percentage: row.percentage || ((row.entry_count / totalEntries) * 100).toFixed(1)
+        };
+      }
+    });
+    
+    summaryText = `Distribution analysis: ${Object.entries(distributionAnalysis)
+      .map(([bucket, data]: [string, any]) => `${bucket}: ${data.count} entries (${data.percentage}%)`)
+      .join(', ')}`;
+    
+    return {
+      resultType: 'distribution_analysis',
+      dataType: 'percentages',
+      summary: summaryText,
+      count: sqlResults.reduce((sum, row) => sum + (row.entry_count || 0), 0),
+      analysis: distributionAnalysis,
+      sampleEntries: [],
+      totalEntriesContext: totalEntries
+    };
+  }
+  
+  // Check for sentiment/emotion analysis
+  if (sqlResults.some(row => row.avg_sentiment !== undefined || row.emotion !== undefined)) {
+    const sentimentAnalysis = {};
+    sqlResults.forEach(row => {
+      if (row.month && row.avg_sentiment !== undefined) {
+        sentimentAnalysis[row.month] = {
+          averageSentiment: parseFloat(row.avg_sentiment).toFixed(2),
+          entryCount: row.entry_count || 0
+        };
+      } else if (row.emotion && row.score !== undefined) {
+        sentimentAnalysis[row.emotion] = {
+          score: parseFloat(row.score).toFixed(2)
+        };
+      }
+    });
+    
+    return {
+      resultType: 'sentiment_analysis',
+      dataType: 'statistics',
+      summary: `Sentiment analysis computed for ${Object.keys(sentimentAnalysis).length} time periods/emotions`,
+      count: sqlResults.length,
+      analysis: sentimentAnalysis,
+      sampleEntries: [],
+      totalEntriesContext: totalEntries
+    };
+  }
+  
+  // Generic analysis result
+  return {
+    resultType: 'statistical_analysis',
+    dataType: 'statistics',
+    summary: `Statistical analysis computed with ${sqlResults.length} data points`,
+    count: sqlResults.length,
+    analysis: { rawResults: sqlResults.slice(0, 5) }, // Limit to first 5 for brevity
+    sampleEntries: [],
+    totalEntriesContext: totalEntries
+  };
+}
+
+/**
+ * Process SQL filtering results (entries matching criteria)
+ */
+async function processFilteringResults(sqlResults: any[], totalEntries: number, requestId: string) {
+  console.log(`[${requestId}] Processing filtering results: ${sqlResults.length} entries found`);
+  
+  const sampleEntries = sqlResults.slice(0, 3).map(entry => ({
+    id: entry.id,
+    content: entry.content || entry['refined text'] || entry['transcription text'] || 'No content available',
+    created_at: entry.created_at,
+    themes: entry.master_themes || [],
+    sentiment: entry.sentiment
+  }));
+  
+  const percentage = totalEntries > 0 ? ((sqlResults.length / totalEntries) * 100).toFixed(1) : '0';
+  
+  return {
+    resultType: 'filtered_entries',
+    dataType: 'entries',
+    summary: `Found ${sqlResults.length} matching entries (${percentage}% of total ${totalEntries} entries)`,
+    count: sqlResults.length,
+    analysis: { 
+      matchedEntries: sqlResults.length,
+      totalEntries,
+      percentage: parseFloat(percentage)
+    },
+    sampleEntries,
+    totalEntriesContext: totalEntries
+  };
+}
+
+/**
+ * Process vector search results
+ */
+async function processVectorResults(vectorResults: any[], totalEntries: number, requestId: string) {
+  console.log(`[${requestId}] Processing vector results: ${vectorResults.length} entries found`);
+  
+  const sampleEntries = vectorResults.slice(0, 3).map(entry => ({
+    id: entry.id,
+    content: entry.content || 'No content available',
+    created_at: entry.created_at,
+    similarity: entry.similarity || 0,
+    themes: entry.themes || [],
+    emotions: entry.emotions || {}
+  }));
+  
+  const avgSimilarity = vectorResults.length > 0 
+    ? (vectorResults.reduce((sum, r) => sum + (r.similarity || 0), 0) / vectorResults.length).toFixed(3)
+    : '0';
+  
+  return {
+    resultType: 'semantic_search',
+    dataType: 'entries',
+    summary: `Found ${vectorResults.length} semantically relevant entries (avg similarity: ${avgSimilarity})`,
+    count: vectorResults.length,
+    analysis: { 
+      averageSimilarity: parseFloat(avgSimilarity),
+      resultCount: vectorResults.length
+    },
+    sampleEntries,
+    totalEntriesContext: totalEntries
+  };
+}
+
+/**
+ * Auto-detect SQL result type when not explicitly specified
+ */
+async function autoDetectSQLResultType(sqlResults: any[], totalEntries: number, requestId: string) {
+  // Check if it looks like analysis data (has aggregated fields)
+  const hasAggregateFields = sqlResults.some(row => 
+    row.avg_sentiment !== undefined || 
+    row.entry_count !== undefined || 
+    row.total_entries !== undefined ||
+    row.percentage !== undefined
+  );
+  
+  if (hasAggregateFields) {
+    return await processAnalysisResults(sqlResults, totalEntries, requestId);
+  } else {
+    return await processFilteringResults(sqlResults, totalEntries, requestId);
+  }
 }
 
 function groupByExecutionStage(subQuestions: SubQuestion[]): { [stage: number]: SubQuestion[] } {
@@ -912,6 +1127,18 @@ You are provided with this: ${databaseSchemaContext} **CRITICAL DATABASE TYPE: T
    - When timeRange is provided in the step, SQL queries MUST include the date filters
    - Use proper timestamp with time zone format: '2024-08-01T00:00:00Z'::timestamp with time zone
    - ALWAYS include both start and end date filters when timeRange exists
+
+5. **PERCENTAGE CALCULATION REQUIREMENTS (CRITICAL):**
+   - For queries asking about percentages or distributions, ALWAYS calculate percentages within SQL
+   - Use this pattern: WITH total_count AS (SELECT COUNT(*) as total FROM "Journal Entries" WHERE user_id = auth.uid()), bucketed AS (SELECT bucket, COUNT(*) as count FROM "Journal Entries" WHERE user_id = auth.uid() GROUP BY bucket) SELECT bucket, count, ROUND((count * 100.0 / total_count.total), 1) as percentage FROM bucketed CROSS JOIN total_count
+   - For time-based distributions (day/night), use EXTRACT(HOUR FROM created_at AT TIME ZONE '${userTimezone}') to bucket entries
+   - ALWAYS ensure percentage calculations sum to 100% or close to it
+
+6. **QUERY TYPE CLASSIFICATION (MANDATORY):**
+   - Use sqlQueryType: "filtering" for: retrieving entries, finding specific journal data, getting samples
+   - Use sqlQueryType: "analysis" for: COUNT, AVG, SUM, percentages, statistics, aggregations
+   - Example filtering: "SELECT * FROM \"Journal Entries\" WHERE conditions" (returns actual entries)
+   - Example analysis: "SELECT COUNT(*) as total_entries FROM \"Journal Entries\"" (returns computed statistics)
 
 5. **Enhanced Query Guidelines with sqlQueryType:**
    - FILTERING queries (sqlQueryType: "filtering"): Use SELECT * or SELECT specific columns to retrieve entry data for next stage analysis

@@ -58,12 +58,12 @@ export async function executeSQLAnalysis(step: any, userId: string, supabaseClie
     if (data && data.success && data.data) {
       console.log(`[${requestId}] SQL query executed successfully, rows:`, data.data.length);
       
-      // Different handling for analysis vs filtering queries
+      // ENHANCED: Different handling for analysis vs filtering queries
       if (step.sqlQueryType === 'analysis') {
-        // For analysis queries (COUNT, SUM, etc.), return the computed results even if empty
+        // For analysis queries (COUNT, SUM, AVG, etc.), always return computed results
         console.log(`[${requestId}] Analysis query completed with ${data.data.length} result rows`);
         return data.data;
-      } else {
+      } else if (step.sqlQueryType === 'filtering') {
         // For filtering queries, fall back to vector search if no results found
         if (data.data.length === 0) {
           console.log(`[${requestId}] Filtering query returned 0 results, falling back to vector search`);
@@ -71,6 +71,29 @@ export async function executeSQLAnalysis(step: any, userId: string, supabaseClie
           return await executeVectorSearchFallback(step, userId, supabaseClient, requestId);
         }
         return data.data;
+      } else {
+        // LEGACY: Auto-detect based on content (backward compatibility)
+        const hasAggregateFields = data.data.some((row: any) => 
+          row.avg_sentiment !== undefined || 
+          row.entry_count !== undefined || 
+          row.total_entries !== undefined ||
+          row.percentage !== undefined ||
+          row.count !== undefined
+        );
+        
+        if (hasAggregateFields) {
+          // Treat as analysis query
+          console.log(`[${requestId}] Auto-detected analysis query with ${data.data.length} computed results`);
+          return data.data;
+        } else {
+          // Treat as filtering query
+          if (data.data.length === 0) {
+            console.log(`[${requestId}] Auto-detected filtering query returned 0 results, falling back to vector search`);
+            executionDetails.fallbackUsed = true;
+            return await executeVectorSearchFallback(step, userId, supabaseClient, requestId);
+          }
+          return data.data;
+        }
       }
     } else {
       console.warn(`[${requestId}] SQL query returned no results or failed:`, data);
