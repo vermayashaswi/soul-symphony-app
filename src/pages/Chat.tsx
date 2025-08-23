@@ -11,8 +11,6 @@ import { ConversationStateManager } from '@/utils/chat/conversationStateManager'
 import { extractConversationInsights } from '@/utils/chat/messageProcessor';
 import { ChatMessage } from '@/types/chat';
 import { debugTimezoneInfo, getCurrentWeekDates } from '@/utils/chat/dateUtils';
-import { cleanupStaleProcessingMessages, debugProcessingMessages } from '@/utils/chat/messageCleanup';
-import { processingStateManager } from '@/utils/chat/processingStateManager';
 import { format } from 'date-fns';
 import { formatInTimeZone, toZonedTime } from 'date-fns-tz';
 import { PremiumFeatureGuard } from '@/components/subscription/PremiumFeatureGuard';
@@ -163,23 +161,14 @@ const Chat = () => {
       try {
         console.log("Initializing chat system...");
         
-        // Debug current processing messages state
-        console.log('[Chat] Debugging processing messages before cleanup...');
-        await debugProcessingMessages(user.id);
-        
-        // Clean up stale processing messages - only those older than 10 minutes for this user
+        // Clean up stale processing messages
         try {
-          const result = await cleanupStaleProcessingMessages(10, user.id);
-          
-          if (result.errors.length > 0) {
-            console.error('[Chat] Cleanup errors:', result.errors);
-          } else {
-            console.log(`[Chat] Cleanup completed: ${result.cleaned} messages cleaned`);
-          }
-          
-          // Also recover any stuck messages in the processing state manager
-          await processingStateManager.recoverStuckMessages();
-        
+          // Simplified cleanup without complex type inference
+          console.log('Cleaning up stale processing messages...');
+          await supabase.rpc('execute_dynamic_query', {
+            query_text: "DELETE FROM chat_messages WHERE is_processing = true"
+          });
+          console.log('Cleaned up stale processing messages');
         } catch (cleanupError) {
           console.error("Error cleaning up stale messages:", cleanupError);
         }

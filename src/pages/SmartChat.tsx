@@ -11,8 +11,6 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { v4 as uuidv4 } from 'uuid';
 import { PremiumFeatureGuard } from '@/components/subscription/PremiumFeatureGuard';
 import { setupGlobalMessageDeletionListener } from '@/hooks/use-message-deletion';
-import { processingStateManager } from '@/utils/chat/processingStateManager';
-import { cleanupStaleProcessingMessages } from '@/utils/chat/messageCleanup';
 
 const SmartChat = () => {
   const { user } = useAuth();
@@ -66,27 +64,11 @@ const SmartChat = () => {
     loadLastThread();
   }, [user?.id]);
 
-  // Setup global message deletion listener and cleanup
+  // Setup global message deletion listener
   useEffect(() => {
     if (!user?.id) return;
     
     const subscription = setupGlobalMessageDeletionListener(user.id);
-    
-    // Clean up stale processing messages for this user when SmartChat loads
-    const initCleanup = async () => {
-      try {
-        console.log('[SmartChat] Performing initial cleanup...');
-        const result = await cleanupStaleProcessingMessages(10, user.id);
-        console.log(`[SmartChat] Cleanup completed: ${result.cleaned} messages cleaned`);
-        
-        // Recover stuck messages
-        await processingStateManager.recoverStuckMessages();
-      } catch (error) {
-        console.error('[SmartChat] Error during initial cleanup:', error);
-      }
-    };
-    
-    initCleanup();
     
     return () => {
       if (subscription) {
