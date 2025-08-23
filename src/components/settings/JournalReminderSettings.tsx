@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { journalReminderService, JournalReminderTime } from '@/services/journalReminderService';
 import { enhancedAndroidNotificationService } from '@/services/enhancedAndroidNotificationService';
+import { useUserProfile } from '@/hooks/useUserProfile';
 import { toast } from 'sonner';
 
 const TIME_OPTIONS: { value: JournalReminderTime; label: string; time: string }[] = [
@@ -17,6 +18,7 @@ const TIME_OPTIONS: { value: JournalReminderTime; label: string; time: string }[
 ];
 
 export const JournalReminderSettings: React.FC = () => {
+  const { timezone } = useUserProfile();
   const [settings, setSettings] = useState(journalReminderService.getSettings());
   const [isLoading, setIsLoading] = useState(false);
   const [systemStatus, setSystemStatus] = useState<any>(null);
@@ -35,8 +37,8 @@ export const JournalReminderSettings: React.FC = () => {
           return;
         }
         
-        console.log('[JournalReminderSettings] User enabling reminders');
-        const success = await journalReminderService.requestPermissionsAndSetup(settings.times);
+        console.log('[JournalReminderSettings] User enabling reminders with timezone:', timezone);
+        const success = await journalReminderService.requestPermissionsAndSetup(settings.times, timezone || undefined);
         
         if (success) {
           setSettings(prev => ({ ...prev, enabled: true }));
@@ -71,7 +73,7 @@ export const JournalReminderSettings: React.FC = () => {
     
     // If reminders are currently enabled, update them
     if (settings.enabled && newTimes.length > 0) {
-      journalReminderService.requestPermissionsAndSetup(newTimes);
+      journalReminderService.requestPermissionsAndSetup(newTimes, timezone || undefined);
     } else if (settings.enabled && newTimes.length === 0) {
       // If no times selected, disable reminders
       handleToggleEnabled(false);
