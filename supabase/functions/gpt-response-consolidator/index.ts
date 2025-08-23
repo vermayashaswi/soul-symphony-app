@@ -443,6 +443,7 @@ Your response MUST be structured with:
     - Return ONLY a single JSON object. No markdown, no code fences, no commentary.
     - Keys MUST be exactly: "userStatusMessage" and "response" (case-sensitive).
     - userStatusMessage MUST be exactly 5 words.
+    - CRITICAL: Remember that you are talking to a normal user. Don't use words like "semantic search" , "vector analysis" , "sql data" , "userID" etc.
     - Do not include trailing explanations or extra fields`;
 
     console.log(`[CONSOLIDATION] ${consolidationId}: Calling OpenAI API with model gpt-4.1-nano-2025-04-14`);
