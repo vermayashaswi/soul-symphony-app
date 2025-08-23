@@ -63,7 +63,7 @@ export default function MobileChatInterface({
   mentalHealthInsights,
 }: MobileChatInterfaceProps) {
   const [messages, setMessages] = useState<UIChatMessage[]>([]);
-  const [initialLoading, setInitialLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true); // ONLY for initial thread loading
   const [threadId, setThreadId] = useState<string | null>(initialThreadId || null);
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -276,16 +276,16 @@ export default function MobileChatInterface({
     if (!isRealtimeConnected && threadId && user?.id) {
       console.log('[MobileChatInterface] Real-time disconnected, will use polling fallback');
       
-      // Show connection status in UI
+      // Only show connection warning after extended disconnection (2+ minutes)
       const connectionTimer = setTimeout(() => {
         if (!isRealtimeConnected) {
           toast({
-            title: "Connection unstable",
-            description: "Using backup sync method...",
+            title: "Connection issue detected",
+            description: "Messages may sync with delay",
             duration: 3000,
           });
         }
-      }, 5000);
+      }, 120000); // 2 minutes instead of 5 seconds
 
       return () => clearTimeout(connectionTimer);
     }
@@ -930,20 +930,20 @@ export default function MobileChatInterface({
               </ChatErrorBoundary>
             ))}
             
-            {/* Show streaming indicators immediately when isStreaming is true */}
-            {isStreaming ? (
+            {/* *** CRITICAL: PRIMARY streaming indicator controlled by useStreamingChat *** */}
+            {isStreaming && (
               <ChatErrorBoundary>
                 <MobileChatMessage 
                   message={{ role: 'assistant', content: '' }}
                   streamingMessage={
                     useThreeDotFallback || dynamicMessages.length === 0
-                      ? undefined // This will show the three-dot animation
+                      ? undefined // Shows three-dot animation immediately
                       : translatedDynamicMessages[currentMessageIndex] || dynamicMessages[currentMessageIndex]
                   }
                   showStreamingDots={true}
                 />
               </ChatErrorBoundary>
-            ) : null}
+            )}
             
             {/* Spacer for auto-scroll */}
             <div className="pb-5" />
