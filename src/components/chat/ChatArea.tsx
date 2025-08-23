@@ -21,6 +21,8 @@ interface ChatAreaProps {
   processingStage?: string;
   threadId?: string | null;
   onInteractiveOptionClick?: (option: any) => void;
+  onUserMessageSent?: boolean;
+  isStreaming?: boolean;
 }
 
 const ChatArea: React.FC<ChatAreaProps> = ({ 
@@ -28,14 +30,30 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   isLoading, 
   processingStage,
   threadId,
-  onInteractiveOptionClick
+  onInteractiveOptionClick,
+  onUserMessageSent,
+  isStreaming
 }) => {
-  // Use unified auto-scroll hook
+  // Use unified auto-scroll hook with smart threshold management
   const { scrollElementRef, scrollToBottom } = useAutoScroll({
-    dependencies: [chatMessages, isLoading, processingStage],
+    dependencies: [chatMessages, isLoading, processingStage, isStreaming],
     delay: 50,
-    scrollThreshold: 100
+    scrollThreshold: 50
   });
+
+  // Auto-scroll when user sends a message (always scroll, ignore threshold)
+  useEffect(() => {
+    if (onUserMessageSent) {
+      setTimeout(() => scrollToBottom(true), 100);
+    }
+  }, [onUserMessageSent, scrollToBottom]);
+
+  // Auto-scroll for streaming responses (respect threshold for user position)
+  useEffect(() => {
+    if (isStreaming || isLoading) {
+      setTimeout(() => scrollToBottom(false), 150);
+    }
+  }, [isStreaming, isLoading, scrollToBottom]);
 
   // Enhanced logging to ensure context is being passed properly
   useEffect(() => {
@@ -58,18 +76,14 @@ const ChatArea: React.FC<ChatAreaProps> = ({
     }
   }, [chatMessages, threadId]);
 
-  // Listen for global force-scroll events (e.g., after user presses Send)
+  // Listen for global force-scroll events
   useEffect(() => {
     const handleForceScroll = () => {
-      // Force scroll regardless of user's current position
       scrollToBottom(true);
     };
     window.addEventListener('chat:forceScrollToBottom' as any, handleForceScroll);
-    // Backward-compatible alias if needed in future
-    window.addEventListener('chat:scrollToBottom' as any, handleForceScroll);
     return () => {
       window.removeEventListener('chat:forceScrollToBottom' as any, handleForceScroll);
-      window.removeEventListener('chat:scrollToBottom' as any, handleForceScroll);
     };
   }, [scrollToBottom]);
 
