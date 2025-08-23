@@ -280,30 +280,7 @@ serve(async (req) => {
     
     **USER QUESTION:** "${userMessage}"
     
-    **CRITICAL: RAW DATA ANALYSIS INSTRUCTIONS**
-    ⚠️ **IMPORTANT**: The data below contains RAW DATABASE ROWS, NOT pre-analyzed insights. You MUST analyze this raw data yourself.
-    
-    **What you're receiving:**
-    - Raw journal entry rows with emotions (as JSON objects with emotion names and scores)
-    - Raw themes arrays and master_themes arrays 
-    - Raw entity data (as JSON objects with entity types and values)
-    - Raw sentiment scores and created_at timestamps
-    - Raw text content from journal entries
-    
-    **What you MUST do with this raw data:**
-    1. **Calculate trends and patterns** - Don't just reference raw scores, identify patterns over time
-    2. **Perform mathematical analysis** - Calculate averages, find highest/lowest values, identify frequency patterns
-    3. **Detect emotional progressions** - Look for emotional changes over time periods
-    4. **Identify thematic connections** - Connect related themes and entities across entries
-    5. **Transform raw timestamps into meaningful time insights** - Convert dates into time-based patterns
-    6. **Synthesize content analysis** - Extract meaningful insights from raw text content
-    
-    **Examples of proper analysis:**
-    - Raw: {"anxiety": 0.7, "joy": 0.3} → Analysis: "Anxiety was significantly higher than joy (0.7 vs 0.3)"
-    - Raw: 5 entries with "work" theme → Analysis: "Work dominated your journaling, appearing in 5 entries"
-    - Raw: Timestamps from morning vs evening → Analysis: "You tend to journal more in the evenings"
-    
-    **COMPREHENSIVE RAW DATABASE RESULTS TO ANALYZE:**
+    **COMPREHENSIVE ANALYSIS RESULTS:**
     ${JSON.stringify(analysisSummary, null, 2)}
   
    **SUB-QUESTIONS ANALYZED:**
@@ -312,16 +289,16 @@ serve(async (req) => {
       **RESPONSE FORMAT GUIDELINES:**
     Respond naturally in your authentic voice. 
     MANDATORY: Use bold headers/words/sentences, paragraphs, structured responses, italics, bullets and compulsorily emojis.
-    - Let your personality shine through as you share insights and analysis based on the raw data you analyzed
+    - Let your personality shine through as you share insights and analysis based on the data. 
     - Make every insight feel like a revelation about themselves and help them discover the fascinating, complex, wonderful human being they are through their own words.
-    - Back your analysis with tangible data calculations and patterns you discovered
+    - Back your analysis with tangible data when you can
     - Restrict responses to less than 100 words unless question requires huge answers. Feel free to expand then!
     - You connect dots between emotions, events, and timing like a detective solving a mystery
     - You reveal hidden themes and connections that make people go "OH WOW!"
-    - You find the story in the raw data - not just numbers, but the human narrative behind them
+    - You find the story in the data - not just numbers, but the human narrative
     - You celebrate patterns of growth and gently illuminate areas for exploration
     - You make insights feel like gifts, not criticisms
-    - Transform raw database entries into meaningful insights about their emotional journey!
+    - Add references from analysisResults from vector search and correlate actual entry content with analysis reponse that you provide!!
 
   
 

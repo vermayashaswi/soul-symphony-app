@@ -19,17 +19,6 @@ export const createChatMessage = async (
       hasAdditionalData: !!additionalData
     });
 
-    // Input validation
-    if (!threadId || !content || !sender || !userId) {
-      console.error('[createChatMessage] Missing required parameters:', {
-        hasThreadId: !!threadId,
-        hasContent: !!content,
-        hasSender: !!sender,
-        hasUserId: !!userId
-      });
-      return null;
-    }
-
     // First verify the thread belongs to the user
     const { data: thread, error: threadError } = await supabase
       .from('chat_threads')
@@ -42,27 +31,27 @@ export const createChatMessage = async (
       console.error('[createChatMessage] Thread verification failed:', {
         threadId,
         userId,
-        error: threadError?.message,
+        error: threadError,
         hasThread: !!thread
       });
       return null;
     }
 
-    console.log('[createChatMessage] Thread verified, preparing message data');
+    console.log('[createChatMessage] Thread verified, inserting message');
 
-    // Use database-generated timestamp for consistency
+    // Prepare message data with idempotency key support
     const messageData = {
       thread_id: threadId,
       content,
       sender,
       role: sender,
+      created_at: new Date().toISOString(),
       ...additionalData
     };
 
     console.log('[createChatMessage] Message data prepared:', {
       ...messageData,
-      content: `${content.substring(0, 50)}${content.length > 50 ? '...' : ''}`,
-      hasIdempotencyKey: !!additionalData?.idempotency_key
+      content: `${content.substring(0, 50)}${content.length > 50 ? '...' : ''}`
     });
 
     const { data, error } = await supabase
@@ -73,14 +62,10 @@ export const createChatMessage = async (
 
     if (error) {
       console.error('[createChatMessage] Database insert failed:', {
-        error: error.message,
-        code: error.code,
-        details: error.details,
+        error,
         messageData: {
-          thread_id: threadId,
-          sender,
-          content_length: content.length,
-          has_idempotency: !!additionalData?.idempotency_key
+          ...messageData,
+          content: `${content.substring(0, 50)}${content.length > 50 ? '...' : ''}`
         }
       });
       return null;
@@ -88,21 +73,19 @@ export const createChatMessage = async (
 
     console.log('[createChatMessage] Message inserted successfully:', {
       messageId: data.id,
-      threadId: data.thread_id,
-      created_at: data.created_at
+      threadId: data.thread_id
     });
 
-    // Update thread's updated_at timestamp in background
-    supabase
+    // Update thread's updated_at timestamp
+    const { error: updateError } = await supabase
       .from('chat_threads')
       .update({ updated_at: new Date().toISOString() })
       .eq('id', threadId)
-      .eq('user_id', userId)
-      .then(({ error: updateError }) => {
-        if (updateError) {
-          console.warn('[createChatMessage] Failed to update thread timestamp:', updateError);
-        }
-      });
+      .eq('user_id', userId);
+
+    if (updateError) {
+      console.warn('[createChatMessage] Failed to update thread timestamp:', updateError);
+    }
 
     // Cast sender and role to proper types and handle sub_query_responses
     const finalMessage = {
@@ -115,14 +98,13 @@ export const createChatMessage = async (
     console.log('[createChatMessage] Message creation completed successfully:', {
       messageId: finalMessage.id,
       threadId: finalMessage.thread_id,
-      sender: finalMessage.sender,
-      created_at: finalMessage.created_at
+      sender: finalMessage.sender
     });
 
     return finalMessage;
   } catch (error) {
     console.error('[createChatMessage] Exception occurred:', {
-      error: error instanceof Error ? error.message : String(error),
+      error,
       threadId,
       userId,
       sender,
@@ -134,8 +116,6 @@ export const createChatMessage = async (
 
 export const getChatMessages = async (threadId: string, userId: string): Promise<ChatMessage[]> => {
   try {
-    console.log('[getChatMessages] Fetching messages for thread:', { threadId, userId });
-    
     // First verify the thread belongs to the user
     const { data: thread, error: threadError } = await supabase
       .from('chat_threads')
@@ -145,28 +125,20 @@ export const getChatMessages = async (threadId: string, userId: string): Promise
       .single();
 
     if (threadError || !thread) {
-      console.error('[getChatMessages] Thread verification failed:', threadError);
+      console.error('Thread not found or access denied:', threadError);
       return [];
     }
 
-    // Order by created_at AND id to ensure consistent ordering even with same timestamps
     const { data, error } = await supabase
       .from('chat_messages')
       .select('*')
       .eq('thread_id', threadId)
-      .order('created_at', { ascending: true })
-      .order('id', { ascending: true });
+      .order('created_at', { ascending: true });
 
     if (error) {
-      console.error('[getChatMessages] Database query failed:', error);
+      console.error('Error fetching chat messages:', error);
       return [];
     }
-
-    console.log('[getChatMessages] Retrieved messages:', {
-      count: data?.length || 0,
-      threadId,
-      messageOrder: data?.slice(0, 3).map(m => `${m.sender}:${m.created_at}`)
-    });
 
     // Cast sender and role to proper types and handle sub_query_responses
     return (data || []).map(msg => ({
@@ -176,7 +148,7 @@ export const getChatMessages = async (threadId: string, userId: string): Promise
       sub_query_responses: Array.isArray(msg.sub_query_responses) ? msg.sub_query_responses : []
     }));
   } catch (error) {
-    console.error('[getChatMessages] Exception occurred:', error);
+    console.error('Exception fetching chat messages:', error);
     return [];
   }
 };

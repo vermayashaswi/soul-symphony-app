@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Menu, Plus, Trash2 } from "lucide-react";
@@ -25,9 +25,6 @@ import { useStreamingChat } from "@/hooks/useStreamingChat";
 import { threadSafetyManager } from "@/utils/threadSafetyManager";
 import ChatErrorBoundary from "../ChatErrorBoundary";
 import { useAutoScroll } from "@/hooks/use-auto-scroll";
-import { useMobileChatSync } from "@/hooks/use-mobile-chat-sync";
-import { useEnhancedErrorRecovery } from "@/hooks/use-enhanced-error-recovery";
-import { saveChatStreamingState } from "@/utils/chatStateStorage";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -63,7 +60,7 @@ export default function MobileChatInterface({
   mentalHealthInsights,
 }: MobileChatInterfaceProps) {
   const [messages, setMessages] = useState<UIChatMessage[]>([]);
-  const [initialLoading, setInitialLoading] = useState(true); // ONLY for initial thread loading
+  const [initialLoading, setInitialLoading] = useState(true);
   const [threadId, setThreadId] = useState<string | null>(initialThreadId || null);
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -87,94 +84,6 @@ export default function MobileChatInterface({
     processingStatus,
     setLocalLoading
   } = useChatRealtime(threadId);
-
-  const { toast } = useToast();
-  const { user } = useAuth();
-  const { translate } = useTranslation();
-  
-  // Enhanced mobile chat synchronization with fallback
-  const {
-    isOnline,
-    isRealtimeConnected,
-    forceSyncMessages,
-    addPendingSyncMessage,
-    checkForMissedMessages
-  } = useMobileChatSync({
-    threadId,
-    userId: user?.id || null,
-    onMessagesSync: (syncedMessages) => {
-      console.log('[MobileChatInterface] Received synced messages:', syncedMessages.length);
-      
-      // Convert to UI messages and merge with existing ones
-      const uiMessages = syncedMessages
-        .filter(msg => !msg.is_processing)
-        .map(msg => ({
-          role: msg.sender as 'user' | 'assistant',
-          content: msg.content,
-          references: msg.reference_entries ? Array.isArray(msg.reference_entries) ? msg.reference_entries : [] : undefined,
-          hasNumericResult: msg.has_numeric_result
-        }));
-      
-      // Merge with existing messages, avoiding duplicates
-      setMessages(prevMessages => {
-        const messageMap = new Map();
-        
-        // Add existing messages
-        prevMessages.forEach((msg, index) => {
-          const key = `${msg.role}-${msg.content.substring(0, 50)}`;
-          messageMap.set(key, { msg, index });
-        });
-        
-        // Add/update with synced messages
-        uiMessages.forEach(msg => {
-          const key = `${msg.role}-${msg.content.substring(0, 50)}`;
-          messageMap.set(key, { msg, index: -1 });
-        });
-        
-        return Array.from(messageMap.values())
-          .sort((a, b) => a.index - b.index)
-          .map(item => item.msg);
-      });
-      
-      if (uiMessages.length > 0) {
-        setShowSuggestions(false);
-      }
-    },
-    onConnectionRecovered: () => {
-      console.log('[MobileChatInterface] Real-time connection recovered');
-      errorRecovery.resetRecoveryState();
-    },
-    onError: (error) => {
-      console.error('[MobileChatInterface] Sync error:', error);
-      errorRecovery.handleError(new Error(error), async () => {
-        await forceSyncMessages();
-      });
-    }
-  });
-
-  // Enhanced error recovery with automatic retry
-  const errorRecovery = useEnhancedErrorRecovery({
-    maxRetries: 3,
-    retryDelay: 2000,
-    onRecoveryStart: () => {
-      console.log('[MobileChatInterface] Starting error recovery...');
-      setLocalLoading(true, 'Recovering connection...');
-    },
-    onRecoverySuccess: () => {
-      console.log('[MobileChatInterface] Error recovery successful');
-      setLocalLoading(false);
-    },
-    onRecoveryFailed: () => {
-      console.log('[MobileChatInterface] Error recovery failed');
-      setLocalLoading(false);
-      toast({
-        title: "Connection issues persist",
-        description: "Please refresh the page to continue",
-        variant: "destructive",
-        duration: 5000,
-      });
-    }
-  });
   
   const { isKeyboardVisible } = useUnifiedKeyboard();
   
@@ -204,99 +113,9 @@ export default function MobileChatInterface({
   });
   
   // Use streaming chat for enhanced UX
-  // Handle final responses from streaming chat
-  const handleFinalResponse = useCallback((content: string, analysis?: any, threadId?: string, requestId?: string | null) => {
-    console.log('[MobileChatInterface] Final response received:', {
-      content: content.substring(0, 100) + '...',
-      analysis,
-      threadId,
-      requestId,
-      currentMessagesCount: messages.length
-    });
-    
-    if (!content) {
-      console.warn('[MobileChatInterface] Empty final response received');
-      return;
-    }
-
-    // CRITICAL: Validate message ordering - ensure assistant response comes AFTER user message
-    const lastMessage = messages[messages.length - 1];
-    if (!lastMessage || lastMessage.role !== 'user') {
-      console.warn('[MobileChatInterface] Message ordering issue detected - last message is not from user:', lastMessage?.role);
-      // Still proceed but log the issue for debugging
-    }
-
-    // Create the assistant message
-    const newMessage: UIChatMessage = {
-      role: 'assistant',
-      content,
-      analysis,
-      hasNumericResult: !!analysis?.hasNumericResult
-    };
-
-    // Add to local state immediately for instant UI update
-    setMessages(prev => {
-      const updated = [...prev, newMessage];
-      
-      console.log('[MobileChatInterface] Updated messages state:', {
-        previousCount: prev.length,
-        newCount: updated.length,
-        lastMessage: newMessage.content.substring(0, 50) + '...',
-        messageOrder: updated.slice(-2).map(m => m.role).join(' -> ')
-      });
-      
-      return updated;
-    });
-
-    // Save assistant message to database with error handling
-    if (threadId && user?.id) {
-      const saveAssistantMessage = async () => {
-        try {
-          console.log('[MobileChatInterface] Saving assistant response to database');
-          
-          const savedMessage = await saveMessage(
-            threadId,
-            content,
-            'assistant',
-            user.id,
-            analysis?.references,
-            !!analysis?.hasNumericResult,
-            undefined, // isInteractive
-            undefined, // interactiveOptions
-            uuidv4(),  // idempotency key
-            analysis
-          );
-          
-          if (!savedMessage) {
-            console.error('[MobileChatInterface] Failed to save assistant message');
-            toast({
-              title: "Response not saved",
-              description: "The response may not persist after refresh",
-              variant: "destructive",
-              duration: 3000,
-            });
-          } else {
-            console.log('[MobileChatInterface] Assistant message saved successfully:', savedMessage.id);
-          }
-        } catch (error) {
-          console.error('[MobileChatInterface] Error saving assistant message:', error);
-        }
-      };
-      
-      // Save in background
-      saveAssistantMessage();
-    }
-
-    console.log('[MobileChatInterface] Successfully processed final response');
-  }, [messages, user?.id, toast]);
-
-  const streamingChat = useStreamingChat({
-      threadId: threadId,
-      onFinalResponse: handleFinalResponse
-  });
-
   const {
     isStreaming,
+    // streamingThreadId - removed as part of thread isolation
     streamingMessages,
     currentUserMessage,
     showBackendAnimation,
@@ -306,27 +125,110 @@ export default function MobileChatInterface({
     currentMessageIndex,
     useThreeDotFallback,
     queryCategory,
-    restoreStreamingState,
-    expectedProcessingTime,
-    processingStartTime,
-    isRetrying,
-    retryAttempts,
-    stopStreaming,
-    clearStreamingMessages
-  } = streamingChat;
+    restoreStreamingState
+   } = useStreamingChat({
+      threadId: threadId,
+     onFinalResponse: async (response, analysis, originThreadId, requestId) => {
+       // Handle final streaming response scoped to its origin thread
+       if (!response || !originThreadId || !user?.id) {
+         debugLog.addEvent("Streaming Response", "[Mobile] Missing required data for final response", "error");
+         console.error("[Mobile] [Streaming] Missing response data:", { response: !!response, originThreadId: !!originThreadId, userId: !!user?.id });
+         return;
+       }
+       
+        debugLog.addEvent("Streaming Response", `[Mobile] Final response received for ${originThreadId}: ${response.substring(0, 100)}...`, "success");
 
-  // ============= Combined Processing State =============
-  const isBackendProcessing = 
-    isStreaming || 
-    isProcessing || 
-    processingStatus === 'processing' || 
-    initialLoading;
+         // Optimistic UI: append assistant message immediately so UI doesn't appear blank
+         if (originThreadId === threadId) {
+           setMessages(prev => [...prev, { role: 'assistant', content: response, analysis }]);
+           setShowSuggestions(false);
+           setLocalLoading(false);
+         }
 
-  // Configure streaming chat - useStreamingChat handles callbacks internally
-  useEffect(() => {
-    // The streaming chat hook manages all response handling internally
-    // No additional callback configuration needed
-  }, [threadId]);
+         // Update user message with classification data if available
+         if (analysis?.classification && requestId) {
+           try {
+             // Find the most recent user message to update with classification
+             const { data: recentUserMessages } = await supabase
+               .from('chat_messages')
+               .select('id')
+               .eq('thread_id', originThreadId)
+               .eq('sender', 'user')
+               .order('created_at', { ascending: false })
+               .limit(1);
+
+             if (recentUserMessages && recentUserMessages.length > 0) {
+               await updateUserMessageClassification(
+                 recentUserMessages[0].id,
+                 analysis.classification,
+                 user.id
+               );
+               debugLog.addEvent("Classification", "Updated user message with classification data", "success");
+             }
+           } catch (classificationError) {
+             console.warn('[Mobile] Failed to update user message classification:', classificationError);
+           }
+         }
+        
+        // Let backend persist assistant message; UI will also update via realtime when it arrives
+        if (originThreadId === threadId) {
+         // Watchdog fallback: if realtime insert doesn't arrive, persist client-side after a short delay
+         try {
+           setTimeout(async () => {
+             // Double-check still on same thread
+             if (!currentThreadIdRef.current || currentThreadIdRef.current !== originThreadId) return;
+
+             // Has an assistant message with same content arrived?
+             const { data: recent, error: recentErr } = await supabase
+               .from('chat_messages')
+               .select('id, content, sender, created_at')
+               .eq('thread_id', originThreadId)
+               .order('created_at', { ascending: false })
+               .limit(5);
+
+             if (recentErr) {
+               console.warn('[Mobile Streaming Watchdog] Failed to fetch recent messages:', recentErr.message);
+             }
+
+             const alreadyExists = (recent || []).some(m => (m as any).sender === 'assistant' && (m as any).content?.trim() === response.trim());
+             if (!alreadyExists) {
+               // Persist safely with an idempotency_key derived from threadId + response
+               try {
+                 const enc = new TextEncoder();
+                 const keySource = requestId || `${originThreadId}:${response}`;
+                 const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
+                 const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+                 const idempotencyKey = hex.slice(0, 32);
+
+                  await supabase.from('chat_messages').upsert({
+                    thread_id: originThreadId,
+                    content: response,
+                    sender: 'assistant',
+                    role: 'assistant',
+                    idempotency_key: idempotencyKey,
+                    analysis_data: analysis || null
+                  }, { onConflict: 'thread_id,idempotency_key' });
+               } catch (e) {
+                 console.warn('[Mobile Streaming Watchdog] Persist fallback failed:', (e as any)?.message || e);
+               }
+             }
+
+             setLocalLoading(false);
+           }, 1200);
+         } catch (e) {
+           console.warn('[Mobile Streaming Watchdog] Exception scheduling fallback:', (e as any)?.message || e);
+           setLocalLoading(false);
+         }
+       }
+    },
+     onError: (error) => {
+       toast({
+         title: "Error",
+         description: error,
+         variant: "destructive"
+       });
+     }
+   });
   
   const suggestionQuestions = [
     {
@@ -351,6 +253,9 @@ export default function MobileChatInterface({
     }
   ];
   
+  const { toast } = useToast();
+  const { user } = useAuth();
+  const { translate } = useTranslation();
   const loadedThreadRef = useRef<string | null>(null);
   
   // Use unified auto-scroll hook
@@ -360,30 +265,68 @@ export default function MobileChatInterface({
     scrollThreshold: 100
   });
 
-  // Connection status monitoring and recovery triggers
+  // Realtime: append assistant messages saved by backend
   useEffect(() => {
-    if (!isOnline) {
-      console.log('[MobileChatInterface] Device offline, stopping real-time');
-      return;
-    }
-
-    if (!isRealtimeConnected && threadId && user?.id) {
-      console.log('[MobileChatInterface] Real-time disconnected, will use polling fallback');
-      
-      // Only show connection warning after extended disconnection (2+ minutes)
-      const connectionTimer = setTimeout(() => {
-        if (!isRealtimeConnected) {
-          toast({
-            title: "Connection issue detected",
-            description: "Messages may sync with delay",
-            duration: 3000,
-          });
+    if (!threadId) return;
+    const channel = supabase
+      .channel(`mobile-thread-assistant-append-${threadId}`)
+      .on('postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'chat_messages',
+          filter: `thread_id=eq.${threadId}`
+        },
+        (payload) => {
+          const m: any = payload.new;
+          if (m.sender === 'assistant') {
+            setMessages(prev => {
+              // Avoid duplicates by simple heuristic
+              const last = prev[prev.length - 1];
+              if (last && last.role === 'assistant' && last.content === m.content) return prev;
+              const uiMsg: UIChatMessage = {
+                role: 'assistant',
+                content: m.content,
+                references: m.reference_entries || undefined,
+                analysis: m.analysis_data || undefined,
+                hasNumericResult: m.has_numeric_result || false
+              };
+              return [...prev, uiMsg];
+            });
+          }
         }
-      }, 120000); // 2 minutes instead of 5 seconds
-
-      return () => clearTimeout(connectionTimer);
-    }
-  }, [isOnline, isRealtimeConnected, threadId, user?.id, toast]);
+      )
+      .on('postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'chat_messages',
+          filter: `thread_id=eq.${threadId}`
+        },
+        (payload) => {
+          const m: any = payload.new;
+          if (m.sender === 'assistant') {
+            setMessages(prev => {
+              // If last assistant message already matches, skip; else append updated
+              const last = prev[prev.length - 1];
+              if (last && last.role === 'assistant' && last.content === m.content) return prev;
+              const uiMsg: UIChatMessage = {
+                role: 'assistant',
+                content: m.content,
+                references: m.reference_entries || undefined,
+                analysis: m.analysis_data || undefined,
+                hasNumericResult: m.has_numeric_result || false
+              };
+              return [...prev, uiMsg];
+            });
+          }
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [threadId]);
 
   useEffect(() => {
     if (threadId) {
@@ -427,50 +370,6 @@ export default function MobileChatInterface({
       window.removeEventListener('threadSelected' as any, onThreadChange);
     };
   }, []);
-
-  // Navigation and tab switching handling with enhanced state reconciliation
-  useEffect(() => {
-    if (!threadId) return;
-
-    const handleVisibilityChange = async () => {
-      if (document.hidden) {
-        console.log('[MobileChatInterface] Page hidden, saving state');
-        // Save current streaming state if active
-        if (streamingChat.isStreaming) {
-          saveChatStreamingState(threadId, {
-            isStreaming: true,
-            streamingMessages: streamingChat.streamingMessages,
-            currentUserMessage: streamingChat.currentUserMessage,
-            showBackendAnimation: streamingChat.showBackendAnimation,
-            dynamicMessages: streamingChat.dynamicMessages,
-            currentMessageIndex: streamingChat.currentMessageIndex,
-            useThreeDotFallback: streamingChat.useThreeDotFallback,
-            queryCategory: streamingChat.queryCategory,
-            expectedProcessingTime: streamingChat.expectedProcessingTime,
-            processingStartTime: streamingChat.processingStartTime,
-            activeRequestId: null,
-            pausedDueToBackground: true
-          });
-        }
-      } else {
-        console.log('[MobileChatInterface] Page visible, checking for state restoration');
-        // Enhanced state reconciliation: check for missed messages first
-        await checkForMissedMessages();
-        
-        // Then try to restore streaming state with validation
-        setTimeout(async () => {
-          const restored = await streamingChat.restoreStreamingState(threadId);
-          if (!restored) {
-            // If state wasn't restored, force sync to ensure we have latest messages
-            await forceSyncMessages();
-          }
-        }, 100);
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [threadId, streamingChat, forceSyncMessages, checkForMissedMessages]);
 
   // Auto-scroll is now handled by the useAutoScroll hook
 
@@ -537,136 +436,145 @@ export default function MobileChatInterface({
     }
   };
 
-  const handleSendMessage = async (message: string, isAudio: boolean = false) => {
-    if (!message.trim() || !user?.id) return;
+  const handleSendMessage = async (message: string) => {
+    if (!message.trim()) return;
+    if (!user?.id) {
+      toast({
+        title: "Authentication required",
+        description: "Please sign in to use the chat feature.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (isProcessing || isLoading) {
+      toast({
+        title: "Please wait",
+        description: "Another request is currently being processed.",
+        variant: "default"
+      });
+      return;
+    }
+
+    let currentThreadId = threadId;
+    let isFirstMessage = false;
     
-    console.log('[MobileChatInterface] Sending message:', {
-      messageLength: message.length,
-      threadId: threadId,
-      userId: user.id,
-      isAudio
-    });
-    
-    // Always create thread if none exists
-    let activeThreadId = threadId;
-    if (!activeThreadId) {
-      debugLog.addEvent("Thread Creation", "Creating new thread for message", "info");
+    if (!currentThreadId) {
       try {
-        activeThreadId = await onCreateNewThread();
-        if (!activeThreadId) {
-          console.error('[MobileChatInterface] Failed to create new thread');
-          toast({
-            title: "Error",
-            description: "Failed to create conversation. Please try again.",
-            variant: "destructive",
-          });
-          return;
+        if (onCreateNewThread) {
+          const newThreadId = await onCreateNewThread();
+          if (!newThreadId) {
+            throw new Error("Failed to create new thread");
+          }
+          currentThreadId = newThreadId;
+        } else {
+          const newThreadId = uuidv4();
+          const { error } = await supabase
+            .from('chat_threads')
+            .insert({
+              id: newThreadId,
+              user_id: user.id,
+              title: "New Conversation",
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            });
+          
+          if (error) throw error;
+          
+          currentThreadId = newThreadId;
+          setThreadId(newThreadId);
         }
-        setThreadId(activeThreadId);
-        console.log('[MobileChatInterface] Created new thread:', activeThreadId);
-        localStorage.setItem("lastActiveChatThreadId", activeThreadId);
-      } catch (error) {
-        console.error('[MobileChatInterface] Error creating thread:', error);
+      } catch (error: any) {
         toast({
           title: "Error",
-          description: "Failed to create conversation. Please try again.",
-          variant: "destructive",
+          description: "Failed to create new conversation",
+          variant: "destructive"
         });
         return;
       }
+    } else {
+      const { count, error } = await supabase
+        .from('chat_messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('thread_id', currentThreadId);
+        
+      isFirstMessage = !error && count === 0;
     }
     
-    // Create user message immediately in UI
-    const userMessage: UIChatMessage = {
-      role: 'user',
-      content: message,
-    };
+    setMessages(prev => [...prev, { role: 'user', content: message }]);
+    // Force scroll to bottom on send so user sees streaming/processing
+    scrollToBottom(true);
+    setLocalLoading(true, "Processing your request...");
+    // Ensure we remain pinned to bottom as processing begins
+    scrollToBottom(true);
     
-    // Optimistically add user message to UI state immediately
-    setMessages(prev => [...prev, userMessage]);
-    setShowSuggestions(false);
-    
-    // Create unique idempotency key to prevent duplicates
-    const idempotencyKey = uuidv4();
-    
-    // Save user message to database with retry logic (ASYNC with error recovery)
-    const saveUserMessage = async (retryCount = 0): Promise<any> => {
-      try {
-        console.log(`[MobileChatInterface] Saving user message (attempt ${retryCount + 1})`);
-        
-        const savedMessage = await saveMessage(
-          activeThreadId!,
-          message,
-          'user',
-          user.id,
-          undefined, // references
-          undefined, // hasNumericResult
-          undefined, // isInteractive
-          undefined, // interactiveOptions
-          idempotencyKey,
-          undefined // analysisData
-        );
-        
-        if (!savedMessage) {
-          throw new Error('Database save returned null');
-        }
-        
-        console.log('[MobileChatInterface] User message saved successfully:', savedMessage.id);
-        return savedMessage;
-        
-      } catch (error) {
-        console.error(`[MobileChatInterface] Save attempt ${retryCount + 1} failed:`, error);
-        
-        if (retryCount < 2) { // Retry up to 3 times
-          console.log(`[MobileChatInterface] Retrying save in ${(retryCount + 1) * 1000}ms`);
-          await new Promise(resolve => setTimeout(resolve, (retryCount + 1) * 1000));
-          return saveUserMessage(retryCount + 1);
-        }
-        
-        return null;
-      }
-    };
-    
-    // Start streaming immediately (don't wait for database save)
     try {
-      console.log('[MobileChatInterface] Starting streaming chat immediately');
-      await startStreamingChat(message, activeThreadId, user.id);
+      await updateThreadProcessingStatus(currentThreadId, 'processing');
       
-      // Save user message in background with retry
-      saveUserMessage().then(savedMessage => {
-        if (!savedMessage) {
-          console.error('[MobileChatInterface] All save attempts failed');
-          toast({
-            title: "Message not saved",
-            description: "Your message may not persist after refresh",
-            variant: "destructive",
-            duration: 3000,
-          });
+      const savedUserMessage = await saveMessage(currentThreadId, message, 'user', user.id);
+      
+      // Generate title for the first message in a thread
+      if (isFirstMessage && savedUserMessage) {
+        try {
+          const generatedTitle = await generateThreadTitle(currentThreadId, user.id);
+          if (generatedTitle) {
+            // Dispatch event to update sidebar
+            window.dispatchEvent(
+              new CustomEvent('threadTitleUpdated', {
+                detail: { threadId: currentThreadId, title: generatedTitle }
+              })
+            );
+          }
+        } catch (titleError) {
+          console.warn('Failed to generate thread title:', titleError);
         }
-      });
-      
-      // Analytics tracking for message sent
-      debugLog.addEvent("Message Sent", `Streaming started for thread ${activeThreadId}`, "info");
-      
-    } catch (error) {
-      console.error('[MobileChatInterface] Error starting streaming:', error);
-      
-      // Remove the optimistic user message from UI on error
-      setMessages(prev => prev.slice(0, -1));
-      
-      toast({
-        title: "Failed to send message",
-        description: "Please try again.",
-        variant: "destructive",
-        duration: 5000,
-      });
-      
-      // Show suggestions again if this was the first message
-      if (messages.length === 0) {
-        setShowSuggestions(true);
       }
       
-      return;
+      window.dispatchEvent(
+        new CustomEvent('messageCreated', { 
+          detail: { 
+            threadId: currentThreadId, 
+            isFirstMessage,
+            content: message
+          } 
+        })
+      );
+      
+      // Use streaming chat for enhanced UX
+      const conversationContext = messages.slice(-5).map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }));
+      
+      // Start streaming chat with conversation context
+      await startStreamingChat(
+        message,
+        user.id,
+        currentThreadId,
+        conversationContext,
+        {}
+      );
+      
+      await updateThreadProcessingStatus(currentThreadId, 'idle');
+    } catch (error: any) {
+      if (currentThreadId) {
+        await updateThreadProcessingStatus(currentThreadId, 'failed');
+      }
+      
+      const errorMessageContent = "I'm having trouble processing your request. Please try again later. " + 
+                 (error?.message ? `Error: ${error.message}` : "");
+      
+      if (currentThreadId === currentThreadIdRef.current) {
+        setMessages(prev => [
+          ...prev, 
+          { 
+            role: 'assistant', 
+            content: errorMessageContent
+          }
+        ]);
+      }
+    } finally {
+      setLocalLoading(false);
     }
   };
 
@@ -850,37 +758,10 @@ export default function MobileChatInterface({
       {/* Header */}
       <div className="sticky top-0 z-40 w-full bg-background border-b">
         <div className="container flex h-14 max-w-screen-lg items-center">
-          <Sheet 
-            open={sheetOpen && !isBackendProcessing} 
-            onOpenChange={(open) => {
-              if (!isBackendProcessing) {
-                setSheetOpen(open);
-              }
-            }}
-          >
+          <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
             <SheetTrigger asChild>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className={`mr-2 transition-all duration-200 ${
-                  isBackendProcessing 
-                    ? 'opacity-20 cursor-not-allowed pointer-events-none grayscale' 
-                    : 'hover:bg-muted/50'
-                }`}
-                disabled={isBackendProcessing}
-                onClick={(e) => {
-                  if (isBackendProcessing) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    return false;
-                  }
-                }}
-              >
-                <Menu className={`h-5 w-5 transition-colors duration-200 ${
-                  isBackendProcessing 
-                    ? 'text-muted-foreground/50' 
-                    : 'text-foreground'
-                }`} />
+              <Button variant="ghost" size="icon" className="mr-2">
+                <Menu className="h-5 w-5" />
                 <span className="sr-only">
                   <TranslatableText text="Toggle Menu" />
                 </span>
@@ -1042,20 +923,27 @@ export default function MobileChatInterface({
               </ChatErrorBoundary>
             ))}
             
-            {/* *** CRITICAL: PRIMARY streaming indicator controlled by useStreamingChat *** */}
-            {isStreaming && (
+            {/* Show streaming status or basic loading */}
+            {isStreaming ? (
               <ChatErrorBoundary>
                 <MobileChatMessage 
                   message={{ role: 'assistant', content: '' }}
                   streamingMessage={
                     useThreeDotFallback || dynamicMessages.length === 0
-                      ? undefined // Shows three-dot animation immediately
-                      : translatedDynamicMessages[currentMessageIndex] || dynamicMessages[currentMessageIndex]
+                      ? undefined // Show only three-dot animation
+                      : translatedDynamicMessages[currentMessageIndex] || dynamicMessages[currentMessageIndex] // Use pre-translated message
                   }
                   showStreamingDots={true}
                 />
               </ChatErrorBoundary>
-            )}
+            ) : (!isStreaming && (isLoading || isProcessing)) ? (
+              <ChatErrorBoundary>
+                <MobileChatMessage 
+                  message={{ role: 'assistant', content: '' }}
+                  isLoading={true}
+                />
+              </ChatErrorBoundary>
+            ) : null}
             
             {/* Spacer for auto-scroll */}
             <div className="pb-5" />
@@ -1066,7 +954,7 @@ export default function MobileChatInterface({
       {/* Chat Input */}
       <MobileChatInput 
         onSendMessage={handleSendMessage} 
-        isLoading={isLoading || isProcessing || isStreaming}
+        isLoading={isLoading || isProcessing}
         userId={userId || user?.id}
       />
       
