@@ -271,8 +271,7 @@ export default function MobileChatInterface({
     isStreaming || 
     isProcessing || 
     processingStatus === 'processing' || 
-    initialLoading || 
-    streamingChat.isStreaming;
+    initialLoading;
 
   // Configure streaming chat - useStreamingChat handles callbacks internally
   useEffect(() => {
@@ -509,97 +508,31 @@ export default function MobileChatInterface({
       return;
     }
 
-    let currentThreadId = threadId;
-    let isFirstMessage = false;
-    
-    if (!currentThreadId) {
-      try {
-        if (onCreateNewThread) {
-          const newThreadId = await onCreateNewThread();
-          if (!newThreadId) {
-            throw new Error("Failed to create new thread");
-          }
-          currentThreadId = newThreadId;
-        } else {
-          const newThreadId = uuidv4();
-          const { error } = await supabase
-            .from('chat_threads')
-            .insert({
-              id: newThreadId,
-              user_id: user.id,
-              title: "New Conversation",
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            });
-          
-          if (error) throw error;
-          
-          currentThreadId = newThreadId;
-          setThreadId(newThreadId);
-        }
-      } catch (error: any) {
-        toast({
-          title: "Error",
-          description: "Failed to create new conversation",
-          variant: "destructive"
-        });
-        return;
-      }
-    } else {
-      const { count, error } = await supabase
-        .from('chat_messages')
-        .select('*', { count: 'exact', head: true })
-        .eq('thread_id', currentThreadId);
-        
-      isFirstMessage = !error && count === 0;
-    }
-    
-    // Add user message to UI immediately
+    // ============= INSTANT UI UPDATES =============
+    // Add user message to UI immediately (no delays)
     setMessages(prev => [...prev, { role: 'user', content: message }]);
     setShowSuggestions(false);
     
-    // Force scroll to bottom so user sees their message and upcoming response
+    // Force scroll to bottom so user sees their message
     scrollToBottom(true);
-    
+
+    // Handle thread creation for UI immediately  
+    let currentThreadId = threadId;
+    if (!currentThreadId) {
+      // Create temporary thread ID for UI
+      currentThreadId = uuidv4();
+      setThreadId(currentThreadId);
+    }
+
+    // Prepare conversation context for streaming chat
+    const conversationContext = messages.slice(-5).map(msg => ({
+      role: msg.role,
+      content: msg.content
+    }));
+
+    // ============= START STREAMING IMMEDIATELY =============
+    // This shows the three dots instantly
     try {
-      await updateThreadProcessingStatus(currentThreadId, 'processing');
-      
-      const savedUserMessage = await saveMessage(currentThreadId, message, 'user', user.id);
-      
-      // Generate title for the first message in a thread
-      if (isFirstMessage && savedUserMessage) {
-        try {
-          const generatedTitle = await generateThreadTitle(currentThreadId, user.id);
-          if (generatedTitle) {
-            // Dispatch event to update sidebar
-            window.dispatchEvent(
-              new CustomEvent('threadTitleUpdated', {
-                detail: { threadId: currentThreadId, title: generatedTitle }
-              })
-            );
-          }
-        } catch (titleError) {
-          console.warn('Failed to generate thread title:', titleError);
-        }
-      }
-      
-      window.dispatchEvent(
-        new CustomEvent('messageCreated', { 
-          detail: { 
-            threadId: currentThreadId, 
-            isFirstMessage,
-            content: message
-          } 
-        })
-      );
-      
-      // Prepare conversation context for streaming chat
-      const conversationContext = messages.slice(-5).map(msg => ({
-        role: msg.role,
-        content: msg.content
-      }));
-      
-      // Start streaming chat - this will show immediate streaming indicators
       await startStreamingChat(
         message,
         user.id,
@@ -607,13 +540,8 @@ export default function MobileChatInterface({
         conversationContext,
         {}
       );
-      
-      await updateThreadProcessingStatus(currentThreadId, 'idle');
     } catch (error: any) {
-      if (currentThreadId) {
-        await updateThreadProcessingStatus(currentThreadId, 'failed');
-      }
-      
+      console.error('Streaming error:', error);
       const errorMessageContent = "I'm having trouble processing your request. Please try again later. " + 
                  (error?.message ? `Error: ${error.message}` : "");
       
@@ -626,9 +554,91 @@ export default function MobileChatInterface({
           }
         ]);
       }
-    } finally {
-      // Don't reset loading here - let streaming state manage it
     }
+
+    // ============= BACKGROUND OPERATIONS (NON-BLOCKING) =============
+    // All database operations happen in background while streaming is active
+    (async () => {
+      try {
+        let actualThreadId = currentThreadId;
+        let isFirstMessage = false;
+        
+        // Create actual thread in database if needed
+        if (!threadId) {
+          try {
+            if (onCreateNewThread) {
+              const newThreadId = await onCreateNewThread();
+              if (newThreadId) {
+                actualThreadId = newThreadId;
+                setThreadId(newThreadId);
+              }
+            } else {
+              const { error } = await supabase
+                .from('chat_threads')
+                .insert({
+                  id: actualThreadId,
+                  user_id: user.id,
+                  title: "New Conversation",
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString()
+                });
+              
+              if (error) {
+                console.error('Thread creation error:', error);
+                return;
+              }
+            }
+          } catch (error: any) {
+            console.error('Thread creation failed:', error);
+            return;
+          }
+        } else {
+          // Check if first message for existing thread
+          const { count, error } = await supabase
+            .from('chat_messages')
+            .select('*', { count: 'exact', head: true })
+            .eq('thread_id', actualThreadId);
+            
+          isFirstMessage = !error && count === 0;
+        }
+        
+        // Update processing status
+        await updateThreadProcessingStatus(actualThreadId, 'processing');
+        
+        // Save user message to database
+        const savedUserMessage = await saveMessage(actualThreadId, message, 'user', user.id);
+        
+        // Generate title for first message
+        if (isFirstMessage && savedUserMessage) {
+          try {
+            const generatedTitle = await generateThreadTitle(actualThreadId, user.id);
+            if (generatedTitle) {
+              window.dispatchEvent(
+                new CustomEvent('threadTitleUpdated', {
+                  detail: { threadId: actualThreadId, title: generatedTitle }
+                })
+              );
+            }
+          } catch (titleError) {
+            console.warn('Failed to generate thread title:', titleError);
+          }
+        }
+        
+        // Dispatch message created event
+        window.dispatchEvent(
+          new CustomEvent('messageCreated', { 
+            detail: { 
+              threadId: actualThreadId, 
+              isFirstMessage,
+              content: message
+            } 
+          })
+        );
+        
+      } catch (error) {
+        console.error('Background operations error:', error);
+      }
+    })();
   };
 
   const handleSelectThread = async (selectedThreadId: string) => {
@@ -823,16 +833,25 @@ export default function MobileChatInterface({
               <Button 
                 variant="ghost" 
                 size="icon" 
-                className={`mr-2 ${isBackendProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                className={`mr-2 transition-all duration-200 ${
+                  isBackendProcessing 
+                    ? 'opacity-20 cursor-not-allowed pointer-events-none grayscale' 
+                    : 'hover:bg-muted/50'
+                }`}
                 disabled={isBackendProcessing}
                 onClick={(e) => {
                   if (isBackendProcessing) {
                     e.preventDefault();
                     e.stopPropagation();
+                    return false;
                   }
                 }}
               >
-                <Menu className={`h-5 w-5 ${isBackendProcessing ? 'text-muted-foreground' : ''}`} />
+                <Menu className={`h-5 w-5 transition-colors duration-200 ${
+                  isBackendProcessing 
+                    ? 'text-muted-foreground/50' 
+                    : 'text-foreground'
+                }`} />
                 <span className="sr-only">
                   <TranslatableText text="Toggle Menu" />
                 </span>
