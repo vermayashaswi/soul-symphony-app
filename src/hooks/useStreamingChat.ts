@@ -286,31 +286,9 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
           const category = (body as any)?.category || threadState.queryCategory;
           let result: { data: any; error: any };
 
-          if (category === 'JOURNAL_SPECIFIC') {
-            // Disable client-side timeout for long-running analysis
-            result = (await supabase.functions.invoke('chat-with-rag', { body })) as { data: any; error: any };
-          } else if (category === 'GENERAL_MENTAL_HEALTH') {
-            const timeoutMs = 20000 + i * 5000;
-            const timeoutPromise = new Promise((_, rej) =>
-              setTimeout(() => rej(new Error('Request timed out')), timeoutMs)
-            );
-
-            result = (await Promise.race([
-              supabase.functions.invoke('general-mental-health-chat', { body }),
-              timeoutPromise,
-            ])) as { data: any; error: any };
-          } else {
-            // Fallback for unknown categories
-            const timeoutMs = 20000 + i * 5000;
-            const timeoutPromise = new Promise((_, rej) =>
-              setTimeout(() => rej(new Error('Request timed out')), timeoutMs)
-            );
-
-            result = (await Promise.race([
-              supabase.functions.invoke('general-mental-health-chat', { body }),
-              timeoutPromise,
-            ])) as { data: any; error: any };
-          }
+          // ALL categories now route through chat-with-rag as the single orchestrator
+          // chat-with-rag will handle classification and routing to appropriate edge functions
+          result = (await supabase.functions.invoke('chat-with-rag', { body })) as { data: any; error: any };
           if ((result as any)?.error) {
             lastErr = (result as any).error;
             if (isEdgeFunctionError(lastErr) || isNetworkError(lastErr)) {
