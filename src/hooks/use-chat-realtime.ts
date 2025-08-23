@@ -120,21 +120,15 @@ export function useChatRealtime(threadId: string | null) {
             const messageData = payload.new as any;
             console.log(`[useChatRealtime] New message in thread ${threadId}:`, messageData.sender);
             
-            // Clear processing state immediately when assistant message arrives
+            // Only update if this is still the active thread
             if (threadId && threadRealtimeStates.has(threadId)) {
-              if (messageData.sender === 'assistant') {
-                console.log(`[useChatRealtime] Assistant message received, clearing processing state for thread: ${threadId}`);
+              if (messageData.sender === 'assistant' && !messageData.is_processing) {
                 updateThreadRealtimeState(threadId, {
                   isLoading: false,
                   isProcessing: false,
                   processingStatus: 'idle',
                   processingStage: null
                 });
-                
-                // Dispatch event to clear streaming messages
-                window.dispatchEvent(new CustomEvent('assistantMessageReceived', {
-                  detail: { threadId, messageId: messageData.id }
-                }));
               }
             }
           }
@@ -150,10 +144,8 @@ export function useChatRealtime(threadId: string | null) {
             const messageData = payload.new as any;
             console.log(`[useChatRealtime] Updated message in thread ${threadId}:`, messageData.sender);
             
-            // Clear processing state on message updates
             if (threadId && threadRealtimeStates.has(threadId)) {
-              if (messageData.sender === 'assistant') {
-                console.log(`[useChatRealtime] Assistant message updated, clearing processing state for thread: ${threadId}`);
+              if (messageData.sender === 'assistant' && !messageData.is_processing) {
                 updateThreadRealtimeState(threadId, {
                   isLoading: false,
                   isProcessing: false,

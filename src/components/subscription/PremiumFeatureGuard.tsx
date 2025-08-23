@@ -36,14 +36,7 @@ export const PremiumFeatureGuard: React.FC<PremiumFeatureGuardProps> = ({
   const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false);
 
   // Show loading state while subscription data is being fetched
-  // For iOS, add timeout to prevent infinite loading
   if (isLoading) {
-    setTimeout(() => {
-      if (isLoading) {
-        console.log('[PremiumFeatureGuard] Loading timeout on iOS, allowing access');
-      }
-    }, 3000); // 3 second timeout for iOS
-    
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div>

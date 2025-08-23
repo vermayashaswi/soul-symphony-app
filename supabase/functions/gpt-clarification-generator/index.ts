@@ -30,6 +30,9 @@ serve(async (req) => {
 
 USER QUESTION: "${userMessage}"
 
+CONVERSATION CONTEXT:
+${conversationContext ? conversationContext.slice(-6).map((msg) => `${msg.role || msg.sender || 'user'}: ${msg.content}`).join('\n') : 'No prior context'}
+
 USER PROFILE:
 - Timezone: ${userProfile?.timezone || 'Unknown'}
 - Premium User: ${userProfile?.is_premium ? 'Yes' : 'No'}
@@ -82,10 +85,6 @@ TONE: Direct, insightful, naturally warm, witty when appropriate, and focused on
           model: 'gpt-4.1-nano-2025-04-14',
           messages: [
             { role: 'system', content: 'You are Ruh, the soul-centered wellness companion by SOuLO. You combine ancient wisdom with modern psychology to help people connect with their deepest truth and inner knowing.' },
-            ...conversationContext ? conversationContext.slice(-4).map(msg => ({ 
-              role: msg.role || msg.sender || 'user', 
-              content: msg.content 
-            })) : [],
             { role: 'user', content: clarificationPrompt }
           ],
           max_completion_tokens: 800
