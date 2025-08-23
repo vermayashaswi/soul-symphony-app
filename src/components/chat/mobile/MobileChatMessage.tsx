@@ -44,8 +44,8 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({
   }, [message]);
   
   // Determine what type of content to render
-  const shouldShowLoading = isLoading && !streamingMessage;
-  const shouldShowStreaming = !!streamingMessage;
+  const shouldShowLoading = isLoading && !streamingMessage && !showStreamingDots;
+  const shouldShowStreaming = !!streamingMessage || showStreamingDots;
   const shouldShowMessage = !shouldShowLoading && !shouldShowStreaming;
   
   // Calculate derived values
@@ -73,15 +73,15 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({
         transition={{ duration: 0.3 }}
         className="relative flex items-start gap-2 justify-start mb-3"
       >
-        {/* Show avatar only when there's a streaming message with content */}
-        {streamingMessage && (
+        {/* CRITICAL: Always show avatar during streaming (with content or dots) */}
+        {(streamingMessage || showStreamingDots) && (
           <div className="border border-primary/20 rounded-full">
             <ParticleAvatar className="w-8 h-8" size={32} />
           </div>
         )}
         
-        {/* For general mental health queries (showStreamingDots=true, streamingMessage=undefined), show only dots */}
-        {showStreamingDots && !streamingMessage ? (
+        {/* Show three dots when showStreamingDots=true and no streamingMessage */}
+        {(showStreamingDots && !streamingMessage) ? (
           <div className="flex items-center space-x-1 bg-muted/60 border border-border/50 rounded-2xl rounded-tl-none px-4 py-3">
             <div className="flex space-x-1">
               <div 
@@ -107,7 +107,7 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({
               />
             </div>
           </div>
-        ) : streamingMessage && (
+        ) : streamingMessage ? (
           <div className="min-w-0 max-w-[85%] rounded-2xl rounded-tl-none p-3.5 text-sm shadow-sm bg-muted/60 border border-border/50">
             <div className="flex items-center gap-2">
               <span className="text-muted-foreground">{streamingMessage}</span>
@@ -138,7 +138,7 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({
               )}
             </div>
           </div>
-        )}
+        ) : null}
       </motion.div>
     );
   }

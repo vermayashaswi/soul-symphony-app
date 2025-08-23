@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { processingStateManager } from "./processingStateManager";
 
 /**
  * Generates a title for a chat thread using GPT based on the existing messages
@@ -200,7 +201,13 @@ export const createProcessingMessage = async (
       return null;
     }
     
-    return data?.id || null;
+    const messageId = data?.id;
+    if (messageId) {
+      // Start tracking this message to prevent it from getting stuck
+      processingStateManager.startProcessing(messageId);
+    }
+    
+    return messageId || null;
   } catch (error) {
     console.error("Error in createProcessingMessage:", error);
     return null;
@@ -230,21 +237,29 @@ export const updateProcessingMessage = async (
         return false;
       }
     } else {
-      // Update the processing message with the final content
-      const { error } = await supabase
-        .from('chat_messages')
-        .update({
-          content: finalContent,
-          is_processing: false,
-          reference_entries: references || null,
-          analysis_data: analysis || null,
-          has_numeric_result: hasNumericResult || false
-        })
-        .eq('id', messageId);
-        
-      if (error) {
-        console.error("Error updating processing message:", error);
+      // Update the processing message with the final content using processing state manager
+      const success = await processingStateManager.completeProcessing(messageId, finalContent);
+      
+      if (!success) {
+        console.error("Error updating processing message via state manager");
         return false;
+      }
+      
+      // Update additional fields if provided
+      if (references || analysis || hasNumericResult) {
+        const { error } = await supabase
+          .from('chat_messages')
+          .update({
+            reference_entries: references || null,
+            analysis_data: analysis || null,
+            has_numeric_result: hasNumericResult || false
+          })
+          .eq('id', messageId);
+          
+        if (error) {
+          console.error("Error updating message metadata:", error);
+          // Don't return false here since the main update succeeded
+        }
       }
     }
     
