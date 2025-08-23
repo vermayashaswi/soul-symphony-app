@@ -17,11 +17,6 @@ interface UseAutoScrollOptions {
   delay?: number;
   
   /**
-   * Scroll behavior
-   */
-  behavior?: ScrollBehavior;
-  
-  /**
    * Whether to use smooth scrolling
    */
   smooth?: boolean;
@@ -40,10 +35,9 @@ export const useAutoScroll = (options: UseAutoScrollOptions) => {
   const {
     dependencies,
     enabled = true,
-    delay = 100,
-    behavior = 'smooth',
+    delay = 50,
     smooth = true,
-    scrollThreshold = 150
+    scrollThreshold = 50
   } = options;
 
   const scrollElementRef = useRef<HTMLDivElement>(null);
@@ -61,13 +55,31 @@ export const useAutoScroll = (options: UseAutoScrollOptions) => {
     return distanceFromBottom <= scrollThreshold;
   }, [scrollThreshold]);
 
-  // Scroll to bottom function
+  // Scroll to bottom function with smart threshold management
   const scrollToBottom = useCallback((force = false) => {
     if (!enabled && !force) return;
     if (!scrollElementRef.current) return;
 
-    // Don't auto-scroll if user has manually scrolled up (unless forced)
-    if (!force && !isNearBottom()) {
+    // For force-scroll (user actions), always scroll regardless of position
+    if (force) {
+      // Clear any existing timeout
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+
+      scrollTimeoutRef.current = setTimeout(() => {
+        if (scrollElementRef.current) {
+          scrollElementRef.current.scrollTo({
+            top: scrollElementRef.current.scrollHeight,
+            behavior: smooth ? 'smooth' : 'auto'
+          });
+        }
+      }, delay);
+      return;
+    }
+
+    // For automatic scrolling (system actions), respect user position
+    if (!isNearBottom()) {
       return;
     }
 

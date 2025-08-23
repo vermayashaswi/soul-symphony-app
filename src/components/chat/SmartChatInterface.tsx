@@ -35,7 +35,7 @@ import { TranslatableText } from "@/components/translation/TranslatableText";
 import { useChatMessageClassification, QueryCategory } from "@/hooks/use-chat-message-classification";
 import { useStreamingChat } from "@/hooks/useStreamingChat";
 import { threadSafetyManager } from "@/utils/threadSafetyManager";
-import { useAutoScroll } from "@/hooks/use-auto-scroll";
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -75,6 +75,8 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
+  const [userMessageSent, setUserMessageSent] = useState(false);
+  const [userJustSentMessage, setUserJustSentMessage] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
   const { translate } = useTranslation();
@@ -216,12 +218,6 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     }
   }, [isAnyProcessing, onProcessingStateChange]);
   
-  // Use unified auto-scroll hook
-  const { scrollElementRef, scrollToBottom } = useAutoScroll({
-    dependencies: [chatHistory, isLoading, isProcessing, isStreaming, streamingMessages],
-    delay: 50,
-    scrollThreshold: 100
-  });
 
   // Realtime: append assistant messages saved by backend
   useEffect(() => {
@@ -350,7 +346,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     };
   }, [effectiveUserId, propsThreadId]);
 
-  // Auto-scroll is now handled by the useAutoScroll hook
+  
 
   const loadThreadMessages = async (threadId: string) => {
     if (!threadId || !effectiveUserId) {
@@ -486,14 +482,16 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
      debugLog.addEvent("User Message", `Adding temporary message to UI: ${tempUserMessage.id}`, "info");
     setChatHistory(prev => [...prev, tempUserMessage]);
     
-    // Force chat area to jump to bottom on send
-    window.dispatchEvent(new Event('chat:forceScrollToBottom'));
+    // Trigger user message sent for auto-scroll
+    setUserMessageSent(true);
+    setTimeout(() => setUserMessageSent(false), 200);
     
     // Set local loading state for immediate UI feedback
     setLocalLoading(true, "Analyzing your question...");
     
-    // Ensure we stay pinned to bottom as processing begins
-    window.dispatchEvent(new Event('chat:forceScrollToBottom'));
+    // Trigger immediate auto-scroll for user message
+    setUserJustSentMessage(true);
+    setTimeout(() => setUserJustSentMessage(false), 100);
     try {
       // Update thread processing status to 'processing'
       await updateThreadProcessingStatus(threadId, 'processing');
@@ -618,11 +616,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       setLocalLoading(false);
       updateProcessingStage(null);
       
-      // Trigger scroll to bottom when user sends message
-      setTimeout(() => {
-        const event = new CustomEvent('chat:forceScrollToBottom');
-        window.dispatchEvent(event);
-      }, 100);
+      // Auto-scroll handled by ChatArea component
       
       // Skip the rest since streaming handles the response
       return;
@@ -919,6 +913,8 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
             processingStage={processingStage || undefined}
             threadId={currentThreadId}
             onInteractiveOptionClick={handleInteractiveOptionClick}
+            onUserMessageSent={userMessageSent}
+            isStreaming={isStreaming}
           />
         )}
         
