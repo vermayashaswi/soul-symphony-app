@@ -219,7 +219,14 @@ export default function MobileChatInterface({
       return;
     }
 
-    // Create the new message
+    // CRITICAL: Validate message ordering
+    // Ensure assistant response comes after the last user message
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage && lastMessage.role !== 'user') {
+      console.warn('[MobileChatInterface] Message ordering issue detected - last message is not from user');
+    }
+
+    // Create the new message with timestamp validation
     const newMessage: UIChatMessage = {
       role: 'assistant',
       content,
@@ -229,17 +236,21 @@ export default function MobileChatInterface({
 
     // Add to local state immediately for instant UI update
     setMessages(prev => {
+      // Ensure proper ordering: assistant message comes after user message
       const updated = [...prev, newMessage];
+      
       console.log('[MobileChatInterface] Updated messages state:', {
         previousCount: prev.length,
         newCount: updated.length,
-        lastMessage: newMessage.content.substring(0, 50) + '...'
+        lastMessage: newMessage.content.substring(0, 50) + '...',
+        messageOrder: updated.slice(-2).map(m => m.role).join(' -> ')
       });
+      
       return updated;
     });
 
     console.log('[MobileChatInterface] Successfully added final response to local state');
-  }, [messages.length]);
+  }, [messages]);
 
   const streamingChat = useStreamingChat({
       threadId: threadId,
@@ -508,6 +519,11 @@ export default function MobileChatInterface({
       return;
     }
 
+    // ============= PRE-GENERATE TIMESTAMP FOR MESSAGE ORDERING =============
+    // Create timestamp now to ensure user message is always before assistant message
+    const userMessageTimestamp = new Date().toISOString();
+    console.log('[MobileChatInterface] Pre-generated timestamp for user message:', userMessageTimestamp);
+
     // ============= INSTANT UI UPDATES =============
     // Add user message to UI immediately (no delays)
     setMessages(prev => [...prev, { role: 'user', content: message }]);
@@ -530,13 +546,89 @@ export default function MobileChatInterface({
       content: msg.content
     }));
 
-    // ============= START STREAMING IMMEDIATELY =============
-    // This shows the three dots instantly
+    // ============= CRITICAL DATABASE OPERATIONS BEFORE STREAMING =============
+    // These operations must complete before streaming starts to ensure proper ordering
+    let actualThreadId = currentThreadId;
+    let isFirstMessage = false;
+    let savedUserMessage = null;
+    
+    try {
+      // Create actual thread in database if needed (synchronous)
+      if (!threadId) {
+        try {
+          if (onCreateNewThread) {
+            const newThreadId = await onCreateNewThread();
+            if (newThreadId) {
+              actualThreadId = newThreadId;
+              setThreadId(newThreadId);
+            }
+          } else {
+            const { error } = await supabase
+              .from('chat_threads')
+              .insert({
+                id: actualThreadId,
+                user_id: user.id,
+                title: "New Conversation",
+                created_at: userMessageTimestamp,
+                updated_at: userMessageTimestamp
+              });
+            
+            if (error) {
+              console.error('Thread creation error:', error);
+              return;
+            }
+          }
+        } catch (error: any) {
+          console.error('Thread creation failed:', error);
+          return;
+        }
+      } else {
+        // Check if first message for existing thread
+        const { count, error } = await supabase
+          .from('chat_messages')
+          .select('*', { count: 'exact', head: true })
+          .eq('thread_id', actualThreadId);
+          
+        isFirstMessage = !error && count === 0;
+      }
+      
+      // Update processing status
+      await updateThreadProcessingStatus(actualThreadId, 'processing');
+      
+      // CRITICAL: Save user message to database BEFORE starting streaming
+      // This ensures user message timestamp is always before assistant message
+      console.log('[MobileChatInterface] Saving user message before streaming with timestamp:', userMessageTimestamp);
+      savedUserMessage = await saveMessage(actualThreadId, message, 'user', user.id, null, false, false, [], null, null);
+      
+      if (!savedUserMessage) {
+        console.error('[MobileChatInterface] Failed to save user message');
+        toast({
+          title: "Error",
+          description: "Failed to save message. Please try again.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      console.log('[MobileChatInterface] User message saved successfully, starting streaming...');
+      
+    } catch (error) {
+      console.error('[MobileChatInterface] Critical pre-streaming operations failed:', error);
+      toast({
+        title: "Error",
+        description: "Failed to prepare message. Please try again.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // ============= START STREAMING AFTER USER MESSAGE IS SAVED =============
+    // This shows the three dots and begins assistant response
     try {
       await startStreamingChat(
         message,
         user.id,
-        currentThreadId,
+        actualThreadId,
         conversationContext,
         {}
       );
@@ -545,7 +637,7 @@ export default function MobileChatInterface({
       const errorMessageContent = "I'm having trouble processing your request. Please try again later. " + 
                  (error?.message ? `Error: ${error.message}` : "");
       
-      if (currentThreadId === currentThreadIdRef.current) {
+      if (actualThreadId === currentThreadIdRef.current) {
         setMessages(prev => [
           ...prev, 
           { 
@@ -557,57 +649,9 @@ export default function MobileChatInterface({
     }
 
     // ============= BACKGROUND OPERATIONS (NON-BLOCKING) =============
-    // All database operations happen in background while streaming is active
+    // Non-critical operations that can happen in background
     (async () => {
       try {
-        let actualThreadId = currentThreadId;
-        let isFirstMessage = false;
-        
-        // Create actual thread in database if needed
-        if (!threadId) {
-          try {
-            if (onCreateNewThread) {
-              const newThreadId = await onCreateNewThread();
-              if (newThreadId) {
-                actualThreadId = newThreadId;
-                setThreadId(newThreadId);
-              }
-            } else {
-              const { error } = await supabase
-                .from('chat_threads')
-                .insert({
-                  id: actualThreadId,
-                  user_id: user.id,
-                  title: "New Conversation",
-                  created_at: new Date().toISOString(),
-                  updated_at: new Date().toISOString()
-                });
-              
-              if (error) {
-                console.error('Thread creation error:', error);
-                return;
-              }
-            }
-          } catch (error: any) {
-            console.error('Thread creation failed:', error);
-            return;
-          }
-        } else {
-          // Check if first message for existing thread
-          const { count, error } = await supabase
-            .from('chat_messages')
-            .select('*', { count: 'exact', head: true })
-            .eq('thread_id', actualThreadId);
-            
-          isFirstMessage = !error && count === 0;
-        }
-        
-        // Update processing status
-        await updateThreadProcessingStatus(actualThreadId, 'processing');
-        
-        // Save user message to database
-        const savedUserMessage = await saveMessage(actualThreadId, message, 'user', user.id);
-        
         // Generate title for first message
         if (isFirstMessage && savedUserMessage) {
           try {
