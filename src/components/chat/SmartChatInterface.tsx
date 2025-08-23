@@ -35,7 +35,6 @@ import { TranslatableText } from "@/components/translation/TranslatableText";
 import { useChatMessageClassification, QueryCategory } from "@/hooks/use-chat-message-classification";
 import { useStreamingChat } from "@/hooks/useStreamingChat";
 import { threadSafetyManager } from "@/utils/threadSafetyManager";
-import { idempotencyManager } from "@/utils/idempotencyManager";
 import { useAutoScroll } from "@/hooks/use-auto-scroll";
 import {
   AlertDialog,
@@ -60,6 +59,7 @@ export interface SmartChatInterfaceProps {
   onCreateNewThread?: () => Promise<string | null>;
   userId?: string;
   mentalHealthInsights?: MentalHealthInsights;
+  onProcessingStateChange?: (isProcessing: boolean) => void;
 }
 
 const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ 
@@ -67,7 +67,8 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
   onSelectThread, 
   onCreateNewThread, 
   userId: propsUserId, 
-  mentalHealthInsights 
+  mentalHealthInsights,
+  onProcessingStateChange
 }) => {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -116,27 +117,10 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
   } = useStreamingChat({
       threadId: currentThreadId,
     onFinalResponse: async (response, analysis, originThreadId, requestId) => {
-      // Enhanced thread validation for final response handling
+      // Handle final streaming response scoped to its origin thread
       if (!response || !originThreadId || !effectiveUserId) {
         debugLog.addEvent("Streaming Response", "Missing required data for final response", "error");
         console.error("[Streaming] Missing response data:", { response: !!response, originThreadId: !!originThreadId, userId: !!effectiveUserId });
-        return;
-      }
-      
-      // Validate this response belongs to the current thread context
-      const validation = threadSafetyManager.validateThreadContext(originThreadId, requestId || undefined);
-      if (!validation.valid) {
-        console.warn("[Streaming] REJECTING final response due to thread validation failure:", validation.reason);
-        debugLog.addEvent("Streaming Response", `Response rejected: ${validation.reason}`, "warning");
-        return;
-      }
-      
-      // Additional check: only process if this is still the active thread
-      if (originThreadId !== currentThreadIdRef.current) {
-        console.warn("[Streaming] REJECTING final response - thread no longer active", { 
-          originThreadId, 
-          currentActive: currentThreadIdRef.current 
-        });
         return;
       }
       
@@ -152,7 +136,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       if (originThreadId === currentThreadId) {
         // Watchdog: if realtime insert doesn't arrive, persist client-side after a short delay
         try {
-            setTimeout(async () => {
+          setTimeout(async () => {
             // Double-check still on same thread
             if (!currentThreadIdRef.current || currentThreadIdRef.current !== originThreadId) return;
 
@@ -168,69 +152,31 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
               console.warn('[Streaming Watchdog] Failed to fetch recent messages:', recentErr.message);
             }
 
-            // Check if the exact response already exists or similar content
-            const responseAlreadyExists = (recent || []).some(m => {
-              const existingContent = (m as any).content?.trim() || '';
-              const newContent = response.trim();
-              // Check for exact match or very similar content (edge function may have saved it)
-              return existingContent === newContent || 
-                     (existingContent.length > 50 && newContent.length > 50 && 
-                      existingContent.substring(0, 100) === newContent.substring(0, 100));
-            });
-            
-            if (!responseAlreadyExists) {
-              console.log('[Streaming Watchdog] Assistant response not found in DB, saving fallback');
+            const alreadyExists = (recent || []).some(m => (m as any).sender === 'assistant' && (m as any).content?.trim() === response.trim());
+            if (!alreadyExists) {
+              // Persist safely with an idempotency_key derived from threadId + response
               try {
-                // Create watchdog-specific idempotency key to avoid conflicts
-                const idempotencyKey = `watchdog-${originThreadId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-                
-                const savedMessage = await saveMessage(
-                  originThreadId, 
-                  response, 
-                  'assistant', 
-                  effectiveUserId, 
-                  null, // references
-                  false, // hasNumericResult
-                  false, // isInteractive
-                  [], // interactiveOptions
-                  idempotencyKey,
-                  {
-                    watchdog_fallback: true,
-                    original_request_id: requestId,
-                    fallback_timestamp: new Date().toISOString(),
-                    analysis_data: analysis || null
-                  }
-                );
-                
-                if (savedMessage) {
-                  console.log(`[Streaming Watchdog] Successfully saved fallback message: ${savedMessage.id}`);
-                } else {
-                  console.warn('[Streaming Watchdog] saveMessage returned null');
-                  
-                  // Show user feedback for save failure
-                  toast({
-                    title: "Response not saved",
-                    description: "The AI response was displayed but couldn't be saved to your conversation history.",
-                    variant: "destructive"
-                  });
-                }
+                const enc = new TextEncoder();
+                const keySource = requestId || `${originThreadId}:${response}`;
+                const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
+                const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+                const idempotencyKey = hex.slice(0, 32);
+
+                await supabase.from('chat_messages').upsert({
+                  thread_id: originThreadId,
+                  content: response,
+                  sender: 'assistant',
+                  role: 'assistant',
+                  idempotency_key: idempotencyKey
+                }, { onConflict: 'thread_id,idempotency_key' });
               } catch (e) {
-                console.error('[Streaming Watchdog] Failed to save fallback message:', (e as any)?.message || e);
-                
-                // Show user feedback for save failure
-                toast({
-                  title: "Response not saved",
-                  description: "The AI response was displayed but couldn't be saved to your conversation history.",
-                  variant: "destructive"
-                });
+                console.warn('[Streaming Watchdog] Persist fallback failed:', (e as any)?.message || e);
               }
-            } else {
-              console.log('[Streaming Watchdog] Assistant response already exists in DB, skipping save');
             }
 
             setLocalLoading(false);
             updateProcessingStage(null);
-          }, 500); // Reduced to 500ms for faster failure detection
+          }, 1200);
         } catch (e) {
           console.warn('[Streaming Watchdog] Exception scheduling fallback:', (e as any)?.message || e);
           setLocalLoading(false);
@@ -259,6 +205,16 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     updateProcessingStage,
     setLocalLoading
   } = useChatRealtime(currentThreadId);
+
+  // Combined processing state for external components
+  const isAnyProcessing = isLoading || isProcessing || isStreaming;
+  
+  // Notify parent about processing state changes
+  useEffect(() => {
+    if (onProcessingStateChange) {
+      onProcessingStateChange(isAnyProcessing);
+    }
+  }, [isAnyProcessing, onProcessingStateChange]);
   
   // Use unified auto-scroll hook
   const { scrollElementRef, scrollToBottom } = useAutoScroll({
@@ -281,16 +237,6 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
         },
         (payload) => {
           const m: any = payload.new;
-          
-          // Thread validation: only process messages for current thread
-          if (m.thread_id !== currentThreadIdRef.current) {
-            console.warn('[Realtime] IGNORING message for inactive thread', { 
-              messageThread: m.thread_id, 
-              currentThread: currentThreadIdRef.current 
-            });
-            return;
-          }
-          
           if (m.sender === 'assistant') {
             setChatHistory(prev => {
               if (prev.some(msg => msg.id === m.id)) return prev;
@@ -303,8 +249,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
                 created_at: m.created_at,
                 reference_entries: m.reference_entries,
                 analysis_data: m.analysis_data,
-                has_numeric_result: m.has_numeric_result,
-                idempotency_key: m.idempotency_key
+                has_numeric_result: m.has_numeric_result
               } as any;
               return [...prev, newMsg];
             });
@@ -320,16 +265,6 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
         },
         (payload) => {
           const m: any = payload.new;
-          
-          // Thread validation: only process updates for current thread
-          if (m.thread_id !== currentThreadIdRef.current) {
-            console.warn('[Realtime] IGNORING update for inactive thread', { 
-              messageThread: m.thread_id, 
-              currentThread: currentThreadIdRef.current 
-            });
-            return;
-          }
-          
           if (m.sender === 'assistant') {
             setChatHistory(prev => {
               const updatedMsg: ChatMessage = {
@@ -341,8 +276,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
                 created_at: m.created_at,
                 reference_entries: m.reference_entries,
                 analysis_data: m.analysis_data,
-                has_numeric_result: m.has_numeric_result,
-                idempotency_key: m.idempotency_key
+                has_numeric_result: m.has_numeric_result
               } as any;
               const idx = prev.findIndex(msg => msg.id === m.id);
               if (idx === -1) {
@@ -567,101 +501,65 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       // Check if this is the first message in the thread
       const isFirstMessage = chatHistory.length === 1; // Only the temp message we just added
       
-    // Save the user message with idempotency key
-    let savedUserMessage: ChatMessage | null = null;
-    let correlationId: string | null = null;
-    
-    try {
-      // Generate correlation ID for request tracking
-      correlationId = idempotencyManager.generateCorrelationId();
-      
-      // Enhanced message validation with better first message handling
-      const messageValidation = idempotencyManager.validateMessageForThread(threadId, message, 'user');
-      if (!messageValidation.valid) {
-        debugLog.addEvent("Validation", `Duplicate message blocked: ${messageValidation.reason}`, "warn");
+      // Save the user message with idempotency key
+      let savedUserMessage: ChatMessage | null = null;
+      try {
+        const idempotencyKey = `user-${effectiveUserId}-${threadId}-${Date.now()}-${Math.random().toString(36).substring(2)}`;
+        debugLog.addEvent("Database", `Saving user message to thread ${threadId} with idempotency key: ${idempotencyKey}`, "info");
+        savedUserMessage = await saveMessage(
+          threadId, 
+          message, 
+          'user', 
+          effectiveUserId,
+          null, // references
+          undefined, // hasNumericResult
+          false, // isInteractive
+          undefined, // interactiveOptions
+          idempotencyKey
+        );
+        debugLog.addEvent("Database", `User message saved with ID: ${savedUserMessage?.id}`, "success");
+        
+        if (savedUserMessage) {
+          debugLog.addEvent("UI Update", `Replacing temporary message with saved message: ${savedUserMessage.id}`, "info");
+          setChatHistory(prev => prev.map(msg => 
+            msg.id === tempUserMessage.id ? {
+              ...savedUserMessage!,
+              sender: savedUserMessage!.sender as 'user' | 'assistant' | 'error',
+              role: savedUserMessage!.role as 'user' | 'assistant' | 'error'
+            } : msg
+          ));
+          
+          // Generate title for the first message in a thread
+          if (isFirstMessage) {
+            try {
+              debugLog.addEvent("Title Generation", "Generating thread title after first message", "info");
+              const generatedTitle = await generateThreadTitle(threadId, effectiveUserId);
+              if (generatedTitle) {
+                // Dispatch event to update sidebar
+                window.dispatchEvent(
+                  new CustomEvent('threadTitleUpdated', {
+                    detail: { threadId, title: generatedTitle }
+                  })
+                );
+                debugLog.addEvent("Title Generation", `Generated title: ${generatedTitle}`, "success");
+              }
+            } catch (titleError) {
+              debugLog.addEvent("Title Generation", `Failed to generate title: ${titleError instanceof Error ? titleError.message : "Unknown error"}`, "error");
+              console.warn('Failed to generate thread title:', titleError);
+            }
+          }
+        } else {
+          debugLog.addEvent("Database", "Failed to save user message - null response", "error");
+          throw new Error("Failed to save message");
+        }
+      } catch (saveError: any) {
+        debugLog.addEvent("Database", `Error saving user message: ${saveError.message || "Unknown error"}`, "error");
         toast({
-          title: "Duplicate message detected", 
-          description: messageValidation.reason,
+          title: "Error saving message",
+          description: saveError.message || "Could not save your message",
           variant: "destructive"
         });
-        // Remove temp message and reset state
-        setChatHistory(prev => prev.filter(msg => msg.id !== tempUserMessage.id));
-        setLocalLoading(false);
-        return;
       }
-      
-      // Generate proper idempotency key for user message
-      const userIdempotencyKey = await idempotencyManager.generateIdempotencyKey(threadId, message, 'user');
-      debugLog.addEvent("Database", `Saving user message to thread ${threadId} with idempotency key: ${userIdempotencyKey}`, "info");
-      
-      // Save user message with enhanced error handling
-      savedUserMessage = await saveMessage(
-        threadId, 
-        message, 
-        'user', 
-        effectiveUserId,
-        null, // references
-        undefined, // hasNumericResult
-        false, // isInteractive
-        undefined, // interactiveOptions
-        userIdempotencyKey
-      );
-      
-      // Register idempotency key and set active request tracking
-      if (savedUserMessage) {
-        idempotencyManager.registerKey(userIdempotencyKey, threadId, savedUserMessage.id, message);
-        threadSafetyManager.setActiveRequestId(threadId, correlationId);
-        
-        debugLog.addEvent("UI Update", `Replacing temporary message with saved message: ${savedUserMessage.id}`, "info");
-        setChatHistory(prev => prev.map(msg => 
-          msg.id === tempUserMessage.id ? {
-            ...savedUserMessage!,
-            sender: savedUserMessage!.sender as 'user' | 'assistant' | 'error',
-            role: savedUserMessage!.role as 'user' | 'assistant' | 'error'
-          } : msg
-        ));
-        
-        // Generate title for the first message in a thread
-        if (isFirstMessage) {
-          try {
-            debugLog.addEvent("Title Generation", "Generating thread title after first message", "info");
-            const generatedTitle = await generateThreadTitle(threadId, effectiveUserId);
-            if (generatedTitle) {
-              // Dispatch event to update sidebar
-              window.dispatchEvent(
-                new CustomEvent('threadTitleUpdated', {
-                  detail: { threadId, title: generatedTitle }
-                })
-              );
-              debugLog.addEvent("Title Generation", `Generated title: ${generatedTitle}`, "success");
-            }
-          } catch (titleError) {
-            debugLog.addEvent("Title Generation", `Failed to generate title: ${titleError instanceof Error ? titleError.message : "Unknown error"}`, "error");
-            console.warn('Failed to generate thread title:', titleError);
-          }
-        }
-      } else {
-        debugLog.addEvent("Database", "saveMessage returned null - this should not happen", "error");
-        throw new Error("Message save failed - received null response");
-      }
-      
-    } catch (saveError: any) {
-      debugLog.addEvent("Database", `Critical error saving user message: ${saveError.message || "Unknown error"}`, "error");
-      console.error('[SmartChatInterface] Message save failed:', saveError);
-      
-      // Remove temp message from UI on save failure
-      setChatHistory(prev => prev.filter(msg => msg.id !== tempUserMessage.id));
-      setLocalLoading(false);
-      
-      toast({
-        title: "Failed to save message",
-        description: saveError.message || "Could not save your message to the database",
-        variant: "destructive"
-      });
-      
-      // Don't continue with streaming if user message failed to save
-      return;
-    }
       
       // Initialize processing message placeholder (only created for non-journal queries)
       let processingMessageId: string | null = null;
@@ -702,26 +600,29 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       // Route ALL queries to chat-with-rag (restored original design)
       debugLog.addEvent("Routing", "Using chat-with-rag for all queries with streaming", "info");
       
-      // Start streaming chat for all queries with correlation ID
-      if (correlationId) {
-        await startStreamingChat(
-          message,
-          effectiveUserId,
-          threadId,
-          conversationContext,
-          {
-            useAllEntries: queryClassification.useAllEntries || false,
-            hasPersonalPronouns: message.toLowerCase().includes('i ') || message.toLowerCase().includes('my '),
-            hasExplicitTimeReference: /\b(last week|yesterday|this week|last month|today|recently|lately)\b/i.test(message),
-            threadMetadata: {}
-          }
-          // Note: correlationId is passed through thread safety manager
-        );
-      }
+      // Start streaming chat for all queries
+      await startStreamingChat(
+        message,
+        effectiveUserId,
+        threadId,
+        conversationContext,
+        {
+          useAllEntries: queryClassification.useAllEntries || false,
+          hasPersonalPronouns: message.toLowerCase().includes('i ') || message.toLowerCase().includes('my '),
+          hasExplicitTimeReference: /\b(last week|yesterday|this week|last month|today|recently|lately)\b/i.test(message),
+          threadMetadata: {}
+        }
+      );
       
       // Streaming owns the lifecycle; ensure local loader is cleared immediately
       setLocalLoading(false);
       updateProcessingStage(null);
+      
+      // Trigger scroll to bottom when user sends message
+      setTimeout(() => {
+        const event = new CustomEvent('chat:forceScrollToBottom');
+        window.dispatchEvent(event);
+      }, 100);
       
       // Skip the rest since streaming handles the response
       return;

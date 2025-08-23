@@ -217,17 +217,7 @@ export const saveMessage = async (
 
   if (!userId) {
     console.error('[saveMessage] User ID is required for saveMessage');
-    throw new Error('User ID is required for message persistence');
-  }
-
-  if (!threadId) {
-    console.error('[saveMessage] Thread ID is required for saveMessage');
-    throw new Error('Thread ID is required for message persistence');
-  }
-
-  if (!content?.trim()) {
-    console.error('[saveMessage] Content is required for saveMessage');
-    throw new Error('Message content cannot be empty');
+    return null;
   }
 
   // Process content for assistant messages to handle JSON responses
@@ -255,21 +245,15 @@ export const saveMessage = async (
   if (analysisData) additionalData.analysis_data = analysisData;
 
   console.log('[saveMessage] Processed data, calling createChatMessage');
+  const result = await createChatMessage(threadId, processedContent, sender, userId, additionalData);
   
-  try {
-    const result = await createChatMessage(threadId, processedContent, sender, userId, additionalData);
-    
-    if (result) {
-      console.log('[saveMessage] Message saved successfully:', result.id);
-      return result;
-    } else {
-      console.error('[saveMessage] createChatMessage returned null');
-      throw new Error('Failed to create message in database');
-    }
-  } catch (error) {
-    console.error('[saveMessage] Error in createChatMessage:', error);
-    throw error;
+  if (result) {
+    console.log('[saveMessage] Message saved successfully:', result.id);
+  } else {
+    console.error('[saveMessage] Failed to save message');
   }
+  
+  return result;
 };
 
 // Update message with classification data

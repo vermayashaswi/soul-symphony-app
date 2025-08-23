@@ -21,7 +21,6 @@ export type Database = {
           created_at: string
           has_numeric_result: boolean | null
           id: string
-          idempotency_key: string | null
           is_processing: boolean | null
           reference_entries: Json | null
           request_correlation_id: string | null
@@ -39,7 +38,6 @@ export type Database = {
           created_at?: string
           has_numeric_result?: boolean | null
           id?: string
-          idempotency_key?: string | null
           is_processing?: boolean | null
           reference_entries?: Json | null
           request_correlation_id?: string | null
@@ -57,7 +55,6 @@ export type Database = {
           created_at?: string
           has_numeric_result?: boolean | null
           id?: string
-          idempotency_key?: string | null
           is_processing?: boolean | null
           reference_entries?: Json | null
           request_correlation_id?: string | null
@@ -694,6 +691,10 @@ export type Database = {
         Args: { entry_id_param: number }
         Returns: boolean
       }
+      check_message_persistence_health: {
+        Args: { expected_message_count?: number; thread_id_param: string }
+        Returns: Json
+      }
       check_table_columns: {
         Args: { table_name: string }
         Returns: {
@@ -721,9 +722,9 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: number
       }
-      cleanup_stuck_processing_messages: {
+      cleanup_malformed_json_messages: {
         Args: Record<PropertyKey, never>
-        Returns: number
+        Returns: Json
       }
       close_user_session: {
         Args: { p_session_id: string; p_user_id: string }
@@ -784,7 +785,7 @@ export type Database = {
         Returns: Json
       }
       execute_dynamic_query: {
-        Args: { query_text: string }
+        Args: { query_text: string; user_timezone?: string }
         Returns: Json
       }
       extend_session_activity: {
@@ -1172,6 +1173,14 @@ export type Database = {
       perform_database_maintenance: {
         Args: Record<PropertyKey, never>
         Returns: Json
+      }
+      pg_advisory_unlock: {
+        Args: { key: number }
+        Returns: boolean
+      }
+      pg_try_advisory_lock: {
+        Args: { key: number }
+        Returns: boolean
       }
       regenerate_missing_data_for_entry: {
         Args: { target_entry_id: number }

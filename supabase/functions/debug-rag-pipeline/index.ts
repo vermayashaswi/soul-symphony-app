@@ -138,7 +138,8 @@ serve(async (req) => {
     try {
       const testSQL = `SELECT id, "refined text", created_at FROM "Journal Entries" WHERE user_id = '${userId}' ORDER BY created_at DESC LIMIT 3`;
       const { data: sqlResult, error: sqlError } = await supabaseClient.rpc('execute_dynamic_query', {
-        query_text: testSQL
+        query_text: testSQL,
+        user_timezone: 'UTC'
       });
       
       if (sqlError) throw sqlError;

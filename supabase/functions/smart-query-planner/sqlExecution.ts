@@ -1,7 +1,8 @@
 
-export async function executeSQLAnalysis(step: any, userId: string, supabaseClient: any, requestId: string, executionDetails: any) {
+export async function executeSQLAnalysis(step: any, userId: string, supabaseClient: any, requestId: string, executionDetails: any, userTimezone: string = 'UTC') {
   try {
-    console.log(`[${requestId}] Executing SQL query:`, step.sqlQuery);
+    console.log(`[${requestId}] Executing SQL query (${step.sqlQueryType || 'unknown'}):`, step.sqlQuery);
+    executionDetails.queryType = step.sqlQueryType;
     
     if (!step.sqlQuery || !step.sqlQuery.trim()) {
       console.log(`[${requestId}] No SQL query provided, using vector search fallback`);
@@ -9,7 +10,7 @@ export async function executeSQLAnalysis(step: any, userId: string, supabaseClie
       return await executeVectorSearchFallback(step, userId, supabaseClient, requestId);
     }
 
-    const originalQuery = step.sqlQuery.trim();
+    const originalQuery = step.sqlQuery.trim().replace(/;+$/, ''); // Fixed: remove trailing semicolons
     executionDetails.originalQuery = originalQuery;
     
     // Sanitize user ID in the query
@@ -28,7 +29,8 @@ export async function executeSQLAnalysis(step: any, userId: string, supabaseClie
     console.log(`[${requestId}] Executing sanitized query via RPC:`, sanitizedQuery.substring(0, 200) + '...');
     
     const { data, error } = await supabaseClient.rpc('execute_dynamic_query', {
-      query_text: sanitizedQuery
+      query_text: sanitizedQuery,
+      user_timezone: userTimezone
     });
 
     if (error) {
@@ -55,13 +57,44 @@ export async function executeSQLAnalysis(step: any, userId: string, supabaseClie
 
     if (data && data.success && data.data) {
       console.log(`[${requestId}] SQL query executed successfully, rows:`, data.data.length);
-      // If SQL query executed but returned 0 results, try vector fallback
-      if (data.data.length === 0) {
-        console.log(`[${requestId}] SQL query returned 0 results, falling back to vector search`);
-        executionDetails.fallbackUsed = true;
-        return await executeVectorSearchFallback(step, userId, supabaseClient, requestId);
+      
+      // ENHANCED: Different handling for analysis vs filtering queries
+      if (step.sqlQueryType === 'analysis') {
+        // For analysis queries (COUNT, SUM, AVG, etc.), always return computed results
+        console.log(`[${requestId}] Analysis query completed with ${data.data.length} result rows`);
+        return data.data;
+      } else if (step.sqlQueryType === 'filtering') {
+        // For filtering queries, fall back to vector search if no results found
+        if (data.data.length === 0) {
+          console.log(`[${requestId}] Filtering query returned 0 results, falling back to vector search`);
+          executionDetails.fallbackUsed = true;
+          return await executeVectorSearchFallback(step, userId, supabaseClient, requestId);
+        }
+        return data.data;
+      } else {
+        // LEGACY: Auto-detect based on content (backward compatibility)
+        const hasAggregateFields = data.data.some((row: any) => 
+          row.avg_sentiment !== undefined || 
+          row.entry_count !== undefined || 
+          row.total_entries !== undefined ||
+          row.percentage !== undefined ||
+          row.count !== undefined
+        );
+        
+        if (hasAggregateFields) {
+          // Treat as analysis query
+          console.log(`[${requestId}] Auto-detected analysis query with ${data.data.length} computed results`);
+          return data.data;
+        } else {
+          // Treat as filtering query
+          if (data.data.length === 0) {
+            console.log(`[${requestId}] Auto-detected filtering query returned 0 results, falling back to vector search`);
+            executionDetails.fallbackUsed = true;
+            return await executeVectorSearchFallback(step, userId, supabaseClient, requestId);
+          }
+          return data.data;
+        }
       }
-      return data.data;
     } else {
       console.warn(`[${requestId}] SQL query returned no results or failed:`, data);
       executionDetails.fallbackUsed = true;
@@ -86,7 +119,7 @@ export async function executeBasicSQLQuery(userId: string, supabaseClient: any, 
     .select('*')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
-    .limit(10);
+    .limit(25); // Fixed: increased limit from 10 to 25 to get more accurate results
 
   if (error) {
     console.error(`[${requestId}] Basic SQL query error:`, error);

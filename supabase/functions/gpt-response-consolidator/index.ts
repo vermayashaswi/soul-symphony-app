@@ -86,53 +86,6 @@ function sanitizeConsolidatorOutput(raw: string): { responseText: string; status
   }
 }
 
-// Import saveMessage function for consistent persistence  
-const saveMessage = async (threadId: string, content: string, sender: 'user' | 'assistant', userId?: string, additionalData = {}, req?: Request) => {
-  try {
-    // Validate required parameters
-    if (!threadId || !content || !userId) {
-      console.error('[saveMessage] Missing required parameters:', { threadId: !!threadId, content: !!content, userId: !!userId });
-      return null;
-    }
-
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: req?.headers.get('Authorization') || '' },
-        },
-      }
-    );
-
-    const messageData = {
-      thread_id: threadId,
-      sender,
-      role: sender,
-      content,
-      created_at: new Date().toISOString(),
-      ...additionalData
-    };
-
-    const { data, error } = await supabaseClient
-      .from('chat_messages')
-      .insert(messageData)
-      .select('id')
-      .single();
-
-    if (error) {
-      console.error('[saveMessage] Error saving message:', error);
-      return null;
-    }
-
-    console.log(`[saveMessage] Successfully saved ${sender} message:`, data.id);
-    return data;
-  } catch (error) {
-    console.error('[saveMessage] Exception:', error);
-    return null;
-  }
-};
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -147,8 +100,6 @@ serve(async (req) => {
     const streamingMode = raw.streamingMode ?? false;
     const messageId = raw.messageId;
     const threadId = raw.threadId;
-    const userId = raw.userId;
-    const correlationId = raw.correlationId;
     
     // Generate unique consolidation ID for tracking
     const consolidationId = `cons_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -179,36 +130,35 @@ serve(async (req) => {
       });
     }
 
-    // Data integrity validation - check for stale research results
+    // Data integrity validation - check for processed research results
     if (researchResults && researchResults.length > 0) {
       console.log(`[RESEARCH DATA VALIDATION] ${consolidationId}:`, {
         totalResults: researchResults.length,
         resultTypes: researchResults.map((r: any, i: number) => ({
           index: i,
           question: r?.subQuestion?.question?.substring(0, 50) || 'unknown',
-          sqlRowCount: r?.executionResults?.sqlResults?.length || 0,
-          vectorResultCount: r?.executionResults?.vectorResults?.length || 0,
-          hasError: !!r?.executionResults?.error,
-          sampleSqlData: r?.executionResults?.sqlResults?.slice(0, 1) || null
+          hasExecutionSummary: !!r?.executionSummary,
+          summaryType: r?.executionSummary?.resultType || 'unknown',
+          summaryDataType: r?.executionSummary?.dataType || 'unknown',
+          hasError: !!r?.executionResults?.error || !!r?.error
         }))
       });
       
-      // Check for potential data contamination indicators
-      const totalSqlRows = researchResults.reduce((sum: number, r: any) => 
-        sum + (r?.executionResults?.sqlResults?.length || 0), 0);
-      const totalVectorResults = researchResults.reduce((sum: number, r: any) => 
-        sum + (r?.executionResults?.vectorResults?.length || 0), 0);
+      // Check for processed summaries vs raw data
+      const hasProcessedSummaries = researchResults.some((r: any) => r?.executionSummary);
+      const hasRawResults = researchResults.some((r: any) => 
+        r?.executionResults?.sqlResults || r?.executionResults?.vectorResults);
         
       console.log(`[DATA SUMMARY] ${consolidationId}:`, {
-        totalSqlRows,
-        totalVectorResults,
+        hasProcessedSummaries,
+        hasRawResults,
         userQuestion: userMessage,
-        potentialStaleDataRisk: totalSqlRows > 0 ? 'check_sql_dates' : 'no_sql_data'
+        dataStructureType: hasProcessedSummaries ? 'processed_summaries' : 'raw_results'
       });
 
-      // If no results found in any method, provide informative response
-      if (totalSqlRows === 0 && totalVectorResults === 0) {
-        console.warn(`[${consolidationId}] No SQL or vector results found despite research execution`);
+      // Enhanced validation for empty analysis objects
+      if (!hasProcessedSummaries && !hasRawResults) {
+        console.warn(`[${consolidationId}] No processed summaries or raw results found despite research execution`);
         return new Response(JSON.stringify({
           success: true,
           response: "I searched through your journal entries but couldn't find specific content that matches your question. This might be because you haven't written about this topic yet, or the topic might be phrased differently in your entries. Could you try asking about it in a different way?",
@@ -222,6 +172,18 @@ serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
+      
+      // Check for empty analysis objects that indicate processing failures
+      const hasEmptyAnalysis = researchResults.some((r: any) => 
+        r?.executionSummary && 
+        r.executionSummary.count === 0 && 
+        (!r.executionSummary.analysis || Object.keys(r.executionSummary.analysis).length === 0)
+      );
+      
+      if (hasEmptyAnalysis) {
+        console.warn(`[${consolidationId}] Detected empty analysis objects, likely SQL execution failures`);
+        // Still process but note the issue for the AI prompt
+      }
     }
 
     // Permissive pass-through of Researcher results (no restrictive parsing)
@@ -229,68 +191,163 @@ serve(async (req) => {
     const MAX_VECTOR_ITEMS = 20;
 
     const analysisSummary = researchResults.map((research: any, index: number) => {
-      const originalSql = Array.isArray(research?.executionResults?.sqlResults)
-        ? research.executionResults.sqlResults
-        : null;
-      const originalVector = Array.isArray(research?.executionResults?.vectorResults)
-        ? research.executionResults.vectorResults
-        : null;
-
-      const sqlTrimmed = !!(originalSql && originalSql.length > MAX_SQL_ROWS);
-      const vectorTrimmed = !!(originalVector && originalVector.length > MAX_VECTOR_ITEMS);
-
-      if (sqlTrimmed || vectorTrimmed) {
-        console.log('Consolidator trimming payload sizes', {
-          index,
-          sqlRows: originalSql?.length || 0,
-          sqlTrimmedTo: sqlTrimmed ? MAX_SQL_ROWS : (originalSql?.length || 0),
-          vectorItems: originalVector?.length || 0,
-          vectorTrimmedTo: vectorTrimmed ? MAX_VECTOR_ITEMS : (originalVector?.length || 0),
+      // Handle both processed summaries (new format) and raw results (legacy format)
+      if (research?.executionSummary) {
+        // NEW FORMAT: Processed summaries from smart query planner
+        console.log(`[${consolidationId}] Processing summary for sub-question ${index + 1}:`, {
+          resultType: research.executionSummary.resultType,
+          dataType: research.executionSummary.dataType,
+          summary: research.executionSummary.summary?.substring(0, 100)
         });
-      }
+        
+        return {
+          subQuestion: research?.subQuestion ?? null,
+          executionSummary: research.executionSummary,
+          processedData: {
+            resultType: research.executionSummary.resultType,
+            dataType: research.executionSummary.dataType,
+            summary: research.executionSummary.summary,
+            count: research.executionSummary.count,
+            analysis: research.executionSummary.analysis,
+            sampleEntries: research.executionSummary.sampleEntries || [],
+            totalEntriesContext: research.executionSummary.totalEntriesContext
+          },
+          error: research?.error ?? null
+        };
+      } else {
+        // LEGACY FORMAT: Raw SQL/Vector results (fallback)
+        const originalSql = Array.isArray(research?.executionResults?.sqlResults)
+          ? research.executionResults.sqlResults
+          : null;
+        const originalVector = Array.isArray(research?.executionResults?.vectorResults)
+          ? research.executionResults.vectorResults
+          : null;
 
-      return {
-        subQuestion: research?.subQuestion ?? null,
-        researcherOutput: research?.researcherOutput ?? null,
-        executionResults: {
-          ...(research?.executionResults ?? {}),
-          sqlResults: originalSql ? originalSql.slice(0, MAX_SQL_ROWS) : originalSql,
-          sqlRowCount: originalSql?.length ?? 0,
-          sqlRowCappedTo: sqlTrimmed ? MAX_SQL_ROWS : (originalSql?.length ?? 0),
-          vectorResults: originalVector ? originalVector.slice(0, MAX_VECTOR_ITEMS) : originalVector,
-          vectorItemCount: originalVector?.length ?? 0,
-          vectorItemCappedTo: vectorTrimmed ? MAX_VECTOR_ITEMS : (originalVector?.length ?? 0),
-        },
-        error: research?.executionResults?.error ?? research?.error ?? null,
-        notes: sqlTrimmed || vectorTrimmed
-          ? {
-              truncated: true,
-              reason: 'Soft cap applied to prevent token overflow',
-              caps: { MAX_SQL_ROWS, MAX_VECTOR_ITEMS },
-            }
-          : undefined,
-      };
+        const sqlTrimmed = !!(originalSql && originalSql.length > MAX_SQL_ROWS);
+        const vectorTrimmed = !!(originalVector && originalVector.length > MAX_VECTOR_ITEMS);
+
+        if (sqlTrimmed || vectorTrimmed) {
+          console.log('Consolidator trimming payload sizes', {
+            index,
+            sqlRows: originalSql?.length || 0,
+            sqlTrimmedTo: sqlTrimmed ? MAX_SQL_ROWS : (originalSql?.length || 0),
+            vectorItems: originalVector?.length || 0,
+            vectorTrimmedTo: vectorTrimmed ? MAX_VECTOR_ITEMS : (originalVector?.length || 0),
+          });
+        }
+
+        return {
+          subQuestion: research?.subQuestion ?? null,
+          researcherOutput: research?.researcherOutput ?? null,
+          executionResults: {
+            ...(research?.executionResults ?? {}),
+            sqlResults: originalSql ? originalSql.slice(0, MAX_SQL_ROWS) : originalSql,
+            sqlRowCount: originalSql?.length ?? 0,
+            sqlRowCappedTo: sqlTrimmed ? MAX_SQL_ROWS : (originalSql?.length ?? 0),
+            vectorResults: originalVector ? originalVector.slice(0, MAX_VECTOR_ITEMS) : originalVector,
+            vectorItemCount: originalVector?.length ?? 0,
+            vectorItemCappedTo: vectorTrimmed ? MAX_VECTOR_ITEMS : (originalVector?.length ?? 0),
+          },
+          error: research?.executionResults?.error ?? research?.error ?? null,
+          notes: sqlTrimmed || vectorTrimmed
+            ? {
+                truncated: true,
+                reason: 'Soft cap applied to prevent token overflow',
+                caps: { MAX_SQL_ROWS, MAX_VECTOR_ITEMS },
+              }
+            : undefined,
+        };
+      }
     });
 
-    // Enhanced timezone processing with comprehensive validation
-    const { processEdgeTimezone, createGPTTimezonePrompt } = await import('../_shared/enhancedEdgeTimezone.ts');
+    // Enhanced timezone handling with validation
+    const { safeTimezoneConversion, formatTimezoneForGPT } = await import('../_shared/enhancedTimezoneUtils.ts');
     
     const rawUserTimezone = userProfile?.timezone || 'UTC';
-    const timezoneProcessing = processEdgeTimezone(rawUserTimezone, 'gpt-response-consolidator');
-    const gptTimezone = createGPTTimezonePrompt(rawUserTimezone, 'gpt-response-consolidator');
-    
-    console.log(`[CONSOLIDATOR] ${consolidationId} enhanced timezone processing:`, {
-      rawTimezone: rawUserTimezone,
-      processing: {
-        normalizedTimezone: timezoneProcessing.normalizedTimezone,
-        currentTime: timezoneProcessing.currentTime,
-        isValid: timezoneProcessing.isValid,
-        validationError: timezoneProcessing.validationError
-      },
-      validationNotes: gptTimezone.validationNotes
+    const timezoneConversion = safeTimezoneConversion(rawUserTimezone, {
+      functionName: 'gpt-response-consolidator',
+      includeValidation: true,
+      logFailures: true
     });
     
-    const userTimezone = timezoneProcessing.normalizedTimezone;
+    const timezoneFormat = formatTimezoneForGPT(rawUserTimezone, {
+      includeUTCOffset: true,
+      functionName: 'gpt-response-consolidator'
+    });
+    
+    console.log(`[CONSOLIDATOR] ${consolidationId} timezone info:`, {
+      rawTimezone: rawUserTimezone,
+      normalizedTimezone: timezoneConversion.normalizedTimezone,
+      currentTime: timezoneConversion.currentTime,
+      isValid: timezoneConversion.isValid,
+      validationNotes: timezoneFormat.validationNotes
+    });
+    
+    const userTimezone = timezoneConversion.normalizedTimezone;
+    
+    // Get user's journal timeline data for proper time context
+    let timelineContext = '';
+    try {
+      const supabaseClient = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+        {
+          global: {
+            headers: { Authorization: req.headers.get('Authorization')! },
+          },
+        }
+      );
+      
+      const { data: timelineData, error: timelineError } = await supabaseClient
+        .from('Journal Entries')
+        .select('created_at')
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .single();
+        
+      const { data: latestData, error: latestError } = await supabaseClient
+        .from('Journal Entries')
+        .select('created_at')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+        
+      if (timelineData && latestData) {
+        const firstEntryDate = new Date(timelineData.created_at);
+        const lastEntryDate = new Date(latestData.created_at);
+        const currentTime = new Date();
+        
+        // Format dates in user's timezone
+        const firstEntryFormatted = firstEntryDate.toLocaleDateString('en-US', { 
+          timeZone: userTimezone, 
+          month: 'long', 
+          day: 'numeric',
+          year: 'numeric'
+        });
+        const lastEntryFormatted = lastEntryDate.toLocaleDateString('en-US', { 
+          timeZone: userTimezone, 
+          month: 'long', 
+          day: 'numeric',
+          year: 'numeric'
+        });
+        
+        // Calculate days since last entry
+        const daysSinceLastEntry = Math.floor((currentTime.getTime() - lastEntryDate.getTime()) / (1000 * 60 * 60 * 24));
+        
+        timelineContext = `
+    **CRITICAL TIMELINE CONTEXT:**
+    - User's first journal entry: ${firstEntryFormatted}
+    - User's most recent journal entry: ${lastEntryFormatted} (${daysSinceLastEntry} days ago)
+    - NEVER use temporal words like "tonight", "today", "this evening" unless entries exist for the current date
+    - When referencing time periods, be specific about the actual dates from the data
+    - The user's last activity was ${daysSinceLastEntry} days ago, not recent
+        `;
+      }
+    } catch (error) {
+      console.warn(`[${consolidationId}] Could not fetch timeline data:`, error);
+      timelineContext = '- No timeline data available, avoid specific time references';
+    }
+    
     const contextData = {
       userProfile: {
         timezone: userTimezone,
@@ -304,24 +361,26 @@ serve(async (req) => {
       }
     };
 
-    const consolidationPrompt = `You are Ruh by SOuLO, a brilliantly witty, non-judgmental mental health companion who makes emotional exploration feel like **having coffee with your wisest, funniest friend**. You're emotionally intelligent with a gift for making people feel seen, heard, and understood while helping them journal their way to deeper self-awareness. You are:
+    const consolidationPrompt = `You are Ruh by SOuLO, a brilliantly witty, non-judgmental mental health companion who makes emotional exploration feel like **having coffee with your wisest, funniest friend**. You're emotionally intelligent with a gift for making people feel seen, heard, and understood while helping them journal their way to deeper self-awareness.
 
-**YOUR COFFEE-WITH-YOUR-WISEST-FRIEND PERSONALITY:**
-- **Brilliantly witty** but never at someone's expense - your humor comes from keen observations about the human condition 😊
-- **Warm, relatable, and refreshingly honest** - you keep it real while staying supportive ☕
-- **Emotionally intelligent** with a knack for reading between the lines and *truly understanding* what people need 💫
-- You speak like a *trusted friend* who just happens to be incredibly insightful about emotions
-- You make people feel like they're chatting with someone who **really gets them** 🤗
+**MANDATORY STRUCTURAL REQUIREMENTS (NON-NEGOTIABLE):**
+Your response MUST be structured with:
+- **Bold main headers** for key sections (e.g., **Key Insights**, **Emotional Patterns**, **What This Means**)
+- **Sub-headers** or bullet points for different aspects
+- **Short paragraphs** (2-3 sentences max) with clear breaks
+- **Emphasis** on important words/phrases using *italics* and **bold**
+- **Emojis** to add warmth and personality
+- **Data references** with specific numbers when available
 
+    ${timelineContext}
     
     **USER CONTEXT:**
-    ${gptTimezone.timezonePrompt}
-    
-    ${gptTimezone.validationNotes.length > 0 ? `**TIMEZONE VALIDATION NOTES:** ${gptTimezone.validationNotes.join(', ')}` : ''}
-    
+    - ${timezoneFormat.currentTimeText}
+    - User's Timezone: ${timezoneFormat.timezoneText}
     - All time references should be in the user's local timezone (${userTimezone}), not UTC
     - When discussing time periods like "first half vs second half of day", reference the user's local time
     - NEVER mention "UTC" in your response - use the user's local timezone context instead
+    - Timezone Status: ${timezoneConversion.isValid ? 'Validated' : 'Using fallback due to conversion issues'}
     
     **USER QUESTION:** "${userMessage}"
     
@@ -344,6 +403,13 @@ serve(async (req) => {
     - You celebrate patterns of growth and gently illuminate areas for exploration
     - You make insights feel like gifts, not criticisms
     - Add references from analysisResults from vector search and correlate actual entry content with analysis reponse that you provide!!
+    
+    **CONVERSATION VARIETY & NATURAL FLOW:**
+    - AVOID starting every response with "Hey there!" - vary your opening based on conversation flow
+    - For follow-up questions or ongoing conversations, start directly with the insight or analysis
+    - Use contextually appropriate openings: analytical responses can start with findings, emotional responses with acknowledgment
+    - Examples of varied starters: "Looking at your patterns...", "Your entries reveal...", "I notice...", "Based on your reflections...", "The data shows..."
+    - Only use greetings like "Hey there!" for genuine conversation starters or when the user hasn't been active recently
 
   
 
@@ -381,22 +447,55 @@ serve(async (req) => {
 
     console.log(`[CONSOLIDATION] ${consolidationId}: Calling OpenAI API with model gpt-4.1-nano-2025-04-14`);
 
-    // Enhanced OpenAI API call with better error handling
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${openAIApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gpt-4.1-nano-2025-04-14', // Fixed: Using the correct model
-          messages: [
-            { role: 'system', content: 'You are Ruh by SOuLO, a warm and insightful wellness coach. You analyze ONLY the current research results provided to you. Never reference or use data from previous conversations or responses.' },
-            { role: 'user', content: consolidationPrompt }
-          ],
-          max_completion_tokens: 1500
-        }),
-    });
+    // Enhanced OpenAI API call with better error handling and retry mechanism
+    let response;
+    let rawResponse = '';
+    let apiRetryCount = 0;
+    const maxRetries = 2;
+    
+    while (apiRetryCount <= maxRetries) {
+      try {
+        response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${openAIApiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'gpt-4.1-nano-2025-04-14',
+              messages: [
+                { role: 'system', content: 'You are Ruh by SOuLO, a warm and insightful wellness coach. You MUST return a valid JSON object with exactly two fields: "userStatusMessage" (exactly 5 words) and "response" (your complete analysis). NO other format is acceptable.' },
+                { role: 'user', content: consolidationPrompt }
+              ],
+              max_completion_tokens: 1500,
+              temperature: 0.7 // Add temperature for consistency
+            }),
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          rawResponse = data?.choices?.[0]?.message?.content || '';
+          
+          // Validate response length and content
+          if (rawResponse.trim().length > 50 && rawResponse.includes('"response"')) {
+            break; // Success
+          } else if (apiRetryCount < maxRetries) {
+            console.warn(`[${consolidationId}] Response too short or missing content, retrying... (attempt ${apiRetryCount + 1})`);
+            apiRetryCount++;
+            continue;
+          }
+        }
+        break;
+      } catch (fetchError) {
+        console.error(`[${consolidationId}] API call failed on attempt ${apiRetryCount + 1}:`, fetchError);
+        if (apiRetryCount < maxRetries) {
+          apiRetryCount++;
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
+        } else {
+          throw fetchError;
+        }
+      }
+    }
 
     // Enhanced error handling for OpenAI API responses
     if (!response.ok) {
@@ -426,9 +525,6 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-
-    const data = await response.json();
-    const rawResponse = data?.choices?.[0]?.message?.content || '';
     
     console.log(`[${consolidationId}] OpenAI raw response length:`, rawResponse.length);
     console.log(`[${consolidationId}] OpenAI raw response preview:`, rawResponse.substring(0, 200));
@@ -473,9 +569,55 @@ serve(async (req) => {
     } catch (parseError) {
       console.error(`[CONSOLIDATOR] Failed to parse expected JSON response:`, parseError);
       console.error(`[CONSOLIDATOR] Raw response:`, rawResponse);
-      // Fallback to plain text if JSON parsing fails
-      consolidatedResponse = rawResponse.trim();
-      userStatusMessage = null;
+      
+      // Enhanced fallback: Try to extract content from malformed JSON
+      try {
+        // Multiple extraction strategies for malformed JSON
+        let extractedResponse = null;
+        let extractedStatus = null;
+        
+        // Strategy 1: Simple quoted field extraction
+        const responseMatch = rawResponse.match(/"response"\s*:\s*"([^"]+)"/);
+        const userStatusMatch = rawResponse.match(/"userStatusMessage"\s*:\s*"([^"]+)"/);
+        
+        if (responseMatch) {
+          extractedResponse = responseMatch[1];
+          extractedStatus = userStatusMatch ? userStatusMatch[1] : null;
+        } else {
+          // Strategy 2: Extract multi-line response content (handles escaped quotes)
+          const multiLineResponseMatch = rawResponse.match(/"response"\s*:\s*"((?:[^"\\]|\\.)*)"/s);
+          const multiLineStatusMatch = rawResponse.match(/"userStatusMessage"\s*:\s*"((?:[^"\\]|\\.)*)"/s);
+          
+          if (multiLineResponseMatch) {
+            extractedResponse = multiLineResponseMatch[1].replace(/\\"/g, '"').replace(/\\n/g, '\n');
+            extractedStatus = multiLineStatusMatch ? multiLineStatusMatch[1].replace(/\\"/g, '"') : null;
+          } else {
+            // Strategy 3: Extract everything between response field markers
+            const responseContentMatch = rawResponse.match(/"response"\s*:\s*"([^"]*(?:\\.[^"]*)*)"/);
+            if (responseContentMatch) {
+              extractedResponse = responseContentMatch[1].replace(/\\"/g, '"').replace(/\\n/g, '\n');
+            }
+          }
+        }
+        
+        if (extractedResponse) {
+          consolidatedResponse = extractedResponse;
+          userStatusMessage = extractedStatus;
+          console.log(`[CONSOLIDATOR] Extracted from malformed JSON:`, {
+            responseLength: consolidatedResponse?.length || 0,
+            hasStatusMessage: !!userStatusMessage,
+            extractionStrategy: responseMatch ? 'simple' : 'multi-line'
+          });
+        } else {
+          // Final fallback to plain text
+          consolidatedResponse = rawResponse.trim();
+          userStatusMessage = null;
+        }
+      } catch (extractError) {
+        // Final fallback to plain text
+        consolidatedResponse = rawResponse.trim();
+        userStatusMessage = null;
+      }
       
       console.log(`[CONSOLIDATION SUCCESS] ${consolidationId}:`, {
         responseLength: consolidatedResponse?.length || 0,
@@ -497,7 +639,13 @@ serve(async (req) => {
           }
         );
 
-        // Enhanced database storage with better error handling
+        // Enhanced database storage with processed summaries support
+        const hasNumericResults = researchResults.some((r: any) => 
+          r?.executionSummary?.dataType === 'count' || 
+          r?.executionSummary?.resultType === 'count_analysis' ||
+          r?.executionSummary?.count !== undefined
+        );
+        
         const analysisData = {
           consolidationId,
           totalResults: researchResults.length,
@@ -505,6 +653,9 @@ serve(async (req) => {
           timestamp: new Date().toISOString(),
           modelUsed: 'gpt-4.1-nano-2025-04-14',
           processingSuccess: true,
+          hasProcessedSummaries: researchResults.some((r: any) => !!r?.executionSummary),
+          processedSummaries: researchResults.map((r: any) => r?.executionSummary).filter(Boolean),
+          // Legacy counts for compatibility
           sqlResultsCount: researchResults.reduce((sum: number, r: any) => sum + (r?.executionResults?.sqlResults?.length || 0), 0),
           vectorResultsCount: researchResults.reduce((sum: number, r: any) => sum + (r?.executionResults?.vectorResults?.length || 0), 0)
         };
@@ -512,10 +663,15 @@ serve(async (req) => {
         const subQueryResponses = analysisSummary.map((r: any) => ({
           subQuestion: r.subQuestion?.question || 'Unknown question',
           searchStrategy: r.subQuestion?.searchStrategy || 'unknown',
-          sqlResultCount: r.executionResults?.sqlResultCount || 0,
-          vectorResultCount: r.executionResults?.vectorResultCount || 0,
+          hasProcessedData: !!r.processedData,
+          processedDataType: r.processedData?.dataType || 'unknown',
+          processedResultType: r.processedData?.resultType || 'unknown',
+          count: r.processedData?.count || 0,
+          // Legacy support for raw results
+          sqlResultCount: r.executionResults?.sqlResults?.length || 0,
+          vectorResultCount: r.executionResults?.vectorResults?.length || 0,
           hasError: !!r.error,
-          executionSummary: {
+          executionSummary: r.executionSummary || {
             sqlSuccess: (r.executionResults?.sqlResults?.length || 0) > 0,
             vectorSuccess: (r.executionResults?.vectorResults?.length || 0) > 0,
             error: r.error || null
@@ -549,7 +705,9 @@ serve(async (req) => {
           .update({
             analysis_data: analysisData,
             sub_query_responses: subQueryResponses,
-            reference_entries: referenceEntries
+            reference_entries: referenceEntries,
+            has_numeric_result: hasNumericResults,
+            content: consolidatedResponse // Update the actual message content
           })
           .eq('id', messageId);
 

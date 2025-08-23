@@ -12,6 +12,7 @@ interface DesktopChatLayoutProps {
   onCreateNewThread: () => Promise<string | null>;
   userId?: string;
   mentalHealthInsights?: MentalHealthInsights;
+  onProcessingStateChange?: (isProcessing: boolean) => void;
 }
 
 const DesktopChatLayout: React.FC<DesktopChatLayoutProps> = ({
@@ -19,8 +20,10 @@ const DesktopChatLayout: React.FC<DesktopChatLayoutProps> = ({
   onSelectThread,
   onCreateNewThread,
   userId,
-  mentalHealthInsights
+  mentalHealthInsights,
+  onProcessingStateChange
 }) => {
+  const [isProcessing, setIsProcessing] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const handleCreateNewThread = async () => {
@@ -38,7 +41,9 @@ const DesktopChatLayout: React.FC<DesktopChatLayoutProps> = ({
           defaultSize={25} 
           minSize={sidebarCollapsed ? 4 : 20} 
           maxSize={40}
-          className={`transition-all duration-200 ${sidebarCollapsed ? 'min-w-16' : 'min-w-80'}`}
+          className={`transition-all duration-200 ${sidebarCollapsed ? 'min-w-16' : 'min-w-80'} ${
+            isProcessing ? 'pointer-events-none opacity-75' : ''
+          }`}
         >
           <div className="flex flex-col h-full border-r border-border bg-card">
             {/* Sidebar Header */}
@@ -61,9 +66,18 @@ const DesktopChatLayout: React.FC<DesktopChatLayoutProps> = ({
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                  className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                  title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                  onClick={() => !isProcessing && setSidebarCollapsed(!sidebarCollapsed)}
+                  disabled={isProcessing}
+                  className={`h-8 w-8 transition-opacity ${
+                    isProcessing 
+                      ? "text-muted-foreground/50 opacity-50 cursor-not-allowed" 
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                  title={
+                    isProcessing 
+                      ? "Sidebar disabled during processing" 
+                      : (sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar")
+                  }
                 >
                   {sidebarCollapsed ? (
                     <ChevronRight className="h-4 w-4" />
@@ -100,7 +114,13 @@ const DesktopChatLayout: React.FC<DesktopChatLayoutProps> = ({
           </div>
         </ResizablePanel>
 
-        <ResizableHandle className="w-1 bg-border hover:bg-muted-foreground/20 transition-colors" />
+        <ResizableHandle 
+          className={`w-1 transition-colors ${
+            isProcessing 
+              ? "bg-border opacity-50 cursor-not-allowed"
+              : "bg-border hover:bg-muted-foreground/20"
+          }`}
+        />
 
         {/* Chat Panel */}
         <ResizablePanel defaultSize={75} minSize={60}>
@@ -110,6 +130,12 @@ const DesktopChatLayout: React.FC<DesktopChatLayoutProps> = ({
             onCreateNewThread={onCreateNewThread}
             userId={userId}
             mentalHealthInsights={mentalHealthInsights}
+            onProcessingStateChange={(processing) => {
+              setIsProcessing(processing);
+              if (onProcessingStateChange) {
+                onProcessingStateChange(processing);
+              }
+            }}
           />
         </ResizablePanel>
       </ResizablePanelGroup>
