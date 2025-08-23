@@ -188,8 +188,9 @@ class EnhancedAndroidNotificationService {
     }
   }
 
-  async scheduleJournalReminders(times: JournalReminderTime[]): Promise<EnhancedNotificationResult> {
-    this.log('Scheduling journal reminders', { times });
+  async scheduleJournalReminders(times: JournalReminderTime[], userTimezone?: string): Promise<EnhancedNotificationResult> {
+    const timezone = userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    this.log('Scheduling journal reminders', { times, timezone });
 
     try {
       if (!this.isNative) {
@@ -225,7 +226,8 @@ class EnhancedAndroidNotificationService {
             actionTypeId: 'JOURNAL_REMINDER',
             extra: {
               reminderTime: time,
-              scheduledAt: now.toISOString()
+              scheduledAt: now.toISOString(),
+              timezone: timezone
             }
           }]
         };
@@ -238,7 +240,8 @@ class EnhancedAndroidNotificationService {
           hour: timeMap.hour,
           minute: timeMap.minute,
           channelId: 'journal-reminders-high',
-          pattern: 'on-time-recurring'
+          pattern: 'on-time-recurring',
+          timezone: timezone
         });
       }
 
@@ -265,24 +268,29 @@ class EnhancedAndroidNotificationService {
     }
   }
 
-  private async scheduleWebReminders(times: JournalReminderTime[]): Promise<EnhancedNotificationResult> {
-    // Simplified web reminder scheduling
-    this.log('Scheduling web reminders', { times });
+  private async scheduleWebReminders(times: JournalReminderTime[], userTimezone?: string): Promise<EnhancedNotificationResult> {
+    const timezone = userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    this.log('Scheduling web reminders', { times, timezone });
     
     // Clear existing web reminders (stored in localStorage)
     localStorage.removeItem('webReminderTimeouts');
     
     let scheduledCount = 0;
     for (const time of times) {
-      // Schedule using setTimeout for next occurrence
-      const nextTime = this.getNextReminderTime(time);
+      // Schedule using setTimeout for next occurrence in user's timezone
+      const nextTime = this.getNextReminderTime(time, timezone);
       const delay = nextTime.getTime() - Date.now();
+      
+      this.log(`Web reminder ${time} delay: ${delay}ms (next: ${nextTime.toLocaleString()}) timezone: ${timezone}`);
       
       if (delay > 0) {
         setTimeout(() => {
+          console.log(`[EnhancedAndroidNotification] Web notification firing for ${time} at ${new Date().toLocaleString()}`);
           this.showWebNotification(time);
         }, delay);
         scheduledCount++;
+      } else {
+        this.log(`Skipping ${time} - delay is ${delay}ms (in the past)`);
       }
     }
 
@@ -314,17 +322,25 @@ class EnhancedAndroidNotificationService {
     return timeMap[time];
   }
 
-  private getNextReminderTime(time: JournalReminderTime): Date {
+  private getNextReminderTime(time: JournalReminderTime, timezone?: string): Date {
     const now = new Date();
-    const next = new Date();
+    const tz = timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
     const targetTime = this.getTimeMapping(time);
 
+    // Create target time in user's timezone context
+    const next = new Date();
     next.setHours(targetTime.hour, targetTime.minute, 0, 0);
 
     // If the time has passed today, schedule for tomorrow
     if (next <= now) {
       next.setDate(next.getDate() + 1);
     }
+
+    this.log(`Next reminder time for ${time}:`, {
+      scheduled: next.toLocaleString(),
+      timezone: tz,
+      delay: next.getTime() - now.getTime()
+    });
 
     return next;
   }

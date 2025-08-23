@@ -11,9 +11,11 @@ import { toast } from 'sonner';
 import { enhancedNotificationService } from '@/services/enhancedNotificationService';
 import { journalReminderService } from '@/services/journalReminderService';
 import { useTranslation } from '@/contexts/TranslationContext';
+import { useUserProfile } from '@/hooks/useUserProfile';
 
 const JournalRemindersSettings: React.FC = () => {
   const { translate } = useTranslation();
+  const { timezone } = useUserProfile();
   const [isEnabled, setIsEnabled] = useState(false);
   const [reminderTime, setReminderTime] = useState('19:00');
   const [isLoading, setIsLoading] = useState(false);
@@ -122,7 +124,7 @@ const JournalRemindersSettings: React.FC = () => {
         timeSlot = 'night';
       }
       
-      await journalReminderService.requestPermissionsAndSetup([timeSlot]);
+      await journalReminderService.requestPermissionsAndSetup([timeSlot], timezone || undefined);
     } catch (error) {
       console.error('Error scheduling reminder:', error);
       throw error;
