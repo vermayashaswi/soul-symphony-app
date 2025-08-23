@@ -502,7 +502,7 @@ async function executeSQLAnalysis(step: any, userId: string, supabaseClient: any
       return await executeVectorSearchFallback(step, userId, supabaseClient, requestId);
     }
 
-    const originalQuery = step.sqlQuery.trim();
+    const originalQuery = step.sqlQuery.trim().replace(/;+$/, ''); // Fixed: remove trailing semicolons
     executionDetails.originalQuery = originalQuery;
     
     // Validate SQL query for restricted columns
@@ -716,7 +716,7 @@ async function executeBasicSQLQuery(userId: string, supabaseClient: any, request
     .select('*')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
-    .limit(10);
+    .limit(25); // Fixed: increased limit from 10 to 25 to get more accurate results
 
   if (error) {
     console.error(`[${requestId}] Basic SQL query error:`, error);
