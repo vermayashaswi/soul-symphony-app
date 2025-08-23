@@ -897,8 +897,22 @@ export default function MobileChatInterface({
       <div className="sticky top-0 z-40 w-full bg-background border-b">
         <div className="container flex h-14 max-w-screen-lg items-center">
           <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="mr-2">
+            <SheetTrigger asChild disabled={isLoading || isProcessing || isStreaming}>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                disabled={isLoading || isProcessing || isStreaming}
+                className={`mr-2 transition-opacity ${
+                  isLoading || isProcessing || isStreaming
+                    ? "text-muted-foreground/50 opacity-50 cursor-not-allowed"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+                title={
+                  isLoading || isProcessing || isStreaming
+                    ? "Menu disabled during processing"
+                    : "Open menu"
+                }
+              >
                 <Menu className="h-5 w-5" />
                 <span className="sr-only">
                   <TranslatableText text="Toggle Menu" />

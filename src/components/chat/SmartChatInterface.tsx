@@ -59,6 +59,7 @@ export interface SmartChatInterfaceProps {
   onCreateNewThread?: () => Promise<string | null>;
   userId?: string;
   mentalHealthInsights?: MentalHealthInsights;
+  onProcessingStateChange?: (isProcessing: boolean) => void;
 }
 
 const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ 
@@ -66,7 +67,8 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
   onSelectThread, 
   onCreateNewThread, 
   userId: propsUserId, 
-  mentalHealthInsights 
+  mentalHealthInsights,
+  onProcessingStateChange
 }) => {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -203,6 +205,16 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     updateProcessingStage,
     setLocalLoading
   } = useChatRealtime(currentThreadId);
+
+  // Combined processing state for external components
+  const isAnyProcessing = isLoading || isProcessing || isStreaming;
+  
+  // Notify parent about processing state changes
+  useEffect(() => {
+    if (onProcessingStateChange) {
+      onProcessingStateChange(isAnyProcessing);
+    }
+  }, [isAnyProcessing, onProcessingStateChange]);
   
   // Use unified auto-scroll hook
   const { scrollElementRef, scrollToBottom } = useAutoScroll({
