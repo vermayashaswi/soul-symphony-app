@@ -219,14 +219,14 @@ export default function MobileChatInterface({
       return;
     }
 
-    // CRITICAL: Validate message ordering
-    // Ensure assistant response comes after the last user message
+    // CRITICAL: Validate message ordering - ensure assistant response comes AFTER user message
     const lastMessage = messages[messages.length - 1];
-    if (lastMessage && lastMessage.role !== 'user') {
-      console.warn('[MobileChatInterface] Message ordering issue detected - last message is not from user');
+    if (!lastMessage || lastMessage.role !== 'user') {
+      console.warn('[MobileChatInterface] Message ordering issue detected - last message is not from user:', lastMessage?.role);
+      // Still proceed but log the issue for debugging
     }
 
-    // Create the new message with timestamp validation
+    // Create the assistant message
     const newMessage: UIChatMessage = {
       role: 'assistant',
       content,
@@ -236,7 +236,6 @@ export default function MobileChatInterface({
 
     // Add to local state immediately for instant UI update
     setMessages(prev => {
-      // Ensure proper ordering: assistant message comes after user message
       const updated = [...prev, newMessage];
       
       console.log('[MobileChatInterface] Updated messages state:', {
@@ -249,8 +248,47 @@ export default function MobileChatInterface({
       return updated;
     });
 
-    console.log('[MobileChatInterface] Successfully added final response to local state');
-  }, [messages]);
+    // Save assistant message to database with error handling
+    if (threadId && user?.id) {
+      const saveAssistantMessage = async () => {
+        try {
+          console.log('[MobileChatInterface] Saving assistant response to database');
+          
+          const savedMessage = await saveMessage(
+            threadId,
+            content,
+            'assistant',
+            user.id,
+            analysis?.references,
+            !!analysis?.hasNumericResult,
+            undefined, // isInteractive
+            undefined, // interactiveOptions
+            uuidv4(),  // idempotency key
+            analysis
+          );
+          
+          if (!savedMessage) {
+            console.error('[MobileChatInterface] Failed to save assistant message');
+            toast({
+              title: "Response not saved",
+              description: "The response may not persist after refresh",
+              variant: "destructive",
+              duration: 3000,
+            });
+          } else {
+            console.log('[MobileChatInterface] Assistant message saved successfully:', savedMessage.id);
+          }
+        } catch (error) {
+          console.error('[MobileChatInterface] Error saving assistant message:', error);
+        }
+      };
+      
+      // Save in background
+      saveAssistantMessage();
+    }
+
+    console.log('[MobileChatInterface] Successfully processed final response');
+  }, [messages, user?.id, toast]);
 
   const streamingChat = useStreamingChat({
       threadId: threadId,
@@ -499,190 +537,137 @@ export default function MobileChatInterface({
     }
   };
 
-  const handleSendMessage = async (message: string) => {
-    if (!message.trim()) return;
-    if (!user?.id) {
-      toast({
-        title: "Authentication required",
-        description: "Please sign in to use the chat feature.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (isProcessing || isLoading) {
-      toast({
-        title: "Please wait",
-        description: "Another request is currently being processed.",
-        variant: "default"
-      });
-      return;
-    }
-
-    // ============= PRE-GENERATE TIMESTAMP FOR MESSAGE ORDERING =============
-    // Create timestamp now to ensure user message is always before assistant message
-    const userMessageTimestamp = new Date().toISOString();
-    console.log('[MobileChatInterface] Pre-generated timestamp for user message:', userMessageTimestamp);
-
-    // ============= INSTANT UI UPDATES =============
-    // Add user message to UI immediately (no delays)
-    setMessages(prev => [...prev, { role: 'user', content: message }]);
-    setShowSuggestions(false);
+  const handleSendMessage = async (message: string, isAudio: boolean = false) => {
+    if (!message.trim() || !user?.id) return;
     
-    // Force scroll to bottom so user sees their message
-    scrollToBottom(true);
-
-    // Handle thread creation for UI immediately  
-    let currentThreadId = threadId;
-    if (!currentThreadId) {
-      // Create temporary thread ID for UI
-      currentThreadId = uuidv4();
-      setThreadId(currentThreadId);
-    }
-
-    // Prepare conversation context for streaming chat
-    const conversationContext = messages.slice(-5).map(msg => ({
-      role: msg.role,
-      content: msg.content
-    }));
-
-    // ============= CRITICAL DATABASE OPERATIONS BEFORE STREAMING =============
-    // These operations must complete before streaming starts to ensure proper ordering
-    let actualThreadId = currentThreadId;
-    let isFirstMessage = false;
-    let savedUserMessage = null;
+    console.log('[MobileChatInterface] Sending message:', {
+      messageLength: message.length,
+      threadId: threadId,
+      userId: user.id,
+      isAudio
+    });
     
-    try {
-      // Create actual thread in database if needed (synchronous)
-      if (!threadId) {
-        try {
-          if (onCreateNewThread) {
-            const newThreadId = await onCreateNewThread();
-            if (newThreadId) {
-              actualThreadId = newThreadId;
-              setThreadId(newThreadId);
-            }
-          } else {
-            const { error } = await supabase
-              .from('chat_threads')
-              .insert({
-                id: actualThreadId,
-                user_id: user.id,
-                title: "New Conversation",
-                created_at: userMessageTimestamp,
-                updated_at: userMessageTimestamp
-              });
-            
-            if (error) {
-              console.error('Thread creation error:', error);
-              return;
-            }
-          }
-        } catch (error: any) {
-          console.error('Thread creation failed:', error);
+    // Always create thread if none exists
+    let activeThreadId = threadId;
+    if (!activeThreadId) {
+      debugLog.addEvent("Thread Creation", "Creating new thread for message", "info");
+      try {
+        activeThreadId = await onCreateNewThread();
+        if (!activeThreadId) {
+          console.error('[MobileChatInterface] Failed to create new thread');
+          toast({
+            title: "Error",
+            description: "Failed to create conversation. Please try again.",
+            variant: "destructive",
+          });
           return;
         }
-      } else {
-        // Check if first message for existing thread
-        const { count, error } = await supabase
-          .from('chat_messages')
-          .select('*', { count: 'exact', head: true })
-          .eq('thread_id', actualThreadId);
-          
-        isFirstMessage = !error && count === 0;
-      }
-      
-      // Update processing status
-      await updateThreadProcessingStatus(actualThreadId, 'processing');
-      
-      // CRITICAL: Save user message to database BEFORE starting streaming
-      // This ensures user message timestamp is always before assistant message
-      console.log('[MobileChatInterface] Saving user message before streaming with timestamp:', userMessageTimestamp);
-      savedUserMessage = await saveMessage(actualThreadId, message, 'user', user.id, null, false, false, [], null, null);
-      
-      if (!savedUserMessage) {
-        console.error('[MobileChatInterface] Failed to save user message');
+        setThreadId(activeThreadId);
+        console.log('[MobileChatInterface] Created new thread:', activeThreadId);
+        localStorage.setItem("lastActiveChatThreadId", activeThreadId);
+      } catch (error) {
+        console.error('[MobileChatInterface] Error creating thread:', error);
         toast({
           title: "Error",
-          description: "Failed to save message. Please try again.",
-          variant: "destructive"
+          description: "Failed to create conversation. Please try again.",
+          variant: "destructive",
         });
         return;
       }
-      
-      console.log('[MobileChatInterface] User message saved successfully, starting streaming...');
-      
-    } catch (error) {
-      console.error('[MobileChatInterface] Critical pre-streaming operations failed:', error);
-      toast({
-        title: "Error",
-        description: "Failed to prepare message. Please try again.",
-        variant: "destructive"
-      });
-      return;
     }
-
-    // ============= START STREAMING AFTER USER MESSAGE IS SAVED =============
-    // This shows the three dots and begins assistant response
-    try {
-      await startStreamingChat(
-        message,
-        user.id,
-        actualThreadId,
-        conversationContext,
-        {}
-      );
-    } catch (error: any) {
-      console.error('Streaming error:', error);
-      const errorMessageContent = "I'm having trouble processing your request. Please try again later. " + 
-                 (error?.message ? `Error: ${error.message}` : "");
-      
-      if (actualThreadId === currentThreadIdRef.current) {
-        setMessages(prev => [
-          ...prev, 
-          { 
-            role: 'assistant', 
-            content: errorMessageContent
-          }
-        ]);
-      }
-    }
-
-    // ============= BACKGROUND OPERATIONS (NON-BLOCKING) =============
-    // Non-critical operations that can happen in background
-    (async () => {
+    
+    // Create user message immediately in UI
+    const userMessage: UIChatMessage = {
+      role: 'user',
+      content: message,
+    };
+    
+    // Optimistically add user message to UI state immediately
+    setMessages(prev => [...prev, userMessage]);
+    setShowSuggestions(false);
+    
+    // Create unique idempotency key to prevent duplicates
+    const idempotencyKey = uuidv4();
+    
+    // Save user message to database with retry logic (ASYNC with error recovery)
+    const saveUserMessage = async (retryCount = 0): Promise<any> => {
       try {
-        // Generate title for first message
-        if (isFirstMessage && savedUserMessage) {
-          try {
-            const generatedTitle = await generateThreadTitle(actualThreadId, user.id);
-            if (generatedTitle) {
-              window.dispatchEvent(
-                new CustomEvent('threadTitleUpdated', {
-                  detail: { threadId: actualThreadId, title: generatedTitle }
-                })
-              );
-            }
-          } catch (titleError) {
-            console.warn('Failed to generate thread title:', titleError);
-          }
-        }
+        console.log(`[MobileChatInterface] Saving user message (attempt ${retryCount + 1})`);
         
-        // Dispatch message created event
-        window.dispatchEvent(
-          new CustomEvent('messageCreated', { 
-            detail: { 
-              threadId: actualThreadId, 
-              isFirstMessage,
-              content: message
-            } 
-          })
+        const savedMessage = await saveMessage(
+          activeThreadId!,
+          message,
+          'user',
+          user.id,
+          undefined, // references
+          undefined, // hasNumericResult
+          undefined, // isInteractive
+          undefined, // interactiveOptions
+          idempotencyKey,
+          undefined // analysisData
         );
         
+        if (!savedMessage) {
+          throw new Error('Database save returned null');
+        }
+        
+        console.log('[MobileChatInterface] User message saved successfully:', savedMessage.id);
+        return savedMessage;
+        
       } catch (error) {
-        console.error('Background operations error:', error);
+        console.error(`[MobileChatInterface] Save attempt ${retryCount + 1} failed:`, error);
+        
+        if (retryCount < 2) { // Retry up to 3 times
+          console.log(`[MobileChatInterface] Retrying save in ${(retryCount + 1) * 1000}ms`);
+          await new Promise(resolve => setTimeout(resolve, (retryCount + 1) * 1000));
+          return saveUserMessage(retryCount + 1);
+        }
+        
+        return null;
       }
-    })();
+    };
+    
+    // Start streaming immediately (don't wait for database save)
+    try {
+      console.log('[MobileChatInterface] Starting streaming chat immediately');
+      await startStreamingChat(message, activeThreadId, user.id);
+      
+      // Save user message in background with retry
+      saveUserMessage().then(savedMessage => {
+        if (!savedMessage) {
+          console.error('[MobileChatInterface] All save attempts failed');
+          toast({
+            title: "Message not saved",
+            description: "Your message may not persist after refresh",
+            variant: "destructive",
+            duration: 3000,
+          });
+        }
+      });
+      
+      // Analytics tracking for message sent
+      debugLog.addEvent("Message Sent", `Streaming started for thread ${activeThreadId}`, "info");
+      
+    } catch (error) {
+      console.error('[MobileChatInterface] Error starting streaming:', error);
+      
+      // Remove the optimistic user message from UI on error
+      setMessages(prev => prev.slice(0, -1));
+      
+      toast({
+        title: "Failed to send message",
+        description: "Please try again.",
+        variant: "destructive",
+        duration: 5000,
+      });
+      
+      // Show suggestions again if this was the first message
+      if (messages.length === 0) {
+        setShowSuggestions(true);
+      }
+      
+      return;
+    }
   };
 
   const handleSelectThread = async (selectedThreadId: string) => {
