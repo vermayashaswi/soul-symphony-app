@@ -930,15 +930,15 @@ export default function MobileChatInterface({
               </ChatErrorBoundary>
             ))}
             
-            {/* Show only streaming status - remove redundant loading indicator */}
+            {/* Show streaming indicators immediately when isStreaming is true */}
             {isStreaming ? (
               <ChatErrorBoundary>
                 <MobileChatMessage 
                   message={{ role: 'assistant', content: '' }}
                   streamingMessage={
                     useThreeDotFallback || dynamicMessages.length === 0
-                      ? undefined // Show only three-dot animation
-                      : translatedDynamicMessages[currentMessageIndex] || dynamicMessages[currentMessageIndex] // Use pre-translated message
+                      ? undefined // This will show the three-dot animation
+                      : translatedDynamicMessages[currentMessageIndex] || dynamicMessages[currentMessageIndex]
                   }
                   showStreamingDots={true}
                 />

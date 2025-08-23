@@ -200,13 +200,13 @@ export function useMobileChatSync({
     connectionHealthRef.current = setInterval(() => {
       const timeSinceLastSync = Date.now() - syncState.lastSyncTime;
       
-      // If no activity for more than 30 seconds and we should be connected
-      if (timeSinceLastSync > 30000 && syncState.isOnline && syncState.connectionRetries < maxRetries) {
-        console.log('[MobileChatSync] Connection health check failed, reconnecting...');
+      // Much longer timeout - only trigger if truly disconnected for 2+ minutes 
+      if (timeSinceLastSync > 120000 && syncState.isOnline && syncState.connectionRetries < maxRetries) {
+        console.log('[MobileChatSync] Connection health check failed after 2 minutes, reconnecting...');
         setSyncState(prev => ({ ...prev, connectionRetries: prev.connectionRetries + 1 }));
         reconnectRealtime();
       }
-    }, healthCheckInterval);
+    }, healthCheckInterval * 2); // Check less frequently
   }, [syncState.lastSyncTime, syncState.isOnline, syncState.connectionRetries]);
 
   // Reconnect real-time subscription

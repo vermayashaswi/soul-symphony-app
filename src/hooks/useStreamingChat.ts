@@ -696,14 +696,15 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     // Create abort controller for this streaming session
     const abortController = new AbortController();
     
-    // Reset and initialize state
+    // **IMMEDIATELY** initialize streaming state for instant UI feedback
+    console.log(`[useStreamingChat] *** SETTING STREAMING STATE IMMEDIATELY for thread: ${targetThreadId} ***`);
     const updates: Partial<ThreadStreamingState> = {
       isStreaming: true,
       processingStartTime: Date.now(),
       streamingMessages: [],
       currentUserMessage: '',
       showBackendAnimation: false,
-      useThreeDotFallback: false,
+      useThreeDotFallback: true, // Start with three dots for immediate feedback
       dynamicMessages: [],
       currentMessageIndex: 0,
       retryAttempts: 0,
@@ -715,6 +716,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     };
 
     updateThreadState(targetThreadId, updates);
+    console.log(`[useStreamingChat] *** STREAMING STATE SET - isStreaming: true for thread: ${targetThreadId} ***`);
 
     // Add user message immediately
     addStreamingMessage({
