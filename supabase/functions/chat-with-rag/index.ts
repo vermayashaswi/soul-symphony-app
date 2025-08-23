@@ -259,11 +259,20 @@ serve(async (req) => {
 
       // Step 3: Generate consolidated response using gpt-response-consolidator
       console.log("[chat-with-rag] Step 3: Calling gpt-response-consolidator");
+      console.log("[chat-with-rag] Execution result structure for consolidator:", {
+        hasExecutionResult: !!executionResult,
+        executionResultLength: executionResult?.length || 0,
+        sampleResult: executionResult?.[0] ? {
+          hasExecutionSummary: !!executionResult[0].executionSummary,
+          summaryType: executionResult[0].executionSummary?.resultType,
+          summaryData: executionResult[0].executionSummary?.summary
+        } : null
+      });
       
       const consolidationResponse = await supabaseClient.functions.invoke('gpt-response-consolidator', {
         body: {
           userMessage: message,
-          researchResults: executionResult || [], // Map executionResult to researchResults
+          researchResults: executionResult || [], // Processed results from smart query planner
           conversationContext: conversationContext,
           userProfile: { ...userProfile, timezone: normalizedTimezone },
           streamingMode: false,

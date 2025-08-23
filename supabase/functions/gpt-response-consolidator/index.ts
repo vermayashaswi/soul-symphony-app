@@ -130,36 +130,35 @@ serve(async (req) => {
       });
     }
 
-    // Data integrity validation - check for stale research results
+    // Data integrity validation - check for processed research results
     if (researchResults && researchResults.length > 0) {
       console.log(`[RESEARCH DATA VALIDATION] ${consolidationId}:`, {
         totalResults: researchResults.length,
         resultTypes: researchResults.map((r: any, i: number) => ({
           index: i,
           question: r?.subQuestion?.question?.substring(0, 50) || 'unknown',
-          sqlRowCount: r?.executionResults?.sqlResults?.length || 0,
-          vectorResultCount: r?.executionResults?.vectorResults?.length || 0,
-          hasError: !!r?.executionResults?.error,
-          sampleSqlData: r?.executionResults?.sqlResults?.slice(0, 1) || null
+          hasExecutionSummary: !!r?.executionSummary,
+          summaryType: r?.executionSummary?.resultType || 'unknown',
+          summaryDataType: r?.executionSummary?.dataType || 'unknown',
+          hasError: !!r?.executionResults?.error || !!r?.error
         }))
       });
       
-      // Check for potential data contamination indicators
-      const totalSqlRows = researchResults.reduce((sum: number, r: any) => 
-        sum + (r?.executionResults?.sqlResults?.length || 0), 0);
-      const totalVectorResults = researchResults.reduce((sum: number, r: any) => 
-        sum + (r?.executionResults?.vectorResults?.length || 0), 0);
+      // Check for processed summaries vs raw data
+      const hasProcessedSummaries = researchResults.some((r: any) => r?.executionSummary);
+      const hasRawResults = researchResults.some((r: any) => 
+        r?.executionResults?.sqlResults || r?.executionResults?.vectorResults);
         
       console.log(`[DATA SUMMARY] ${consolidationId}:`, {
-        totalSqlRows,
-        totalVectorResults,
+        hasProcessedSummaries,
+        hasRawResults,
         userQuestion: userMessage,
-        potentialStaleDataRisk: totalSqlRows > 0 ? 'check_sql_dates' : 'no_sql_data'
+        dataStructureType: hasProcessedSummaries ? 'processed_summaries' : 'raw_results'
       });
 
-      // If no results found in any method, provide informative response
-      if (totalSqlRows === 0 && totalVectorResults === 0) {
-        console.warn(`[${consolidationId}] No SQL or vector results found despite research execution`);
+      // If no processed summaries and no raw results, provide informative response
+      if (!hasProcessedSummaries && !hasRawResults) {
+        console.warn(`[${consolidationId}] No processed summaries or raw results found despite research execution`);
         return new Response(JSON.stringify({
           success: true,
           response: "I searched through your journal entries but couldn't find specific content that matches your question. This might be because you haven't written about this topic yet, or the topic might be phrased differently in your entries. Could you try asking about it in a different way?",
@@ -180,47 +179,73 @@ serve(async (req) => {
     const MAX_VECTOR_ITEMS = 20;
 
     const analysisSummary = researchResults.map((research: any, index: number) => {
-      const originalSql = Array.isArray(research?.executionResults?.sqlResults)
-        ? research.executionResults.sqlResults
-        : null;
-      const originalVector = Array.isArray(research?.executionResults?.vectorResults)
-        ? research.executionResults.vectorResults
-        : null;
-
-      const sqlTrimmed = !!(originalSql && originalSql.length > MAX_SQL_ROWS);
-      const vectorTrimmed = !!(originalVector && originalVector.length > MAX_VECTOR_ITEMS);
-
-      if (sqlTrimmed || vectorTrimmed) {
-        console.log('Consolidator trimming payload sizes', {
-          index,
-          sqlRows: originalSql?.length || 0,
-          sqlTrimmedTo: sqlTrimmed ? MAX_SQL_ROWS : (originalSql?.length || 0),
-          vectorItems: originalVector?.length || 0,
-          vectorTrimmedTo: vectorTrimmed ? MAX_VECTOR_ITEMS : (originalVector?.length || 0),
+      // Handle both processed summaries (new format) and raw results (legacy format)
+      if (research?.executionSummary) {
+        // NEW FORMAT: Processed summaries from smart query planner
+        console.log(`[${consolidationId}] Processing summary for sub-question ${index + 1}:`, {
+          resultType: research.executionSummary.resultType,
+          dataType: research.executionSummary.dataType,
+          summary: research.executionSummary.summary?.substring(0, 100)
         });
-      }
+        
+        return {
+          subQuestion: research?.subQuestion ?? null,
+          executionSummary: research.executionSummary,
+          processedData: {
+            resultType: research.executionSummary.resultType,
+            dataType: research.executionSummary.dataType,
+            summary: research.executionSummary.summary,
+            count: research.executionSummary.count,
+            analysis: research.executionSummary.analysis,
+            sampleEntries: research.executionSummary.sampleEntries || [],
+            totalEntriesContext: research.executionSummary.totalEntriesContext
+          },
+          error: research?.error ?? null
+        };
+      } else {
+        // LEGACY FORMAT: Raw SQL/Vector results (fallback)
+        const originalSql = Array.isArray(research?.executionResults?.sqlResults)
+          ? research.executionResults.sqlResults
+          : null;
+        const originalVector = Array.isArray(research?.executionResults?.vectorResults)
+          ? research.executionResults.vectorResults
+          : null;
 
-      return {
-        subQuestion: research?.subQuestion ?? null,
-        researcherOutput: research?.researcherOutput ?? null,
-        executionResults: {
-          ...(research?.executionResults ?? {}),
-          sqlResults: originalSql ? originalSql.slice(0, MAX_SQL_ROWS) : originalSql,
-          sqlRowCount: originalSql?.length ?? 0,
-          sqlRowCappedTo: sqlTrimmed ? MAX_SQL_ROWS : (originalSql?.length ?? 0),
-          vectorResults: originalVector ? originalVector.slice(0, MAX_VECTOR_ITEMS) : originalVector,
-          vectorItemCount: originalVector?.length ?? 0,
-          vectorItemCappedTo: vectorTrimmed ? MAX_VECTOR_ITEMS : (originalVector?.length ?? 0),
-        },
-        error: research?.executionResults?.error ?? research?.error ?? null,
-        notes: sqlTrimmed || vectorTrimmed
-          ? {
-              truncated: true,
-              reason: 'Soft cap applied to prevent token overflow',
-              caps: { MAX_SQL_ROWS, MAX_VECTOR_ITEMS },
-            }
-          : undefined,
-      };
+        const sqlTrimmed = !!(originalSql && originalSql.length > MAX_SQL_ROWS);
+        const vectorTrimmed = !!(originalVector && originalVector.length > MAX_VECTOR_ITEMS);
+
+        if (sqlTrimmed || vectorTrimmed) {
+          console.log('Consolidator trimming payload sizes', {
+            index,
+            sqlRows: originalSql?.length || 0,
+            sqlTrimmedTo: sqlTrimmed ? MAX_SQL_ROWS : (originalSql?.length || 0),
+            vectorItems: originalVector?.length || 0,
+            vectorTrimmedTo: vectorTrimmed ? MAX_VECTOR_ITEMS : (originalVector?.length || 0),
+          });
+        }
+
+        return {
+          subQuestion: research?.subQuestion ?? null,
+          researcherOutput: research?.researcherOutput ?? null,
+          executionResults: {
+            ...(research?.executionResults ?? {}),
+            sqlResults: originalSql ? originalSql.slice(0, MAX_SQL_ROWS) : originalSql,
+            sqlRowCount: originalSql?.length ?? 0,
+            sqlRowCappedTo: sqlTrimmed ? MAX_SQL_ROWS : (originalSql?.length ?? 0),
+            vectorResults: originalVector ? originalVector.slice(0, MAX_VECTOR_ITEMS) : originalVector,
+            vectorItemCount: originalVector?.length ?? 0,
+            vectorItemCappedTo: vectorTrimmed ? MAX_VECTOR_ITEMS : (originalVector?.length ?? 0),
+          },
+          error: research?.executionResults?.error ?? research?.error ?? null,
+          notes: sqlTrimmed || vectorTrimmed
+            ? {
+                truncated: true,
+                reason: 'Soft cap applied to prevent token overflow',
+                caps: { MAX_SQL_ROWS, MAX_VECTOR_ITEMS },
+              }
+            : undefined,
+        };
+      }
     });
 
     // Enhanced timezone handling with validation
@@ -473,7 +498,13 @@ serve(async (req) => {
           }
         );
 
-        // Enhanced database storage with better error handling
+        // Enhanced database storage with processed summaries support
+        const hasNumericResults = researchResults.some((r: any) => 
+          r?.executionSummary?.dataType === 'count' || 
+          r?.executionSummary?.resultType === 'count_analysis' ||
+          r?.executionSummary?.count !== undefined
+        );
+        
         const analysisData = {
           consolidationId,
           totalResults: researchResults.length,
@@ -481,6 +512,9 @@ serve(async (req) => {
           timestamp: new Date().toISOString(),
           modelUsed: 'gpt-4.1-nano-2025-04-14',
           processingSuccess: true,
+          hasProcessedSummaries: researchResults.some((r: any) => !!r?.executionSummary),
+          processedSummaries: researchResults.map((r: any) => r?.executionSummary).filter(Boolean),
+          // Legacy counts for compatibility
           sqlResultsCount: researchResults.reduce((sum: number, r: any) => sum + (r?.executionResults?.sqlResults?.length || 0), 0),
           vectorResultsCount: researchResults.reduce((sum: number, r: any) => sum + (r?.executionResults?.vectorResults?.length || 0), 0)
         };
@@ -488,10 +522,15 @@ serve(async (req) => {
         const subQueryResponses = analysisSummary.map((r: any) => ({
           subQuestion: r.subQuestion?.question || 'Unknown question',
           searchStrategy: r.subQuestion?.searchStrategy || 'unknown',
+          hasProcessedData: !!r.processedData,
+          processedDataType: r.processedData?.dataType || 'unknown',
+          processedResultType: r.processedData?.resultType || 'unknown',
+          count: r.processedData?.count || 0,
+          // Legacy support for raw results
           sqlResultCount: r.executionResults?.sqlResults?.length || 0,
           vectorResultCount: r.executionResults?.vectorResults?.length || 0,
           hasError: !!r.error,
-          executionSummary: {
+          executionSummary: r.executionSummary || {
             sqlSuccess: (r.executionResults?.sqlResults?.length || 0) > 0,
             vectorSuccess: (r.executionResults?.vectorResults?.length || 0) > 0,
             error: r.error || null
@@ -525,7 +564,9 @@ serve(async (req) => {
           .update({
             analysis_data: analysisData,
             sub_query_responses: subQueryResponses,
-            reference_entries: referenceEntries
+            reference_entries: referenceEntries,
+            has_numeric_result: hasNumericResults,
+            content: consolidatedResponse // Update the actual message content
           })
           .eq('id', messageId);
 
