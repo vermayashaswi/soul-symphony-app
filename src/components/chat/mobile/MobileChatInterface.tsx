@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Menu, Plus, Trash2 } from "lucide-react";
@@ -204,8 +204,46 @@ export default function MobileChatInterface({
   });
   
   // Use streaming chat for enhanced UX
+  // Handle final responses from streaming chat
+  const handleFinalResponse = useCallback((content: string, analysis?: any, threadId?: string, requestId?: string | null) => {
+    console.log('[MobileChatInterface] Final response received:', {
+      content: content.substring(0, 100) + '...',
+      analysis,
+      threadId,
+      requestId,
+      currentMessagesCount: messages.length
+    });
+    
+    if (!content) {
+      console.warn('[MobileChatInterface] Empty final response received');
+      return;
+    }
+
+    // Create the new message
+    const newMessage: UIChatMessage = {
+      role: 'assistant',
+      content,
+      analysis,
+      hasNumericResult: !!analysis?.hasNumericResult
+    };
+
+    // Add to local state immediately for instant UI update
+    setMessages(prev => {
+      const updated = [...prev, newMessage];
+      console.log('[MobileChatInterface] Updated messages state:', {
+        previousCount: prev.length,
+        newCount: updated.length,
+        lastMessage: newMessage.content.substring(0, 50) + '...'
+      });
+      return updated;
+    });
+
+    console.log('[MobileChatInterface] Successfully added final response to local state');
+  }, [messages.length]);
+
   const streamingChat = useStreamingChat({
-      threadId: threadId
+      threadId: threadId,
+      onFinalResponse: handleFinalResponse
   });
 
   const {

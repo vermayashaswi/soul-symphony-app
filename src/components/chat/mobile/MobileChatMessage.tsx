@@ -73,14 +73,14 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({
         transition={{ duration: 0.3 }}
         className="relative flex items-start gap-2 justify-start mb-3"
       >
-        {/* CRITICAL: Only show avatar when there's actual streaming content */}
-        {streamingMessage && (
+        {/* CRITICAL: Always show avatar during streaming (with content or dots) */}
+        {(streamingMessage || showStreamingDots) && (
           <div className="border border-primary/20 rounded-full">
             <ParticleAvatar className="w-8 h-8" size={32} />
           </div>
         )}
         
-        {/* Show three dots when showStreamingDots=true or when no streamingMessage */}
+        {/* Show three dots when showStreamingDots=true and no streamingMessage */}
         {(showStreamingDots && !streamingMessage) ? (
           <div className="flex items-center space-x-1 bg-muted/60 border border-border/50 rounded-2xl rounded-tl-none px-4 py-3">
             <div className="flex space-x-1">
