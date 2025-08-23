@@ -219,7 +219,13 @@ export default function MobileChatInterface({
     currentMessageIndex,
     useThreeDotFallback,
     queryCategory,
-    restoreStreamingState
+    restoreStreamingState,
+    expectedProcessingTime,
+    processingStartTime,
+    isRetrying,
+    retryAttempts,
+    stopStreaming,
+    clearStreamingMessages
   } = streamingChat;
 
   // Configure streaming chat - useStreamingChat handles callbacks internally
@@ -502,11 +508,11 @@ export default function MobileChatInterface({
       isFirstMessage = !error && count === 0;
     }
     
+    // Add user message to UI immediately
     setMessages(prev => [...prev, { role: 'user', content: message }]);
-    // Force scroll to bottom on send so user sees streaming/processing
-    scrollToBottom(true);
-    setLocalLoading(true, "Processing your request...");
-    // Ensure we remain pinned to bottom as processing begins
+    setShowSuggestions(false);
+    
+    // Force scroll to bottom so user sees their message and upcoming response
     scrollToBottom(true);
     
     try {
@@ -541,13 +547,13 @@ export default function MobileChatInterface({
         })
       );
       
-      // Use streaming chat for enhanced UX
+      // Prepare conversation context for streaming chat
       const conversationContext = messages.slice(-5).map(msg => ({
         role: msg.role,
         content: msg.content
       }));
       
-      // Start streaming chat with conversation context
+      // Start streaming chat - this will show immediate streaming indicators
       await startStreamingChat(
         message,
         user.id,
@@ -575,7 +581,7 @@ export default function MobileChatInterface({
         ]);
       }
     } finally {
-      setLocalLoading(false);
+      // Don't reset loading here - let streaming state manage it
     }
   };
 
@@ -948,7 +954,7 @@ export default function MobileChatInterface({
       {/* Chat Input */}
       <MobileChatInput 
         onSendMessage={handleSendMessage} 
-        isLoading={isLoading || isProcessing}
+        isLoading={isLoading || isProcessing || isStreaming}
         userId={userId || user?.id}
       />
       
