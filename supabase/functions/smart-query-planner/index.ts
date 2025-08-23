@@ -215,15 +215,113 @@ async function processExecutionResults(allResults: any[], userId: string, totalE
  */
 async function processAnalysisResults(sqlResults: any[], totalEntries: number, requestId: string) {
   console.log(`[${requestId}] Processing analysis results: ${sqlResults.length} rows`);
+  console.log(`[${requestId}] Sample SQL result structure:`, JSON.stringify(sqlResults[0], null, 2));
   
-  // Check for count queries
-  if (sqlResults.length === 1 && sqlResults[0].total_entries !== undefined) {
+  // Check for count queries - multiple variations
+  if (sqlResults.length === 1 && (
+    sqlResults[0].total_entries !== undefined || 
+    sqlResults[0].count !== undefined ||
+    sqlResults[0].entry_count !== undefined
+  )) {
+    const totalCount = sqlResults[0].total_entries || sqlResults[0].count || sqlResults[0].entry_count;
     return {
       resultType: 'count_analysis',
       dataType: 'count',
-      summary: `Total journal entries: ${sqlResults[0].total_entries}`,
-      count: sqlResults[0].total_entries,
-      analysis: { totalEntries: sqlResults[0].total_entries },
+      summary: `Found ${totalCount} matching journal entries`,
+      count: totalCount,
+      analysis: { totalEntries: totalCount },
+      sampleEntries: [],
+      totalEntriesContext: totalEntries
+    };
+  }
+
+  // Enhanced emotion analysis detection - check for common emotion-related fields
+  if (sqlResults.some(row => 
+    row.emotion !== undefined || 
+    row.avg_sentiment !== undefined || 
+    row.score !== undefined ||
+    row.avg_score !== undefined ||
+    Object.keys(row).some(key => key.toLowerCase().includes('emotion'))
+  )) {
+    const emotionAnalysis = {};
+    let emotionCount = 0;
+    
+    sqlResults.forEach(row => {
+      // Handle emotion score results
+      if (row.emotion && (row.score !== undefined || row.avg_score !== undefined)) {
+        const score = row.score || row.avg_score;
+        emotionAnalysis[row.emotion] = {
+          score: parseFloat(score).toFixed(2),
+          occurrences: row.entry_count || row.count || 1
+        };
+        emotionCount++;
+      }
+      // Handle monthly sentiment
+      else if (row.month && row.avg_sentiment !== undefined) {
+        emotionAnalysis[row.month] = {
+          averageSentiment: parseFloat(row.avg_sentiment).toFixed(2),
+          entryCount: row.entry_count || 0
+        };
+        emotionCount++;
+      }
+      // Handle any other emotion-related field
+      else {
+        Object.keys(row).forEach(key => {
+          if (key.toLowerCase().includes('emotion') && row[key] !== undefined) {
+            emotionAnalysis[key] = row[key];
+            emotionCount++;
+          }
+        });
+      }
+    });
+    
+    const summary = Object.keys(emotionAnalysis).length > 0 
+      ? `Emotion analysis: ${Object.entries(emotionAnalysis).slice(0, 3).map(([emotion, data]: [string, any]) => 
+          `${emotion}${data.score ? ` (${data.score})` : ''}`).join(', ')}`
+      : `Emotion analysis completed with ${sqlResults.length} data points`;
+    
+    return {
+      resultType: 'emotion_analysis',
+      dataType: 'emotions',
+      summary,
+      count: sqlResults.length,
+      analysis: emotionAnalysis,
+      sampleEntries: [],
+      totalEntriesContext: totalEntries
+    };
+  }
+
+  // Enhanced theme analysis detection
+  if (sqlResults.some(row => 
+    row.theme !== undefined || 
+    row.master_theme !== undefined ||
+    Object.keys(row).some(key => key.toLowerCase().includes('theme'))
+  )) {
+    const themeAnalysis = {};
+    
+    sqlResults.forEach(row => {
+      if (row.theme && (row.entry_count !== undefined || row.count !== undefined)) {
+        const count = row.entry_count || row.count;
+        themeAnalysis[row.theme] = {
+          count: count,
+          percentage: totalEntries > 0 ? ((count / totalEntries) * 100).toFixed(1) : '0'
+        };
+      } else if (row.master_theme) {
+        themeAnalysis[row.master_theme] = row.entry_count || row.count || 1;
+      }
+    });
+    
+    const summary = Object.keys(themeAnalysis).length > 0 
+      ? `Theme analysis: ${Object.entries(themeAnalysis).slice(0, 3).map(([theme, data]: [string, any]) => 
+          `${theme}${data.count ? ` (${data.count} entries)` : ''}`).join(', ')}`
+      : `Theme analysis completed with ${sqlResults.length} themes`;
+    
+    return {
+      resultType: 'theme_analysis',
+      dataType: 'themes',
+      summary,
+      count: sqlResults.length,
+      analysis: themeAnalysis,
       sampleEntries: [],
       totalEntriesContext: totalEntries
     };
@@ -232,7 +330,6 @@ async function processAnalysisResults(sqlResults: any[], totalEntries: number, r
   // Check for percentage/distribution queries
   if (sqlResults.some(row => row.percentage !== undefined || row.entry_count !== undefined)) {
     const distributionAnalysis = {};
-    let summaryText = '';
     
     sqlResults.forEach(row => {
       if (row.bucket && row.entry_count !== undefined) {
@@ -243,14 +340,14 @@ async function processAnalysisResults(sqlResults: any[], totalEntries: number, r
       }
     });
     
-    summaryText = `Distribution analysis: ${Object.entries(distributionAnalysis)
+    const summary = `Distribution analysis: ${Object.entries(distributionAnalysis)
       .map(([bucket, data]: [string, any]) => `${bucket}: ${data.count} entries (${data.percentage}%)`)
       .join(', ')}`;
     
     return {
       resultType: 'distribution_analysis',
       dataType: 'percentages',
-      summary: summaryText,
+      summary,
       count: sqlResults.reduce((sum, row) => sum + (row.entry_count || 0), 0),
       analysis: distributionAnalysis,
       sampleEntries: [],
@@ -258,40 +355,33 @@ async function processAnalysisResults(sqlResults: any[], totalEntries: number, r
     };
   }
   
-  // Check for sentiment/emotion analysis
-  if (sqlResults.some(row => row.avg_sentiment !== undefined || row.emotion !== undefined)) {
-    const sentimentAnalysis = {};
-    sqlResults.forEach(row => {
-      if (row.month && row.avg_sentiment !== undefined) {
-        sentimentAnalysis[row.month] = {
-          averageSentiment: parseFloat(row.avg_sentiment).toFixed(2),
-          entryCount: row.entry_count || 0
-        };
-      } else if (row.emotion && row.score !== undefined) {
-        sentimentAnalysis[row.emotion] = {
-          score: parseFloat(row.score).toFixed(2)
-        };
+  // Enhanced generic analysis - extract any meaningful data from SQL results
+  const genericAnalysis = {};
+  let meaningfulFieldsFound = 0;
+  
+  sqlResults.forEach((row, index) => {
+    Object.keys(row).forEach(key => {
+      // Skip common metadata fields
+      if (!['id', 'created_at', 'updated_at', 'user_id'].includes(key.toLowerCase())) {
+        if (!genericAnalysis[key]) {
+          genericAnalysis[key] = [];
+        }
+        genericAnalysis[key].push(row[key]);
+        meaningfulFieldsFound++;
       }
     });
-    
-    return {
-      resultType: 'sentiment_analysis',
-      dataType: 'statistics',
-      summary: `Sentiment analysis computed for ${Object.keys(sentimentAnalysis).length} time periods/emotions`,
-      count: sqlResults.length,
-      analysis: sentimentAnalysis,
-      sampleEntries: [],
-      totalEntriesContext: totalEntries
-    };
-  }
+  });
   
-  // Generic analysis result
+  const summary = meaningfulFieldsFound > 0 
+    ? `Analysis completed with ${Object.keys(genericAnalysis).length} data categories from ${sqlResults.length} results`
+    : `Statistical analysis computed with ${sqlResults.length} data points`;
+  
   return {
     resultType: 'statistical_analysis',
     dataType: 'statistics',
-    summary: `Statistical analysis computed with ${sqlResults.length} data points`,
+    summary,
     count: sqlResults.length,
-    analysis: { rawResults: sqlResults.slice(0, 5) }, // Limit to first 5 for brevity
+    analysis: meaningfulFieldsFound > 0 ? genericAnalysis : { rawResults: sqlResults.slice(0, 5) },
     sampleEntries: [],
     totalEntriesContext: totalEntries
   };
@@ -303,15 +393,52 @@ async function processAnalysisResults(sqlResults: any[], totalEntries: number, r
 async function processFilteringResults(sqlResults: any[], totalEntries: number, requestId: string) {
   console.log(`[${requestId}] Processing filtering results: ${sqlResults.length} entries found`);
   
+  if (sqlResults.length === 0) {
+    return {
+      resultType: 'no_entries_found',
+      dataType: 'entries',
+      summary: `No entries found matching the specified criteria`,
+      count: 0,
+      analysis: { 
+        matchedEntries: 0,
+        totalEntries,
+        percentage: 0
+      },
+      sampleEntries: [],
+      totalEntriesContext: totalEntries
+    };
+  }
+  
   const sampleEntries = sqlResults.slice(0, 3).map(entry => ({
     id: entry.id,
     content: entry.content || entry['refined text'] || entry['transcription text'] || 'No content available',
     created_at: entry.created_at,
-    themes: entry.master_themes || [],
+    themes: entry.master_themes || entry.themes || [],
+    emotions: entry.emotions || {},
     sentiment: entry.sentiment
   }));
   
   const percentage = totalEntries > 0 ? ((sqlResults.length / totalEntries) * 100).toFixed(1) : '0';
+  
+  // Extract themes and emotions from the filtered entries for analysis
+  const themeFrequency = {};
+  const emotionFrequency = {};
+  
+  sqlResults.forEach(entry => {
+    // Count themes
+    if (entry.master_themes && Array.isArray(entry.master_themes)) {
+      entry.master_themes.forEach(theme => {
+        themeFrequency[theme] = (themeFrequency[theme] || 0) + 1;
+      });
+    }
+    
+    // Count emotions
+    if (entry.emotions && typeof entry.emotions === 'object') {
+      Object.keys(entry.emotions).forEach(emotion => {
+        emotionFrequency[emotion] = (emotionFrequency[emotion] || 0) + 1;
+      });
+    }
+  });
   
   return {
     resultType: 'filtered_entries',
@@ -321,7 +448,15 @@ async function processFilteringResults(sqlResults: any[], totalEntries: number, 
     analysis: { 
       matchedEntries: sqlResults.length,
       totalEntries,
-      percentage: parseFloat(percentage)
+      percentage: parseFloat(percentage),
+      commonThemes: Object.entries(themeFrequency)
+        .sort(([,a], [,b]) => b - a)
+        .slice(0, 5)
+        .map(([theme, count]) => ({ theme, count })),
+      commonEmotions: Object.entries(emotionFrequency)
+        .sort(([,a], [,b]) => b - a)
+        .slice(0, 5)
+        .map(([emotion, count]) => ({ emotion, count }))
     },
     sampleEntries,
     totalEntriesContext: totalEntries

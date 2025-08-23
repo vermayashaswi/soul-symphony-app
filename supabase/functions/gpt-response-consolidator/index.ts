@@ -156,7 +156,7 @@ serve(async (req) => {
         dataStructureType: hasProcessedSummaries ? 'processed_summaries' : 'raw_results'
       });
 
-      // If no processed summaries and no raw results, provide informative response
+      // Enhanced validation for empty analysis objects
       if (!hasProcessedSummaries && !hasRawResults) {
         console.warn(`[${consolidationId}] No processed summaries or raw results found despite research execution`);
         return new Response(JSON.stringify({
@@ -171,6 +171,18 @@ serve(async (req) => {
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
+      }
+      
+      // Check for empty analysis objects that indicate processing failures
+      const hasEmptyAnalysis = researchResults.some((r: any) => 
+        r?.executionSummary && 
+        r.executionSummary.count === 0 && 
+        (!r.executionSummary.analysis || Object.keys(r.executionSummary.analysis).length === 0)
+      );
+      
+      if (hasEmptyAnalysis) {
+        console.warn(`[${consolidationId}] Detected empty analysis objects, likely SQL execution failures`);
+        // Still process but note the issue for the AI prompt
       }
     }
 
