@@ -24,7 +24,7 @@ import { useEnhancedSwipeGestures } from "@/hooks/use-enhanced-swipe-gestures";
 import { useStreamingChat } from "@/hooks/useStreamingChat";
 import { threadSafetyManager } from "@/utils/threadSafetyManager";
 import ChatErrorBoundary from "../ChatErrorBoundary";
-import ChatArea from "@/components/chat/ChatArea";
+import { useAutoScroll } from "@/hooks/use-auto-scroll";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -322,6 +322,23 @@ export default function MobileChatInterface({
   // Track user message sending for auto-scroll
   const [userJustSentMessage, setUserJustSentMessage] = useState(false);
 
+  // Auto-scroll setup for mobile chat area
+  const { scrollElementRef, scrollToBottom } = useAutoScroll({
+    dependencies: [messages, streamingMessages, isLoading, isStreaming],
+    enabled: true,
+    delay: 50,
+    smooth: true,
+    scrollThreshold: 50
+  });
+
+  // Auto-scroll when user sends a message
+  React.useEffect(() => {
+    if (userJustSentMessage) {
+      scrollToBottom(true); // Force scroll for user messages
+      setUserJustSentMessage(false);
+    }
+  }, [userJustSentMessage, scrollToBottom]);
+
   // Realtime: append assistant messages saved by backend
   useEffect(() => {
     if (!threadId) return;
@@ -444,7 +461,6 @@ export default function MobileChatInterface({
   // Handle user message sent callback
   const handleUserMessageSent = () => {
     setUserJustSentMessage(true);
-    setTimeout(() => setUserJustSentMessage(false), 100);
   };
 
   const loadThreadMessages = async (currentThreadId: string) => {
@@ -1057,20 +1073,42 @@ export default function MobileChatInterface({
             </div>
           </div>
         ) : (
-          <div className={`mobile-chat-content ${isKeyboardVisible ? 'keyboard-visible' : ''}`}>
-            <ChatArea
-              chatMessages={messages.map(msg => ({
-                ...msg,
-                sender: msg.role,
-                id: Math.random().toString(),
-                thread_id: threadId || '',
-                created_at: new Date().toISOString()
-              }))}
-              isLoading={isLoading || isProcessing}
-              isStreaming={isStreaming}
-              threadId={threadId}
-              onUserMessageSent={userJustSentMessage}
-            />
+          <div 
+            ref={scrollElementRef}
+            className={`mobile-chat-content flex-1 overflow-y-auto p-4 space-y-3 ${isKeyboardVisible ? 'keyboard-visible' : ''}`}
+          >
+            {messages.map((message, index) => (
+              <MobileChatMessage
+                key={index}
+                message={message}
+                showAnalysis={false}
+                isLoading={false}
+                streamingMessage={undefined}
+                showStreamingDots={false}
+              />
+            ))}
+            
+            {/* Show streaming message if currently streaming */}
+            {isStreaming && streamingMessages && currentMessageIndex < streamingMessages.length && (
+              <MobileChatMessage
+                message={{ role: 'assistant', content: '' }}
+                showAnalysis={false}
+                isLoading={false}
+                streamingMessage={translatedDynamicMessages[currentMessageIndex] || dynamicMessages[currentMessageIndex] || ''}
+                showStreamingDots={useThreeDotFallback}
+              />
+            )}
+            
+            {/* Show loading indicator if loading but not streaming */}
+            {(isLoading || isProcessing) && !isStreaming && (
+              <MobileChatMessage
+                message={{ role: 'assistant', content: '' }}
+                showAnalysis={false}
+                isLoading={true}
+                streamingMessage={undefined}
+                showStreamingDots={false}
+              />
+            )}
           </div>
         )}
       
