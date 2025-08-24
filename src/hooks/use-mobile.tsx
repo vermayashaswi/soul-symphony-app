@@ -64,30 +64,6 @@ export function useIsMobile() {
       userAgent: navigator.userAgent,
       touch: 'ontouchstart' in window || navigator.maxTouchPoints > 0
     });
-
-    // Enhanced iPhone detection for troubleshooting
-    const initialIsIPhone = /iphone/i.test(navigator.userAgent.toLowerCase());
-    if (initialIsIPhone) {
-      console.log('[useMobile] iPhone Safari detected - enhanced logging enabled');
-      try {
-        // Dynamically import iPhone debug logger to avoid circular dependencies
-        import('@/services/iPhoneDebugLogger').then(({ iPhoneDebugLogger }) => {
-          iPhoneDebugLogger.logMobileDetection({
-            isMobile: initialIsMobile,
-            isIOS: initialIsIOS,
-            isIPhone: true,
-            screenDimensions: `${window.screen.width}x${window.screen.height}`,
-            viewportDimensions: `${window.innerWidth}x${window.innerHeight}`,
-            orientation: screen.orientation?.angle || 'unknown',
-            touchCapable: 'ontouchstart' in window || navigator.maxTouchPoints > 0
-          });
-        }).catch(err => {
-          console.warn('[useMobile] iPhone debug logging failed:', err);
-        });
-      } catch (error) {
-        console.warn('[useMobile] iPhone debug logging failed:', error);
-      }
-    }
     
     // Create event listeners for resize and orientation change
     const handleResize = () => {
@@ -120,11 +96,6 @@ export function useIsMobile() {
     }
     if (initialIsAndroid) {
       document.body.classList.add('android-device');
-    }
-    
-    // Add iPhone-specific class for targeted debugging
-    if (initialIsIPhone) {
-      document.body.classList.add('iphone-device');
     }
     
     // Setup matchMedia query as well
@@ -167,11 +138,6 @@ export function useIsMobile() {
       }
       if (initialIsAndroid) {
         document.body.classList.remove('android-device');
-      }
-      
-      // Remove iPhone-specific class
-      if (initialIsIPhone) {
-        document.body.classList.remove('iphone-device');
       }
     };
   }, [isMobile]);

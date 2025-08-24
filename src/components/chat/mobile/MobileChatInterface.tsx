@@ -66,8 +66,6 @@ export default function MobileChatInterface({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [isIOSDevice, setIsIOSDevice] = useState(false);
-  const [isIPhoneMobile, setIsIPhoneMobile] = useState(false);
-  const [emergencyBypass, setEmergencyBypass] = useState(false);
   const debugLog = useDebugLog();
   
   // Track active thread for safety manager
@@ -275,44 +273,20 @@ export default function MobileChatInterface({
   const loadedThreadRef = useRef<string | null>(null);
   const userVerificationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
-  // Detect iOS device and iPhone mobile browser for specific handling
+  // Detect iOS device for specific handling
   useEffect(() => {
     const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
     const isiOS = /iphone|ipad|ipod/i.test(userAgent.toLowerCase());
-    const isIPhoneBrowser = /iPhone|iPod/.test(userAgent) && !(navigator as any).standalone;
-    
     setIsIOSDevice(isiOS);
-    setIsIPhoneMobile(isIPhoneBrowser);
-    
-    debugLog.addEvent("Platform Detection", `iOS device: ${isiOS}, iPhone mobile: ${isIPhoneBrowser}`, "info");
-    
-    // iPhone emergency bypass: Force loading to false after 3 seconds max
-    if (isIPhoneBrowser) {
-      console.log('[MobileChatInterface] iPhone detected - setting emergency bypass timer');
-      const emergencyTimer = setTimeout(() => {
-        console.log('[MobileChatInterface] Emergency bypass activated for iPhone');
-        setEmergencyBypass(true);
-        setInitialLoading(false);
-        debugLog.addEvent("iPhone Emergency", "Emergency bypass activated - forced loading to false", "warning");
-      }, 3000);
-      
-      return () => clearTimeout(emergencyTimer);
-    }
+    debugLog.addEvent("Platform Detection", `iOS device detected: ${isiOS}`, "info");
   }, []);
 
-  // Simplified iOS user verification - no complex retry logic for iPhone
+  // iOS-specific user verification with retry logic
   useEffect(() => {
     if (!isIOSDevice || user) return;
 
-    // iPhone mobile browsers: Simple, immediate verification
-    if (isIPhoneMobile) {
-      debugLog.addEvent("iPhone User Verification", "iPhone mobile browser - simplified flow", "info");
-      return;
-    }
-
-    // Other iOS devices: Keep existing retry logic
     let retryCount = 0;
-    const maxRetries = 3; // Reduced retries
+    const maxRetries = 5;
     const retryDelay = 1000;
 
     const verifyUser = () => {
@@ -326,21 +300,24 @@ export default function MobileChatInterface({
         debugLog.addEvent("iOS User Verification", `Retry ${retryCount}/${maxRetries} - User not yet available`, "warning");
         userVerificationTimeoutRef.current = setTimeout(verifyUser, retryDelay);
       } else {
-        debugLog.addEvent("iOS User Verification", "Max retries reached - showing emergency access", "warning");
-        setEmergencyBypass(true);
-        setInitialLoading(false);
+        debugLog.addEvent("iOS User Verification", "Max retries reached - user verification failed", "error");
+        toast({
+          title: "Authentication Issue",
+          description: "Please refresh the page if the chat doesn't load.",
+          variant: "destructive"
+        });
       }
     };
 
-    // Shorter delay for iOS stabilization
-    userVerificationTimeoutRef.current = setTimeout(verifyUser, 1000);
+    // Start verification after a brief delay for iOS session stabilization
+    userVerificationTimeoutRef.current = setTimeout(verifyUser, 2000);
 
     return () => {
       if (userVerificationTimeoutRef.current) {
         clearTimeout(userVerificationTimeoutRef.current);
       }
     };
-  }, [isIOSDevice, user, isIPhoneMobile]);
+  }, [isIOSDevice, user]);
 
   // Track user message sending for auto-scroll
   const [userJustSentMessage, setUserJustSentMessage] = useState(false);
@@ -426,55 +403,44 @@ export default function MobileChatInterface({
   }, [threadId]);
 
   useEffect(() => {
-    // Simplified thread loading - iPhone optimized
-    const initializeThread = async () => {
-      try {
-        if (threadId) {
-          await loadThreadMessages(threadId);
-          const restored = restoreStreamingState(threadId);
-          if (restored) {
-            debugLog.addEvent("Thread Initialization", `Restored streaming state for thread: ${threadId}`, "info");
-          }
-          debugLog.addEvent("Thread Initialization", `Loading current thread: ${threadId}`, "info");
-        } else {
-          const storedThreadId = localStorage.getItem("lastActiveChatThreadId");
-          if (storedThreadId && user?.id) {
-            setThreadId(storedThreadId);
-            await loadThreadMessages(storedThreadId);
-            const restored = restoreStreamingState(storedThreadId);
-            if (restored) {
-              debugLog.addEvent("Thread Initialization", `Restored streaming state for stored thread: ${storedThreadId}`, "info");
-            }
-            debugLog.addEvent("Thread Initialization", `Loading stored thread: ${storedThreadId}`, "info");
-          } else {
-            setInitialLoading(false);
-            debugLog.addEvent("Thread Initialization", "No stored thread found", "info");
-          }
+    // iOS-specific delay before thread loading
+    const loadWithIOSDelay = () => {
+      if (threadId) {
+        loadThreadMessages(threadId);
+        // Try to restore streaming state for this thread
+        const restored = restoreStreamingState(threadId);
+        if (restored) {
+          debugLog.addEvent("Thread Initialization", `Restored streaming state for thread: ${threadId}`, "info");
         }
-      } catch (error) {
-        console.error('[MobileChatInterface] Thread loading error:', error);
-        setInitialLoading(false);
-        debugLog.addEvent("Thread Initialization", `Error loading thread: ${error}`, "error");
+        debugLog.addEvent("Thread Initialization", `Loading current thread: ${threadId}`, "info");
+      } else {
+        const storedThreadId = localStorage.getItem("lastActiveChatThreadId");
+        if (storedThreadId && user?.id) {
+          setThreadId(storedThreadId);
+          loadThreadMessages(storedThreadId);
+          // Try to restore streaming state for stored thread
+          const restored = restoreStreamingState(storedThreadId);
+          if (restored) {
+            debugLog.addEvent("Thread Initialization", `Restored streaming state for stored thread: ${storedThreadId}`, "info");
+          }
+          debugLog.addEvent("Thread Initialization", `Loading stored thread: ${storedThreadId}`, "info");
+        } else {
+          setInitialLoading(false);
+          debugLog.addEvent("Thread Initialization", "No stored thread found", "info");
+        }
       }
     };
 
-    // iPhone mobile browsers: No delays, immediate loading
-    if (isIPhoneMobile) {
-      debugLog.addEvent("Thread Initialization", "iPhone mobile - immediate loading", "info");
-      initializeThread();
-      return;
-    }
-
-    // Other iOS devices: Minimal delay
     if (isIOSDevice && !user) {
-      debugLog.addEvent("Thread Initialization", "iOS device - minimal delay for auth", "info");
-      const timeout = setTimeout(initializeThread, 500);
+      // For iOS, wait longer for user authentication to stabilize
+      debugLog.addEvent("Thread Initialization", "iOS device - waiting for user authentication", "info");
+      const timeout = setTimeout(loadWithIOSDelay, 3000);
       return () => clearTimeout(timeout);
     } else {
-      // Non-iOS or user available: Load immediately
-      initializeThread();
+      // For non-iOS or when user is available, load immediately
+      loadWithIOSDelay();
     }
-  }, [threadId, user?.id, restoreStreamingState, isIOSDevice, isIPhoneMobile]);
+  }, [threadId, user?.id, restoreStreamingState, isIOSDevice]);
   
   useEffect(() => {
     const onThreadChange = (event: CustomEvent) => {
@@ -1061,59 +1027,12 @@ export default function MobileChatInterface({
       </div>
       
       {/* Chat Content */}
-      {(initialLoading && !emergencyBypass) ? (
+      {initialLoading ? (
           <div className="flex items-center justify-center py-10">
             <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></div>
             <span className="ml-2 text-muted-foreground">
               <TranslatableText text="Loading conversation..." />
-              {isIPhoneMobile && <span className="block text-xs mt-1">(iPhone optimized)</span>}
             </span>
-          </div>
-        ) : emergencyBypass && messages.length === 0 ? (
-          <div className="flex flex-col justify-start h-full mt-6 pt-4">
-            <div className="text-center px-4">
-              <div className="iphone-emergency-state mb-4">
-                <h3 className="text-lg font-medium mb-2">
-                  <TranslatableText text="Emergency Mode Active" />
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  <TranslatableText text="iPhone emergency access - Chat interface ready" />
-                </p>
-              </div>
-              <h3 className="text-xl font-medium mb-2">
-                <TranslatableText text="How can I help you?" />
-              </h3>
-              <p className="text-muted-foreground text-sm mb-4">
-                <TranslatableText text="Ask me anything about your mental well-being and journal entries" />
-              </p>
-              
-              {showSuggestions && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.2 }}
-                  className="flex flex-col gap-2 mx-auto max-w-[280px]"
-                >
-                  {suggestionQuestions.map((question, index) => (
-                    <Button
-                      key={index}
-                      variant="outline"
-                      size="sm"
-                      className="px-3 py-2 h-auto justify-start text-sm text-left bg-muted/50 hover:bg-muted w-full"
-                      onClick={() => handleSendMessage(question.text)}
-                      disabled={isLoading || isProcessing}
-                    >
-                      <div className="flex items-start w-full">
-                        <span className="mr-2">{question.icon}</span>
-                        <span className="flex-grow break-words whitespace-normal">
-                          <TranslatableText text={question.text} />
-                        </span>
-                      </div>
-                    </Button>
-                  ))}
-                </motion.div>
-              )}
-            </div>
           </div>
         ) : messages.length === 0 ? (
           <div className="flex flex-col justify-start h-full mt-6 pt-4">
