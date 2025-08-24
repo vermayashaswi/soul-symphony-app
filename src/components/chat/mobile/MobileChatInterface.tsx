@@ -17,7 +17,7 @@ import { getThreadMessages, saveMessage, updateUserMessageClassification } from 
 import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
 import { processChatMessage } from "@/services/chatService";
 import { MentalHealthInsights } from "@/hooks/use-mental-health-insights";
-import { useChatRealtime } from "@/hooks/use-chat-realtime";
+
 import { updateThreadProcessingStatus, generateThreadTitle } from "@/utils/chat/threadUtils";
 import { useUnifiedKeyboard } from "@/hooks/use-unified-keyboard";
 import { useEnhancedSwipeGestures } from "@/hooks/use-enhanced-swipe-gestures";
@@ -79,12 +79,6 @@ export default function MobileChatInterface({
     currentThreadIdRef.current = threadId;
   }, [threadId]);
   
-  const {
-    isLoading,
-    isProcessing,
-    processingStatus,
-    setLocalLoading
-  } = useChatRealtime(threadId);
   
   // Emergency iPhone loading bypass - IMMEDIATE
   useEffect(() => {
@@ -95,10 +89,9 @@ export default function MobileChatInterface({
       // IMMEDIATE force loading completion for iPhone
       console.log('[MobileChatInterface] IMMEDIATE iPhone bypass - forcing loading completion NOW');
       setInitialLoading(false);
-      setLocalLoading(false);
       setIsIOSDevice(true);
     }
-  }, [setLocalLoading]);
+  }, []);
   
   const { isKeyboardVisible } = useUnifiedKeyboard();
   
@@ -163,8 +156,7 @@ export default function MobileChatInterface({
              }
              return [...prev, { role: 'assistant', content: response, analysis }];
            });
-           setShowSuggestions(false);
-           setLocalLoading(false);
+            setShowSuggestions(false);
            
            debugLog.addEvent("Streaming Response", `[Mobile] Assistant message added to UI for thread ${originThreadId}`, "success");
          }
@@ -241,11 +233,10 @@ export default function MobileChatInterface({
                 debugLog.addEvent("Streaming Watchdog", `[Mobile] Assistant message already exists in database`, "info");
               }
 
-              setLocalLoading(false);
             }, 800); // Reduced delay for faster first message experience
           } catch (e) {
             console.warn('[Mobile Streaming Watchdog] Exception scheduling fallback:', (e as any)?.message || e);
-            setLocalLoading(false);
+            
           }
         }
     },
@@ -303,7 +294,7 @@ export default function MobileChatInterface({
 
   // Auto-scroll setup for mobile chat area
   const { scrollElementRef, scrollToBottom } = useAutoScroll({
-    dependencies: [messages, streamingMessages, isLoading, isStreaming],
+    dependencies: [messages, streamingMessages, isStreaming],
     enabled: true,
     delay: 50,
     smooth: true,
@@ -527,14 +518,6 @@ export default function MobileChatInterface({
       return;
     }
 
-    if (isProcessing || isLoading) {
-      toast({
-        title: "Please wait",
-        description: "Another request is currently being processed.",
-        variant: "default"
-      });
-      return;
-    }
 
     let currentThreadId = threadId;
     let isFirstMessage = false;
@@ -784,16 +767,6 @@ export default function MobileChatInterface({
       return;
     }
 
-    if (isProcessing || processingStatus === 'processing') {
-      console.log('[MobileChat] Cannot delete thread while processing');
-      toast({
-        title: "Cannot delete conversation",
-        description: "Please wait for the current request to complete before deleting this conversation.",
-        variant: "destructive"
-      });
-      setShowDeleteDialog(false);
-      return;
-    }
 
     try {
       console.log('[MobileChat] Deleting thread:', threadId);
@@ -883,7 +856,7 @@ export default function MobileChatInterface({
     }
   };
 
-  const isDeletionDisabled = isProcessing || processingStatus === 'processing' || isLoading;
+  const isDeletionDisabled = false;
 
   return (
     <div className="mobile-chat-interface">
@@ -891,18 +864,18 @@ export default function MobileChatInterface({
       <div className="sticky top-0 z-40 w-full bg-background border-b">
         <div className="container flex h-14 max-w-screen-lg items-center">
           <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-            <SheetTrigger asChild disabled={isLoading || isProcessing || isStreaming}>
+            <SheetTrigger asChild disabled={isStreaming}>
               <Button 
                 variant="ghost" 
                 size="icon" 
-                disabled={isLoading || isProcessing || isStreaming}
+                disabled={isStreaming}
                 className={`mr-2 transition-opacity ${
-                  isLoading || isProcessing || isStreaming
+                  isStreaming
                     ? "text-muted-foreground/50 opacity-50 cursor-not-allowed"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
                 title={
-                  isLoading || isProcessing || isStreaming
+                  isStreaming
                     ? "Menu disabled during processing"
                     : "Open menu"
                 }
@@ -1040,7 +1013,7 @@ export default function MobileChatInterface({
                       size="sm"
                       className="px-3 py-2 h-auto justify-start text-sm text-left bg-muted/50 hover:bg-muted w-full"
                       onClick={() => handleSendMessage(question.text)}
-                      disabled={isLoading || isProcessing}
+                      disabled={false}
                     >
                       <div className="flex items-start w-full">
                         <span className="mr-2">{question.icon}</span>
@@ -1081,23 +1054,13 @@ export default function MobileChatInterface({
               />
             )}
             
-            {/* Show loading indicator if loading but not streaming */}
-            {(isLoading || isProcessing) && !isStreaming && (
-              <MobileChatMessage
-                message={{ role: 'assistant', content: '' }}
-                showAnalysis={false}
-                isLoading={true}
-                streamingMessage={undefined}
-                showStreamingDots={false}
-              />
-            )}
           </div>
         )}
       
       {/* Chat Input */}
       <MobileChatInput 
         onSendMessage={handleSendMessage} 
-        isLoading={isLoading || isProcessing}
+        isLoading={false}
         userId={userId || user?.id}
       />
       
