@@ -50,8 +50,6 @@ interface MobileChatInterfaceProps {
   onCreateNewThread: () => Promise<string | null>;
   userId?: string;
   mentalHealthInsights?: MentalHealthInsights;
-  isProcessingActive?: boolean;
-  onProcessingStateChange?: (isProcessing: boolean) => void;
 }
 
 export default function MobileChatInterface({
@@ -60,8 +58,6 @@ export default function MobileChatInterface({
   onCreateNewThread,
   userId,
   mentalHealthInsights,
-  isProcessingActive = false,
-  onProcessingStateChange,
 }: MobileChatInterfaceProps) {
   const [messages, setMessages] = useState<UIChatMessage[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -247,14 +243,6 @@ export default function MobileChatInterface({
        });
      }
    });
-  
-  // Calculate and notify processing state changes
-  useEffect(() => {
-    const isCurrentlyProcessing = isLoading || isProcessing || isStreaming;
-    if (onProcessingStateChange) {
-      onProcessingStateChange(isCurrentlyProcessing);
-    }
-  }, [isLoading, isProcessing, isStreaming, onProcessingStateChange]);
   
   const suggestionQuestions = [
     {
@@ -902,23 +890,9 @@ export default function MobileChatInterface({
       {/* Header */}
       <div className="sticky top-0 z-40 w-full bg-background border-b">
         <div className="container flex h-14 max-w-screen-lg items-center">
-          <Sheet 
-            open={sheetOpen && !isProcessingActive} 
-            onOpenChange={(open) => !isProcessingActive && setSheetOpen(open)}
-          >
+          <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
             <SheetTrigger asChild>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className={`mr-2 ${
-                  isProcessingActive 
-                    ? 'opacity-50 cursor-not-allowed' 
-                    : ''
-                }`}
-                disabled={isProcessingActive}
-                title={isProcessingActive ? "Cannot access sidebar while processing" : "Toggle Menu"}
-                onClick={() => !isProcessingActive && setSheetOpen(true)}
-              >
+              <Button variant="ghost" size="icon" className="mr-2">
                 <Menu className="h-5 w-5" />
                 <span className="sr-only">
                   <TranslatableText text="Toggle Menu" />
