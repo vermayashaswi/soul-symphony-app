@@ -284,11 +284,19 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
   useEffect(() => {
     if (propsThreadId && propsThreadId !== currentThreadId) {
       loadThreadMessages(propsThreadId);
-      // Try to restore streaming state for this thread
-      const restored = restoreStreamingState(propsThreadId);
-      if (restored) {
-        debugLog.addEvent("Props Thread Change", `Restored streaming state for props thread: ${propsThreadId}`, "info");
-      }
+      // Try to restore streaming state for this thread (now async)
+      const tryRestore = async () => {
+        try {
+          const restored = await restoreStreamingState(propsThreadId);
+          if (restored) {
+            debugLog.addEvent("Props Thread Change", `Restored streaming state for props thread: ${propsThreadId}`, "info");
+          }
+        } catch (error) {
+          console.warn('[SmartChatInterface] Error restoring state for props thread:', error);
+        }
+      };
+      tryRestore();
+      
       // Update local storage to maintain consistency
       if (propsThreadId) {
         localStorage.setItem("lastActiveChatThreadId", propsThreadId);
@@ -319,11 +327,18 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     if (storedThreadId && effectiveUserId) {
       setLocalThreadId(storedThreadId);
       loadThreadMessages(storedThreadId);
-      // Try to restore streaming state for stored thread
-      const restored = restoreStreamingState(storedThreadId);
-      if (restored) {
-        debugLog.addEvent("Initialization", `Restored streaming state for stored thread: ${storedThreadId}`, "info");
-      }
+      // Try to restore streaming state for stored thread (now async)
+      const tryRestoreStored = async () => {
+        try {
+          const restored = await restoreStreamingState(storedThreadId);
+          if (restored) {
+            debugLog.addEvent("Initialization", `Restored streaming state for stored thread: ${storedThreadId}`, "info");
+          }
+        } catch (error) {
+          console.warn('[SmartChatInterface] Error restoring state for stored thread:', error);
+        }
+      };
+      tryRestoreStored();
       debugLog.addEvent("Initialization", `Loading stored thread: ${storedThreadId}`, "info");
     } else {
       setInitialLoading(false);
