@@ -69,15 +69,16 @@
 	"android": {
 		"allowMixedContent": false,
 		"captureInput": true,
-		"webContentsDebuggingEnabled": false,
+		"webContentsDebuggingEnabled": true,
 		"backgroundColor": "#FFFFFF",
 		"launchMode": "singleTask",
 		"orientation": "portrait",
 		"useLegacyBridge": false,
 		"appendUserAgent": "SouloApp",
-		"overrideUserAgent": "SouloApp/1.0.0 Mobile",
 		"androidScheme": "https",
 		"loadOnMainThread": true,
-		"handlePermissions": true
+		"handlePermissions": true,
+		"mixedContentMode": "always_allow",
+		"allowUniversalAccessFromFileURLs": true
 	}
 }
