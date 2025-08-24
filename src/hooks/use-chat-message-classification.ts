@@ -81,6 +81,26 @@ export function useChatMessageClassification() {
       try {
         console.log(`[Classification Hook] Classification attempt ${attempt}/${maxRetries} for message:`, message);
         
+        // CAPACITOR PARITY FIX: Force GENERAL_MENTAL_HEALTH for Capacitor to match web behavior
+        const isCapacitor = (window as any).Capacitor;
+        if (isCapacitor) {
+          console.log("[Classification Hook] Capacitor detected - forcing GENERAL_MENTAL_HEALTH classification for parity");
+          const result = {
+            category: QueryCategory.GENERAL_MENTAL_HEALTH,
+            confidence: 0.9,
+            reasoning: 'Forced GENERAL_MENTAL_HEALTH for Capacitor parity',
+            useAllEntries: false
+          };
+          
+          setClassification({
+            ...result,
+            isLoading: false,
+            error: null
+          });
+          
+          return result;
+        }
+        
         // Use the enhanced chat-query-classifier edge function
         const { data, error } = await supabase.functions.invoke('chat-query-classifier', {
           body: { message, conversationContext }

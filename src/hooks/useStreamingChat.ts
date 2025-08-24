@@ -378,20 +378,34 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     const activeThreadId = targetThreadId || threadId;
     if (!activeThreadId) return;
 
-    // CAPACITOR FIX: Force three-dot fallback for all Capacitor environments to match browser behavior
+    // CAPACITOR PARITY FIX: Always force three-dot fallback for Capacitor to match web browser behavior
     const isCapacitor = !!(
       (window as any).Capacitor?.isNative ||
       window.location.href.includes('capacitor://') ||
       window.location.href.includes('ionic://') ||
-      (window as any).Capacitor?.isPluginAvailable
+      (window as any).Capacitor?.isPluginAvailable ||
+      (window as any).Capacitor
     );
 
-    // Force three-dot fallback for Capacitor or non-journal queries
-    if (isCapacitor || category !== 'JOURNAL_SPECIFIC') {
+    // Force three-dot fallback for ALL Capacitor environments regardless of category
+    if (isCapacitor) {
+      console.log('[useStreamingChat] Capacitor detected - forcing three-dot fallback for web parity');
       updateThreadState(activeThreadId, {
         useThreeDotFallback: true,
         dynamicMessages: [],
-        currentMessageIndex: 0
+        currentMessageIndex: 0,
+        translatedDynamicMessages: []
+      });
+      return;
+    }
+
+    // For web browsers, only use dynamic messages for journal-specific queries
+    if (category !== 'JOURNAL_SPECIFIC') {
+      updateThreadState(activeThreadId, {
+        useThreeDotFallback: true,
+        dynamicMessages: [],
+        currentMessageIndex: 0,
+        translatedDynamicMessages: []
       });
       return;
     }
@@ -530,8 +544,22 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     }
   }, [threadId, getThreadState, updateThreadState, generateStreamingMessages, invokeWithBackoff, isEdgeFunctionError, addStreamingMessage, resetRetryState]);
 
-  // Enhanced timing logic with thread validation
+  // Enhanced timing logic with thread validation - CAPACITOR PARITY FIX: Disable for Capacitor
   useEffect(() => {
+    // CAPACITOR PARITY FIX: Skip dynamic message rotation for Capacitor to match web behavior
+    const isCapacitor = !!(
+      (window as any).Capacitor?.isNative ||
+      window.location.href.includes('capacitor://') ||
+      window.location.href.includes('ionic://') ||
+      (window as any).Capacitor?.isPluginAvailable ||
+      (window as any).Capacitor
+    );
+    
+    if (isCapacitor) {
+      console.log('[useStreamingChat] Skipping dynamic message rotation for Capacitor to match browser behavior');
+      return;
+    }
+    
     if (!threadId || !state.isStreaming || state.useThreeDotFallback || state.dynamicMessages.length === 0) return;
 
     let timeoutId: NodeJS.Timeout;
