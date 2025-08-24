@@ -7,7 +7,6 @@ import { AuthContextType } from '@/types/auth';
 import { ensureProfileExists as ensureProfileExistsService, updateUserProfile as updateUserProfileService } from '@/services/profileService';
 import { 
   signInWithGoogle as signInWithGoogleService,
-  signInWithApple as signInWithAppleService,
   signInWithEmail as signInWithEmailService,
   signUp as signUpService,
   resetPassword as resetPasswordService,
@@ -238,23 +237,6 @@ const location = useLocation();
     }
   };
 
-  const signInWithApple = async (): Promise<void> => {
-    setIsLoading(true);
-    logInfo('Initiating Apple ID sign-in', 'AuthContext', { 
-      origin: window.location.origin,
-      pathname: window.location.pathname
-    });
-    
-    try {
-      await signInWithAppleService();
-      logInfo('Apple ID sign-in initiated', 'AuthContext');
-      
-      // Conversion tracking now handled by SessionProvider
-    } catch (error: any) {
-      logAuthError(`Apple ID sign-in failed: ${error.message}`, 'AuthContext', error);
-      setIsLoading(false);
-    }
-  };
 
   const signInWithEmail = async (email: string, password: string): Promise<void> => {
     setIsLoading(true);
@@ -650,7 +632,6 @@ const location = useLocation();
     user,
     isLoading,
     signInWithGoogle,
-    signInWithApple,
     signOut,
     refreshSession,
     signInWithEmail,

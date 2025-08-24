@@ -6,7 +6,6 @@ export type AuthContextType = {
   user: User | null;
   isLoading: boolean;
   signInWithGoogle: () => Promise<void>;
-  signInWithApple: () => Promise<void>;
   signOut: () => Promise<void>;
   refreshSession: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;

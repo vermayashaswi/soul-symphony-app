@@ -28,7 +28,7 @@ class EnhancedAuthService {
    * Enhanced sign-in with retry logic and comprehensive error handling
    */
   async signInWithRetry(
-    method: 'google' | 'apple' | 'email',
+    method: 'google' | 'email',
     credentials?: { email: string; password: string }
   ): Promise<void> {
     let lastError: any;
@@ -95,14 +95,12 @@ class EnhancedAuthService {
    * Execute the actual sign-in based on method
    */
   private async executeSignIn(
-    method: 'google' | 'apple' | 'email',
+    method: 'google' | 'email',
     credentials?: { email: string; password: string }
   ): Promise<void> {
     switch (method) {
       case 'google':
         return await authService.signInWithGoogle();
-      case 'apple':
-        return await authService.signInWithApple();
       case 'email':
         if (!credentials) {
           throw new Error('Email credentials required');
