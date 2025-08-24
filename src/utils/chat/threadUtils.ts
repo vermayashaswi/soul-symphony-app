@@ -175,11 +175,13 @@ export const updateThreadProcessingStatus = async (
 
 /**
  * Creates a processing message placeholder
+ * @deprecated Use useStreamingChat for all processing states
  */
 export const createProcessingMessage = async (
   threadId: string,
   initialContent: string = "Processing your request..."
 ): Promise<string | null> => {
+  console.warn('createProcessingMessage is deprecated. Use useStreamingChat for processing states.');
   try {
     // Create a placeholder message that shows we're processing
     const { data, error } = await supabase
@@ -209,6 +211,7 @@ export const createProcessingMessage = async (
 
 /**
  * Updates a processing message with final content or removes it
+ * @deprecated Use useStreamingChat for all processing states
  */
 export const updateProcessingMessage = async (
   messageId: string,
@@ -217,6 +220,7 @@ export const updateProcessingMessage = async (
   analysis?: any,
   hasNumericResult?: boolean
 ): Promise<boolean> => {
+  console.warn('updateProcessingMessage is deprecated. Use useStreamingChat for processing states.');
   try {
     if (finalContent === null) {
       // Delete the processing message if we don't have final content

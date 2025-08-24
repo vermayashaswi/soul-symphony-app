@@ -568,18 +568,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       })}` , "success");
       
       // NO manual processing stage updates - useStreamingChat handles all states
-      
-      // Create processing placeholder only for non-journal-specific queries
-      if (queryClassification.category !== QueryCategory.JOURNAL_SPECIFIC) {
-        processingMessageId = await createProcessingMessage(threadId, "Processing your request...");
-        if (processingMessageId) {
-          debugLog.addEvent("Database", `Created processing message with ID: ${processingMessageId}`, "success");
-        }
-      } else if (processingMessageId) {
-        // Safety: if a placeholder exists, remove it for streaming path
-        await updateProcessingMessage(processingMessageId, null);
-        processingMessageId = null;
-      }
+      // NO database processing messages - useStreamingChat handles all processing indicators
       
       // Route ALL queries to chat-with-rag (restored original design)
       debugLog.addEvent("Routing", "Using chat-with-rag for all queries with streaming", "info");
