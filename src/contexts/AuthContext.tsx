@@ -370,25 +370,11 @@ const location = useLocation();
         userMetadataKeys: currentUser.user_metadata ? Object.keys(currentUser.user_metadata) : []
       });
       
-      // Increased delay for mobile stability, reduced delay for iPhone specifically
+      // Increased delay for mobile stability - use consistent timing across all platforms
       if (isMobileDevice) {
-        const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
-        const isIOS = /iphone|ipad|ipod/i.test(userAgent.toLowerCase());
-        const isIPhone = /iphone/i.test(userAgent.toLowerCase());
+        const delay = 1500; // Use consistent 1500ms delay that works for Android
         
-        // Minimal delay for iPhone specifically to fix loading issues
-        const delay = isIPhone ? 100 : (isIOS ? 500 : 1500);
-        
-        logProfile(`Mobile device detected (${isIPhone ? 'iPhone' : isIOS ? 'iOS' : 'other'}), adding ${delay}ms stabilization delay`, 'AuthContext');
-        
-        // iPhone-specific debug logging
-        if (isIPhone) {
-          iPhoneDebugLogger.log('PROFILE_CREATION_DELAY', { 
-            delay, 
-            userAgent, 
-            profileCreationAttempts: profileCreationAttempts + 1 
-          });
-        }
+        logProfile(`Mobile device detected, adding ${delay}ms stabilization delay`, 'AuthContext');
         
         await new Promise(resolve => setTimeout(resolve, delay));
       }
@@ -476,17 +462,15 @@ const location = useLocation();
           userId: currentSession?.user?.id
         });
 
-        // iPhone-specific debug logging
-        const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
-        const isIPhone = /iphone/i.test(userAgent.toLowerCase());
-        if (isIPhone) {
-          iPhoneDebugLogger.logAuthStateChange(event, !!currentSession?.user, {
-            userId: currentSession?.user?.id,
-            email: currentSession?.user?.email,
-            provider: currentSession?.user?.app_metadata?.provider,
-            isNative: nativeIntegrationService.isRunningNatively()
-          });
-        }
+        // Debug logging for all platforms
+        console.log('[AuthContext] Auth state change details:', {
+          event,
+          hasUser: !!currentSession?.user,
+          userId: currentSession?.user?.id,
+          email: currentSession?.user?.email,
+          provider: currentSession?.user?.app_metadata?.provider,
+          isNative: nativeIntegrationService.isRunningNatively()
+        });
         
         // Prevent loops by checking if this is the same session
         if (currentSession?.access_token === session?.access_token && event !== 'SIGNED_OUT') {
@@ -536,10 +520,8 @@ const location = useLocation();
             }, 100); // Minimal delay for native
             
           } else {
-            // Web: Use existing logic with longer delays for stability, extra delay for iOS
-            const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
-            const isIOS = /iphone|ipad|ipod/i.test(userAgent.toLowerCase());
-            const initialDelay = isIOS ? 500 : (isMobileDevice ? 1000 : 2000);
+            // Web: Use consistent delays for stability across all platforms
+            const initialDelay = isMobileDevice ? 1000 : 2000;
             
             logProfile(`WEB: Scheduling profile creation in ${initialDelay}ms for platform stability`, 'AuthContext');
             
@@ -637,10 +619,8 @@ const location = useLocation();
           }, 100);
           
         } else {
-          // Web: Use existing logic with stability delays, extra delay for iOS
-          const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
-          const isIOS = /iphone|ipad|ipod/i.test(userAgent.toLowerCase());
-          const initialDelay = isIOS ? 500 : (isMobileDevice ? 1000 : 2000);
+          // Web: Use consistent delays for stability across all platforms
+          const initialDelay = isMobileDevice ? 1000 : 2000;
           
           logProfile(`WEB: Scheduling initial profile creation in ${initialDelay}ms for platform stability`, 'AuthContext');
           

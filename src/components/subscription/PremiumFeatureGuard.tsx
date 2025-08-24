@@ -37,32 +37,10 @@ export const PremiumFeatureGuard: React.FC<PremiumFeatureGuardProps> = ({
   const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false);
   const [loadingTimeout, setLoadingTimeout] = useState(false);
 
-  // iPhone-specific loading timeout to prevent infinite loading
-  React.useEffect(() => {
-    const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
-    const isIPhone = /iphone/i.test(userAgent.toLowerCase());
-    
-    if (isIPhone && isLoading) {
-      iPhoneDebugLogger.logPremiumGuardCheck({ 
-        feature, 
-        isLoading, 
-        hasActiveSubscription, 
-        isTrialActive 
-      });
-      
-      // Set a timeout for iPhone devices specifically
-      const timeout = setTimeout(() => {
-        console.warn('[PremiumFeatureGuard] iPhone loading timeout - forcing progression');
-        iPhoneDebugLogger.logLoadingTimeout('PremiumFeatureGuard', 15000);
-        setLoadingTimeout(true);
-      }, 5000); // 5 second timeout for iPhone
-      
-      return () => clearTimeout(timeout);
-    }
-  }, [isLoading, feature, hasActiveSubscription, isTrialActive]);
+  // Remove iPhone-specific loading timeout - let it follow standard Android flow
 
   // Show loading state while subscription data is being fetched
-  if (isLoading && !loadingTimeout) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div>
@@ -79,28 +57,12 @@ export const PremiumFeatureGuard: React.FC<PremiumFeatureGuardProps> = ({
     status,
     trialEndDate: trialEndDate?.toISOString(),
     daysRemaining: daysRemainingInTrial,
-    isTrialEligible,
-    loadingTimeout
+    isTrialEligible
   });
 
-  // iPhone-specific debug logging
-  const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
-  const isIPhone = /iphone/i.test(userAgent.toLowerCase());
-  if (isIPhone) {
-    iPhoneDebugLogger.logPremiumGuardCheck({
-      feature,
-      hasActiveSubscription,
-      isTrialActive,
-      tier,
-      status,
-      loadingTimeout,
-      isLoading
-    });
-  }
-
-  // Allow access if user has active subscription or active trial (or loading timeout on iPhone)
-  if (hasActiveSubscription || (loadingTimeout && isIPhone)) {
-    console.log('[PremiumFeatureGuard] Access granted - user has active subscription, trial, or iPhone timeout occurred');
+  // Allow access if user has active subscription or active trial
+  if (hasActiveSubscription) {
+    console.log('[PremiumFeatureGuard] Access granted - user has active subscription or trial');
     return <>{children}</>;
   }
 

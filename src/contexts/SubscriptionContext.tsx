@@ -213,30 +213,9 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
   // Fetch subscription data when user changes
   useEffect(() => {
     if (user) {
-      // Add iPhone timeout for subscription loading
-      const isIPhone = /iphone/i.test(navigator.userAgent.toLowerCase());
-      let timeoutId: NodeJS.Timeout | null = null;
-      
-      if (isIPhone) {
-        timeoutId = setTimeout(() => {
-          console.log('[SubscriptionContext] iPhone timeout - defaulting to free tier');
-          setTier('free');
-          setStatus('free');
-          setTrialEndDate(null);
-          setIsTrialEligible(false);
-          setIsLoading(false);
-          setHasInitialLoadCompleted(true);
-          iPhoneDebugLogger.logLoadingTimeout('subscription_context', 6000);
-        }, 6000);
-      }
-      
       // Add small delay to allow trial setup trigger to complete
       const timer = setTimeout(() => {
-        fetchSubscriptionData().finally(() => {
-          if (timeoutId) {
-            clearTimeout(timeoutId);
-          }
-        });
+        fetchSubscriptionData();
       }, 500);
       
       // Reset error handler when user changes
@@ -244,9 +223,6 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
       
       return () => {
         clearTimeout(timer);
-        if (timeoutId) {
-          clearTimeout(timeoutId);
-        }
       };
     } else {
       fetchSubscriptionData();

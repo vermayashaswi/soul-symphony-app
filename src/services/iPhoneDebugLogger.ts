@@ -14,9 +14,15 @@ class IPhoneDebugLogger {
   private logs: iPhoneDebugEntry[] = [];
   private maxLogs = 50;
 
+  private _isIPhoneCache: boolean | null = null;
+  
   private isIPhoneDevice(): boolean {
-    const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
-    return /iphone/i.test(userAgent.toLowerCase());
+    // Cache the result to avoid repeated user agent parsing
+    if (this._isIPhoneCache === null) {
+      const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
+      this._isIPhoneCache = /iphone/i.test(userAgent.toLowerCase());
+    }
+    return this._isIPhoneCache;
   }
 
   log(stage: string, data: any = {}) {
