@@ -833,7 +833,17 @@ CONVERSATION CONTEXT: ${last.length > 0 ? last.map(m => `${m.role || m.sender}: 
 - Generate sub-questions that target the exact emotions/entities mentioned in recent conversation rather than generic "top emotions"
 
 
-MANDATORY: Look at the conversation context provided to you with roles. Logically figure out what the "ASK" ("ASK" refers to what user is trying to ask in ongoing conversation and what is his immediate request. Also, look at what all assisstant has already provided user with in the conversation context) and basis this ASK, Generate an intelligent execution plan with proper sub-questions that can be executed to answer the user's query.
+MANDATORY: Look at the conversation context provided to you with roles. Logically figure out what the "ASK" is by:
+1. Identifying what the ASSISTANT previously provided (e.g., sentiment analysis, emotion data)
+2. Understanding how the current USER message relates to or builds upon that previous response
+3. When user asks follow-up questions like "how has it been moving", connect it to the TOPIC of the previous assistant response
+4. Generate sub-questions that CONTINUE the analysis thread from previous conversation, not start a new unrelated analysis
+
+**SUB-QUESTION GENERATION STRATEGY:**
+- For follow-up queries, first sub-question should ALWAYS relate to the previous conversation topic
+- If previous response was about sentiment, continue with sentiment analysis
+- If user asks "how has X been moving/changing", focus on temporal trends of X
+- Avoid generating unrelated sub-questions when clear conversation continuity exists
 
 ANALYSIS STATUS:
 - Personal pronouns: ${hasPersonalPronouns}
