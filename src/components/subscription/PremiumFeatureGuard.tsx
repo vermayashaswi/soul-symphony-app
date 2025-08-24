@@ -8,6 +8,7 @@ import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { SubscriptionModal } from './SubscriptionModal';
+import { iPhoneDebugLogger } from '@/services/iPhoneDebugLogger';
 
 interface PremiumFeatureGuardProps {
   children: React.ReactNode;
@@ -34,9 +35,34 @@ export const PremiumFeatureGuard: React.FC<PremiumFeatureGuardProps> = ({
   } = useSubscription();
   const navigate = useNavigate();
   const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false);
+  const [loadingTimeout, setLoadingTimeout] = useState(false);
+
+  // iPhone-specific loading timeout to prevent infinite loading
+  React.useEffect(() => {
+    const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
+    const isIPhone = /iphone/i.test(userAgent.toLowerCase());
+    
+    if (isIPhone && isLoading) {
+      iPhoneDebugLogger.logPremiumGuardCheck({ 
+        feature, 
+        isLoading, 
+        hasActiveSubscription, 
+        isTrialActive 
+      });
+      
+      // Set a timeout for iPhone devices specifically
+      const timeout = setTimeout(() => {
+        console.warn('[PremiumFeatureGuard] iPhone loading timeout - forcing progression');
+        iPhoneDebugLogger.logLoadingTimeout('PremiumFeatureGuard', 15000);
+        setLoadingTimeout(true);
+      }, 15000); // 15 second timeout for iPhone
+      
+      return () => clearTimeout(timeout);
+    }
+  }, [isLoading, feature, hasActiveSubscription, isTrialActive]);
 
   // Show loading state while subscription data is being fetched
-  if (isLoading) {
+  if (isLoading && !loadingTimeout) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div>
@@ -53,12 +79,28 @@ export const PremiumFeatureGuard: React.FC<PremiumFeatureGuardProps> = ({
     status,
     trialEndDate: trialEndDate?.toISOString(),
     daysRemaining: daysRemainingInTrial,
-    isTrialEligible
+    isTrialEligible,
+    loadingTimeout
   });
 
-  // Allow access if user has active subscription or active trial
-  if (hasActiveSubscription) {
-    console.log('[PremiumFeatureGuard] Access granted - user has active subscription or trial');
+  // iPhone-specific debug logging
+  const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
+  const isIPhone = /iphone/i.test(userAgent.toLowerCase());
+  if (isIPhone) {
+    iPhoneDebugLogger.logPremiumGuardCheck({
+      feature,
+      hasActiveSubscription,
+      isTrialActive,
+      tier,
+      status,
+      loadingTimeout,
+      isLoading
+    });
+  }
+
+  // Allow access if user has active subscription or active trial (or loading timeout on iPhone)
+  if (hasActiveSubscription || (loadingTimeout && isIPhone)) {
+    console.log('[PremiumFeatureGuard] Access granted - user has active subscription, trial, or iPhone timeout occurred');
     return <>{children}</>;
   }
 

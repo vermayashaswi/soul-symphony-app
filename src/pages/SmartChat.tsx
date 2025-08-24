@@ -10,6 +10,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { v4 as uuidv4 } from 'uuid';
 import { PremiumFeatureGuard } from '@/components/subscription/PremiumFeatureGuard';
 import { setupGlobalMessageDeletionListener } from '@/hooks/use-message-deletion';
+import { iPhoneDebugLogger } from '@/services/iPhoneDebugLogger';
 
 const SmartChat = () => {
   const { user } = useAuth();
@@ -19,9 +20,32 @@ const SmartChat = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const isMobile = useIsMobile();
 
+  // iPhone-specific debug logging for Smart Chat mount
+  useEffect(() => {
+    const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
+    const isIPhone = /iphone/i.test(userAgent.toLowerCase());
+    
+    if (isIPhone) {
+      iPhoneDebugLogger.logSmartChatMount({
+        user: user?.id || 'no-user',
+        currentThreadId,
+        isProcessing,
+        isMobile: isMobile.isMobile,
+        pathname: window.location.pathname
+      });
+    }
+  }, [user?.id, currentThreadId, isProcessing, isMobile.isMobile]);
+
   // Redirect to login if not authenticated
   useEffect(() => {
     if (!user) {
+      const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
+      const isIPhone = /iphone/i.test(userAgent.toLowerCase());
+      
+      if (isIPhone) {
+        iPhoneDebugLogger.log('AUTH_REDIRECT', { reason: 'no-user', redirectTo: '/app/auth' });
+      }
+      
       navigate('/app/auth');
     }
   }, [user, navigate]);

@@ -18,6 +18,7 @@ import { debugLogger, logInfo, logError, logAuthError, logProfile, logAuth } fro
 import { isAppRoute } from '@/routes/RouteHelpers';
 import { useLocation } from 'react-router-dom';
 import { LocationProvider } from '@/contexts/LocationContext';
+import { iPhoneDebugLogger } from '@/services/iPhoneDebugLogger';
 
 import { nativeAuthService } from '@/services/nativeAuthService';
 import { nativeIntegrationService } from '@/services/nativeIntegrationService';
@@ -369,12 +370,26 @@ const location = useLocation();
         userMetadataKeys: currentUser.user_metadata ? Object.keys(currentUser.user_metadata) : []
       });
       
-      // Increased delay for mobile stability, extra delay for iOS
+      // Increased delay for mobile stability, reduced delay for iPhone specifically
       if (isMobileDevice) {
         const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
         const isIOS = /iphone|ipad|ipod/i.test(userAgent.toLowerCase());
-        const delay = isIOS ? 3500 : 2000; // Extended delay for iOS browsers
-        logProfile(`Mobile device detected (${isIOS ? 'iOS' : 'other'}), adding ${delay}ms stabilization delay`, 'AuthContext');
+        const isIPhone = /iphone/i.test(userAgent.toLowerCase());
+        
+        // Reduced delay for iPhone specifically to fix loading issues
+        const delay = isIPhone ? 1000 : (isIOS ? 2500 : 1500);
+        
+        logProfile(`Mobile device detected (${isIPhone ? 'iPhone' : isIOS ? 'iOS' : 'other'}), adding ${delay}ms stabilization delay`, 'AuthContext');
+        
+        // iPhone-specific debug logging
+        if (isIPhone) {
+          iPhoneDebugLogger.log('PROFILE_CREATION_DELAY', { 
+            delay, 
+            userAgent, 
+            profileCreationAttempts: profileCreationAttempts + 1 
+          });
+        }
+        
         await new Promise(resolve => setTimeout(resolve, delay));
       }
       
@@ -460,6 +475,18 @@ const location = useLocation();
           hasUser: !!currentSession?.user,
           userId: currentSession?.user?.id
         });
+
+        // iPhone-specific debug logging
+        const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
+        const isIPhone = /iphone/i.test(userAgent.toLowerCase());
+        if (isIPhone) {
+          iPhoneDebugLogger.logAuthStateChange(event, !!currentSession?.user, {
+            userId: currentSession?.user?.id,
+            email: currentSession?.user?.email,
+            provider: currentSession?.user?.app_metadata?.provider,
+            isNative: nativeIntegrationService.isRunningNatively()
+          });
+        }
         
         // Prevent loops by checking if this is the same session
         if (currentSession?.access_token === session?.access_token && event !== 'SIGNED_OUT') {
