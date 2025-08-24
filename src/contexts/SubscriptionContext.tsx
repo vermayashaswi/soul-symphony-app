@@ -3,7 +3,6 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { subscriptionErrorHandler } from '@/services/subscriptionErrorHandler';
-import { iPhoneDebugLogger } from '@/services/iPhoneDebugLogger';
 
 export type SubscriptionTier = 'free' | 'premium';
 export type SubscriptionStatus = 'active' | 'canceled' | 'expired' | 'trial' | 'free' | 'unknown';
@@ -40,9 +39,6 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
   const [isTrialEligible, setIsTrialEligible] = useState(false);
 
   const fetchSubscriptionData = async (): Promise<void> => {
-    const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
-    const isIPhone = /iphone/i.test(userAgent.toLowerCase());
-    
     if (!user) {
       setTier('free');
       setStatus('unknown');
@@ -51,10 +47,6 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
       setHasInitialLoadCompleted(true);
       setTrialEndDate(null);
       setIsTrialEligible(false);
-      
-      if (isIPhone) {
-        iPhoneDebugLogger.logSubscriptionCheck({ result: 'no-user', tier: 'free' });
-      }
       return;
     }
 
@@ -63,15 +55,6 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
       setError(null);
       
       console.log('[SubscriptionContext] Fetching subscription data for user:', user.id);
-      
-      // iPhone-specific debug logging
-      if (isIPhone) {
-        iPhoneDebugLogger.logSubscriptionCheck({ 
-          stage: 'start', 
-          userId: user.id,
-          hasUser: !!user 
-        });
-      }
       
       // First call the cleanup function to ensure expired trials are processed
       const { error: cleanupError } = await supabase.rpc('cleanup_expired_trials');
@@ -110,17 +93,6 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
           isPremium: subscriptionData.is_premium_access,
           computedAccess: userTier === 'premium' && userStatus === 'trial'
         });
-
-        // iPhone-specific debug logging
-        if (isIPhone) {
-          iPhoneDebugLogger.logSubscriptionCheck({
-            stage: 'function-success',
-            tier: userTier,
-            status: userStatus,
-            isTrialActive: userIsTrialActive,
-            isPremium: subscriptionData.is_premium_access
-          });
-        }
       } else {
         // Fallback to direct profile query if function fails - RLS ensures user can only access their own profile
         const { data: profileData, error: profileError } = await supabase
@@ -189,16 +161,6 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
     } finally {
       setIsLoading(false);
       setHasInitialLoadCompleted(true);
-      
-      // iPhone-specific completion logging
-      if (isIPhone) {
-        iPhoneDebugLogger.logSubscriptionCheck({
-          stage: 'complete',
-          finalTier: tier,
-          finalStatus: status,
-          finalHasActiveSubscription: status === 'active' || (status === 'trial' && tier === 'premium' && trialEndDate && trialEndDate > new Date())
-        });
-      }
     }
   };
 
@@ -221,9 +183,7 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
       // Reset error handler when user changes
       subscriptionErrorHandler.reset();
       
-      return () => {
-        clearTimeout(timer);
-      };
+      return () => clearTimeout(timer);
     } else {
       fetchSubscriptionData();
     }

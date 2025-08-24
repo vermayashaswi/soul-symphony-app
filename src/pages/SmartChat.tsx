@@ -10,7 +10,6 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { v4 as uuidv4 } from 'uuid';
 import { PremiumFeatureGuard } from '@/components/subscription/PremiumFeatureGuard';
 import { setupGlobalMessageDeletionListener } from '@/hooks/use-message-deletion';
-import { iPhoneDebugLogger } from '@/services/iPhoneDebugLogger';
 
 const SmartChat = () => {
   const { user } = useAuth();
@@ -18,19 +17,7 @@ const SmartChat = () => {
   const { toast } = useToast();
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  
   const isMobile = useIsMobile();
-
-  // Standard debug logging for all platforms
-  useEffect(() => {
-    console.log('[SmartChat] Component mounted with state:', {
-      user: user?.id || 'no-user',
-      currentThreadId,
-      isProcessing,
-      isMobile: isMobile.isMobile,
-      pathname: window.location.pathname
-    });
-  }, [user?.id, currentThreadId, isProcessing, isMobile.isMobile]);
 
   // Redirect to login if not authenticated
   useEffect(() => {
