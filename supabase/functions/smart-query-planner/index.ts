@@ -827,6 +827,11 @@ USER QUERY: "${message}"
 USER TIMEZONE: "${userTimezone}"
 CONVERSATION CONTEXT: ${last.length > 0 ? last.map(m => `${m.role || m.sender}: ${m.content || 'N/A'}`).join('\n  ') : 'None'}
 
+**CRITICAL CONVERSATION CONTEXT INSTRUCTIONS:**
+- When user says "these emotions" or similar references, check the conversation context for specific emotion names mentioned in previous ASSISTANT responses
+- If previous assistant messages contain specific emotions (like "contentment, hope, sadness, disappointment"), focus your analysis on THOSE SPECIFIC emotions
+- Generate sub-questions that target the exact emotions/entities mentioned in recent conversation rather than generic "top emotions"
+
 ANALYSIS STATUS:
 - Personal pronouns: ${hasPersonalPronouns}
 - Time reference: ${hasExplicitTimeReference}
