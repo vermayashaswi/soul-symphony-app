@@ -50,6 +50,7 @@ interface MobileChatInterfaceProps {
   onCreateNewThread: () => Promise<string | null>;
   userId?: string;
   mentalHealthInsights?: MentalHealthInsights;
+  onProcessingStateChange?: (isProcessing: boolean) => void;
 }
 
 export default function MobileChatInterface({
@@ -58,6 +59,7 @@ export default function MobileChatInterface({
   onCreateNewThread,
   userId,
   mentalHealthInsights,
+  onProcessingStateChange,
 }: MobileChatInterfaceProps) {
   const [messages, setMessages] = useState<UIChatMessage[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -884,15 +886,29 @@ export default function MobileChatInterface({
   };
 
   const isDeletionDisabled = isProcessing || processingStatus === 'processing' || isLoading;
+  
+  // Calculate if any processing is active (for disabling UI controls)
+  const isProcessingActive = isLoading || isProcessing || isStreaming || (processingStatus === 'processing');
+  
+  // Notify parent of processing state changes
+  useEffect(() => {
+    onProcessingStateChange?.(isProcessingActive);
+  }, [isProcessingActive, onProcessingStateChange]);
 
   return (
     <div className="mobile-chat-interface">
       {/* Header */}
       <div className="sticky top-0 z-40 w-full bg-background border-b">
         <div className="container flex h-14 max-w-screen-lg items-center">
-          <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+          <Sheet open={sheetOpen} onOpenChange={(open) => !isProcessingActive && setSheetOpen(open)}>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="mr-2">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className={`mr-2 ${isProcessingActive ? 'opacity-50 cursor-not-allowed' : ''}`}
+                disabled={isProcessingActive}
+                title={isProcessingActive ? "Please wait while processing..." : "Toggle Menu"}
+              >
                 <Menu className="h-5 w-5" />
                 <span className="sr-only">
                   <TranslatableText text="Toggle Menu" />
