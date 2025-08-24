@@ -17,6 +17,7 @@ const SmartChat = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
+  const [isProcessingActive, setIsProcessingActive] = useState(false);
   const isMobile = useIsMobile();
 
   // Redirect to login if not authenticated
@@ -154,6 +155,7 @@ const SmartChat = () => {
             onSelectThread={handleSelectThread}
             onCreateNewThread={handleCreateNewThread}
             userId={user?.id}
+            onProcessingStateChange={setIsProcessingActive}
           />
         ) : (
           <DesktopChatLayout
@@ -161,6 +163,8 @@ const SmartChat = () => {
             onSelectThread={handleSelectThread}
             onCreateNewThread={handleCreateNewThread}
             userId={user?.id}
+            isProcessingActive={isProcessingActive}
+            onProcessingStateChange={setIsProcessingActive}
           />
         )}
       </div>

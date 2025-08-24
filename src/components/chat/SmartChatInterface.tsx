@@ -59,6 +59,7 @@ export interface SmartChatInterfaceProps {
   onCreateNewThread?: () => Promise<string | null>;
   userId?: string;
   mentalHealthInsights?: MentalHealthInsights;
+  onProcessingStateChange?: (isProcessing: boolean) => void;
 }
 
 const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ 
@@ -66,7 +67,8 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
   onSelectThread, 
   onCreateNewThread, 
   userId: propsUserId, 
-  mentalHealthInsights 
+  mentalHealthInsights,
+  onProcessingStateChange
 }) => {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -210,6 +212,14 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     delay: 50,
     scrollThreshold: 100
   });
+
+  // Notify parent of processing state changes for sidebar control
+  useEffect(() => {
+    const isProcessingActive = isLoading || isProcessing || isStreaming;
+    if (onProcessingStateChange) {
+      onProcessingStateChange(isProcessingActive);
+    }
+  }, [isLoading, isProcessing, isStreaming, onProcessingStateChange]);
 
   // Realtime: append assistant messages saved by backend
   useEffect(() => {
@@ -833,6 +843,14 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
 
   // Thread-scoped loading indicator: during streaming, only show for current thread
   const showLoadingForThisThread = isLoading || isProcessing || isStreaming;
+  
+  // Calculate if any processing is active (for disabling UI controls)
+  const isProcessingActive = isLoading || isProcessing || isStreaming || (processingStatus === 'processing');
+  
+  // Notify parent of processing state changes
+  useEffect(() => {
+    onProcessingStateChange?.(isProcessingActive);
+  }, [isProcessingActive, onProcessingStateChange]);
 
   return (
     <div className="chat-interface flex flex-col h-full">

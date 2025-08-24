@@ -50,6 +50,7 @@ interface MobileChatInterfaceProps {
   onCreateNewThread: () => Promise<string | null>;
   userId?: string;
   mentalHealthInsights?: MentalHealthInsights;
+  onProcessingStateChange?: (isProcessing: boolean) => void;
 }
 
 export default function MobileChatInterface({
@@ -58,6 +59,7 @@ export default function MobileChatInterface({
   onCreateNewThread,
   userId,
   mentalHealthInsights,
+  onProcessingStateChange,
 }: MobileChatInterfaceProps) {
   const [messages, setMessages] = useState<UIChatMessage[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -325,6 +327,27 @@ export default function MobileChatInterface({
     delay: 50,
     scrollThreshold: 100
   });
+
+  // Force scroll event listener (matching ChatArea.tsx behavior)
+  useEffect(() => {
+    const handleForceScrollToBottom = () => {
+      scrollToBottom(true);
+    };
+
+    window.addEventListener('chat:forceScrollToBottom', handleForceScrollToBottom);
+    
+    return () => {
+      window.removeEventListener('chat:forceScrollToBottom', handleForceScrollToBottom);
+    };
+  }, [scrollToBottom]);
+
+  // Notify parent of processing state changes for sidebar control
+  useEffect(() => {
+    const isProcessingActive = isLoading || isProcessing || isStreaming;
+    if (onProcessingStateChange) {
+      onProcessingStateChange(isProcessingActive);
+    }
+  }, [isLoading, isProcessing, isStreaming, onProcessingStateChange]);
 
   // Realtime: append assistant messages saved by backend
   useEffect(() => {
@@ -608,6 +631,9 @@ export default function MobileChatInterface({
 
     debugLog.addEvent("Message Sending", `[Mobile] Adding user message to UI: ${message.substring(0, 50)}...`, "info");
 
+    // Dispatch force scroll event to ensure all scroll handlers trigger
+    window.dispatchEvent(new Event('chat:forceScrollToBottom'));
+    
     // Scroll to bottom after adding user message
     setTimeout(scrollToBottom, 100);
 
@@ -884,15 +910,24 @@ export default function MobileChatInterface({
   };
 
   const isDeletionDisabled = isProcessing || processingStatus === 'processing' || isLoading;
+  
+  // Calculate if any processing is active (for disabling UI controls)
+  const isProcessingActive = isLoading || isProcessing || isStreaming || (processingStatus === 'processing');
 
   return (
     <div className="mobile-chat-interface">
       {/* Header */}
       <div className="sticky top-0 z-40 w-full bg-background border-b">
         <div className="container flex h-14 max-w-screen-lg items-center">
-          <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+          <Sheet open={sheetOpen} onOpenChange={(open) => !isProcessingActive && setSheetOpen(open)}>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="mr-2">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className={`mr-2 ${isProcessingActive ? 'opacity-50 cursor-not-allowed' : ''}`}
+                disabled={isProcessingActive}
+                title={isProcessingActive ? "Please wait while processing..." : "Toggle Menu"}
+              >
                 <Menu className="h-5 w-5" />
                 <span className="sr-only">
                   <TranslatableText text="Toggle Menu" />
