@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { nativeIntegrationService } from '@/services/nativeIntegrationService';
+import { capacitorAuthService } from '@/services/capacitorAuthService';
 
 interface SessionValidationState {
   session: Session | null;
@@ -112,6 +113,11 @@ export const useSessionValidation = () => {
 
   useEffect(() => {
     checkSession();
+    
+    // Initialize Capacitor auth service for native apps
+    if (isNative) {
+      capacitorAuthService.initialize().catch(console.error);
+    }
   }, [isNative]);
 
   return {

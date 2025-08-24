@@ -79,6 +79,14 @@ export default function MobileChatInterface({
     currentThreadIdRef.current = threadId;
   }, [threadId]);
   
+  // CAPACITOR FIX: Detect Capacitor environment for consistent behavior
+  const isCapacitor = !!(
+    (window as any).Capacitor?.isNative ||
+    window.location.href.includes('capacitor://') ||
+    window.location.href.includes('ionic://') ||
+    (window as any).Capacitor?.isPluginAvailable
+  );
+
   const {
     isLoading,
     isProcessing,

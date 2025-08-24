@@ -21,15 +21,13 @@
 		"SplashScreen": {
 			"launchAutoHide": false,
 			"backgroundColor": "#8b5cf6",
-			"showSpinner": false,
+			"showSpinner": true,
 			"androidSpinnerStyle": "large",
 			"iosSpinnerStyle": "small",
 			"spinnerColor": "#FFFFFF",
 			"splashFullScreen": true,
 			"splashImmersive": true,
-			"splashScreenDelay": 500,
-			"androidSplashResourceName": "splash",
-			"iosLaunchStoryboard": "LaunchScreen"
+			"splashScreenDelay": 2000
 		},
 		"Keyboard": {
 			"resize": "native",
@@ -71,8 +69,8 @@
 	"android": {
 		"allowMixedContent": false,
 		"captureInput": true,
-		"webContentsDebuggingEnabled": true,
-		"backgroundColor": "#8b5cf6",
+		"webContentsDebuggingEnabled": false,
+		"backgroundColor": "#FFFFFF",
 		"launchMode": "singleTask",
 		"orientation": "portrait",
 		"useLegacyBridge": false,
@@ -80,8 +78,6 @@
 		"overrideUserAgent": "SouloApp/1.0.0 Mobile",
 		"androidScheme": "https",
 		"loadOnMainThread": true,
-		"handlePermissions": true,
-		"initialFocus": false,
-		"hardwareAccelerated": true
+		"handlePermissions": true
 	}
 }
