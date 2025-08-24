@@ -50,6 +50,7 @@ interface MobileChatInterfaceProps {
   onCreateNewThread: () => Promise<string | null>;
   userId?: string;
   mentalHealthInsights?: MentalHealthInsights;
+  isProcessingActive?: boolean;
 }
 
 export default function MobileChatInterface({
@@ -58,6 +59,7 @@ export default function MobileChatInterface({
   onCreateNewThread,
   userId,
   mentalHealthInsights,
+  isProcessingActive = false,
 }: MobileChatInterfaceProps) {
   const [messages, setMessages] = useState<UIChatMessage[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -890,9 +892,23 @@ export default function MobileChatInterface({
       {/* Header */}
       <div className="sticky top-0 z-40 w-full bg-background border-b">
         <div className="container flex h-14 max-w-screen-lg items-center">
-          <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+          <Sheet 
+            open={sheetOpen && !isProcessingActive} 
+            onOpenChange={(open) => !isProcessingActive && setSheetOpen(open)}
+          >
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="mr-2">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className={`mr-2 ${
+                  isProcessingActive 
+                    ? 'opacity-50 cursor-not-allowed' 
+                    : ''
+                }`}
+                disabled={isProcessingActive}
+                title={isProcessingActive ? "Cannot access sidebar while processing" : "Toggle Menu"}
+                onClick={() => !isProcessingActive && setSheetOpen(true)}
+              >
                 <Menu className="h-5 w-5" />
                 <span className="sr-only">
                   <TranslatableText text="Toggle Menu" />

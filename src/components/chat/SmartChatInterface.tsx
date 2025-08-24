@@ -59,6 +59,7 @@ export interface SmartChatInterfaceProps {
   onCreateNewThread?: () => Promise<string | null>;
   userId?: string;
   mentalHealthInsights?: MentalHealthInsights;
+  onProcessingStateChange?: (isProcessing: boolean) => void;
 }
 
 const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ 
@@ -66,7 +67,8 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
   onSelectThread, 
   onCreateNewThread, 
   userId: propsUserId, 
-  mentalHealthInsights 
+  mentalHealthInsights,
+  onProcessingStateChange
 }) => {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -833,6 +835,16 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
 
   // Thread-scoped loading indicator: during streaming, only show for current thread
   const showLoadingForThisThread = isLoading || isProcessing || isStreaming;
+  
+  // Processing state for parent components
+  const isProcessingActive = isLoading || isProcessing || isStreaming;
+  
+  // Notify parent of processing state changes
+  useEffect(() => {
+    if (onProcessingStateChange) {
+      onProcessingStateChange(isProcessingActive);
+    }
+  }, [isProcessingActive, onProcessingStateChange]);
 
   return (
     <div className="chat-interface flex flex-col h-full">
