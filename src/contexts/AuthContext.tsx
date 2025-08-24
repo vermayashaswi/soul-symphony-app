@@ -369,12 +369,13 @@ const location = useLocation();
         userMetadataKeys: currentUser.user_metadata ? Object.keys(currentUser.user_metadata) : []
       });
       
-      // Simplified mobile handling - no delays for iPhone users
+      // Increased delay for mobile stability, extra delay for iOS
       if (isMobileDevice) {
         const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
         const isIOS = /iphone|ipad|ipod/i.test(userAgent.toLowerCase());
-        logProfile(`Mobile device detected (${isIOS ? 'iOS' : 'other'}), using immediate processing`, 'AuthContext');
-        console.log('[iPhone Fix] Skipping iOS delays for faster chat loading');
+        const delay = isIOS ? 3500 : 2000; // Extended delay for iOS browsers
+        logProfile(`Mobile device detected (${isIOS ? 'iOS' : 'other'}), adding ${delay}ms stabilization delay`, 'AuthContext');
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
       
       const profileCreated = await ensureProfileExistsService(currentUser);
