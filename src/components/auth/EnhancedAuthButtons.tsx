@@ -22,7 +22,7 @@ export const EnhancedAuthButtons: React.FC<EnhancedAuthButtonsProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [currentError, setCurrentError] = useState('');
 
-  const handleSignIn = async (method: 'google') => {
+  const handleSignIn = async (method: 'google' | 'apple') => {
     try {
       console.log(`[EnhancedAuthButtons] Starting ${method} sign-in`);
       setIsLoading(true);
@@ -32,8 +32,12 @@ export const EnhancedAuthButtons: React.FC<EnhancedAuthButtonsProps> = ({
         // Use enhanced service with retry logic
         await enhancedAuthService.signInWithRetry(method);
       } else {
-        // Use standard auth service - Google only
-        await authService.signInWithGoogle();
+        // Use standard auth service
+        if (method === 'google') {
+          await authService.signInWithGoogle();
+        } else if (method === 'apple') {
+          await authService.signInWithApple();
+        }
       }
       
       onAuthSuccess?.();
@@ -54,7 +58,7 @@ export const EnhancedAuthButtons: React.FC<EnhancedAuthButtonsProps> = ({
       // Show retry option after first failure
       if (!isRetryMode && showRetryOptions) {
         toast.error(
-          `Google sign-in failed. Try enhanced retry mode?`,
+          `${method === 'google' ? 'Google' : 'Apple'} sign-in failed. Try enhanced retry mode?`,
           {
             action: {
               label: 'Enable Retry Mode',
@@ -132,6 +136,31 @@ export const EnhancedAuthButtons: React.FC<EnhancedAuthButtonsProps> = ({
           )}
         </div>
 
+        <div className="relative">
+          <Button 
+            size="lg" 
+            className="w-full flex items-center justify-center gap-2 bg-black text-white hover:bg-gray-800"
+            onClick={() => handleSignIn('apple')}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <span className="animate-spin h-5 w-5 border-t-2 border-white rounded-full mr-2" />
+            ) : (
+              <svg viewBox="0 0 24 24" width="24" height="24" xmlns="http://www.w3.org/2000/svg">
+                <path fill="currentColor" d="M12.017 14.999c-1.45-.074-2.693-1.057-3.115-2.441-.422-1.384.07-2.888 1.221-3.73.65-.475 1.44-.742 2.259-.762 1.45.074 2.693 1.057 3.115 2.441.422 1.384-.07 2.888-1.221 3.73-.65.475-1.44.742-2.259.762zm7.5-1.999c0 5.523-4.477 10-10 10s-10-4.477-10-10 4.477-10 10-10 10 4.477 10 10z"/>
+              </svg>
+            )}
+            Sign in with Apple
+          </Button>
+          {authAttempts.apple > 0 && (
+            <Badge
+              variant="outline"
+              className="absolute -top-2 -right-2 text-xs bg-yellow-50 border-yellow-200"
+            >
+              {authAttempts.apple} attempts
+            </Badge>
+          )}
+        </div>
       </div>
 
       {/* Show current error */}
@@ -181,7 +210,7 @@ export const EnhancedAuthButtons: React.FC<EnhancedAuthButtonsProps> = ({
       {/* Attempt summary */}
       {Object.keys(authAttempts).length > 0 && (
         <div className="text-xs text-muted-foreground text-center">
-          Total attempts: Google {authAttempts.google || 0}
+          Total attempts: Google {authAttempts.google || 0}, Apple {authAttempts.apple || 0}
         </div>
       )}
     </div>

@@ -7,6 +7,7 @@ import { AuthContextType } from '@/types/auth';
 import { ensureProfileExists as ensureProfileExistsService, updateUserProfile as updateUserProfileService } from '@/services/profileService';
 import { 
   signInWithGoogle as signInWithGoogleService,
+  signInWithApple as signInWithAppleService,
   signInWithEmail as signInWithEmailService,
   signUp as signUpService,
   resetPassword as resetPasswordService,
@@ -237,6 +238,23 @@ const location = useLocation();
     }
   };
 
+  const signInWithApple = async (): Promise<void> => {
+    setIsLoading(true);
+    logInfo('Initiating Apple ID sign-in', 'AuthContext', { 
+      origin: window.location.origin,
+      pathname: window.location.pathname
+    });
+    
+    try {
+      await signInWithAppleService();
+      logInfo('Apple ID sign-in initiated', 'AuthContext');
+      
+      // Conversion tracking now handled by SessionProvider
+    } catch (error: any) {
+      logAuthError(`Apple ID sign-in failed: ${error.message}`, 'AuthContext', error);
+      setIsLoading(false);
+    }
+  };
 
   const signInWithEmail = async (email: string, password: string): Promise<void> => {
     setIsLoading(true);
@@ -351,12 +369,13 @@ const location = useLocation();
         userMetadataKeys: currentUser.user_metadata ? Object.keys(currentUser.user_metadata) : []
       });
       
-      // Simplified mobile handling - no delays for iPhone users
+      // Increased delay for mobile stability, extra delay for iOS
       if (isMobileDevice) {
         const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
         const isIOS = /iphone|ipad|ipod/i.test(userAgent.toLowerCase());
-        logProfile(`Mobile device detected (${isIOS ? 'iOS' : 'other'}), using immediate processing`, 'AuthContext');
-        console.log('[iPhone Fix] Skipping iOS delays for faster chat loading');
+        const delay = isIOS ? 3500 : 2000; // Extended delay for iOS browsers
+        logProfile(`Mobile device detected (${isIOS ? 'iOS' : 'other'}), adding ${delay}ms stabilization delay`, 'AuthContext');
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
       
       const profileCreated = await ensureProfileExistsService(currentUser);
@@ -632,6 +651,7 @@ const location = useLocation();
     user,
     isLoading,
     signInWithGoogle,
+    signInWithApple,
     signOut,
     refreshSession,
     signInWithEmail,

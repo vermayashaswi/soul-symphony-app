@@ -296,6 +296,17 @@ class NativeAuthService {
     }
   }
 
+  async signInWithApple(): Promise<void> {
+    try {
+      console.log('[NativeAuth] Apple sign-in not implemented for native');
+      throw new Error('Apple sign-in not available in native app');
+    } catch (error: any) {
+      console.error('[NativeAuth] Apple sign-in failed:', error);
+      this.handleAuthError(error, 'Apple');
+      throw error;
+    }
+  }
+
   async signOut(): Promise<void> {
     try {
       console.log('[NativeAuth] Starting sign out');

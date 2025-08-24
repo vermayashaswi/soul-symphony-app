@@ -74,6 +74,45 @@ export const signInWithGoogle = async (): Promise<void> => {
   }
 };
 
+/**
+ * Sign in with Apple ID - uses native auth when available, otherwise web OAuth
+ */
+export const signInWithApple = async (): Promise<void> => {
+  try {
+    console.log('[AuthService] Starting Apple sign-in');
+
+    // Check if we should use native authentication
+    if (nativeIntegrationService.isRunningNatively()) {
+      console.log('[AuthService] Native environment - Apple sign-in not implemented natively');
+      throw new Error('Apple sign-in not available in native app');
+    }
+
+    // Web Apple Sign-In
+    console.log('[AuthService] Using web OAuth Apple sign-in');
+    const redirectUrl = getRedirectUrl();
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'apple',
+      options: {
+        redirectTo: redirectUrl,
+      },
+    });
+
+    if (error) {
+      console.error('[AuthService] Apple OAuth error:', error);
+      throw error;
+    }
+
+    if (data?.url) {
+      console.log('[AuthService] Redirecting to Apple OAuth URL:', data.url);
+      setTimeout(() => {
+        window.location.href = data.url;
+      }, 100);
+    }
+  } catch (error: any) {
+    console.error('[AuthService] Apple sign-in error:', error);
+    throw error;
+  }
+};
 
 /**
  * Sign in with email and password
