@@ -107,7 +107,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     return `${message}_${threadId}_${Math.floor(timestamp / 5000)}`; // 5-second window
   }, []);
 
-  // Page Visibility API for mobile browser handling
+  // Enhanced Page Visibility API for mobile browser handling
   useEffect(() => {
     const handleVisibilityChange = () => {
       const visible = !document.hidden;
@@ -117,27 +117,31 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
         // Page backgrounded - pause streaming without aborting
         console.log(`[useStreamingChat] Page backgrounded for thread: ${threadId}`);
         const threadState = getThreadState(threadId);
-        if (threadState.isStreaming) {
-          // Save current state but don't abort
+        if (threadState.isStreaming || threadState.showBackendAnimation) {
+          // Enhanced state saving with more complete information
           saveChatStreamingState(threadId, {
             ...threadState,
             pausedDueToBackground: true,
+            savedAt: Date.now(),
+            navigationSafe: true, // Mark as safe for navigation restoration
           });
+          console.log(`[useStreamingChat] Saved enhanced state for navigation: ${threadId}`);
         }
       } else if (visible && threadId) {
         // Page foregrounded - restore UI state if we had an active stream
         console.log(`[useStreamingChat] Page foregrounded for thread: ${threadId}`);
         try {
           const savedState: any = getChatStreamingState(threadId);
-          if (savedState && (savedState.isStreaming || savedState.pausedDueToBackground)) {
+          if (savedState && (savedState.isStreaming || savedState.pausedDueToBackground || savedState.navigationSafe)) {
+            console.log(`[useStreamingChat] Restoring navigation-safe state for thread: ${threadId}`);
             updateThreadState(threadId, {
               isStreaming: true,
               streamingMessages: savedState.streamingMessages || [],
               currentUserMessage: savedState.currentUserMessage || '',
               showBackendAnimation: !!savedState.showBackendAnimation,
-            dynamicMessages: savedState.dynamicMessages || [],
-            translatedDynamicMessages: savedState.translatedDynamicMessages || [],
-            currentMessageIndex: savedState.currentMessageIndex || 0,
+              dynamicMessages: savedState.dynamicMessages || [],
+              translatedDynamicMessages: savedState.translatedDynamicMessages || [],
+              currentMessageIndex: savedState.currentMessageIndex || 0,
               useThreeDotFallback: !!savedState.useThreeDotFallback,
               queryCategory: savedState.queryCategory || '',
               expectedProcessingTime: savedState.expectedProcessingTime || null,
@@ -146,13 +150,15 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
               activeRequestId: savedState.activeRequestId || null,
             });
           }
-        } catch {}
+        } catch (error) {
+          console.warn(`[useStreamingChat] Error restoring state: ${error}`);
+        }
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [threadId, getThreadState]);
+  }, [threadId, getThreadState, updateThreadState]);
 
   // Capacitor app lifecycle handling
   useEffect(() => {
@@ -168,26 +174,31 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
             // App backgrounded
             console.log(`[useStreamingChat] Capacitor app backgrounded for thread: ${threadId}`);
             const threadState = getThreadState(threadId);
-            if (threadState.isStreaming) {
+            if (threadState.isStreaming || threadState.showBackendAnimation) {
+              // Enhanced state saving for Capacitor
               saveChatStreamingState(threadId, {
                 ...threadState,
                 pausedDueToBackground: true,
+                savedAt: Date.now(),
+                navigationSafe: true,
               });
+              console.log(`[useStreamingChat] Saved enhanced Capacitor state: ${threadId}`);
             }
            } else if (state.isActive && threadId) {
               // App foregrounded
               console.log(`[useStreamingChat] Capacitor app foregrounded for thread: ${threadId}`);
               try {
                 const savedState: any = getChatStreamingState(threadId);
-                if (savedState && (savedState.isStreaming || savedState.pausedDueToBackground)) {
+                if (savedState && (savedState.isStreaming || savedState.pausedDueToBackground || savedState.navigationSafe)) {
+                  console.log(`[useStreamingChat] Restoring Capacitor navigation-safe state: ${threadId}`);
                   updateThreadState(threadId, {
                     isStreaming: true,
                     streamingMessages: savedState.streamingMessages || [],
                     currentUserMessage: savedState.currentUserMessage || '',
                     showBackendAnimation: !!savedState.showBackendAnimation,
-            dynamicMessages: savedState.dynamicMessages || [],
-            translatedDynamicMessages: savedState.translatedDynamicMessages || [],
-            currentMessageIndex: savedState.currentMessageIndex || 0,
+                    dynamicMessages: savedState.dynamicMessages || [],
+                    translatedDynamicMessages: savedState.translatedDynamicMessages || [],
+                    currentMessageIndex: savedState.currentMessageIndex || 0,
                     useThreeDotFallback: !!savedState.useThreeDotFallback,
                     queryCategory: savedState.queryCategory || '',
                     expectedProcessingTime: savedState.expectedProcessingTime || null,
@@ -196,7 +207,9 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
                     activeRequestId: savedState.activeRequestId || null,
                   });
                 }
-              } catch {}
+              } catch (error) {
+                console.warn(`[useStreamingChat] Error restoring Capacitor state: ${error}`);
+              }
             }
         };
 
@@ -215,7 +228,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     }
   }, [threadId, getThreadState]);
 
-  // Thread switch handler - abort current operations and switch state
+  // Enhanced thread switch handler - restore navigation state and manage transitions
   useEffect(() => {
     if (!threadId) {
       setState(createInitialState());
@@ -224,7 +237,32 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
 
     console.log(`[useStreamingChat] Switching to thread: ${threadId}`);
 
-    // Set state to the new thread's state
+    // Try to restore any saved state first
+    try {
+      const savedState: any = getChatStreamingState(threadId);
+      if (savedState && (savedState.isStreaming || savedState.pausedDueToBackground || savedState.navigationSafe)) {
+        console.log(`[useStreamingChat] Restoring saved state for thread switch: ${threadId}`);
+        updateThreadState(threadId, {
+          isStreaming: !!savedState.isStreaming,
+          streamingMessages: savedState.streamingMessages || [],
+          currentUserMessage: savedState.currentUserMessage || '',
+          showBackendAnimation: !!savedState.showBackendAnimation,
+          dynamicMessages: savedState.dynamicMessages || [],
+          translatedDynamicMessages: savedState.translatedDynamicMessages || [],
+          currentMessageIndex: savedState.currentMessageIndex || 0,
+          useThreeDotFallback: !!savedState.useThreeDotFallback,
+          queryCategory: savedState.queryCategory || '',
+          expectedProcessingTime: savedState.expectedProcessingTime || null,
+          processingStartTime: savedState.processingStartTime || Date.now(),
+          abortController: savedState.isStreaming ? new AbortController() : null,
+          activeRequestId: savedState.activeRequestId || null,
+        });
+      }
+    } catch (error) {
+      console.warn(`[useStreamingChat] Error restoring thread state: ${error}`);
+    }
+
+    // Set state to the new thread's state (either restored or fresh)
     const threadState = getThreadState(threadId);
     setState(threadState);
     
@@ -232,7 +270,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     return () => {
       // Cleanup will be handled by the abort controller
     };
-  }, [threadId, getThreadState]);
+  }, [threadId, getThreadState, updateThreadState]);
 
   // Utility function to detect edge function errors
   const isEdgeFunctionError = useCallback((error: any): boolean => {
