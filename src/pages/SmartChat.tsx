@@ -8,8 +8,9 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { v4 as uuidv4 } from 'uuid';
-
+import { PremiumFeatureGuard } from '@/components/subscription/PremiumFeatureGuard';
 import { setupGlobalMessageDeletionListener } from '@/hooks/use-message-deletion';
+import { iPhoneDebugLogger } from '@/services/iPhoneDebugLogger';
 
 const SmartChat = () => {
   const { user } = useAuth();
@@ -17,7 +18,19 @@ const SmartChat = () => {
   const { toast } = useToast();
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  
   const isMobile = useIsMobile();
+
+  // Standard debug logging for all platforms
+  useEffect(() => {
+    console.log('[SmartChat] Component mounted with state:', {
+      user: user?.id || 'no-user',
+      currentThreadId,
+      isProcessing,
+      isMobile: isMobile.isMobile,
+      pathname: window.location.pathname
+    });
+  }, [user?.id, currentThreadId, isProcessing, isMobile.isMobile]);
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -135,35 +148,37 @@ const SmartChat = () => {
   console.log("[SmartChat] Rendering with mobile detection:", isMobile.isMobile);
 
   return (
-    <div 
-      className="w-full h-full flex flex-col smart-chat-container"
-      style={{
-        position: 'fixed',
-        top: '3px',
-        left: 0,
-        right: 0,
-        bottom: 0,
-        width: '100%',
-        height: 'calc(100% - 3px)'
-      }}
-    >
-      {isMobile.isMobile ? (
-        <MobileChatInterface
-          currentThreadId={currentThreadId}
-          onSelectThread={handleSelectThread}
-          onCreateNewThread={handleCreateNewThread}
-          userId={user?.id}
-        />
-      ) : (
-        <DesktopChatLayout
-          currentThreadId={currentThreadId}
-          onSelectThread={handleSelectThread}
-          onCreateNewThread={handleCreateNewThread}
-          userId={user?.id}
-          onProcessingStateChange={setIsProcessing}
-        />
-      )}
-    </div>
+    <PremiumFeatureGuard feature="chat">
+      <div 
+        className="w-full h-full flex flex-col smart-chat-container"
+        style={{
+          position: 'fixed',
+          top: '3px',
+          left: 0,
+          right: 0,
+          bottom: 0,
+          width: '100%',
+          height: 'calc(100% - 3px)'
+        }}
+      >
+        {isMobile.isMobile ? (
+          <MobileChatInterface
+            currentThreadId={currentThreadId}
+            onSelectThread={handleSelectThread}
+            onCreateNewThread={handleCreateNewThread}
+            userId={user?.id}
+          />
+        ) : (
+          <DesktopChatLayout
+            currentThreadId={currentThreadId}
+            onSelectThread={handleSelectThread}
+            onCreateNewThread={handleCreateNewThread}
+            userId={user?.id}
+            onProcessingStateChange={setIsProcessing}
+          />
+        )}
+      </div>
+    </PremiumFeatureGuard>
   );
 };
 

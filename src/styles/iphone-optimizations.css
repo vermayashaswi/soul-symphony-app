@@ -1,0 +1,73 @@
+/* iPhone-specific optimizations for better performance and compatibility */
+
+/* iPhone loading spinner optimizations */
+@media only screen and (max-device-width: 812px) and (-webkit-min-device-pixel-ratio: 2) {
+  /* Target iPhone devices specifically */
+  
+  .animate-spin {
+    /* Use transform3d for hardware acceleration on iPhone */
+    transform: translateZ(0);
+    will-change: transform;
+    animation: iphone-spin 1s linear infinite;
+  }
+  
+  @keyframes iphone-spin {
+    from {
+      transform: rotate(0deg) translateZ(0);
+    }
+    to {
+      transform: rotate(360deg) translateZ(0);
+    }
+  }
+  
+  /* Optimize chat interface for iPhone */
+  .mobile-chat-interface {
+    /* Enable hardware acceleration */
+    transform: translateZ(0);
+    will-change: transform;
+    /* Prevent scrolling bounce on iPhone */
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* iPhone-specific loading states */
+  .mobile-chat-content {
+    /* Optimize scrolling performance */
+    -webkit-overflow-scrolling: touch;
+    transform: translateZ(0);
+  }
+  
+  /* Emergency fallback styling for stuck loaders */
+  .iphone-emergency-state {
+    opacity: 0.9;
+    background: hsl(var(--primary) / 0.1);
+    border: 1px dashed hsl(var(--primary) / 0.3);
+    border-radius: 8px;
+    padding: 16px;
+    margin: 8px;
+    text-align: center;
+  }
+}
+
+/* iPhone-specific chat improvements */
+@supports (-webkit-touch-callout: none) {
+  /* iOS Safari specific styles */
+  
+  .mobile-chat-interface {
+    /* Prevent zoom on focus */
+    -webkit-text-size-adjust: 100%;
+  }
+  
+  /* Improve button press feedback on iPhone */
+  button {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+  
+  /* Optimize input fields for iPhone */
+  input[type="text"], textarea {
+    /* Prevent zoom on focus */
+    font-size: 16px !important;
+    -webkit-appearance: none;
+    border-radius: 0;
+  }
+}

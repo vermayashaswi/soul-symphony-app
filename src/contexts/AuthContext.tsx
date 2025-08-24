@@ -18,6 +18,7 @@ import { debugLogger, logInfo, logError, logAuthError, logProfile, logAuth } fro
 import { isAppRoute } from '@/routes/RouteHelpers';
 import { useLocation } from 'react-router-dom';
 import { LocationProvider } from '@/contexts/LocationContext';
+import { iPhoneDebugLogger } from '@/services/iPhoneDebugLogger';
 
 import { nativeAuthService } from '@/services/nativeAuthService';
 import { nativeIntegrationService } from '@/services/nativeIntegrationService';
@@ -369,12 +370,13 @@ const location = useLocation();
         userMetadataKeys: currentUser.user_metadata ? Object.keys(currentUser.user_metadata) : []
       });
       
-      // Simplified mobile handling - no delays for iPhone users
+      // Increased delay for mobile stability - use consistent timing across all platforms
       if (isMobileDevice) {
-        const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
-        const isIOS = /iphone|ipad|ipod/i.test(userAgent.toLowerCase());
-        logProfile(`Mobile device detected (${isIOS ? 'iOS' : 'other'}), using immediate processing`, 'AuthContext');
-        console.log('[iPhone Fix] Skipping iOS delays for faster chat loading');
+        const delay = 1500; // Use consistent 1500ms delay that works for Android
+        
+        logProfile(`Mobile device detected, adding ${delay}ms stabilization delay`, 'AuthContext');
+        
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
       
       const profileCreated = await ensureProfileExistsService(currentUser);
@@ -459,6 +461,16 @@ const location = useLocation();
           hasUser: !!currentSession?.user,
           userId: currentSession?.user?.id
         });
+
+        // Debug logging for all platforms
+        console.log('[AuthContext] Auth state change details:', {
+          event,
+          hasUser: !!currentSession?.user,
+          userId: currentSession?.user?.id,
+          email: currentSession?.user?.email,
+          provider: currentSession?.user?.app_metadata?.provider,
+          isNative: nativeIntegrationService.isRunningNatively()
+        });
         
         // Prevent loops by checking if this is the same session
         if (currentSession?.access_token === session?.access_token && event !== 'SIGNED_OUT') {
@@ -508,10 +520,8 @@ const location = useLocation();
             }, 100); // Minimal delay for native
             
           } else {
-            // Web: Use existing logic with longer delays for stability, extra delay for iOS
-            const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
-            const isIOS = /iphone|ipad|ipod/i.test(userAgent.toLowerCase());
-            const initialDelay = isIOS ? 4000 : (isMobileDevice ? 3000 : 2000);
+            // Web: Use consistent delays for stability across all platforms
+            const initialDelay = isMobileDevice ? 1000 : 2000;
             
             logProfile(`WEB: Scheduling profile creation in ${initialDelay}ms for platform stability`, 'AuthContext');
             
@@ -609,10 +619,8 @@ const location = useLocation();
           }, 100);
           
         } else {
-          // Web: Use existing logic with stability delays, extra delay for iOS
-          const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
-          const isIOS = /iphone|ipad|ipod/i.test(userAgent.toLowerCase());
-          const initialDelay = isIOS ? 4000 : (isMobileDevice ? 3000 : 2000);
+          // Web: Use consistent delays for stability across all platforms
+          const initialDelay = isMobileDevice ? 1000 : 2000;
           
           logProfile(`WEB: Scheduling initial profile creation in ${initialDelay}ms for platform stability`, 'AuthContext');
           

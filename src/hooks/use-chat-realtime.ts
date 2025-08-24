@@ -232,9 +232,13 @@ export function useChatRealtime(threadId: string | null) {
 
     let timer: ReturnType<typeof setTimeout> | null = null;
     if (loading) {
-      // Auto-reset after 75s to prevent stuck loaders
+      // iPhone optimization: Much shorter timeout to prevent stuck loaders
+      const userAgent = typeof window !== 'undefined' ? window.navigator.userAgent : '';
+      const isIPhoneMobile = /iPhone|iPod/.test(userAgent) && typeof window !== 'undefined' && !(window.navigator as any).standalone;
+      const timeout = isIPhoneMobile ? 10000 : 75000; // 10s for iPhone, 75s for others
+      
       timer = setTimeout(() => {
-        console.warn(`[useChatRealtime] Watchdog timeout for thread: ${threadId}`);
+        console.warn(`[useChatRealtime] Watchdog timeout for thread: ${threadId} (${timeout/1000}s)`);
         updateThreadRealtimeState(threadId, {
           isLoading: false,
           isProcessing: false,
@@ -242,7 +246,7 @@ export function useChatRealtime(threadId: string | null) {
           processingStage: null,
           watchdogTimer: null
         });
-      }, 75000);
+      }, timeout);
     }
 
     updateThreadRealtimeState(threadId, {
