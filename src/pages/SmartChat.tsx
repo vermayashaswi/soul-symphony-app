@@ -156,6 +156,7 @@ const SmartChat = () => {
             onCreateNewThread={handleCreateNewThread}
             userId={user?.id}
             isProcessingActive={isProcessingActive}
+            onProcessingStateChange={setIsProcessingActive}
           />
         ) : (
           <DesktopChatLayout

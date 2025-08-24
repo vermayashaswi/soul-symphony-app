@@ -51,6 +51,7 @@ interface MobileChatInterfaceProps {
   userId?: string;
   mentalHealthInsights?: MentalHealthInsights;
   isProcessingActive?: boolean;
+  onProcessingStateChange?: (isProcessing: boolean) => void;
 }
 
 export default function MobileChatInterface({
@@ -60,6 +61,7 @@ export default function MobileChatInterface({
   userId,
   mentalHealthInsights,
   isProcessingActive = false,
+  onProcessingStateChange,
 }: MobileChatInterfaceProps) {
   const [messages, setMessages] = useState<UIChatMessage[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -245,6 +247,14 @@ export default function MobileChatInterface({
        });
      }
    });
+  
+  // Calculate and notify processing state changes
+  useEffect(() => {
+    const isCurrentlyProcessing = isLoading || isProcessing || isStreaming;
+    if (onProcessingStateChange) {
+      onProcessingStateChange(isCurrentlyProcessing);
+    }
+  }, [isLoading, isProcessing, isStreaming, onProcessingStateChange]);
   
   const suggestionQuestions = [
     {
