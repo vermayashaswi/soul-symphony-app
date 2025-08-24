@@ -18,9 +18,10 @@ const SmartChat = () => {
   const { toast } = useToast();
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [iPhoneBypassLoading, setIPhoneBypassLoading] = useState(false);
   const isMobile = useIsMobile();
 
-  // iPhone-specific debug logging for Smart Chat mount
+  // iPhone-specific debug logging and emergency loading bypass
   useEffect(() => {
     const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
     const isIPhone = /iphone/i.test(userAgent.toLowerCase());
@@ -33,6 +34,15 @@ const SmartChat = () => {
         isMobile: isMobile.isMobile,
         pathname: window.location.pathname
       });
+      
+      // Emergency bypass for iPhone loading issues - force progression after timeout
+      const emergencyTimeout = setTimeout(() => {
+        console.log('[SmartChat] iPhone emergency bypass - forcing app to load');
+        setIPhoneBypassLoading(true);
+        iPhoneDebugLogger.logLoadingTimeout('smart_chat_emergency', 10000);
+      }, 10000);
+      
+      return () => clearTimeout(emergencyTimeout);
     }
   }, [user?.id, currentThreadId, isProcessing, isMobile.isMobile]);
 

@@ -55,7 +55,7 @@ export const PremiumFeatureGuard: React.FC<PremiumFeatureGuardProps> = ({
         console.warn('[PremiumFeatureGuard] iPhone loading timeout - forcing progression');
         iPhoneDebugLogger.logLoadingTimeout('PremiumFeatureGuard', 15000);
         setLoadingTimeout(true);
-      }, 15000); // 15 second timeout for iPhone
+      }, 5000); // 5 second timeout for iPhone
       
       return () => clearTimeout(timeout);
     }

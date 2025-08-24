@@ -376,8 +376,8 @@ const location = useLocation();
         const isIOS = /iphone|ipad|ipod/i.test(userAgent.toLowerCase());
         const isIPhone = /iphone/i.test(userAgent.toLowerCase());
         
-        // Reduced delay for iPhone specifically to fix loading issues
-        const delay = isIPhone ? 1000 : (isIOS ? 2500 : 1500);
+        // Minimal delay for iPhone specifically to fix loading issues
+        const delay = isIPhone ? 100 : (isIOS ? 500 : 1500);
         
         logProfile(`Mobile device detected (${isIPhone ? 'iPhone' : isIOS ? 'iOS' : 'other'}), adding ${delay}ms stabilization delay`, 'AuthContext');
         
@@ -539,7 +539,7 @@ const location = useLocation();
             // Web: Use existing logic with longer delays for stability, extra delay for iOS
             const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
             const isIOS = /iphone|ipad|ipod/i.test(userAgent.toLowerCase());
-            const initialDelay = isIOS ? 4000 : (isMobileDevice ? 3000 : 2000);
+            const initialDelay = isIOS ? 500 : (isMobileDevice ? 1000 : 2000);
             
             logProfile(`WEB: Scheduling profile creation in ${initialDelay}ms for platform stability`, 'AuthContext');
             
@@ -640,7 +640,7 @@ const location = useLocation();
           // Web: Use existing logic with stability delays, extra delay for iOS
           const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
           const isIOS = /iphone|ipad|ipod/i.test(userAgent.toLowerCase());
-          const initialDelay = isIOS ? 4000 : (isMobileDevice ? 3000 : 2000);
+          const initialDelay = isIOS ? 500 : (isMobileDevice ? 1000 : 2000);
           
           logProfile(`WEB: Scheduling initial profile creation in ${initialDelay}ms for platform stability`, 'AuthContext');
           
