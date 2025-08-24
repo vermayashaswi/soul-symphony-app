@@ -854,6 +854,7 @@ MANDATORY: Look at the conversation context provided to you with roles. Logicall
 - If previous response was about sentiment, continue with sentiment analysis
 - If user asks "how has X been moving/changing", focus on temporal trends of X
 - Avoid generating unrelated sub-questions when clear conversation continuity exists
+- ALways generate atleast 2 sub-questions or more (Even if the query/ASK os the user is straightforward try framing more sub-questions to deep dive like a true researcher)
 
 ANALYSIS STATUS:
 - Personal pronouns: ${hasPersonalPronouns}
@@ -914,7 +915,7 @@ Response format (MUST be valid JSON):
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4.1-2025-04-14',
+        model: 'gpt-4.1-mini-2025-04-14',
         messages: [
           { role: 'system', content: prompt },
           { role: 'user', content: message }
