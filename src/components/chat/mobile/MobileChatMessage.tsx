@@ -32,8 +32,11 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({
   streamingMessage,
   showStreamingDots = false 
 }) => {
-  // CRITICAL FIX: Always call all hooks before any conditional logic
+  // Always call hooks first, then detect environment
   const { user } = useAuth();
+  
+  // Detect Capacitor environment to enforce unified behavior
+  const isCapacitor = typeof window !== 'undefined' && !!(window as any).Capacitor;
   
   // Memoize formatted content - this hook must always be called
   const formattedContent = React.useMemo(() => {
@@ -43,10 +46,14 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({
     return message.content;
   }, [message]);
   
-  // Determine what type of content to render
+  // Determine what type of content to render - unified for web and Capacitor
   const shouldShowLoading = isLoading && !streamingMessage;
   const shouldShowStreaming = !!streamingMessage;
   const shouldShowMessage = !shouldShowLoading && !shouldShowStreaming;
+  
+  // For Capacitor, always use simple dots instead of dynamic messages
+  const effectiveStreamingMessage = isCapacitor ? undefined : streamingMessage;
+  const effectiveShowStreamingDots = isCapacitor ? true : showStreamingDots;
   
   // Calculate derived values
   const displayRole = message.role === 'error' ? 'assistant' : message.role;
@@ -73,15 +80,15 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({
         transition={{ duration: 0.3 }}
         className="relative flex items-start gap-2 justify-start mb-3"
       >
-        {/* Show avatar only when there's a streaming message with content */}
-        {streamingMessage && (
+        {/* Show avatar only when there's a streaming message with content (unified behavior) */}
+        {effectiveStreamingMessage && (
           <div className="border border-primary/20 rounded-full">
             <ParticleAvatar className="w-8 h-8" size={32} />
           </div>
         )}
         
-        {/* For general mental health queries (showStreamingDots=true, streamingMessage=undefined), show only dots */}
-        {showStreamingDots && !streamingMessage ? (
+        {/* For Capacitor and general mental health queries, show only dots */}
+        {effectiveShowStreamingDots && !effectiveStreamingMessage ? (
           <div className="flex items-center space-x-1 bg-muted/60 border border-border/50 rounded-2xl rounded-tl-none px-4 py-3">
             <div className="flex space-x-1">
               <div 
@@ -107,11 +114,11 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({
               />
             </div>
           </div>
-        ) : streamingMessage && (
+        ) : effectiveStreamingMessage && (
           <div className="min-w-0 max-w-[85%] rounded-2xl rounded-tl-none p-3.5 text-sm shadow-sm bg-muted/60 border border-border/50">
             <div className="flex items-center gap-2">
-              <span className="text-muted-foreground">{streamingMessage}</span>
-              {showStreamingDots && (
+              <span className="text-muted-foreground">{effectiveStreamingMessage}</span>
+              {effectiveShowStreamingDots && (
                 <div className="flex space-x-1">
                   <div 
                     className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-pulse"

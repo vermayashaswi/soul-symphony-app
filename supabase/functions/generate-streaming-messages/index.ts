@@ -11,6 +11,7 @@ interface StreamingMessageRequest {
   category: string;
   conversationContext?: any[];
   userProfile?: any;
+  isCapacitor?: boolean;
 }
 
 serve(async (req) => {
@@ -24,13 +25,13 @@ serve(async (req) => {
     
     // Parse request body
     const body: StreamingMessageRequest = await req.json();
-    const { userMessage, category, conversationContext = [], userProfile = {} } = body;
+    const { userMessage, category, conversationContext = [], userProfile = {}, isCapacitor = false } = body;
     
-    console.log(`[generate-streaming-messages] Processing message for category: ${category}`);
+    console.log(`[generate-streaming-messages] Processing message for category: ${category}, isCapacitor: ${isCapacitor}`);
     
-    // Generate dynamic messages for JOURNAL_SPECIFIC category, fallback for others
-    if (category !== 'JOURNAL_SPECIFIC') {
-      console.log(`[generate-streaming-messages] Category ${category} -> disabling dynamic messages, using three-dot UI`);
+    // Force fallback for Capacitor to ensure web parity, or for non-journal categories
+    if (isCapacitor || category !== 'JOURNAL_SPECIFIC') {
+      console.log(`[generate-streaming-messages] ${isCapacitor ? 'Capacitor detected' : `Category ${category}`} -> forcing three-dot fallback for unified behavior`);
       return new Response(
         JSON.stringify({ 
           success: true, 
