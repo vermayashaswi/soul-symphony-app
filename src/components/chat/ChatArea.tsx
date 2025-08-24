@@ -23,6 +23,7 @@ interface ChatAreaProps {
   onInteractiveOptionClick?: (option: any) => void;
   onUserMessageSent?: boolean;
   isStreaming?: boolean;
+  streamingMessage?: string;
   className?: string;
 }
 
@@ -34,6 +35,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   onInteractiveOptionClick,
   onUserMessageSent,
   isStreaming,
+  streamingMessage,
   className
 }) => {
   // Use unified auto-scroll hook with smart threshold management
@@ -157,9 +159,27 @@ const ChatArea: React.FC<ChatAreaProps> = ({
         </div>
       ))}
 
-      {isLoading && (
+      {/* Show streaming messages or typing indicator */}
+      {(isLoading || isStreaming) && (
         <div className="flex justify-start mb-4">
-          <TypingIndicator />
+          {streamingMessage ? (
+            <div className="flex gap-3 max-w-[80%]">
+              <div className="mt-1">
+                <ParticleAvatar className="h-8 w-8" size={32} />
+              </div>
+              <Card className="overflow-hidden">
+                <CardContent className="p-3">
+                  <div className="prose prose-sm dark:prose-invert max-w-none">
+                    <div className="text-muted-foreground animate-pulse">
+                      {streamingMessage}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          ) : (
+            <TypingIndicator />
+          )}
         </div>
       )}
 

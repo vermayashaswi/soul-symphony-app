@@ -906,6 +906,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
             onInteractiveOptionClick={handleInteractiveOptionClick}
             onUserMessageSent={userMessageSent}
             isStreaming={isStreaming}
+            streamingMessage={streamingMessages[0]?.message || ''}
           />
         )}
         

@@ -72,7 +72,7 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({
     );
   }
   
-  if (shouldShowStreaming) {
+  if (shouldShowStreaming && streamingMessage) {
     return (
       <motion.div 
         initial={{ opacity: 0, y: 10 }}

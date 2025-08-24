@@ -1088,13 +1088,15 @@ export default function MobileChatInterface({
               />
             ))}
             
-            {/* Show streaming message if currently streaming */}
-            {isStreaming && streamingMessages && currentMessageIndex < streamingMessages.length && (
+            {/* Show streaming message (GPT-generated) or three-dot animation */}
+            {isStreaming && (
               <MobileChatMessage
                 message={{ role: 'assistant', content: '' }}
                 showAnalysis={false}
-                isLoading={false}
-                streamingMessage={translatedDynamicMessages[currentMessageIndex] || dynamicMessages[currentMessageIndex] || ''}
+                isLoading={useThreeDotFallback}
+                streamingMessage={!useThreeDotFallback && translatedDynamicMessages[currentMessageIndex] ? 
+                  translatedDynamicMessages[currentMessageIndex] : 
+                  (!useThreeDotFallback && dynamicMessages[currentMessageIndex] ? dynamicMessages[currentMessageIndex] : '')}
                 showStreamingDots={useThreeDotFallback}
               />
             )}
