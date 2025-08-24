@@ -198,20 +198,16 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
     }
   }, [user]);
 
-  // iPhone Fix: Hardcode premium access for iPhone users
-  const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
-  const isIPhone = /iphone/i.test(userAgent);
-  
   // Computed properties with proper trial logic
-  const isPremium = isIPhone ? true : tier === 'premium';
+  const isPremium = tier === 'premium';
   
   // Check if trial is actually active (not expired) - more robust check
   // CRITICAL: For premium tier users in trial status, they should have access
-  const isTrialActive = isIPhone ? true : (status === 'trial' && tier === 'premium' && trialEndDate && trialEndDate > new Date());
+  const isTrialActive = (status === 'trial' && tier === 'premium' && trialEndDate && trialEndDate > new Date());
   
   // Has active subscription means either active subscription OR active (non-expired) trial
   // Also grant access if user has premium tier regardless of trial status (covers edge cases)
-  const hasActiveSubscription = isIPhone ? true : (status === 'active' || isTrialActive || (tier === 'premium' && status === 'trial'));
+  const hasActiveSubscription = status === 'active' || isTrialActive || (tier === 'premium' && status === 'trial');
   
   const daysRemainingInTrial = trialEndDate && isTrialActive
     ? Math.max(0, Math.ceil((trialEndDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))

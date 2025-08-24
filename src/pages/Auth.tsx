@@ -18,24 +18,7 @@ export default function Auth() {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const { user, isLoading: authLoading } = useAuth();
-  
-  // iPhone Fix: Hardcode onboarding values for iPhone to prevent loading delays
-  const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
-  const isIPhone = /iphone/i.test(userAgent);
-  
-  let onboardingData;
-  if (isIPhone) {
-    // iPhone users get immediate onboarding bypass
-    onboardingData = { 
-      onboardingComplete: true, 
-      loading: false 
-    };
-    console.log('[iPhone Fix] Hardcoded onboarding bypass for iPhone');
-  } else {
-    onboardingData = useOnboarding();
-  }
-  const { onboardingComplete, loading: onboardingLoading } = onboardingData;
-  
+  const { onboardingComplete, loading: onboardingLoading } = useOnboarding();
   const [authError, setAuthError] = useState<string | null>(null);
   const [navigationProcessing, setNavigationProcessing] = useState(false);
   const [authDebugInfo, setAuthDebugInfo] = useState<any>(null);
