@@ -44,6 +44,7 @@ interface ThreadStreamingState {
   abortController: AbortController | null;
   activeRequestId: string | null; // Track active request to prevent duplicates
   lastMessageFingerprint: string | null; // Prevent duplicate messages
+  pausedDueToBackground?: boolean; // STREAMING CONTINUITY FIX: Track background state
 }
 
 const createInitialState = (): ThreadStreamingState => ({
@@ -127,39 +128,54 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
       setIsPageVisible(visible);
       
       if (!visible && threadId) {
-        // Page backgrounded - pause streaming without aborting
+        // Page backgrounded - preserve streaming state without aborting
         console.log(`[useStreamingChat] Page backgrounded for thread: ${threadId}`);
         const threadState = getThreadState(threadId);
         if (threadState.isStreaming) {
-          // Save current state but don't abort
+          // Save current state but don't abort the request
           saveChatStreamingState(threadId, {
-            ...threadState,
+            isStreaming: threadState.isStreaming,
+            streamingMessages: threadState.streamingMessages,
+            currentUserMessage: threadState.currentUserMessage,
+            showBackendAnimation: threadState.showBackendAnimation,
+            dynamicMessages: threadState.dynamicMessages,
+            translatedDynamicMessages: threadState.translatedDynamicMessages || [],
+            currentMessageIndex: threadState.currentMessageIndex,
+            useThreeDotFallback: threadState.useThreeDotFallback,
+            queryCategory: threadState.queryCategory,
+            expectedProcessingTime: threadState.expectedProcessingTime,
+            processingStartTime: threadState.processingStartTime,
+            activeRequestId: threadState.activeRequestId,
             pausedDueToBackground: true,
           });
         }
       } else if (visible && threadId) {
-        // Page foregrounded - restore UI state if we had an active stream
+        // Page foregrounded - restore streaming state if it was preserved
         console.log(`[useStreamingChat] Page foregrounded for thread: ${threadId}`);
         try {
           const savedState: any = getChatStreamingState(threadId);
           if (savedState && (savedState.isStreaming || savedState.pausedDueToBackground)) {
+            console.log(`[useStreamingChat] Restoring streaming state for thread: ${threadId}`);
             updateThreadState(threadId, {
-              isStreaming: true,
+              isStreaming: savedState.isStreaming,
               streamingMessages: savedState.streamingMessages || [],
               currentUserMessage: savedState.currentUserMessage || '',
-              showBackendAnimation: !!savedState.showBackendAnimation,
-            dynamicMessages: savedState.dynamicMessages || [],
-            translatedDynamicMessages: savedState.translatedDynamicMessages || [],
-            currentMessageIndex: savedState.currentMessageIndex || 0,
-              useThreeDotFallback: !!savedState.useThreeDotFallback,
+              showBackendAnimation: savedState.showBackendAnimation,
+              dynamicMessages: savedState.dynamicMessages || [],
+              translatedDynamicMessages: savedState.translatedDynamicMessages || [],
+              currentMessageIndex: savedState.currentMessageIndex || 0,
+              useThreeDotFallback: savedState.useThreeDotFallback,
               queryCategory: savedState.queryCategory || '',
-              expectedProcessingTime: savedState.expectedProcessingTime || null,
+              expectedProcessingTime: savedState.expectedProcessingTime,
               processingStartTime: savedState.processingStartTime || Date.now(),
-              abortController: new AbortController(),
-              activeRequestId: savedState.activeRequestId || null,
+              abortController: new AbortController(), // Fresh controller
+              activeRequestId: savedState.activeRequestId,
+              pausedDueToBackground: false,
             });
           }
-        } catch {}
+        } catch (error) {
+          console.warn('[useStreamingChat] Failed to restore streaming state:', error);
+        }
       }
     };
 
@@ -845,9 +861,11 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
       showBackendAnimation: false,
       useThreeDotFallback: false,
       dynamicMessages: [],
+      translatedDynamicMessages: [],
       currentMessageIndex: 0,
       queryCategory: '',
       activeRequestId: null,
+      pausedDueToBackground: false,
       lastMessageFingerprint: null,
     });
   }, [threadId, updateThreadState]);

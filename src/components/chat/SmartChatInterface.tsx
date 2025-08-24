@@ -567,8 +567,8 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
         });
       }
       
-      // Initialize processing message placeholder (only created for non-journal queries)
-      let processingMessageId: string | null = null;
+      // STREAMING PARITY FIX: Remove processing placeholder system entirely
+      // All queries now use streaming with real-time messages - no stuck placeholders
       
       // Use GPT-based query classification with conversation context
       debugLog.addEvent("Query Classification", `Classifying query: "${message.substring(0, 30)}${message.length > 30 ? '...' : ''}"`, "info");
@@ -591,21 +591,20 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       
       updateProcessingStage("Generating response...");
       
-      // Create processing placeholder only for non-journal-specific queries
-      if (queryClassification.category !== QueryCategory.JOURNAL_SPECIFIC) {
-        processingMessageId = await createProcessingMessage(threadId, "Processing your request...");
-        if (processingMessageId) {
-          debugLog.addEvent("Database", `Created processing message with ID: ${processingMessageId}`, "success");
-        }
-      } else if (processingMessageId) {
-        // Safety: if a placeholder exists, remove it for streaming path
-        await updateProcessingMessage(processingMessageId, null);
-        processingMessageId = null;
+      // STREAMING PARITY FIX: Use streaming for all queries - no processing placeholders
+      debugLog.addEvent("Routing", "Using streaming chat for all queries - no processing placeholders", "info");
+      
+      // Clean up any existing processing messages for this thread before starting
+      try {
+        await supabase
+          .from('chat_messages')
+          .delete()
+          .eq('thread_id', threadId)
+          .eq('is_processing', true);
+      } catch (cleanupError) {
+        console.warn('[SmartChatInterface] Failed to cleanup processing messages:', cleanupError);
       }
-      
-      // Route ALL queries to chat-with-rag (restored original design)
-      debugLog.addEvent("Routing", "Using chat-with-rag for all queries with streaming", "info");
-      
+
       // Start streaming chat for all queries
       await startStreamingChat(
         message,

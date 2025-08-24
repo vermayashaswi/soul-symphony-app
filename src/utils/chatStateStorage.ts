@@ -6,6 +6,7 @@ export interface ChatStreamingState {
   currentUserMessage: string;
   showBackendAnimation: boolean;
   dynamicMessages: string[];
+  translatedDynamicMessages?: string[];
   currentMessageIndex: number;
   useThreeDotFallback: boolean;
   queryCategory: string;
