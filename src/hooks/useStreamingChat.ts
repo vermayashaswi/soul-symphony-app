@@ -44,7 +44,6 @@ interface ThreadStreamingState {
   abortController: AbortController | null;
   activeRequestId: string | null; // Track active request to prevent duplicates
   lastMessageFingerprint: string | null; // Prevent duplicate messages
-  pausedDueToBackground?: boolean; // STREAMING CONTINUITY FIX: Track background state
 }
 
 const createInitialState = (): ThreadStreamingState => ({
@@ -108,74 +107,46 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     return `${message}_${threadId}_${Math.floor(timestamp / 5000)}`; // 5-second window
   }, []);
 
-  // Page Visibility API for mobile browser handling - CAPACITOR FIX: Disable for Capacitor to avoid interference
+  // Page Visibility API for mobile browser handling
   useEffect(() => {
-    // CAPACITOR FIX: Skip page visibility handling for Capacitor to match browser behavior
-    const isCapacitor = !!(
-      (window as any).Capacitor?.isNative ||
-      window.location.href.includes('capacitor://') ||
-      window.location.href.includes('ionic://') ||
-      (window as any).Capacitor?.isPluginAvailable
-    );
-
-    if (isCapacitor) {
-      console.log('[useStreamingChat] Skipping page visibility handling for Capacitor to match browser behavior');
-      return;
-    }
-
     const handleVisibilityChange = () => {
       const visible = !document.hidden;
       setIsPageVisible(visible);
       
       if (!visible && threadId) {
-        // Page backgrounded - preserve streaming state without aborting
+        // Page backgrounded - pause streaming without aborting
         console.log(`[useStreamingChat] Page backgrounded for thread: ${threadId}`);
         const threadState = getThreadState(threadId);
         if (threadState.isStreaming) {
-          // Save current state but don't abort the request
+          // Save current state but don't abort
           saveChatStreamingState(threadId, {
-            isStreaming: threadState.isStreaming,
-            streamingMessages: threadState.streamingMessages,
-            currentUserMessage: threadState.currentUserMessage,
-            showBackendAnimation: threadState.showBackendAnimation,
-            dynamicMessages: threadState.dynamicMessages,
-            translatedDynamicMessages: threadState.translatedDynamicMessages || [],
-            currentMessageIndex: threadState.currentMessageIndex,
-            useThreeDotFallback: threadState.useThreeDotFallback,
-            queryCategory: threadState.queryCategory,
-            expectedProcessingTime: threadState.expectedProcessingTime,
-            processingStartTime: threadState.processingStartTime,
-            activeRequestId: threadState.activeRequestId,
+            ...threadState,
             pausedDueToBackground: true,
           });
         }
       } else if (visible && threadId) {
-        // Page foregrounded - restore streaming state if it was preserved
+        // Page foregrounded - restore UI state if we had an active stream
         console.log(`[useStreamingChat] Page foregrounded for thread: ${threadId}`);
         try {
           const savedState: any = getChatStreamingState(threadId);
           if (savedState && (savedState.isStreaming || savedState.pausedDueToBackground)) {
-            console.log(`[useStreamingChat] Restoring streaming state for thread: ${threadId}`);
             updateThreadState(threadId, {
-              isStreaming: savedState.isStreaming,
+              isStreaming: true,
               streamingMessages: savedState.streamingMessages || [],
               currentUserMessage: savedState.currentUserMessage || '',
-              showBackendAnimation: savedState.showBackendAnimation,
-              dynamicMessages: savedState.dynamicMessages || [],
-              translatedDynamicMessages: savedState.translatedDynamicMessages || [],
-              currentMessageIndex: savedState.currentMessageIndex || 0,
-              useThreeDotFallback: savedState.useThreeDotFallback,
+              showBackendAnimation: !!savedState.showBackendAnimation,
+            dynamicMessages: savedState.dynamicMessages || [],
+            translatedDynamicMessages: savedState.translatedDynamicMessages || [],
+            currentMessageIndex: savedState.currentMessageIndex || 0,
+              useThreeDotFallback: !!savedState.useThreeDotFallback,
               queryCategory: savedState.queryCategory || '',
-              expectedProcessingTime: savedState.expectedProcessingTime,
+              expectedProcessingTime: savedState.expectedProcessingTime || null,
               processingStartTime: savedState.processingStartTime || Date.now(),
-              abortController: new AbortController(), // Fresh controller
-              activeRequestId: savedState.activeRequestId,
-              pausedDueToBackground: false,
+              abortController: new AbortController(),
+              activeRequestId: savedState.activeRequestId || null,
             });
           }
-        } catch (error) {
-          console.warn('[useStreamingChat] Failed to restore streaming state:', error);
-        }
+        } catch {}
       }
     };
 
@@ -183,11 +154,65 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [threadId, getThreadState]);
 
-  // Capacitor app lifecycle handling - CAPACITOR FIX: Disable to avoid chat interference
+  // Capacitor app lifecycle handling
   useEffect(() => {
-    // CAPACITOR FIX: Disable Capacitor app lifecycle handling for chat to match browser behavior
-    console.log('[useStreamingChat] Capacitor app lifecycle handling disabled to match browser behavior');
-    return;
+    // Check if Capacitor App plugin is available using the correct path
+    if (typeof window !== 'undefined' && (window as any).Capacitor?.Plugins?.App) {
+      try {
+        const { App } = (window as any).Capacitor.Plugins;
+        
+        const handleAppStateChange = (state: any) => {
+          setIsAppActive(state.isActive);
+          
+          if (!state.isActive && threadId) {
+            // App backgrounded
+            console.log(`[useStreamingChat] Capacitor app backgrounded for thread: ${threadId}`);
+            const threadState = getThreadState(threadId);
+            if (threadState.isStreaming) {
+              saveChatStreamingState(threadId, {
+                ...threadState,
+                pausedDueToBackground: true,
+              });
+            }
+           } else if (state.isActive && threadId) {
+              // App foregrounded
+              console.log(`[useStreamingChat] Capacitor app foregrounded for thread: ${threadId}`);
+              try {
+                const savedState: any = getChatStreamingState(threadId);
+                if (savedState && (savedState.isStreaming || savedState.pausedDueToBackground)) {
+                  updateThreadState(threadId, {
+                    isStreaming: true,
+                    streamingMessages: savedState.streamingMessages || [],
+                    currentUserMessage: savedState.currentUserMessage || '',
+                    showBackendAnimation: !!savedState.showBackendAnimation,
+            dynamicMessages: savedState.dynamicMessages || [],
+            translatedDynamicMessages: savedState.translatedDynamicMessages || [],
+            currentMessageIndex: savedState.currentMessageIndex || 0,
+                    useThreeDotFallback: !!savedState.useThreeDotFallback,
+                    queryCategory: savedState.queryCategory || '',
+                    expectedProcessingTime: savedState.expectedProcessingTime || null,
+                    processingStartTime: savedState.processingStartTime || Date.now(),
+                    abortController: new AbortController(),
+                    activeRequestId: savedState.activeRequestId || null,
+                  });
+                }
+              } catch {}
+            }
+        };
+
+        App.addListener('appStateChange', handleAppStateChange);
+        
+        return () => {
+          try {
+            App.removeAllListeners();
+          } catch (error) {
+            console.warn('[useStreamingChat] Error removing Capacitor listeners:', error);
+          }
+        };
+      } catch (error) {
+        console.warn('[useStreamingChat] Error setting up Capacitor app lifecycle handlers:', error);
+      }
+    }
   }, [threadId, getThreadState]);
 
   // Thread switch handler - abort current operations and switch state
@@ -394,34 +419,12 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     const activeThreadId = targetThreadId || threadId;
     if (!activeThreadId) return;
 
-    // CAPACITOR PARITY FIX: Always force three-dot fallback for Capacitor to match web browser behavior
-    const isCapacitor = !!(
-      (window as any).Capacitor?.isNative ||
-      window.location.href.includes('capacitor://') ||
-      window.location.href.includes('ionic://') ||
-      (window as any).Capacitor?.isPluginAvailable ||
-      (window as any).Capacitor
-    );
-
-    // Force three-dot fallback for ALL Capacitor environments regardless of category
-    if (isCapacitor) {
-      console.log('[useStreamingChat] Capacitor detected - forcing three-dot fallback for web parity');
-      updateThreadState(activeThreadId, {
-        useThreeDotFallback: true,
-        dynamicMessages: [],
-        currentMessageIndex: 0,
-        translatedDynamicMessages: []
-      });
-      return;
-    }
-
-    // For web browsers, only use dynamic messages for journal-specific queries
+    // Only generate dynamic messages for journal-specific queries
     if (category !== 'JOURNAL_SPECIFIC') {
       updateThreadState(activeThreadId, {
         useThreeDotFallback: true,
         dynamicMessages: [],
-        currentMessageIndex: 0,
-        translatedDynamicMessages: []
+        currentMessageIndex: 0
       });
       return;
     }
@@ -560,22 +563,8 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     }
   }, [threadId, getThreadState, updateThreadState, generateStreamingMessages, invokeWithBackoff, isEdgeFunctionError, addStreamingMessage, resetRetryState]);
 
-  // Enhanced timing logic with thread validation - CAPACITOR PARITY FIX: Disable for Capacitor
+  // Enhanced timing logic with thread validation
   useEffect(() => {
-    // CAPACITOR PARITY FIX: Skip dynamic message rotation for Capacitor to match web behavior
-    const isCapacitor = !!(
-      (window as any).Capacitor?.isNative ||
-      window.location.href.includes('capacitor://') ||
-      window.location.href.includes('ionic://') ||
-      (window as any).Capacitor?.isPluginAvailable ||
-      (window as any).Capacitor
-    );
-    
-    if (isCapacitor) {
-      console.log('[useStreamingChat] Skipping dynamic message rotation for Capacitor to match browser behavior');
-      return;
-    }
-    
     if (!threadId || !state.isStreaming || state.useThreeDotFallback || state.dynamicMessages.length === 0) return;
 
     let timeoutId: NodeJS.Timeout;
@@ -861,11 +850,9 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
       showBackendAnimation: false,
       useThreeDotFallback: false,
       dynamicMessages: [],
-      translatedDynamicMessages: [],
       currentMessageIndex: 0,
       queryCategory: '',
       activeRequestId: null,
-      pausedDueToBackground: false,
       lastMessageFingerprint: null,
     });
   }, [threadId, updateThreadState]);

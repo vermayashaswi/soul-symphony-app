@@ -64,36 +64,11 @@ const SmartChat = () => {
     loadLastThread();
   }, [user?.id]);
 
-  // Setup global message deletion listener and cleanup stuck processing messages
+  // Setup global message deletion listener
   useEffect(() => {
     if (!user?.id) return;
     
     const subscription = setupGlobalMessageDeletionListener(user.id);
-    
-    // STREAMING PARITY FIX: Clean up any stuck processing messages on app start
-    const cleanupProcessingMessages = async () => {
-      try {
-        const { data: userThreads } = await supabase
-          .from('chat_threads')
-          .select('id')
-          .eq('user_id', user.id);
-        
-        if (userThreads && userThreads.length > 0) {
-          const threadIds = userThreads.map(t => t.id);
-          await supabase
-            .from('chat_messages')
-            .delete()
-            .eq('is_processing', true)
-            .in('thread_id', threadIds);
-          
-          console.log('[SmartChat] Cleaned up stuck processing messages for user');
-        }
-      } catch (error) {
-        console.warn('[SmartChat] Failed to cleanup processing messages:', error);
-      }
-    };
-    
-    cleanupProcessingMessages();
     
     return () => {
       if (subscription) {

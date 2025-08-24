@@ -80,7 +80,7 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({
           </div>
         )}
         
-        {/* CAPACITOR PARITY FIX: Always show simple dots for consistent behavior */}
+        {/* For general mental health queries (showStreamingDots=true, streamingMessage=undefined), show only dots */}
         {showStreamingDots && !streamingMessage ? (
           <div className="flex items-center space-x-1 bg-muted/60 border border-border/50 rounded-2xl rounded-tl-none px-4 py-3">
             <div className="flex space-x-1">
