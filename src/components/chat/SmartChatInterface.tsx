@@ -102,6 +102,14 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     threadSafetyManager.setActiveThread(currentThreadId || null);
   }, [currentThreadId]);
   
+  // CAPACITOR FIX: Detect Capacitor environment for consistent behavior
+  const isCapacitor = !!(
+    (window as any).Capacitor?.isNative ||
+    window.location.href.includes('capacitor://') ||
+    window.location.href.includes('ionic://') ||
+    (window as any).Capacitor?.isPluginAvailable
+  );
+
   // Use the GPT-based message classification hook
   const { classifyMessage, classification } = useChatMessageClassification();
   

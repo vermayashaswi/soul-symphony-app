@@ -30,6 +30,7 @@ export function useChatMessageClassification() {
 
   /**
    * Enhanced message classification with prioritized personal pronoun support
+   * CAPACITOR FIX: Force consistent classification behavior
    */
   const classifyMessage = useCallback(async (message: string, conversationContext: any[] = []) => {
     if (!message?.trim()) {
@@ -39,6 +40,32 @@ export function useChatMessageClassification() {
         reasoning: 'Empty message',
         useAllEntries: false
       };
+    }
+
+    // CAPACITOR FIX: Detect Capacitor environment and force GENERAL_MENTAL_HEALTH classification
+    const isCapacitor = !!(
+      (window as any).Capacitor?.isNative ||
+      window.location.href.includes('capacitor://') ||
+      window.location.href.includes('ionic://') ||
+      (window as any).Capacitor?.isPluginAvailable
+    );
+
+    if (isCapacitor) {
+      console.log('[Classification Hook] Capacitor detected - forcing GENERAL_MENTAL_HEALTH classification to match browser behavior');
+      const result = {
+        category: QueryCategory.GENERAL_MENTAL_HEALTH,
+        confidence: 1.0,
+        reasoning: 'Capacitor environment - forced consistent classification',
+        useAllEntries: false
+      };
+      
+      setClassification({
+        ...result,
+        isLoading: false,
+        error: null
+      });
+      
+      return result;
     }
 
     setClassification(prev => ({

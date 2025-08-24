@@ -107,8 +107,21 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     return `${message}_${threadId}_${Math.floor(timestamp / 5000)}`; // 5-second window
   }, []);
 
-  // Page Visibility API for mobile browser handling
+  // Page Visibility API for mobile browser handling - CAPACITOR FIX: Disable for Capacitor to avoid interference
   useEffect(() => {
+    // CAPACITOR FIX: Skip page visibility handling for Capacitor to match browser behavior
+    const isCapacitor = !!(
+      (window as any).Capacitor?.isNative ||
+      window.location.href.includes('capacitor://') ||
+      window.location.href.includes('ionic://') ||
+      (window as any).Capacitor?.isPluginAvailable
+    );
+
+    if (isCapacitor) {
+      console.log('[useStreamingChat] Skipping page visibility handling for Capacitor to match browser behavior');
+      return;
+    }
+
     const handleVisibilityChange = () => {
       const visible = !document.hidden;
       setIsPageVisible(visible);
@@ -154,65 +167,11 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [threadId, getThreadState]);
 
-  // Capacitor app lifecycle handling
+  // Capacitor app lifecycle handling - CAPACITOR FIX: Disable to avoid chat interference
   useEffect(() => {
-    // Check if Capacitor App plugin is available using the correct path
-    if (typeof window !== 'undefined' && (window as any).Capacitor?.Plugins?.App) {
-      try {
-        const { App } = (window as any).Capacitor.Plugins;
-        
-        const handleAppStateChange = (state: any) => {
-          setIsAppActive(state.isActive);
-          
-          if (!state.isActive && threadId) {
-            // App backgrounded
-            console.log(`[useStreamingChat] Capacitor app backgrounded for thread: ${threadId}`);
-            const threadState = getThreadState(threadId);
-            if (threadState.isStreaming) {
-              saveChatStreamingState(threadId, {
-                ...threadState,
-                pausedDueToBackground: true,
-              });
-            }
-           } else if (state.isActive && threadId) {
-              // App foregrounded
-              console.log(`[useStreamingChat] Capacitor app foregrounded for thread: ${threadId}`);
-              try {
-                const savedState: any = getChatStreamingState(threadId);
-                if (savedState && (savedState.isStreaming || savedState.pausedDueToBackground)) {
-                  updateThreadState(threadId, {
-                    isStreaming: true,
-                    streamingMessages: savedState.streamingMessages || [],
-                    currentUserMessage: savedState.currentUserMessage || '',
-                    showBackendAnimation: !!savedState.showBackendAnimation,
-            dynamicMessages: savedState.dynamicMessages || [],
-            translatedDynamicMessages: savedState.translatedDynamicMessages || [],
-            currentMessageIndex: savedState.currentMessageIndex || 0,
-                    useThreeDotFallback: !!savedState.useThreeDotFallback,
-                    queryCategory: savedState.queryCategory || '',
-                    expectedProcessingTime: savedState.expectedProcessingTime || null,
-                    processingStartTime: savedState.processingStartTime || Date.now(),
-                    abortController: new AbortController(),
-                    activeRequestId: savedState.activeRequestId || null,
-                  });
-                }
-              } catch {}
-            }
-        };
-
-        App.addListener('appStateChange', handleAppStateChange);
-        
-        return () => {
-          try {
-            App.removeAllListeners();
-          } catch (error) {
-            console.warn('[useStreamingChat] Error removing Capacitor listeners:', error);
-          }
-        };
-      } catch (error) {
-        console.warn('[useStreamingChat] Error setting up Capacitor app lifecycle handlers:', error);
-      }
-    }
+    // CAPACITOR FIX: Disable Capacitor app lifecycle handling for chat to match browser behavior
+    console.log('[useStreamingChat] Capacitor app lifecycle handling disabled to match browser behavior');
+    return;
   }, [threadId, getThreadState]);
 
   // Thread switch handler - abort current operations and switch state
@@ -419,8 +378,16 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     const activeThreadId = targetThreadId || threadId;
     if (!activeThreadId) return;
 
-    // Only generate dynamic messages for journal-specific queries
-    if (category !== 'JOURNAL_SPECIFIC') {
+    // CAPACITOR FIX: Force three-dot fallback for all Capacitor environments to match browser behavior
+    const isCapacitor = !!(
+      (window as any).Capacitor?.isNative ||
+      window.location.href.includes('capacitor://') ||
+      window.location.href.includes('ionic://') ||
+      (window as any).Capacitor?.isPluginAvailable
+    );
+
+    // Force three-dot fallback for Capacitor or non-journal queries
+    if (isCapacitor || category !== 'JOURNAL_SPECIFIC') {
       updateThreadState(activeThreadId, {
         useThreeDotFallback: true,
         dynamicMessages: [],
