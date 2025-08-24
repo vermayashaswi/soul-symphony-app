@@ -11,8 +11,6 @@ import { v4 as uuidv4 } from "uuid";
 import { useToast } from "@/hooks/use-toast";
 import { ChatMessage } from "@/types/chat";
 import { useMessageDeletion } from "@/hooks/use-message-deletion";
-import { capacitorAuthService } from "@/services/capacitorAuthService";
-import { nativeIntegrationService } from "@/services/nativeIntegrationService";
 
 export interface ChatThread {
   id: string;
@@ -240,14 +238,6 @@ export const useChatPersistence = (userId: string | undefined) => {
     setMessages(prev => [...prev, tempMessage]);
     
     try {
-      // For Capacitor apps, validate session before saving
-      if (nativeIntegrationService.isRunningNatively()) {
-        const isValidSession = await capacitorAuthService.validateSessionOrRetry();
-        if (!isValidSession) {
-          throw new Error('Authentication session is invalid. Please sign in again.');
-        }
-      }
-
       const savedMessage = await createChatMessage(activeThread, content, 'user', userId);
       
       if (savedMessage) {
@@ -267,31 +257,14 @@ export const useChatPersistence = (userId: string | undefined) => {
         );
         return persistenceMessage;
       }
-      
-      // Remove temp message if save failed
-      setMessages(prev => prev.filter(msg => msg.id !== tempId));
       return null;
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error saving message:", error);
-      
-      // Remove temp message on error
-      setMessages(prev => prev.filter(msg => msg.id !== tempId));
-      
-      // Enhanced error handling for authentication issues
-      if (error.message?.includes('Authentication required') || 
-          error.message?.includes('Authentication session is invalid')) {
-        toast({
-          title: "Authentication Required",
-          description: "Please sign in again to continue chatting",
-          variant: "destructive"
-        });
-      } else {
-        toast({
-          title: "Error",
-          description: "Failed to save your message. Please try again.",
-          variant: "destructive"
-        });
-      }
+      toast({
+        title: "Error",
+        description: "Failed to save your message",
+        variant: "destructive"
+      });
       return null;
     }
   };

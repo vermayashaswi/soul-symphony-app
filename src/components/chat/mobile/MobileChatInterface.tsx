@@ -79,14 +79,6 @@ export default function MobileChatInterface({
     currentThreadIdRef.current = threadId;
   }, [threadId]);
   
-  // CAPACITOR FIX: Detect Capacitor environment for consistent behavior
-  const isCapacitor = !!(
-    (window as any).Capacitor?.isNative ||
-    window.location.href.includes('capacitor://') ||
-    window.location.href.includes('ionic://') ||
-    (window as any).Capacitor?.isPluginAvailable
-  );
-
   const {
     isLoading,
     isProcessing,
@@ -715,7 +707,7 @@ export default function MobileChatInterface({
       console.error("[Mobile] Error in streaming chat:", error);
       debugLog.addEvent("Message Sending", `[Mobile] Streaming error: ${error}`, "error");
       
-      const errorMessageContent = "I'm having trouble processing your request. Please try again later. " + 
+      const errorMessageContent = "I'm having trouble with your request. Please try again. " + 
                  (error?.message ? `Error: ${error.message}` : "");
       
       if (currentThreadId === currentThreadIdRef.current) {
@@ -1096,13 +1088,15 @@ export default function MobileChatInterface({
               />
             ))}
             
-            {/* Show streaming message if currently streaming */}
-            {isStreaming && streamingMessages && currentMessageIndex < streamingMessages.length && (
+            {/* Show streaming message (GPT-generated) or three-dot animation */}
+            {isStreaming && (
               <MobileChatMessage
                 message={{ role: 'assistant', content: '' }}
                 showAnalysis={false}
-                isLoading={false}
-                streamingMessage={translatedDynamicMessages[currentMessageIndex] || dynamicMessages[currentMessageIndex] || ''}
+                isLoading={useThreeDotFallback}
+                streamingMessage={!useThreeDotFallback && translatedDynamicMessages[currentMessageIndex] ? 
+                  translatedDynamicMessages[currentMessageIndex] : 
+                  (!useThreeDotFallback && dynamicMessages[currentMessageIndex] ? dynamicMessages[currentMessageIndex] : '')}
                 showStreamingDots={useThreeDotFallback}
               />
             )}

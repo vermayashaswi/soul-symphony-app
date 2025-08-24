@@ -28,9 +28,13 @@ export function useChatMessageClassification() {
     error: null
   });
 
+  // Detect Capacitor environment to force web-like behavior
+  const isCapacitor = useCallback(() => {
+    return typeof window !== 'undefined' && !!(window as any).Capacitor;
+  }, []);
+
   /**
-   * Enhanced message classification with prioritized personal pronoun support
-   * CAPACITOR FIX: Force consistent classification behavior
+   * Enhanced message classification with unified behavior for Capacitor and web
    */
   const classifyMessage = useCallback(async (message: string, conversationContext: any[] = []) => {
     if (!message?.trim()) {
@@ -40,32 +44,6 @@ export function useChatMessageClassification() {
         reasoning: 'Empty message',
         useAllEntries: false
       };
-    }
-
-    // CAPACITOR FIX: Detect Capacitor environment and force GENERAL_MENTAL_HEALTH classification
-    const isCapacitor = !!(
-      (window as any).Capacitor?.isNative ||
-      window.location.href.includes('capacitor://') ||
-      window.location.href.includes('ionic://') ||
-      (window as any).Capacitor?.isPluginAvailable
-    );
-
-    if (isCapacitor) {
-      console.log('[Classification Hook] Capacitor detected - forcing GENERAL_MENTAL_HEALTH classification to match browser behavior');
-      const result = {
-        category: QueryCategory.GENERAL_MENTAL_HEALTH,
-        confidence: 1.0,
-        reasoning: 'Capacitor environment - forced consistent classification',
-        useAllEntries: false
-      };
-      
-      setClassification({
-        ...result,
-        isLoading: false,
-        error: null
-      });
-      
-      return result;
     }
 
     setClassification(prev => ({
@@ -81,29 +59,13 @@ export function useChatMessageClassification() {
       try {
         console.log(`[Classification Hook] Classification attempt ${attempt}/${maxRetries} for message:`, message);
         
-        // CAPACITOR PARITY FIX: Force GENERAL_MENTAL_HEALTH for Capacitor to match web behavior
-        const isCapacitor = (window as any).Capacitor;
-        if (isCapacitor) {
-          console.log("[Classification Hook] Capacitor detected - forcing GENERAL_MENTAL_HEALTH classification for parity");
-          const result = {
-            category: QueryCategory.GENERAL_MENTAL_HEALTH,
-            confidence: 0.9,
-            reasoning: 'Forced GENERAL_MENTAL_HEALTH for Capacitor parity',
-            useAllEntries: false
-          };
-          
-          setClassification({
-            ...result,
-            isLoading: false,
-            error: null
-          });
-          
-          return result;
-        }
-        
-        // Use the enhanced chat-query-classifier edge function
+        // Use the enhanced chat-query-classifier edge function with environment context
         const { data, error } = await supabase.functions.invoke('chat-query-classifier', {
-          body: { message, conversationContext }
+          body: { 
+            message, 
+            conversationContext,
+            isCapacitor: isCapacitor()
+          }
         });
 
         if (error) throw error;

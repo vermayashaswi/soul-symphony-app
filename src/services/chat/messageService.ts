@@ -2,9 +2,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { ChatMessage } from '@/types/chat';
 import { parseMessageContent, getSanitizedFinalContent } from '@/utils/messageParser';
-import { capacitorAuthService } from '@/services/capacitorAuthService';
-import { nativeIntegrationService } from '@/services/nativeIntegrationService';
-import { toast } from 'sonner';
 
 export const createChatMessage = async (
   threadId: string, 
@@ -13,39 +10,14 @@ export const createChatMessage = async (
   userId: string,
   additionalData?: Partial<ChatMessage>
 ): Promise<ChatMessage | null> => {
-  // For Capacitor apps, use enhanced auth retry logic
-  if (nativeIntegrationService.isRunningNatively()) {
-    return await capacitorAuthService.saveMessageWithRetry(async () => {
-      return await createChatMessageInternal(threadId, content, sender, userId, additionalData);
-    });
-  }
-  
-  // For web apps, use normal flow
-  return await createChatMessageInternal(threadId, content, sender, userId, additionalData);
-};
-
-const createChatMessageInternal = async (
-  threadId: string, 
-  content: string, 
-  sender: 'user' | 'assistant', 
-  userId: string,
-  additionalData?: Partial<ChatMessage>
-): Promise<ChatMessage | null> => {
   try {
-    const isNative = nativeIntegrationService.isRunningNatively();
     console.log('[createChatMessage] Starting message creation:', {
       threadId,
       sender,
       userId,
       contentLength: content.length,
-      hasAdditionalData: !!additionalData,
-      isNative
+      hasAdditionalData: !!additionalData
     });
-
-    // Enhanced session debugging for Capacitor
-    if (isNative) {
-      await capacitorAuthService.debugSessionState();
-    }
 
     // First verify the thread belongs to the user
     const { data: thread, error: threadError } = await supabase
@@ -60,19 +32,8 @@ const createChatMessageInternal = async (
         threadId,
         userId,
         error: threadError,
-        hasThread: !!thread,
-        isRLSError: threadError?.message?.toLowerCase().includes('policy') || 
-                   threadError?.message?.toLowerCase().includes('row-level security')
+        hasThread: !!thread
       });
-      
-      // Enhanced error handling for RLS issues
-      if (threadError?.message?.toLowerCase().includes('policy') || 
-          threadError?.message?.toLowerCase().includes('row-level security')) {
-        console.error('[createChatMessage] RLS policy violation - auth.uid() may be null');
-        toast.error('Authentication error: Please sign in again');
-        throw new Error('Authentication required');
-      }
-      
       return null;
     }
 
@@ -102,24 +63,11 @@ const createChatMessageInternal = async (
     if (error) {
       console.error('[createChatMessage] Database insert failed:', {
         error,
-        errorCode: error.code,
-        errorMessage: error.message,
-        isRLSError: error.message?.toLowerCase().includes('policy') || 
-                   error.message?.toLowerCase().includes('row-level security'),
         messageData: {
           ...messageData,
           content: `${content.substring(0, 50)}${content.length > 50 ? '...' : ''}`
         }
       });
-      
-      // Enhanced error handling for RLS issues
-      if (error.message?.toLowerCase().includes('policy') || 
-          error.message?.toLowerCase().includes('row-level security')) {
-        console.error('[createChatMessage] RLS policy violation during insert - auth.uid() may be null');
-        toast.error('Failed to save message: Authentication required');
-        throw new Error('Authentication required');
-      }
-      
       return null;
     }
 
@@ -162,12 +110,6 @@ const createChatMessageInternal = async (
       sender,
       stack: error instanceof Error ? error.stack : 'No stack available'
     });
-    
-    // Re-throw authentication errors
-    if (error instanceof Error && error.message.includes('Authentication required')) {
-      throw error;
-    }
-    
     return null;
   }
 };

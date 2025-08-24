@@ -42,7 +42,7 @@ export const TOAST_MESSAGES = {
       description: "Your entry has been permanently deleted."
     },
     PROCESSING_STARTED: {
-      title: "Processing your entry... ⏳",
+      title: "Analyzing your entry... ⏳",
       description: "Our AI is analyzing your thoughts and emotions."
     },
     PROCESSING_COMPLETE: {

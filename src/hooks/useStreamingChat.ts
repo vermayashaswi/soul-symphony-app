@@ -72,7 +72,10 @@ const threadStates = new Map<string, ThreadStreamingState>();
 export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStreamingChatProps = {}) => {
   const { translate, currentLanguage } = useTranslation();
   
-  // Page visibility and app lifecycle tracking
+  // Detect Capacitor environment to force unified behavior
+  const isCapacitor = typeof window !== 'undefined' && !!(window as any).Capacitor;
+  
+  // Page visibility tracking - unified for both web and Capacitor
   const [isPageVisible, setIsPageVisible] = useState(true);
   const [isAppActive, setIsAppActive] = useState(true);
 
@@ -107,38 +110,29 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     return `${message}_${threadId}_${Math.floor(timestamp / 5000)}`; // 5-second window
   }, []);
 
-  // Page Visibility API for mobile browser handling - CAPACITOR FIX: Disable for Capacitor to avoid interference
+  // Unified page visibility handling for both web and Capacitor
   useEffect(() => {
-    // CAPACITOR FIX: Skip page visibility handling for Capacitor to match browser behavior
-    const isCapacitor = !!(
-      (window as any).Capacitor?.isNative ||
-      window.location.href.includes('capacitor://') ||
-      window.location.href.includes('ionic://') ||
-      (window as any).Capacitor?.isPluginAvailable
-    );
-
-    if (isCapacitor) {
-      console.log('[useStreamingChat] Skipping page visibility handling for Capacitor to match browser behavior');
-      return;
-    }
-
     const handleVisibilityChange = () => {
       const visible = !document.hidden;
       setIsPageVisible(visible);
       
+      // For Capacitor, force simple web-like behavior without state persistence
+      if (isCapacitor) {
+        console.log(`[useStreamingChat] Capacitor visibility change: ${visible ? 'visible' : 'hidden'}`);
+        return; // No background state management for Capacitor
+      }
+      
+      // Web-only background state handling
       if (!visible && threadId) {
-        // Page backgrounded - pause streaming without aborting
         console.log(`[useStreamingChat] Page backgrounded for thread: ${threadId}`);
         const threadState = getThreadState(threadId);
         if (threadState.isStreaming) {
-          // Save current state but don't abort
           saveChatStreamingState(threadId, {
             ...threadState,
             pausedDueToBackground: true,
           });
         }
       } else if (visible && threadId) {
-        // Page foregrounded - restore UI state if we had an active stream
         console.log(`[useStreamingChat] Page foregrounded for thread: ${threadId}`);
         try {
           const savedState: any = getChatStreamingState(threadId);
@@ -148,9 +142,9 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
               streamingMessages: savedState.streamingMessages || [],
               currentUserMessage: savedState.currentUserMessage || '',
               showBackendAnimation: !!savedState.showBackendAnimation,
-            dynamicMessages: savedState.dynamicMessages || [],
-            translatedDynamicMessages: savedState.translatedDynamicMessages || [],
-            currentMessageIndex: savedState.currentMessageIndex || 0,
+              dynamicMessages: savedState.dynamicMessages || [],
+              translatedDynamicMessages: savedState.translatedDynamicMessages || [],
+              currentMessageIndex: savedState.currentMessageIndex || 0,
               useThreeDotFallback: !!savedState.useThreeDotFallback,
               queryCategory: savedState.queryCategory || '',
               expectedProcessingTime: savedState.expectedProcessingTime || null,
@@ -165,14 +159,34 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [threadId, getThreadState]);
+  }, [threadId, getThreadState, isCapacitor]);
 
-  // Capacitor app lifecycle handling - CAPACITOR FIX: Disable to avoid chat interference
+  // Minimal Capacitor app lifecycle handling for app state tracking only
   useEffect(() => {
-    // CAPACITOR FIX: Disable Capacitor app lifecycle handling for chat to match browser behavior
-    console.log('[useStreamingChat] Capacitor app lifecycle handling disabled to match browser behavior');
-    return;
-  }, [threadId, getThreadState]);
+    if (!isCapacitor) return;
+    
+    try {
+      const { App } = (window as any).Capacitor.Plugins;
+      
+      const handleAppStateChange = (state: any) => {
+        setIsAppActive(state.isActive);
+        // No background state persistence for Capacitor to maintain web parity
+        console.log(`[useStreamingChat] Capacitor app state: ${state.isActive ? 'active' : 'inactive'}`);
+      };
+
+      App.addListener('appStateChange', handleAppStateChange);
+      
+      return () => {
+        try {
+          App.removeAllListeners();
+        } catch (error) {
+          console.warn('[useStreamingChat] Error removing Capacitor listeners:', error);
+        }
+      };
+    } catch (error) {
+      console.warn('[useStreamingChat] Capacitor App plugin not available:', error);
+    }
+  }, [isCapacitor]);
 
   // Thread switch handler - abort current operations and switch state
   useEffect(() => {
@@ -367,7 +381,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     });
   }, [threadId, updateThreadState]);
 
-  // Generate streaming messages based on category
+  // Generate streaming messages based on category with Capacitor parity
   const generateStreamingMessages = useCallback(async (
     message: string, 
     category: string, 
@@ -378,34 +392,12 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     const activeThreadId = targetThreadId || threadId;
     if (!activeThreadId) return;
 
-    // CAPACITOR PARITY FIX: Always force three-dot fallback for Capacitor to match web browser behavior
-    const isCapacitor = !!(
-      (window as any).Capacitor?.isNative ||
-      window.location.href.includes('capacitor://') ||
-      window.location.href.includes('ionic://') ||
-      (window as any).Capacitor?.isPluginAvailable ||
-      (window as any).Capacitor
-    );
-
-    // Force three-dot fallback for ALL Capacitor environments regardless of category
-    if (isCapacitor) {
-      console.log('[useStreamingChat] Capacitor detected - forcing three-dot fallback for web parity');
+    // Force three-dot fallback for Capacitor to match mobile web behavior
+    if (isCapacitor || category !== 'JOURNAL_SPECIFIC') {
       updateThreadState(activeThreadId, {
         useThreeDotFallback: true,
         dynamicMessages: [],
-        currentMessageIndex: 0,
-        translatedDynamicMessages: []
-      });
-      return;
-    }
-
-    // For web browsers, only use dynamic messages for journal-specific queries
-    if (category !== 'JOURNAL_SPECIFIC') {
-      updateThreadState(activeThreadId, {
-        useThreeDotFallback: true,
-        dynamicMessages: [],
-        currentMessageIndex: 0,
-        translatedDynamicMessages: []
+        currentMessageIndex: 0
       });
       return;
     }
@@ -416,7 +408,8 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
           userMessage: message,
           category,
           conversationContext,
-          userProfile
+          userProfile,
+          isCapacitor
         }
       });
 
@@ -544,22 +537,8 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     }
   }, [threadId, getThreadState, updateThreadState, generateStreamingMessages, invokeWithBackoff, isEdgeFunctionError, addStreamingMessage, resetRetryState]);
 
-  // Enhanced timing logic with thread validation - CAPACITOR PARITY FIX: Disable for Capacitor
+  // Enhanced timing logic with thread validation
   useEffect(() => {
-    // CAPACITOR PARITY FIX: Skip dynamic message rotation for Capacitor to match web behavior
-    const isCapacitor = !!(
-      (window as any).Capacitor?.isNative ||
-      window.location.href.includes('capacitor://') ||
-      window.location.href.includes('ionic://') ||
-      (window as any).Capacitor?.isPluginAvailable ||
-      (window as any).Capacitor
-    );
-    
-    if (isCapacitor) {
-      console.log('[useStreamingChat] Skipping dynamic message rotation for Capacitor to match browser behavior');
-      return;
-    }
-    
     if (!threadId || !state.isStreaming || state.useThreeDotFallback || state.dynamicMessages.length === 0) return;
 
     let timeoutId: NodeJS.Timeout;
@@ -652,8 +631,8 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
       return;
     }
 
-    // Check if app/page is backgrounded - if so, don't start new requests
-    if (!isPageVisible || !isAppActive) {
+    // For Capacitor, always proceed; for web, check backgrounding
+    if (!isCapacitor && (!isPageVisible || !isAppActive)) {
       console.warn(`[useStreamingChat] App backgrounded, deferring request for thread ${targetThreadId}`);
       return;
     }

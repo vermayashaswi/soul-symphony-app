@@ -19,6 +19,7 @@ serve(async (req) => {
   const body = await req.json().catch(() => null);
   const message = body?.message;
   const conversationContext = Array.isArray(body?.conversationContext) ? body.conversationContext : [];
+  const isCapacitor = body?.isCapacitor || false;
 
   if (!message) {
     return new Response(
@@ -28,7 +29,7 @@ serve(async (req) => {
   }
 
   try {
-    console.log(`[Query Classifier] Analyzing message: "${message}"`);
+    console.log(`[Query Classifier] Analyzing message: "${message}", isCapacitor: ${isCapacitor}`);
 
     // Get OpenAI API key
     const openAiApiKey = Deno.env.get('OPENAI_API_KEY');
@@ -40,8 +41,8 @@ serve(async (req) => {
       );
     }
 
-    // Use GPT for natural conversation flow classification
-    const classification = await gptClassifyMessage(message, conversationContext, openAiApiKey);
+    // Use GPT for natural conversation flow classification with environment context
+    const classification = await gptClassifyMessage(message, conversationContext, openAiApiKey, isCapacitor);
 
     console.log(`[Query Classifier] Result: ${classification.category}`);
 
@@ -65,7 +66,8 @@ serve(async (req) => {
 async function gptClassifyMessage(
   message, 
   conversationContext, 
-  apiKey
+  apiKey,
+  isCapacitor = false
 ) {
   
   // Short-circuit acknowledgements to avoid unnecessary analysis
@@ -81,7 +83,9 @@ async function gptClassifyMessage(
     ? `\n\nCONVERSATION CONTEXT:\n${conversationContext.slice(-6).map((msg) => `${msg.role || msg.sender || 'user'}: ${msg.content}`).join('\n')}`
     : '\n\nCONVERSATION CONTEXT:\nNo prior context';
 
-  const classificationPrompt = `You are the a chat conversation query classifier for a voice journaling app, SOuLO's chatot called "Ruh'. On this app users record their journal entries and SOuLO application has all their entries, emotions, themes, time of entry, entry text etc. available for analysis. People visit the Ruh chatbot on SOuLO to converse about their feelings, problems, share stories, get analysis out of their regular journaling etc. 
+  const classificationPrompt = `You are the a chat conversation query classifier for a voice journaling app, SOuLO's chatot called "Ruh'. On this app users record their journal entries and SOuLO application has all their entries, emotions, themes, time of entry, entry text etc. available for analysis. People visit the Ruh chatbot on SOuLO to converse about their feelings, problems, share stories, get analysis out of their regular journaling etc.
+  
+  ENVIRONMENT CONTEXT: ${isCapacitor ? 'Capacitor mobile app' : 'Web browser'} - ensure identical classification regardless of platform.
   
   Use the conversation context provided to you to classify the latest user message and return ONE JSON object that exactly matches the schema. Be decisive and consistent. Below we have the categories and information about what happens downstream in SOuLO app's back end code if you classify a certain way
 
