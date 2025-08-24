@@ -12,27 +12,13 @@ import { useOnboarding } from '@/hooks/use-onboarding';
 import { authStateManager } from '@/services/authStateManager';
 import { AuthRedirectFallback } from '@/components/auth/AuthRedirectFallback';
 
-// iPhone mobile browser detection
-const isIPhoneMobileBrowser = () => {
-  if (typeof window === 'undefined') return false;
-  const userAgent = window.navigator.userAgent;
-  return /iPhone|iPod/.test(userAgent) && !(window.navigator as any).standalone;
-};
-
 export default function Auth() {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const { user, isLoading: authLoading } = useAuth();
-  
-  // iPhone bypass: Skip useOnboarding hook for iPhone mobile browsers
-  const isIPhone = isIPhoneMobileBrowser();
-  const onboardingData = isIPhone 
-    ? { onboardingComplete: true, loading: false }
-    : useOnboarding();
-  
-  const { onboardingComplete, loading: onboardingLoading } = onboardingData;
+  const { onboardingComplete, loading: onboardingLoading } = useOnboarding();
   const [authError, setAuthError] = useState<string | null>(null);
   const [navigationProcessing, setNavigationProcessing] = useState(false);
   const [authDebugInfo, setAuthDebugInfo] = useState<any>(null);
@@ -112,12 +98,11 @@ export default function Auth() {
       authLoading,
       onboardingComplete,
       onboardingLoading,
-      isIPhone,
       isNative: nativeIntegrationService.isRunningNatively(),
       currentPath: location.pathname,
       navigationProcessing
     });
-  }, [user, authLoading, onboardingComplete, onboardingLoading, navigationProcessing, location.pathname, isIPhone]);
+  }, [user, authLoading, onboardingComplete, onboardingLoading, navigationProcessing, location.pathname]);
 
   // CENTRALIZED NAVIGATION: Auth page only handles UI, AuthStateManager handles navigation
   useEffect(() => {
@@ -144,16 +129,13 @@ export default function Auth() {
     }
   }, [user, authLoading, navigationProcessing]);
 
-  // Show loading state while checking auth - iPhone bypass: only wait for authLoading
-  if (authLoading || (!isIPhone && onboardingLoading)) {
+  // Show loading state while checking auth
+  if (authLoading || onboardingLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center space-y-4">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          <p className="text-muted-foreground">
-            Checking authentication...
-            {isIPhone && <span className="block text-xs mt-1">(iPhone optimized)</span>}
-          </p>
+          <p className="text-muted-foreground">Checking authentication...</p>
         </div>
       </div>
     );
