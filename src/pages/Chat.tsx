@@ -163,12 +163,17 @@ const Chat = () => {
         
         // Clean up stale processing messages
         try {
-          // Simplified cleanup without complex type inference
+          // Clean up any remaining processing messages
           console.log('Cleaning up stale processing messages...');
-          await supabase.rpc('execute_dynamic_query', {
-            query_text: "DELETE FROM chat_messages WHERE is_processing = true"
-          });
-          console.log('Cleaned up stale processing messages');
+          const { error: cleanupError } = await supabase
+            .from('chat_messages')
+            .delete()
+            .eq('is_processing', true);
+          if (cleanupError) {
+            console.warn('Cleanup error (non-critical):', cleanupError);
+          } else {
+            console.log('Cleaned up stale processing messages');
+          }
         } catch (cleanupError) {
           console.error("Error cleaning up stale messages:", cleanupError);
         }

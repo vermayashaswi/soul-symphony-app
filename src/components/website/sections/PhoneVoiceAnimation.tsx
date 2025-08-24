@@ -91,7 +91,7 @@ const PhoneVoiceAnimation = () => {
                 className="flex-1 flex flex-col items-center justify-center"
               >
                 <div className="text-white text-center mb-8">
-                  <TranslatableText text="Processing your entry..." className="text-sm mb-2" />
+                  <TranslatableText text="Analyzing your entry..." className="text-sm mb-2" />
                 </div>
                 <motion.div 
                   className="w-20 h-20 rounded-full bg-purple-600/30 flex items-center justify-center"

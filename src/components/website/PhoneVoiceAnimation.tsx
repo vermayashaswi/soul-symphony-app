@@ -95,7 +95,7 @@ export const PhoneVoiceAnimation = () => {
               >
                 <div className="text-white text-center mb-3 md:mb-4">
                   <span className="text-xs">
-                    <TranslatableText text="Processing your entry..." />
+                    <TranslatableText text="Analyzing your entry..." />
                   </span>
                 </div>
                 <motion.div 

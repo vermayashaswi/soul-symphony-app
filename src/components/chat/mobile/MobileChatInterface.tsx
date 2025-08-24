@@ -707,7 +707,7 @@ export default function MobileChatInterface({
       console.error("[Mobile] Error in streaming chat:", error);
       debugLog.addEvent("Message Sending", `[Mobile] Streaming error: ${error}`, "error");
       
-      const errorMessageContent = "I'm having trouble processing your request. Please try again later. " + 
+      const errorMessageContent = "I'm having trouble with your request. Please try again. " + 
                  (error?.message ? `Error: ${error.message}` : "");
       
       if (currentThreadId === currentThreadIdRef.current) {
