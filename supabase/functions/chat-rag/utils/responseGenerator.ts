@@ -100,7 +100,7 @@ export async function generateResponse(
       return `- Entry from ${formattedDate}: ${entry.content}${emotionInfo}${themeInfo}${sentimentInfo}`;
     }).join('\n\n');
     
-    // Format date range for the prompt
+    // Format date range for the prompt (earliest = start, latest = end)
     const startDateFormatted = earliestDate ? earliestDate.toLocaleDateString('en-US', {
       month: 'long',
       day: 'numeric',
