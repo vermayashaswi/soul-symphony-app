@@ -8,6 +8,7 @@ import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { SubscriptionModal } from './SubscriptionModal';
+import { iPhoneDebugLogger } from '@/services/iPhoneDebugLogger';
 
 interface PremiumFeatureGuardProps {
   children: React.ReactNode;
@@ -34,6 +35,9 @@ export const PremiumFeatureGuard: React.FC<PremiumFeatureGuardProps> = ({
   } = useSubscription();
   const navigate = useNavigate();
   const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false);
+  const [loadingTimeout, setLoadingTimeout] = useState(false);
+
+  // Remove iPhone-specific loading timeout - let it follow standard Android flow
 
   // Show loading state while subscription data is being fetched
   if (isLoading) {
