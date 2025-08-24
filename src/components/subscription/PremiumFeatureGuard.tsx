@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -35,12 +35,30 @@ export const PremiumFeatureGuard: React.FC<PremiumFeatureGuardProps> = ({
   } = useSubscription();
   const navigate = useNavigate();
   const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false);
-  const [loadingTimeout, setLoadingTimeout] = useState(false);
+  const [emergencyBypass, setEmergencyBypass] = useState(false);
 
-  // Remove iPhone-specific loading timeout - let it follow standard Android flow
+  // iPhone emergency bypass - never wait more than 3 seconds
+  useEffect(() => {
+    const userAgent = navigator.userAgent;
+    const isIPhoneMobile = /iPhone|iPod/.test(userAgent) && !(navigator as any).standalone;
+    
+    if (isIPhoneMobile && isLoading) {
+      console.log('[PremiumFeatureGuard] iPhone detected - setting emergency bypass');
+      const timer = setTimeout(() => {
+        console.log('[PremiumFeatureGuard] Emergency bypass activated for iPhone');
+        setEmergencyBypass(true);
+        iPhoneDebugLogger.logError('PremiumFeatureGuard timeout bypass activated', {
+          isLoading,
+          emergencyBypass: true
+        });
+      }, 3000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading]);
 
   // Show loading state while subscription data is being fetched
-  if (isLoading) {
+  if (isLoading && !emergencyBypass) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div>
