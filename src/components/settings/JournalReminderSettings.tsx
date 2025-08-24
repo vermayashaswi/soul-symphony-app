@@ -1,12 +1,13 @@
 
-import React, { useState } from 'react';
-import { Bell, Clock } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Bell, Clock, Bug, Download } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { TranslatableText } from '@/components/translation/TranslatableText';
-import { journalReminderService, JournalReminderTime } from '@/services/journalReminderService';
-import { enhancedAndroidNotificationService } from '@/services/enhancedAndroidNotificationService';
+import { JournalReminderTime } from '@/services/journalReminderService';
+import { unifiedNotificationService } from '@/services/unifiedNotificationService';
+import { notificationDebugLogger } from '@/services/notificationDebugLogger';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { toast } from 'sonner';
 
@@ -19,9 +20,31 @@ const TIME_OPTIONS: { value: JournalReminderTime; label: string; time: string }[
 
 export const JournalReminderSettings: React.FC = () => {
   const { timezone } = useUserProfile();
-  const [settings, setSettings] = useState(journalReminderService.getSettings());
+  const [settings, setSettings] = useState({ enabled: false, times: [] as JournalReminderTime[] });
   const [isLoading, setIsLoading] = useState(false);
   const [systemStatus, setSystemStatus] = useState<any>(null);
+  const [showDebug, setShowDebug] = useState(false);
+  const [debugData, setDebugData] = useState<any>(null);
+
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  const loadSettings = () => {
+    const enabled = localStorage.getItem('journal_reminder_enabled') === 'true';
+    const timesStr = localStorage.getItem('journal_reminder_times');
+    let times: JournalReminderTime[] = [];
+    
+    if (timesStr) {
+      try {
+        times = JSON.parse(timesStr);
+      } catch (error) {
+        console.error('Error parsing saved times:', error);
+      }
+    }
+    
+    setSettings({ enabled, times });
+  };
 
   const handleToggleEnabled = async (enabled: boolean) => {
     if (isLoading) return;
@@ -37,27 +60,42 @@ export const JournalReminderSettings: React.FC = () => {
           return;
         }
         
-        console.log('[JournalReminderSettings] User enabling reminders with timezone:', timezone);
-        const success = await journalReminderService.requestPermissionsAndSetup(settings.times, timezone || undefined);
+        // Log user action with comprehensive debugging
+        notificationDebugLogger.logUserSaveSettings(settings.times, true, timezone);
         
-        if (success) {
+        console.log('[JournalReminderSettings] User enabling reminders with timezone:', timezone);
+        const result = await unifiedNotificationService.scheduleJournalReminders(settings.times, timezone || undefined);
+        
+        if (result.success) {
           setSettings(prev => ({ ...prev, enabled: true }));
+          localStorage.setItem('journal_reminder_enabled', 'true');
+          localStorage.setItem('journal_reminder_times', JSON.stringify(settings.times));
+          
           toast.success('Journal reminders enabled!');
           
           // Update system status
-          const status = await journalReminderService.getNotificationStatus();
+          const status = await unifiedNotificationService.getStatus();
           setSystemStatus(status);
         } else {
-          toast.error('Failed to enable reminders. Please check your notification settings and try again.');
+          toast.error(`Failed to enable reminders: ${result.errors.join(', ')}`);
         }
       } else {
         console.log('[JournalReminderSettings] User disabling reminders');
-        await journalReminderService.disableReminders();
+        notificationDebugLogger.logUserSaveSettings([], false, timezone);
+        
+        await unifiedNotificationService.disableNotifications();
         setSettings(prev => ({ ...prev, enabled: false }));
+        localStorage.setItem('journal_reminder_enabled', 'false');
+        
         toast.success('Journal reminders disabled');
       }
     } catch (error) {
       console.error('[JournalReminderSettings] Error toggling reminders:', error);
+      notificationDebugLogger.logEvent('error', 'JournalReminderSettings', 'toggle_failed', {
+        error: error.message,
+        enabled,
+        timezone
+      });
       toast.error('Failed to update reminder settings');
     } finally {
       setIsLoading(false);
@@ -70,10 +108,19 @@ export const JournalReminderSettings: React.FC = () => {
       : settings.times.filter(t => t !== time);
     
     setSettings(prev => ({ ...prev, times: newTimes }));
+    localStorage.setItem('journal_reminder_times', JSON.stringify(newTimes));
+    
+    // Log the time selection change
+    notificationDebugLogger.logEvent('user_action', 'JournalReminderSettings', 'time_selection_changed', {
+      time,
+      checked,
+      newTimes,
+      timezone
+    });
     
     // If reminders are currently enabled, update them
     if (settings.enabled && newTimes.length > 0) {
-      journalReminderService.requestPermissionsAndSetup(newTimes, timezone || undefined);
+      unifiedNotificationService.scheduleJournalReminders(newTimes, timezone || undefined);
     } else if (settings.enabled && newTimes.length === 0) {
       // If no times selected, disable reminders
       handleToggleEnabled(false);
@@ -83,7 +130,11 @@ export const JournalReminderSettings: React.FC = () => {
   const handleTestNotification = async () => {
     setIsLoading(true);
     try {
-      const success = await enhancedAndroidNotificationService.testNotification();
+      notificationDebugLogger.logEvent('user_action', 'JournalReminderSettings', 'test_notification_clicked', {
+        timezone
+      });
+      
+      const success = await unifiedNotificationService.testNotification();
       if (success) {
         toast.success('Test notification sent! Check your notification panel.');
       } else {
@@ -100,8 +151,12 @@ export const JournalReminderSettings: React.FC = () => {
   const handleRefreshStatus = async () => {
     setIsLoading(true);
     try {
-      const status = await journalReminderService.getNotificationStatus();
+      const status = await unifiedNotificationService.getStatus();
       setSystemStatus(status);
+      
+      const debug = notificationDebugLogger.getDebugData();
+      setDebugData(debug);
+      
       toast.success('Status refreshed');
     } catch (error) {
       console.error('Error refreshing status:', error);
@@ -109,6 +164,26 @@ export const JournalReminderSettings: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleExportDebugData = () => {
+    const data = notificationDebugLogger.exportDebugData();
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `notification-debug-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success('Debug data exported');
+  };
+
+  const handleClearDebugData = () => {
+    notificationDebugLogger.clearDebugData();
+    setDebugData(null);
+    toast.success('Debug data cleared');
   };
 
 
@@ -184,55 +259,125 @@ export const JournalReminderSettings: React.FC = () => {
           </div>
         )}
 
-        {/* Enhanced Android Status Display */}
-        {systemStatus?.androidEnhancedStatus && (
+        {/* System Status Display */}
+        {systemStatus && (
           <div className="space-y-2 p-3 bg-gray-50 border rounded-lg">
             <h4 className="text-sm font-medium">System Status</h4>
             <div className="text-xs space-y-1">
               <div className="flex justify-between">
-                <span>Notification Permission:</span>
-                <span className={systemStatus.androidEnhancedStatus.hasNotificationPermission ? 'text-green-600' : 'text-red-600'}>
-                  {systemStatus.androidEnhancedStatus.hasNotificationPermission ? 'Granted' : 'Denied'}
+                <span>Environment:</span>
+                <span className="font-mono text-blue-600">
+                  {systemStatus.environment?.preferredStrategy} ({systemStatus.environment?.platform})
                 </span>
               </div>
               <div className="flex justify-between">
-                <span>Channels Created:</span>
-                <span className={systemStatus.androidEnhancedStatus.channelsCreated ? 'text-green-600' : 'text-red-600'}>
-                  {systemStatus.androidEnhancedStatus.channelsCreated ? 'Yes' : 'No'}
+                <span>Native Support:</span>
+                <span className={systemStatus.environment?.supportsNativeNotifications ? 'text-green-600' : 'text-red-600'}>
+                  {systemStatus.environment?.supportsNativeNotifications ? 'Yes' : 'No'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Web Support:</span>
+                <span className={systemStatus.environment?.supportsWebNotifications ? 'text-green-600' : 'text-red-600'}>
+                  {systemStatus.environment?.supportsWebNotifications ? 'Yes' : 'No'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Is WebView:</span>
+                <span className={systemStatus.environment?.isWebView ? 'text-orange-600' : 'text-green-600'}>
+                  {systemStatus.environment?.isWebView ? 'Yes (WebView)' : 'No (Native/Web)'}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span>Scheduled Count:</span>
-                <span>{systemStatus.androidEnhancedStatus.scheduledCount}</span>
+                <span>{systemStatus.scheduledNotifications?.length || 0}</span>
               </div>
-              {systemStatus.androidEnhancedStatus.lastError && (
-                <div className="text-red-600 text-xs">
-                  Error: {systemStatus.androidEnhancedStatus.lastError}
+              {systemStatus.nativeStatus?.pendingCount !== undefined && (
+                <div className="flex justify-between">
+                  <span>Native Pending:</span>
+                  <span>{systemStatus.nativeStatus.pendingCount}</span>
+                </div>
+              )}
+              {systemStatus.webStatus?.permission && (
+                <div className="flex justify-between">
+                  <span>Web Permission:</span>
+                  <span className={systemStatus.webStatus.permission === 'granted' ? 'text-green-600' : 'text-red-600'}>
+                    {systemStatus.webStatus.permission}
+                  </span>
                 </div>
               )}
             </div>
           </div>
         )}
 
-        {/* Action Buttons */}
-        {settings.enabled && (
-          <div className="flex gap-2">
+        {/* Debug Panel */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
             <button
-              onClick={handleTestNotification}
-              disabled={isLoading}
-              className="px-3 py-2 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+              onClick={() => setShowDebug(!showDebug)}
+              className="flex items-center gap-1 px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded"
             >
-              Test Notification
+              <Bug className="h-3 w-3" />
+              {showDebug ? 'Hide Debug' : 'Show Debug'}
             </button>
-            <button
-              onClick={handleRefreshStatus}
-              disabled={isLoading}
-              className="px-3 py-2 text-xs bg-gray-500 text-white rounded hover:bg-gray-600 disabled:opacity-50"
-            >
-              Refresh Status
-            </button>
+            {showDebug && (
+              <>
+                <button
+                  onClick={handleExportDebugData}
+                  className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-100 hover:bg-blue-200 rounded text-blue-700"
+                >
+                  <Download className="h-3 w-3" />
+                  Export
+                </button>
+                <button
+                  onClick={handleClearDebugData}
+                  className="px-2 py-1 text-xs bg-red-100 hover:bg-red-200 rounded text-red-700"
+                >
+                  Clear
+                </button>
+              </>
+            )}
           </div>
-        )}
+
+          {showDebug && debugData && (
+            <div className="p-3 bg-gray-900 text-gray-100 rounded-lg text-xs overflow-auto max-h-40">
+              <div className="space-y-2">
+                <div><strong>Recent Events:</strong></div>
+                {debugData.events.slice(-5).map((event: any) => (
+                  <div key={event.id} className="border-l-2 border-gray-600 pl-2">
+                    <div className="font-mono text-yellow-300">{event.timestamp.split('T')[1]?.slice(0, 8)}</div>
+                    <div>{event.component} → {event.action}</div>
+                    {event.data && <div className="text-gray-400">{JSON.stringify(event.data, null, 2).slice(0, 100)}...</div>}
+                  </div>
+                ))}
+                
+                <div className="mt-3"><strong>Summary:</strong></div>
+                <div>Total Events: {debugData.summary.totalEvents}</div>
+                <div>Successful Attempts: {debugData.summary.successfulAttempts}</div>
+                <div>Failed Attempts: {debugData.summary.failedAttempts}</div>
+                <div>Current Timezone: {debugData.summary.currentTimezone?.userTimezone}</div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex gap-2 flex-wrap">
+          <button
+            onClick={handleTestNotification}
+            disabled={isLoading}
+            className="px-3 py-2 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+          >
+            Test Notification
+          </button>
+          <button
+            onClick={handleRefreshStatus}
+            disabled={isLoading}
+            className="px-3 py-2 text-xs bg-gray-500 text-white rounded hover:bg-gray-600 disabled:opacity-50"
+          >
+            Refresh Status
+          </button>
+        </div>
       </CardContent>
     </Card>
   );
