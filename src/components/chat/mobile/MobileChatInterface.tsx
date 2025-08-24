@@ -925,7 +925,11 @@ export default function MobileChatInterface({
               <Button 
                 variant="ghost" 
                 size="icon" 
-                className={`mr-2 ${isProcessingActive ? 'opacity-50 cursor-not-allowed' : ''}`}
+                className={`mr-2 ${
+                  isProcessingActive 
+                    ? 'text-muted-foreground/50 cursor-not-allowed' 
+                    : 'text-muted-foreground hover:text-destructive'
+                }`}
                 disabled={isProcessingActive}
                 title={isProcessingActive ? "Please wait while processing..." : "Toggle Menu"}
               >
