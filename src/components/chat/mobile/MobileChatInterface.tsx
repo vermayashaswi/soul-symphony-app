@@ -328,6 +328,27 @@ export default function MobileChatInterface({
     scrollThreshold: 100
   });
 
+  // Force scroll event listener (matching ChatArea.tsx behavior)
+  useEffect(() => {
+    const handleForceScrollToBottom = () => {
+      scrollToBottom(true);
+    };
+
+    window.addEventListener('chat:forceScrollToBottom', handleForceScrollToBottom);
+    
+    return () => {
+      window.removeEventListener('chat:forceScrollToBottom', handleForceScrollToBottom);
+    };
+  }, [scrollToBottom]);
+
+  // Notify parent of processing state changes for sidebar control
+  useEffect(() => {
+    const isProcessingActive = isLoading || isProcessing || isStreaming;
+    if (onProcessingStateChange) {
+      onProcessingStateChange(isProcessingActive);
+    }
+  }, [isLoading, isProcessing, isStreaming, onProcessingStateChange]);
+
   // Realtime: append assistant messages saved by backend
   useEffect(() => {
     if (!threadId) return;
@@ -610,6 +631,9 @@ export default function MobileChatInterface({
 
     debugLog.addEvent("Message Sending", `[Mobile] Adding user message to UI: ${message.substring(0, 50)}...`, "info");
 
+    // Dispatch force scroll event to ensure all scroll handlers trigger
+    window.dispatchEvent(new Event('chat:forceScrollToBottom'));
+    
     // Scroll to bottom after adding user message
     setTimeout(scrollToBottom, 100);
 
@@ -889,11 +913,6 @@ export default function MobileChatInterface({
   
   // Calculate if any processing is active (for disabling UI controls)
   const isProcessingActive = isLoading || isProcessing || isStreaming || (processingStatus === 'processing');
-  
-  // Notify parent of processing state changes
-  useEffect(() => {
-    onProcessingStateChange?.(isProcessingActive);
-  }, [isProcessingActive, onProcessingStateChange]);
 
   return (
     <div className="mobile-chat-interface">

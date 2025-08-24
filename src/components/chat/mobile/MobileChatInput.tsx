@@ -137,6 +137,9 @@ export default function MobileChatInput({
         
         await Promise.resolve(onSendMessage(trimmedValue));
         
+        // Dispatch force scroll event to ensure user message is visible
+        window.dispatchEvent(new Event('chat:forceScrollToBottom'));
+        
         // Keep input focused to maintain keyboard state
         if (inputRef.current) {
           inputRef.current.focus();
@@ -169,6 +172,9 @@ export default function MobileChatInput({
       
       // Send the transcribed message with audio flag
       await Promise.resolve(onSendMessage(transcribedText, true));
+      
+      // Dispatch force scroll event to ensure voice message is visible
+      window.dispatchEvent(new Event('chat:forceScrollToBottom'));
       
       chatDebug.addEvent("Voice Input", "Voice message sent successfully", "success");
     } catch (error) {

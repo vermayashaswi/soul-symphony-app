@@ -213,6 +213,14 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     scrollThreshold: 100
   });
 
+  // Notify parent of processing state changes for sidebar control
+  useEffect(() => {
+    const isProcessingActive = isLoading || isProcessing || isStreaming;
+    if (onProcessingStateChange) {
+      onProcessingStateChange(isProcessingActive);
+    }
+  }, [isLoading, isProcessing, isStreaming, onProcessingStateChange]);
+
   // Realtime: append assistant messages saved by backend
   useEffect(() => {
     if (!currentThreadId) return;
