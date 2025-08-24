@@ -25,7 +25,7 @@ import DebugPanel from "@/components/debug/DebugPanel";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "@/contexts/TranslationContext";
 import { useChatRealtime } from "@/hooks/use-chat-realtime";
-import { updateThreadProcessingStatus, generateThreadTitle } from "@/utils/chat/threadUtils";
+import { updateThreadProcessingStatus, createProcessingMessage, updateProcessingMessage, generateThreadTitle } from "@/utils/chat/threadUtils";
 import { MentalHealthInsights } from "@/hooks/use-mental-health-insights";
 
 import { ChatMessage } from "@/types/chat";
@@ -35,7 +35,7 @@ import { TranslatableText } from "@/components/translation/TranslatableText";
 import { useChatMessageClassification, QueryCategory } from "@/hooks/use-chat-message-classification";
 import { useStreamingChat } from "@/hooks/useStreamingChat";
 import { threadSafetyManager } from "@/utils/threadSafetyManager";
-
+import { useAutoScroll } from "@/hooks/use-auto-scroll";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -59,7 +59,6 @@ export interface SmartChatInterfaceProps {
   onCreateNewThread?: () => Promise<string | null>;
   userId?: string;
   mentalHealthInsights?: MentalHealthInsights;
-  onProcessingStateChange?: (isProcessing: boolean) => void;
 }
 
 const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ 
@@ -67,16 +66,13 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
   onSelectThread, 
   onCreateNewThread, 
   userId: propsUserId, 
-  mentalHealthInsights,
-  onProcessingStateChange
+  mentalHealthInsights 
 }) => {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
-  const [userMessageSent, setUserMessageSent] = useState(false);
-  const [userJustSentMessage, setUserJustSentMessage] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
   const { translate } = useTranslation();
@@ -115,11 +111,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     startStreamingChat,
     queryCategory,
     restoreStreamingState,
-    stopStreaming,
-    useThreeDotFallback,
-    dynamicMessages,
-    translatedDynamicMessages,
-    currentMessageIndex
+    stopStreaming
   } = useStreamingChat({
       threadId: currentThreadId,
     onFinalResponse: async (response, analysis, originThreadId, requestId) => {
@@ -211,17 +203,13 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     updateProcessingStage,
     setLocalLoading
   } = useChatRealtime(currentThreadId);
-
-  // Combined processing state for external components
-  const isAnyProcessing = isLoading || isProcessing || isStreaming;
   
-  // Notify parent about processing state changes
-  useEffect(() => {
-    if (onProcessingStateChange) {
-      onProcessingStateChange(isAnyProcessing);
-    }
-  }, [isAnyProcessing, onProcessingStateChange]);
-  
+  // Use unified auto-scroll hook
+  const { scrollElementRef, scrollToBottom } = useAutoScroll({
+    dependencies: [chatHistory, isLoading, isProcessing, isStreaming, streamingMessages],
+    delay: 50,
+    scrollThreshold: 100
+  });
 
   // Realtime: append assistant messages saved by backend
   useEffect(() => {
@@ -350,7 +338,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     };
   }, [effectiveUserId, propsThreadId]);
 
-  
+  // Auto-scroll is now handled by the useAutoScroll hook
 
   const loadThreadMessages = async (threadId: string) => {
     if (!threadId || !effectiveUserId) {
@@ -486,16 +474,14 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
      debugLog.addEvent("User Message", `Adding temporary message to UI: ${tempUserMessage.id}`, "info");
     setChatHistory(prev => [...prev, tempUserMessage]);
     
-    // Trigger user message sent for auto-scroll
-    setUserMessageSent(true);
-    setTimeout(() => setUserMessageSent(false), 200);
+    // Force chat area to jump to bottom on send
+    window.dispatchEvent(new Event('chat:forceScrollToBottom'));
     
     // Set local loading state for immediate UI feedback
     setLocalLoading(true, "Analyzing your question...");
     
-    // Trigger immediate auto-scroll for user message
-    setUserJustSentMessage(true);
-    setTimeout(() => setUserJustSentMessage(false), 100);
+    // Ensure we stay pinned to bottom as processing begins
+    window.dispatchEvent(new Event('chat:forceScrollToBottom'));
     try {
       // Update thread processing status to 'processing'
       await updateThreadProcessingStatus(threadId, 'processing');
@@ -587,8 +573,17 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       
       updateProcessingStage("Generating response...");
       
-      // NO PROCESSING MESSAGE CREATION - Pure streaming behavior for all queries
-      debugLog.addEvent("Database", "Using pure streaming - no processing placeholder messages", "info");
+      // Create processing placeholder only for non-journal-specific queries
+      if (queryClassification.category !== QueryCategory.JOURNAL_SPECIFIC) {
+        processingMessageId = await createProcessingMessage(threadId, "Processing your request...");
+        if (processingMessageId) {
+          debugLog.addEvent("Database", `Created processing message with ID: ${processingMessageId}`, "success");
+        }
+      } else if (processingMessageId) {
+        // Safety: if a placeholder exists, remove it for streaming path
+        await updateProcessingMessage(processingMessageId, null);
+        processingMessageId = null;
+      }
       
       // Route ALL queries to chat-with-rag (restored original design)
       debugLog.addEvent("Routing", "Using chat-with-rag for all queries with streaming", "info");
@@ -610,8 +605,6 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       // Streaming owns the lifecycle; ensure local loader is cleared immediately
       setLocalLoading(false);
       updateProcessingStage(null);
-      
-      // Auto-scroll handled by ChatArea component
       
       // Skip the rest since streaming handles the response
       return;
@@ -908,13 +901,6 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
             processingStage={processingStage || undefined}
             threadId={currentThreadId}
             onInteractiveOptionClick={handleInteractiveOptionClick}
-            onUserMessageSent={userMessageSent}
-            isStreaming={isStreaming}
-            streamingMessage={
-              !useThreeDotFallback && dynamicMessages && dynamicMessages.length > 0 
-                ? (translatedDynamicMessages[currentMessageIndex] || dynamicMessages[currentMessageIndex])
-                : ''
-            }
           />
         )}
         

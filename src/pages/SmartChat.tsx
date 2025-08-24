@@ -1,7 +1,8 @@
 
 import React, { useEffect, useState } from 'react';
-import DesktopChatLayout from '@/components/chat/DesktopChatLayout';
+import SmartChatInterface from '@/components/chat/SmartChatInterface';
 import MobileChatInterface from '@/components/chat/mobile/MobileChatInterface';
+import DesktopChatLayout from '@/components/chat/DesktopChatLayout';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
@@ -16,7 +17,6 @@ const SmartChat = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
   const isMobile = useIsMobile();
 
   // Redirect to login if not authenticated
@@ -161,7 +161,6 @@ const SmartChat = () => {
             onSelectThread={handleSelectThread}
             onCreateNewThread={handleCreateNewThread}
             userId={user?.id}
-            onProcessingStateChange={setIsProcessing}
           />
         )}
       </div>

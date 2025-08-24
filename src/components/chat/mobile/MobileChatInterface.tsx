@@ -319,25 +319,12 @@ export default function MobileChatInterface({
     };
   }, [isIOSDevice, user]);
 
-  // Track user message sending for auto-scroll
-  const [userJustSentMessage, setUserJustSentMessage] = useState(false);
-
-  // Auto-scroll setup for mobile chat area
+  // Use unified auto-scroll hook
   const { scrollElementRef, scrollToBottom } = useAutoScroll({
-    dependencies: [messages, streamingMessages, isLoading, isStreaming],
-    enabled: true,
+    dependencies: [messages, isLoading, isProcessing, isStreaming],
     delay: 50,
-    smooth: true,
-    scrollThreshold: 50
+    scrollThreshold: 100
   });
-
-  // Auto-scroll when user sends a message
-  React.useEffect(() => {
-    if (userJustSentMessage) {
-      scrollToBottom(true); // Force scroll for user messages
-      setUserJustSentMessage(false);
-    }
-  }, [userJustSentMessage, scrollToBottom]);
 
   // Realtime: append assistant messages saved by backend
   useEffect(() => {
@@ -458,10 +445,7 @@ export default function MobileChatInterface({
     };
   }, []);
 
-  // Handle user message sent callback
-  const handleUserMessageSent = () => {
-    setUserJustSentMessage(true);
-  };
+  // Auto-scroll is now handled by the useAutoScroll hook
 
   const loadThreadMessages = async (currentThreadId: string) => {
     if (!currentThreadId || !user?.id) {
@@ -624,8 +608,8 @@ export default function MobileChatInterface({
 
     debugLog.addEvent("Message Sending", `[Mobile] Adding user message to UI: ${message.substring(0, 50)}...`, "info");
 
-    // Trigger scroll to bottom after adding user message
-    handleUserMessageSent();
+    // Scroll to bottom after adding user message
+    setTimeout(scrollToBottom, 100);
 
     // PHASE 3: Async user message saving (non-blocking)
     const saveUserMessageAsync = async () => {
@@ -678,8 +662,6 @@ export default function MobileChatInterface({
         {}
       );
 
-      // Auto-scroll handled by ChatArea component
-
       // PHASE 5: Background operations (don't block streaming)
       if (isFirstMessage) {
         // Defer title generation to prevent interference with first response
@@ -707,7 +689,7 @@ export default function MobileChatInterface({
       console.error("[Mobile] Error in streaming chat:", error);
       debugLog.addEvent("Message Sending", `[Mobile] Streaming error: ${error}`, "error");
       
-      const errorMessageContent = "I'm having trouble with your request. Please try again. " + 
+      const errorMessageContent = "I'm having trouble processing your request. Please try again later. " + 
                  (error?.message ? `Error: ${error.message}` : "");
       
       if (currentThreadId === currentThreadIdRef.current) {
@@ -909,22 +891,8 @@ export default function MobileChatInterface({
       <div className="sticky top-0 z-40 w-full bg-background border-b">
         <div className="container flex h-14 max-w-screen-lg items-center">
           <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-            <SheetTrigger asChild disabled={isLoading || isProcessing || isStreaming}>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                disabled={isLoading || isProcessing || isStreaming}
-                className={`mr-2 transition-opacity ${
-                  isLoading || isProcessing || isStreaming
-                    ? "text-muted-foreground/50 opacity-50 cursor-not-allowed"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-                title={
-                  isLoading || isProcessing || isStreaming
-                    ? "Menu disabled during processing"
-                    : "Open menu"
-                }
-              >
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon" className="mr-2">
                 <Menu className="h-5 w-5" />
                 <span className="sr-only">
                   <TranslatableText text="Toggle Menu" />
@@ -1027,7 +995,11 @@ export default function MobileChatInterface({
       </div>
       
       {/* Chat Content */}
-      {initialLoading ? (
+      <div 
+        className={`mobile-chat-content ${isKeyboardVisible ? 'keyboard-visible' : ''}`} 
+        ref={scrollElementRef}
+      >
+        {initialLoading ? (
           <div className="flex items-center justify-center py-10">
             <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></div>
             <span className="ml-2 text-muted-foreground">
@@ -1073,48 +1045,43 @@ export default function MobileChatInterface({
             </div>
           </div>
         ) : (
-          <div 
-            ref={scrollElementRef}
-            className={`mobile-chat-content flex-1 overflow-y-auto p-4 space-y-3 ${isKeyboardVisible ? 'keyboard-visible' : ''}`}
-          >
+          <div className="space-y-3">
             {messages.map((message, index) => (
-              <MobileChatMessage
-                key={index}
-                message={message}
-                showAnalysis={false}
-                isLoading={false}
-                streamingMessage={undefined}
-                showStreamingDots={false}
-              />
+              <ChatErrorBoundary key={index}>
+                <MobileChatMessage 
+                  message={message} 
+                  showAnalysis={false}
+                />
+              </ChatErrorBoundary>
             ))}
             
-            {/* Show streaming messages for journal queries, three-dot animation for others */}
-            {isStreaming && (
-              <MobileChatMessage
-                message={{ role: 'assistant', content: '' }}
-                showAnalysis={false}
-                isLoading={useThreeDotFallback}
-                streamingMessage={
-                  !useThreeDotFallback && dynamicMessages && dynamicMessages.length > 0 
-                    ? (translatedDynamicMessages[currentMessageIndex] || dynamicMessages[currentMessageIndex])
-                    : ''
-                }
-                showStreamingDots={useThreeDotFallback}
-              />
-            )}
+            {/* Show streaming status or basic loading */}
+            {isStreaming ? (
+              <ChatErrorBoundary>
+                <MobileChatMessage 
+                  message={{ role: 'assistant', content: '' }}
+                  streamingMessage={
+                    useThreeDotFallback || dynamicMessages.length === 0
+                      ? undefined // Show only three-dot animation
+                      : translatedDynamicMessages[currentMessageIndex] || dynamicMessages[currentMessageIndex] // Use pre-translated message
+                  }
+                  showStreamingDots={true}
+                />
+              </ChatErrorBoundary>
+            ) : (!isStreaming && (isLoading || isProcessing)) ? (
+              <ChatErrorBoundary>
+                <MobileChatMessage 
+                  message={{ role: 'assistant', content: '' }}
+                  isLoading={true}
+                />
+              </ChatErrorBoundary>
+            ) : null}
             
-            {/* Show loading indicator if loading but not streaming */}
-            {(isLoading || isProcessing) && !isStreaming && (
-              <MobileChatMessage
-                message={{ role: 'assistant', content: '' }}
-                showAnalysis={false}
-                isLoading={true}
-                streamingMessage={undefined}
-                showStreamingDots={false}
-              />
-            )}
+            {/* Spacer for auto-scroll */}
+            <div className="pb-5" />
           </div>
         )}
+      </div>
       
       {/* Chat Input */}
       <MobileChatInput 

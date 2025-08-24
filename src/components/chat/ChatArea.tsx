@@ -21,10 +21,6 @@ interface ChatAreaProps {
   processingStage?: string;
   threadId?: string | null;
   onInteractiveOptionClick?: (option: any) => void;
-  onUserMessageSent?: boolean;
-  isStreaming?: boolean;
-  streamingMessage?: string;
-  className?: string;
 }
 
 const ChatArea: React.FC<ChatAreaProps> = ({ 
@@ -32,32 +28,14 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   isLoading, 
   processingStage,
   threadId,
-  onInteractiveOptionClick,
-  onUserMessageSent,
-  isStreaming,
-  streamingMessage,
-  className
+  onInteractiveOptionClick
 }) => {
-  // Use unified auto-scroll hook with smart threshold management
+  // Use unified auto-scroll hook
   const { scrollElementRef, scrollToBottom } = useAutoScroll({
-    dependencies: [chatMessages, isLoading, processingStage, isStreaming],
+    dependencies: [chatMessages, isLoading, processingStage],
     delay: 50,
-    scrollThreshold: 50
+    scrollThreshold: 100
   });
-
-  // Auto-scroll when user sends a message (always scroll, ignore threshold)
-  useEffect(() => {
-    if (onUserMessageSent) {
-      setTimeout(() => scrollToBottom(true), 50);
-    }
-  }, [onUserMessageSent, scrollToBottom]);
-
-  // Auto-scroll for streaming responses (respect threshold for user position)
-  useEffect(() => {
-    if (isStreaming || isLoading) {
-      setTimeout(() => scrollToBottom(false), 150);
-    }
-  }, [isStreaming, isLoading, scrollToBottom]);
 
   // Enhanced logging to ensure context is being passed properly
   useEffect(() => {
@@ -80,9 +58,23 @@ const ChatArea: React.FC<ChatAreaProps> = ({
     }
   }, [chatMessages, threadId]);
 
+  // Listen for global force-scroll events (e.g., after user presses Send)
+  useEffect(() => {
+    const handleForceScroll = () => {
+      // Force scroll regardless of user's current position
+      scrollToBottom(true);
+    };
+    window.addEventListener('chat:forceScrollToBottom' as any, handleForceScroll);
+    // Backward-compatible alias if needed in future
+    window.addEventListener('chat:scrollToBottom' as any, handleForceScroll);
+    return () => {
+      window.removeEventListener('chat:forceScrollToBottom' as any, handleForceScroll);
+      window.removeEventListener('chat:scrollToBottom' as any, handleForceScroll);
+    };
+  }, [scrollToBottom]);
 
   return (
-    <div ref={scrollElementRef} className={`flex flex-col p-4 overflow-y-auto h-full pb-20 ${className || ''}`}>
+    <div ref={scrollElementRef} className="flex flex-col p-4 overflow-y-auto h-full pb-20">
       {chatMessages.filter(msg => !msg.is_processing).map((message, index) => (
         <div
           key={index}
@@ -159,27 +151,9 @@ const ChatArea: React.FC<ChatAreaProps> = ({
         </div>
       ))}
 
-      {/* Show streaming messages for journal queries or typing indicator for others */}
-      {(isLoading || isStreaming) && (
+      {isLoading && (
         <div className="flex justify-start mb-4">
-          {streamingMessage && streamingMessage.trim() ? (
-            <div className="flex gap-3 max-w-[80%]">
-              <div className="mt-1">
-                <ParticleAvatar className="h-8 w-8" size={32} />
-              </div>
-              <Card className="overflow-hidden">
-                <CardContent className="p-3">
-                  <div className="prose prose-sm dark:prose-invert max-w-none">
-                    <div className="text-muted-foreground animate-pulse">
-                      {streamingMessage}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          ) : (
-            <TypingIndicator />
-          )}
+          <TypingIndicator />
         </div>
       )}
 

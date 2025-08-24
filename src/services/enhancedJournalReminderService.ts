@@ -109,15 +109,8 @@ class EnhancedJournalReminderService {
   /**
    * Request comprehensive permissions including battery optimization and exact alarms
    */
-  async requestPermissionsAndSetup(times: JournalReminderTime[], userTimezone?: string): Promise<boolean> {
+  async requestPermissionsAndSetup(times: JournalReminderTime[]): Promise<boolean> {
     await this.ensureInitialized();
-    
-    // Store user timezone for proper scheduling
-    if (userTimezone) {
-      console.log('🕐 Using provided user timezone:', userTimezone);
-    } else {
-      console.log('🕐 Using browser timezone for notifications');
-    }
     
     try {
       if (this.platformInfo?.isNative) {
@@ -150,7 +143,7 @@ class EnhancedJournalReminderService {
       }
 
       console.log('✅ All permissions granted, setting up reminders...');
-      await this.setupReminders(times, userTimezone);
+      await this.setupReminders(times);
       return true;
     } catch (error) {
       console.error('❌ Error requesting permissions and setting up reminders:', error);
@@ -220,9 +213,8 @@ class EnhancedJournalReminderService {
   /**
    * Setup reminders with absolute timestamps instead of recurring schedules
    */
-  private async setupReminders(times: JournalReminderTime[], userTimezone?: string): Promise<void> {
-    const timezone = userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
-    console.log('⚙️ Setting up enhanced reminders for times:', times, 'timezone:', timezone);
+  private async setupReminders(times: JournalReminderTime[]): Promise<void> {
+    console.log('⚙️ Setting up enhanced reminders for times:', times);
     
     // Clear existing reminders first
     await this.clearAllReminders();
@@ -231,9 +223,9 @@ class EnhancedJournalReminderService {
     console.log('🎯 Using notification strategy:', strategy);
     
     if (strategy === 'native') {
-      await this.setupNativeReminders(times, timezone);
+      await this.setupNativeReminders(times);
     } else {
-      this.setupWebReminders(times, timezone);
+      this.setupWebReminders(times);
     }
     
     // Start health check to monitor reminder status
@@ -243,7 +235,7 @@ class EnhancedJournalReminderService {
   /**
    * Set up native notifications with absolute timestamps and enhanced debugging
    */
-  private async setupNativeReminders(times: JournalReminderTime[], timezone?: string): Promise<void> {
+  private async setupNativeReminders(times: JournalReminderTime[]): Promise<void> {
     if (!this.platformInfo?.capabilities.nativeNotifications) {
       throw new Error('Native notifications not supported');
     }
@@ -258,7 +250,7 @@ class EnhancedJournalReminderService {
       
       for (const time of times) {
         // Generate multiple absolute notifications instead of relying on recurring
-        const absoluteNotifications = this.generateAbsoluteNotifications(time, 30, timezone); // 30 days worth
+        const absoluteNotifications = this.generateAbsoluteNotifications(time, 30); // 30 days worth
         notifications.push(...absoluteNotifications);
       }
 
@@ -300,7 +292,7 @@ class EnhancedJournalReminderService {
   /**
    * Generate absolute notification timestamps instead of recurring schedules
    */
-  private generateAbsoluteNotifications(time: JournalReminderTime, days: number, timezone?: string): ScheduleOptions[] {
+  private generateAbsoluteNotifications(time: JournalReminderTime, days: number): ScheduleOptions[] {
     const notifications: ScheduleOptions[] = [];
     const { hour, minute } = this.TIME_MAPPINGS[time];
     const now = new Date();
@@ -332,8 +324,7 @@ class EnhancedJournalReminderService {
           reminderTime: time,
           type: 'journal_reminder',
           absolute: true,
-          day: i,
-          timezone: timezone
+          day: i
         }
       } as any);
     }
@@ -501,18 +492,18 @@ class EnhancedJournalReminderService {
     }
   }
 
-  private setupWebReminders(times: JournalReminderTime[], timezone?: string): void {
-    console.log('🌐 Setting up web reminders with timezone:', timezone);
+  private setupWebReminders(times: JournalReminderTime[]): void {
+    console.log('🌐 Setting up web reminders');
     
     times.forEach(time => {
-      const reminder = this.scheduleWebReminder(time, timezone);
+      const reminder = this.scheduleWebReminder(time);
       this.activeReminders.push(reminder);
     });
     
     console.log(`✅ Scheduled ${this.activeReminders.length} web reminders`);
   }
 
-  private scheduleWebReminder(time: JournalReminderTime, timezone?: string): ScheduledReminder {
+  private scheduleWebReminder(time: JournalReminderTime): ScheduledReminder {
     const id = `web-${time}-${Date.now()}`;
     const scheduledFor = this.getNextReminderTime(time);
     
@@ -595,10 +586,9 @@ class EnhancedJournalReminderService {
     return bodies[time] || "Tap to open Soulo and start voice journaling";
   }
 
-  private getNextReminderTime(time: JournalReminderTime, timezone?: string): Date {
+  private getNextReminderTime(time: JournalReminderTime): Date {
     const now = new Date();
     const { hour, minute } = this.TIME_MAPPINGS[time];
-    const tz = timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
     
     // Start with today's target time
     const today = new Date();
@@ -609,7 +599,7 @@ class EnhancedJournalReminderService {
       today.setDate(today.getDate() + 1);
     }
     
-    console.log(`📅 Reminder ${time} scheduled for ${today.toLocaleString()} (timezone: ${tz})`);
+    console.log(`📅 Reminder ${time} scheduled for ${today.toLocaleString()}`);
     return today;
   }
 

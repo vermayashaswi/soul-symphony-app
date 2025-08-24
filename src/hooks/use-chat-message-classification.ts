@@ -28,13 +28,8 @@ export function useChatMessageClassification() {
     error: null
   });
 
-  // Detect Capacitor environment to force web-like behavior
-  const isCapacitor = useCallback(() => {
-    return typeof window !== 'undefined' && !!(window as any).Capacitor;
-  }, []);
-
   /**
-   * Enhanced message classification with unified behavior for Capacitor and web
+   * Enhanced message classification with prioritized personal pronoun support
    */
   const classifyMessage = useCallback(async (message: string, conversationContext: any[] = []) => {
     if (!message?.trim()) {
@@ -59,13 +54,9 @@ export function useChatMessageClassification() {
       try {
         console.log(`[Classification Hook] Classification attempt ${attempt}/${maxRetries} for message:`, message);
         
-        // Use the enhanced chat-query-classifier edge function with environment context
+        // Use the enhanced chat-query-classifier edge function
         const { data, error } = await supabase.functions.invoke('chat-query-classifier', {
-          body: { 
-            message, 
-            conversationContext,
-            isCapacitor: isCapacitor()
-          }
+          body: { message, conversationContext }
         });
 
         if (error) throw error;
