@@ -86,6 +86,23 @@ export default function MobileChatInterface({
     setLocalLoading
   } = useChatRealtime(threadId);
   
+  // Emergency iPhone loading bypass
+  useEffect(() => {
+    const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
+    const isIPhone = /iphone/i.test(userAgent.toLowerCase());
+    
+    if (isIPhone) {
+      // Force loading completion after 2 seconds maximum for iPhone
+      const emergencyTimeout = setTimeout(() => {
+        console.log('[MobileChatInterface] Emergency iPhone bypass - forcing loading completion');
+        setInitialLoading(false);
+        setLocalLoading(false);
+      }, 2000);
+      
+      return () => clearTimeout(emergencyTimeout);
+    }
+  }, [setLocalLoading]);
+  
   const { isKeyboardVisible } = useUnifiedKeyboard();
   
   // Enhanced swipe gesture support for navigation and quick actions
@@ -432,9 +449,9 @@ export default function MobileChatInterface({
     };
 
     if (isIOSDevice && !user) {
-      // For iOS, wait longer for user authentication to stabilize
-      debugLog.addEvent("Thread Initialization", "iOS device - waiting for user authentication", "info");
-      const timeout = setTimeout(loadWithIOSDelay, 3000);
+      // Emergency fix: Reduced iOS wait time to prevent infinite loading
+      debugLog.addEvent("Thread Initialization", "iOS device - emergency bypass for fast loading", "info");
+      const timeout = setTimeout(loadWithIOSDelay, 1000); // Reduced from 3000ms
       return () => clearTimeout(timeout);
     } else {
       // For non-iOS or when user is available, load immediately
