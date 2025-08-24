@@ -25,7 +25,7 @@ import DebugPanel from "@/components/debug/DebugPanel";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "@/contexts/TranslationContext";
 import { useChatRealtime } from "@/hooks/use-chat-realtime";
-import { updateThreadProcessingStatus, generateThreadTitle } from "@/utils/chat/threadUtils";
+import { updateThreadProcessingStatus, createProcessingMessage, updateProcessingMessage, generateThreadTitle } from "@/utils/chat/threadUtils";
 import { MentalHealthInsights } from "@/hooks/use-mental-health-insights";
 
 import { ChatMessage } from "@/types/chat";
@@ -115,11 +115,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     startStreamingChat,
     queryCategory,
     restoreStreamingState,
-    stopStreaming,
-    useThreeDotFallback,
-    dynamicMessages,
-    translatedDynamicMessages,
-    currentMessageIndex
+    stopStreaming
   } = useStreamingChat({
       threadId: currentThreadId,
     onFinalResponse: async (response, analysis, originThreadId, requestId) => {
@@ -587,8 +583,17 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       
       updateProcessingStage("Generating response...");
       
-      // NO PROCESSING MESSAGE CREATION - Pure streaming behavior for all queries
-      debugLog.addEvent("Database", "Using pure streaming - no processing placeholder messages", "info");
+      // Create processing placeholder only for non-journal-specific queries
+      if (queryClassification.category !== QueryCategory.JOURNAL_SPECIFIC) {
+        processingMessageId = await createProcessingMessage(threadId, "Processing your request...");
+        if (processingMessageId) {
+          debugLog.addEvent("Database", `Created processing message with ID: ${processingMessageId}`, "success");
+        }
+      } else if (processingMessageId) {
+        // Safety: if a placeholder exists, remove it for streaming path
+        await updateProcessingMessage(processingMessageId, null);
+        processingMessageId = null;
+      }
       
       // Route ALL queries to chat-with-rag (restored original design)
       debugLog.addEvent("Routing", "Using chat-with-rag for all queries with streaming", "info");
@@ -910,11 +915,6 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
             onInteractiveOptionClick={handleInteractiveOptionClick}
             onUserMessageSent={userMessageSent}
             isStreaming={isStreaming}
-            streamingMessage={
-              !useThreeDotFallback && dynamicMessages && dynamicMessages.length > 0 
-                ? (translatedDynamicMessages[currentMessageIndex] || dynamicMessages[currentMessageIndex])
-                : ''
-            }
           />
         )}
         

@@ -707,7 +707,7 @@ export default function MobileChatInterface({
       console.error("[Mobile] Error in streaming chat:", error);
       debugLog.addEvent("Message Sending", `[Mobile] Streaming error: ${error}`, "error");
       
-      const errorMessageContent = "I'm having trouble with your request. Please try again. " + 
+      const errorMessageContent = "I'm having trouble processing your request. Please try again later. " + 
                  (error?.message ? `Error: ${error.message}` : "");
       
       if (currentThreadId === currentThreadIdRef.current) {
@@ -1088,17 +1088,13 @@ export default function MobileChatInterface({
               />
             ))}
             
-            {/* Show streaming messages for journal queries, three-dot animation for others */}
-            {isStreaming && (
+            {/* Show streaming message if currently streaming */}
+            {isStreaming && streamingMessages && currentMessageIndex < streamingMessages.length && (
               <MobileChatMessage
                 message={{ role: 'assistant', content: '' }}
                 showAnalysis={false}
-                isLoading={useThreeDotFallback}
-                streamingMessage={
-                  !useThreeDotFallback && dynamicMessages && dynamicMessages.length > 0 
-                    ? (translatedDynamicMessages[currentMessageIndex] || dynamicMessages[currentMessageIndex])
-                    : ''
-                }
+                isLoading={false}
+                streamingMessage={translatedDynamicMessages[currentMessageIndex] || dynamicMessages[currentMessageIndex] || ''}
                 showStreamingDots={useThreeDotFallback}
               />
             )}

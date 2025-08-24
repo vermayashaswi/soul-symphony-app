@@ -72,10 +72,7 @@ const threadStates = new Map<string, ThreadStreamingState>();
 export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStreamingChatProps = {}) => {
   const { translate, currentLanguage } = useTranslation();
   
-  // Detect Capacitor environment to force unified behavior
-  const isCapacitor = typeof window !== 'undefined' && !!(window as any).Capacitor;
-  
-  // Page visibility tracking - unified for both web and Capacitor
+  // Page visibility and app lifecycle tracking
   const [isPageVisible, setIsPageVisible] = useState(true);
   const [isAppActive, setIsAppActive] = useState(true);
 
@@ -110,29 +107,25 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     return `${message}_${threadId}_${Math.floor(timestamp / 5000)}`; // 5-second window
   }, []);
 
-  // Unified page visibility handling for both web and Capacitor
+  // Page Visibility API for mobile browser handling
   useEffect(() => {
     const handleVisibilityChange = () => {
       const visible = !document.hidden;
       setIsPageVisible(visible);
       
-      // For Capacitor, force simple web-like behavior without state persistence
-      if (isCapacitor) {
-        console.log(`[useStreamingChat] Capacitor visibility change: ${visible ? 'visible' : 'hidden'}`);
-        return; // No background state management for Capacitor
-      }
-      
-      // Web-only background state handling
       if (!visible && threadId) {
+        // Page backgrounded - pause streaming without aborting
         console.log(`[useStreamingChat] Page backgrounded for thread: ${threadId}`);
         const threadState = getThreadState(threadId);
         if (threadState.isStreaming) {
+          // Save current state but don't abort
           saveChatStreamingState(threadId, {
             ...threadState,
             pausedDueToBackground: true,
           });
         }
       } else if (visible && threadId) {
+        // Page foregrounded - restore UI state if we had an active stream
         console.log(`[useStreamingChat] Page foregrounded for thread: ${threadId}`);
         try {
           const savedState: any = getChatStreamingState(threadId);
@@ -142,9 +135,9 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
               streamingMessages: savedState.streamingMessages || [],
               currentUserMessage: savedState.currentUserMessage || '',
               showBackendAnimation: !!savedState.showBackendAnimation,
-              dynamicMessages: savedState.dynamicMessages || [],
-              translatedDynamicMessages: savedState.translatedDynamicMessages || [],
-              currentMessageIndex: savedState.currentMessageIndex || 0,
+            dynamicMessages: savedState.dynamicMessages || [],
+            translatedDynamicMessages: savedState.translatedDynamicMessages || [],
+            currentMessageIndex: savedState.currentMessageIndex || 0,
               useThreeDotFallback: !!savedState.useThreeDotFallback,
               queryCategory: savedState.queryCategory || '',
               expectedProcessingTime: savedState.expectedProcessingTime || null,
@@ -159,34 +152,68 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [threadId, getThreadState, isCapacitor]);
+  }, [threadId, getThreadState]);
 
-  // Minimal Capacitor app lifecycle handling for app state tracking only
+  // Capacitor app lifecycle handling
   useEffect(() => {
-    if (!isCapacitor) return;
-    
-    try {
-      const { App } = (window as any).Capacitor.Plugins;
-      
-      const handleAppStateChange = (state: any) => {
-        setIsAppActive(state.isActive);
-        // No background state persistence for Capacitor to maintain web parity
-        console.log(`[useStreamingChat] Capacitor app state: ${state.isActive ? 'active' : 'inactive'}`);
-      };
+    // Check if Capacitor App plugin is available using the correct path
+    if (typeof window !== 'undefined' && (window as any).Capacitor?.Plugins?.App) {
+      try {
+        const { App } = (window as any).Capacitor.Plugins;
+        
+        const handleAppStateChange = (state: any) => {
+          setIsAppActive(state.isActive);
+          
+          if (!state.isActive && threadId) {
+            // App backgrounded
+            console.log(`[useStreamingChat] Capacitor app backgrounded for thread: ${threadId}`);
+            const threadState = getThreadState(threadId);
+            if (threadState.isStreaming) {
+              saveChatStreamingState(threadId, {
+                ...threadState,
+                pausedDueToBackground: true,
+              });
+            }
+           } else if (state.isActive && threadId) {
+              // App foregrounded
+              console.log(`[useStreamingChat] Capacitor app foregrounded for thread: ${threadId}`);
+              try {
+                const savedState: any = getChatStreamingState(threadId);
+                if (savedState && (savedState.isStreaming || savedState.pausedDueToBackground)) {
+                  updateThreadState(threadId, {
+                    isStreaming: true,
+                    streamingMessages: savedState.streamingMessages || [],
+                    currentUserMessage: savedState.currentUserMessage || '',
+                    showBackendAnimation: !!savedState.showBackendAnimation,
+            dynamicMessages: savedState.dynamicMessages || [],
+            translatedDynamicMessages: savedState.translatedDynamicMessages || [],
+            currentMessageIndex: savedState.currentMessageIndex || 0,
+                    useThreeDotFallback: !!savedState.useThreeDotFallback,
+                    queryCategory: savedState.queryCategory || '',
+                    expectedProcessingTime: savedState.expectedProcessingTime || null,
+                    processingStartTime: savedState.processingStartTime || Date.now(),
+                    abortController: new AbortController(),
+                    activeRequestId: savedState.activeRequestId || null,
+                  });
+                }
+              } catch {}
+            }
+        };
 
-      App.addListener('appStateChange', handleAppStateChange);
-      
-      return () => {
-        try {
-          App.removeAllListeners();
-        } catch (error) {
-          console.warn('[useStreamingChat] Error removing Capacitor listeners:', error);
-        }
-      };
-    } catch (error) {
-      console.warn('[useStreamingChat] Capacitor App plugin not available:', error);
+        App.addListener('appStateChange', handleAppStateChange);
+        
+        return () => {
+          try {
+            App.removeAllListeners();
+          } catch (error) {
+            console.warn('[useStreamingChat] Error removing Capacitor listeners:', error);
+          }
+        };
+      } catch (error) {
+        console.warn('[useStreamingChat] Error setting up Capacitor app lifecycle handlers:', error);
+      }
     }
-  }, [isCapacitor]);
+  }, [threadId, getThreadState]);
 
   // Thread switch handler - abort current operations and switch state
   useEffect(() => {
@@ -381,7 +408,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     });
   }, [threadId, updateThreadState]);
 
-  // Generate streaming messages based on category - journal queries get GPT messages, others get dots
+  // Generate streaming messages based on category
   const generateStreamingMessages = useCallback(async (
     message: string, 
     category: string, 
@@ -392,8 +419,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     const activeThreadId = targetThreadId || threadId;
     if (!activeThreadId) return;
 
-    // Journal-specific queries get GPT-generated streaming messages
-    // Non-journal queries get three-dot animation
+    // Only generate dynamic messages for journal-specific queries
     if (category !== 'JOURNAL_SPECIFIC') {
       updateThreadState(activeThreadId, {
         useThreeDotFallback: true,
@@ -409,8 +435,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
           userMessage: message,
           category,
           conversationContext,
-          userProfile,
-          isCapacitor
+          userProfile
         }
       });
 
@@ -632,8 +657,8 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
       return;
     }
 
-    // For Capacitor, always proceed; for web, check backgrounding
-    if (!isCapacitor && (!isPageVisible || !isAppActive)) {
+    // Check if app/page is backgrounded - if so, don't start new requests
+    if (!isPageVisible || !isAppActive) {
       console.warn(`[useStreamingChat] App backgrounded, deferring request for thread ${targetThreadId}`);
       return;
     }
@@ -744,7 +769,6 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
         category: messageCategory,
         userTimezone, // Pass timezone directly to edge functions
       }, { attempts: 3, baseDelay: 900 }, targetThreadId);
-      
       // Check if request is still active (not superseded by another request)
       const currentThreadState = getThreadState(targetThreadId);
       if (currentThreadState.activeRequestId !== requestId) {
@@ -761,17 +785,6 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
           return;
         }
         throw new Error(error?.message || 'Request failed');
-      }
-
-      // Extract userStatusMessage from smart-query-planner response for journal-specific queries
-      if (messageCategory === 'JOURNAL_SPECIFIC' && data?.userStatusMessage) {
-        console.log(`[useStreamingChat] Displaying userStatusMessage: ${data.userStatusMessage}`);
-        updateThreadState(targetThreadId, {
-          dynamicMessages: [data.userStatusMessage],
-          translatedDynamicMessages: [data.userStatusMessage],
-          useThreeDotFallback: false,
-          currentMessageIndex: 0
-        });
       }
 
       const text = data?.response ?? data?.data ?? data?.message ?? (typeof data === 'string' ? data : null);
