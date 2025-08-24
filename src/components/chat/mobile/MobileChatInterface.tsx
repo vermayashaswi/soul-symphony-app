@@ -281,43 +281,21 @@ export default function MobileChatInterface({
     debugLog.addEvent("Platform Detection", `iOS device detected: ${isiOS}`, "info");
   }, []);
 
-  // iOS-specific user verification with retry logic
+  // iPhone emergency bypass - prevent indefinite loading
   useEffect(() => {
-    if (!isIOSDevice || user) return;
-
-    let retryCount = 0;
-    const maxRetries = 5;
-    const retryDelay = 1000;
-
-    const verifyUser = () => {
-      if (user) {
-        debugLog.addEvent("iOS User Verification", "User verified successfully", "success");
-        return;
-      }
-
-      retryCount++;
-      if (retryCount <= maxRetries) {
-        debugLog.addEvent("iOS User Verification", `Retry ${retryCount}/${maxRetries} - User not yet available`, "warning");
-        userVerificationTimeoutRef.current = setTimeout(verifyUser, retryDelay);
-      } else {
-        debugLog.addEvent("iOS User Verification", "Max retries reached - user verification failed", "error");
-        toast({
-          title: "Authentication Issue",
-          description: "Please refresh the page if the chat doesn't load.",
-          variant: "destructive"
-        });
-      }
-    };
-
-    // Start verification after a brief delay for iOS session stabilization
-    userVerificationTimeoutRef.current = setTimeout(verifyUser, 2000);
-
-    return () => {
-      if (userVerificationTimeoutRef.current) {
-        clearTimeout(userVerificationTimeoutRef.current);
-      }
-    };
-  }, [isIOSDevice, user]);
+    if (isIOSDevice) {
+      console.log('[iPhone Fix] Setting up emergency bypass timer');
+      const emergencyTimeout = setTimeout(() => {
+        if (initialLoading) {
+          console.log('[iPhone Fix] Emergency bypass triggered - forcing loading to false');
+          setInitialLoading(false);
+          debugLog.addEvent("iPhone Emergency Bypass", "Forced loading state to false after timeout", "warning");
+        }
+      }, 3000); // 3 second maximum loading time for iPhone
+      
+      return () => clearTimeout(emergencyTimeout);
+    }
+  }, [isIOSDevice, initialLoading]);
 
   // Track user message sending for auto-scroll
   const [userJustSentMessage, setUserJustSentMessage] = useState(false);
@@ -431,15 +409,12 @@ export default function MobileChatInterface({
       }
     };
 
-    if (isIOSDevice && !user) {
-      // For iOS, wait longer for user authentication to stabilize
-      debugLog.addEvent("Thread Initialization", "iOS device - waiting for user authentication", "info");
-      const timeout = setTimeout(loadWithIOSDelay, 3000);
-      return () => clearTimeout(timeout);
-    } else {
-      // For non-iOS or when user is available, load immediately
-      loadWithIOSDelay();
+    // iPhone fix - immediate loading without authentication waits
+    if (isIOSDevice) {
+      console.log('[iPhone Fix] Immediate thread loading for iPhone');
+      debugLog.addEvent("Thread Initialization", "iPhone - immediate loading", "info");
     }
+    loadWithIOSDelay();
   }, [threadId, user?.id, restoreStreamingState, isIOSDevice]);
   
   useEffect(() => {
