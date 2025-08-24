@@ -796,7 +796,7 @@ async function analyzeQueryWithSubQuestions(message, conversationContext, userEn
     
     console.log(`[Query Planner] Basic analysis - Personal: ${hasPersonalPronouns}, Time ref: ${hasExplicitTimeReference}, Follow-up: ${isFollowUpContext}`);
 
-    const prompt = `You are SOULo's Intelligent Query Planner - a pure execution engine for a voice journaling app called SOuLO. Your ONLY job is to analyze user queries and return structured JSON plans for execution.
+    const prompt = `You are Ruh's Intelligent Query Planner - a pure execution engine for a voice journaling app called SOuLO. Your ONLY job is to analyze user queries and return structured JSON plans for execution.
 
 You are provided with this database schema: ${databaseSchemaContext} **CRITICAL DATABASE TYPE: This is a PostgreSQL database. Use PostgreSQL-specific syntax and functions.**
 
@@ -832,13 +832,15 @@ CONVERSATION CONTEXT: ${last.length > 0 ? last.map(m => `${m.role || m.sender}: 
 - If previous assistant messages contain specific emotions (like "contentment, hope, sadness, disappointment"), focus your analysis on THOSE SPECIFIC emotions
 - Generate sub-questions that target the exact emotions/entities mentioned in recent conversation rather than generic "top emotions"
 
+
+MANDATORY: Look at the conversation context provided to you with roles. Logically figure out what the "ASK" ("ASK" refers to what user is trying to ask in ongoing conversation and what is his immediate request. Also, look at what all assisstant has already provided user with in the conversation context) and basis this ASK, Generate an intelligent execution plan with proper sub-questions that can be executed to answer the user's query.
+
 ANALYSIS STATUS:
 - Personal pronouns: ${hasPersonalPronouns}
 - Time reference: ${hasExplicitTimeReference}
 - Follow-up query: ${isFollowUpContext}
 - User timezone: ${userTimezone}
 
-Generate an intelligent execution plan with proper sub-questions that can be executed to answer the user's query.
 
 Response format (MUST be valid JSON):
 {

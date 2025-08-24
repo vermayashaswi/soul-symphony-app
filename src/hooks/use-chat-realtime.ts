@@ -1,33 +1,13 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { ChatMessage } from '@/types/chat';
-
-export type ThreadProcessingStatus = 'idle' | 'processing' | 'failed';
-
-export interface ChatRealtimeState {
-  isLoading: boolean;
-  isProcessing: boolean;
-  processingStage: string | null;
-  processingStatus: ThreadProcessingStatus;
-}
 
 // Thread-isolated real-time state management
 interface ThreadRealtimeState {
-  isLoading: boolean;
-  isProcessing: boolean;
-  processingStage: string | null;
-  processingStatus: ThreadProcessingStatus;
   subscription: any | null;
-  watchdogTimer?: ReturnType<typeof setTimeout> | null;
 }
 
 const createInitialRealtimeState = (): ThreadRealtimeState => ({
-  isLoading: false,
-  isProcessing: false,
-  processingStage: null,
-  processingStatus: 'idle',
-  subscription: null,
-  watchdogTimer: null
+  subscription: null
 });
 
 // Global thread real-time state store
@@ -46,31 +26,7 @@ export function useChatRealtime(threadId: string | null) {
     const currentState = getThreadRealtimeState(id);
     const newState = { ...currentState, ...updates };
     threadRealtimeStates.set(id, newState);
-    
-    // Only update local state if this is the active thread
-    if (id === threadId) {
-      setRealtimeState({
-        isLoading: newState.isLoading,
-        isProcessing: newState.isProcessing,
-        processingStage: newState.processingStage,
-        processingStatus: newState.processingStatus
-      });
-    }
   };
-
-  // Local state mirrors the active thread state
-  const [realtimeState, setRealtimeState] = useState<ChatRealtimeState>(() => {
-    if (!threadId) {
-      return createInitialRealtimeState();
-    }
-    const threadState = getThreadRealtimeState(threadId);
-    return {
-      isLoading: threadState.isLoading,
-      isProcessing: threadState.isProcessing,
-      processingStage: threadState.processingStage,
-      processingStatus: threadState.processingStatus
-    };
-  });
 
   // Track previous thread ID to clean up subscriptions
   const prevThreadIdRef = useRef<string | null>(null);
@@ -87,20 +43,11 @@ export function useChatRealtime(threadId: string | null) {
     }
 
     if (!threadId) {
-      setRealtimeState(createInitialRealtimeState());
       prevThreadIdRef.current = null;
       return;
     }
 
     console.log(`[useChatRealtime] Setting up real-time for thread: ${threadId}`);
-    
-    // Reset state when switching threads to prevent indicator leakage
-    updateThreadRealtimeState(threadId, {
-      isLoading: false,
-      isProcessing: false,
-      processingStage: null,
-      processingStatus: 'idle'
-    });
 
     // Set up subscription for new thread
     const threadState = getThreadRealtimeState(threadId);
@@ -120,17 +67,7 @@ export function useChatRealtime(threadId: string | null) {
             const messageData = payload.new as any;
             console.log(`[useChatRealtime] New message in thread ${threadId}:`, messageData.sender);
             
-            // Only update if this is still the active thread
-            if (threadId && threadRealtimeStates.has(threadId)) {
-              if (messageData.sender === 'assistant' && !messageData.is_processing) {
-                updateThreadRealtimeState(threadId, {
-                  isLoading: false,
-                  isProcessing: false,
-                  processingStatus: 'idle',
-                  processingStage: null
-                });
-              }
-            }
+            // Real-time message subscription - processing handled by useStreamingChat
           }
         )
         .on('postgres_changes',
@@ -144,16 +81,7 @@ export function useChatRealtime(threadId: string | null) {
             const messageData = payload.new as any;
             console.log(`[useChatRealtime] Updated message in thread ${threadId}:`, messageData.sender);
             
-            if (threadId && threadRealtimeStates.has(threadId)) {
-              if (messageData.sender === 'assistant' && !messageData.is_processing) {
-                updateThreadRealtimeState(threadId, {
-                  isLoading: false,
-                  isProcessing: false,
-                  processingStatus: 'idle',
-                  processingStage: null
-                });
-              }
-            }
+            // Real-time message update subscription - processing handled by useStreamingChat
           }
         )
         .on('postgres_changes',
@@ -178,15 +106,6 @@ export function useChatRealtime(threadId: string | null) {
 
       // Store subscription in thread state
       updateThreadRealtimeState(threadId, { subscription: messageChannel });
-    } else {
-      // Update local state to match existing thread state
-      const currentThreadState = getThreadRealtimeState(threadId);
-      setRealtimeState({
-        isLoading: currentThreadState.isLoading,
-        isProcessing: currentThreadState.isProcessing,
-        processingStage: currentThreadState.processingStage,
-        processingStatus: currentThreadState.processingStatus
-      });
     }
 
     prevThreadIdRef.current = threadId;
@@ -210,53 +129,7 @@ export function useChatRealtime(threadId: string | null) {
     };
   }, []);
 
-  // Update the processing stage - thread-specific
-  const updateProcessingStage = (stage: string | null) => {
-    if (!threadId) return;
-    
-    console.log(`[useChatRealtime] Updating processing stage for thread ${threadId}:`, stage);
-    updateThreadRealtimeState(threadId, { processingStage: stage });
-  };
-
-  // Set local loading state for immediate UI feedback - thread-specific
-  const setLocalLoading = (loading: boolean, stage?: string) => {
-    if (!threadId) return;
-    
-    console.log(`[useChatRealtime] Setting loading state for thread ${threadId}:`, loading, stage);
-
-    // Clear existing watchdog timer
-    const current = getThreadRealtimeState(threadId);
-    if (current.watchdogTimer) {
-      clearTimeout(current.watchdogTimer);
-    }
-
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    if (loading) {
-      // Auto-reset after 75s to prevent stuck loaders
-      timer = setTimeout(() => {
-        console.warn(`[useChatRealtime] Watchdog timeout for thread: ${threadId}`);
-        updateThreadRealtimeState(threadId, {
-          isLoading: false,
-          isProcessing: false,
-          processingStatus: 'failed',
-          processingStage: null,
-          watchdogTimer: null
-        });
-      }, 75000);
-    }
-
-    updateThreadRealtimeState(threadId, {
-      isLoading: loading,
-      isProcessing: loading,
-      processingStatus: loading ? 'processing' : 'idle',
-      processingStage: loading ? (stage || 'Processing...') : null,
-      watchdogTimer: timer
-    });
-  };
-
   return {
-    ...realtimeState,
-    updateProcessingStage,
-    setLocalLoading
+    // No processing state - handled by useStreamingChat
   };
 }

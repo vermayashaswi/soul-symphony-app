@@ -128,32 +128,8 @@ serve(async (req) => {
 
     console.log(`[chat-with-rag] Processing query: "${message}" for user: ${userId} (threadId: ${threadId}, messageId: ${messageId})`);
     
-    // Create assistant message for journal-specific queries
+    // No processing message creation - handled by frontend streaming
     let assistantMessageId = null;
-    if (threadId) {
-      try {
-        console.log(`[chat-with-rag] Creating assistant message for thread: ${threadId}`);
-        const { data: assistantMessage, error: messageError } = await supabaseClient
-          .from('chat_messages')
-          .insert({
-            thread_id: threadId,
-            sender: 'assistant',
-            role: 'assistant',
-            content: 'Processing your journal query...'
-          })
-          .select('id')
-          .single();
-          
-        if (messageError) {
-          console.error('[chat-with-rag] Error creating assistant message:', messageError);
-        } else {
-          assistantMessageId = assistantMessage?.id;
-          console.log(`[chat-with-rag] Created assistant message: ${assistantMessageId}`);
-        }
-      } catch (error) {
-        console.error('[chat-with-rag] Exception creating assistant message:', error);
-      }
-    }
     
     // Enhanced timezone handling with validation
     const { normalizeTimezone } = await import('../_shared/timezoneUtils.ts');

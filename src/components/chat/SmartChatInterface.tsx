@@ -126,11 +126,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       
       debugLog.addEvent("Streaming Response", `Final response received for ${originThreadId}: ${response.substring(0, 100)}...`, "success");
 
-      // Keep typing indicator visible while we finalize and render the message for the active thread
-      if (originThreadId === currentThreadId) {
-        setLocalLoading(true, "Finalizing response...");
-        updateProcessingStage("Finalizing response...");
-      }
+      // NO manual loading states - useStreamingChat handles everything
       
       // Backend persists assistant message; UI will append via realtime
       if (originThreadId === currentThreadId) {
@@ -174,20 +170,16 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
               }
             }
 
-            setLocalLoading(false);
-            updateProcessingStage(null);
+            // NO manual state clearing - useStreamingChat handles it
           }, 1200);
         } catch (e) {
           console.warn('[Streaming Watchdog] Exception scheduling fallback:', (e as any)?.message || e);
-          setLocalLoading(false);
-          updateProcessingStage(null);
+          // NO manual state clearing - useStreamingChat handles it
         }
       }
     },
     onError: (error) => {
-      // Ensure UI never gets stuck on loader after errors
-      setLocalLoading(false);
-      updateProcessingStage(null);
+      // NO manual state clearing - useStreamingChat handles errors
       toast({
         title: "Error",
         description: error,
@@ -196,30 +188,25 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     }
   });
   
-  // Use our enhanced realtime hook to track processing status
+  // Use realtime hook ONLY for message subscriptions (NO processing states)
   const {
-    isLoading,
-    isProcessing,
-    processingStage,
-    processingStatus,
-    updateProcessingStage,
-    setLocalLoading
+    // Only used for message subscription management
   } = useChatRealtime(currentThreadId);
   
-  // Use unified auto-scroll hook
+  // Use unified auto-scroll hook - ONLY useStreamingChat dependencies
   const { scrollElementRef, scrollToBottom } = useAutoScroll({
-    dependencies: [chatHistory, isLoading, isProcessing, isStreaming, streamingMessages],
+    dependencies: [chatHistory, isStreaming, streamingMessages],
     delay: 50,
     scrollThreshold: 100
   });
 
-  // Notify parent of processing state changes for sidebar control
+  // Notify parent of processing state changes - ONLY useStreamingChat states
   useEffect(() => {
-    const isProcessingActive = isLoading || isProcessing || isStreaming;
+    const isProcessingActive = isStreaming;
     if (onProcessingStateChange) {
       onProcessingStateChange(isProcessingActive);
     }
-  }, [isLoading, isProcessing, isStreaming, onProcessingStateChange]);
+  }, [isStreaming, onProcessingStateChange]);
 
   // Realtime: append assistant messages saved by backend
   useEffect(() => {
@@ -297,11 +284,19 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
   useEffect(() => {
     if (propsThreadId && propsThreadId !== currentThreadId) {
       loadThreadMessages(propsThreadId);
-      // Try to restore streaming state for this thread
-      const restored = restoreStreamingState(propsThreadId);
-      if (restored) {
-        debugLog.addEvent("Props Thread Change", `Restored streaming state for props thread: ${propsThreadId}`, "info");
-      }
+      // Try to restore streaming state for this thread (now async)
+      const tryRestore = async () => {
+        try {
+          const restored = await restoreStreamingState(propsThreadId);
+          if (restored) {
+            debugLog.addEvent("Props Thread Change", `Restored streaming state for props thread: ${propsThreadId}`, "info");
+          }
+        } catch (error) {
+          console.warn('[SmartChatInterface] Error restoring state for props thread:', error);
+        }
+      };
+      tryRestore();
+      
       // Update local storage to maintain consistency
       if (propsThreadId) {
         localStorage.setItem("lastActiveChatThreadId", propsThreadId);
@@ -332,11 +327,18 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     if (storedThreadId && effectiveUserId) {
       setLocalThreadId(storedThreadId);
       loadThreadMessages(storedThreadId);
-      // Try to restore streaming state for stored thread
-      const restored = restoreStreamingState(storedThreadId);
-      if (restored) {
-        debugLog.addEvent("Initialization", `Restored streaming state for stored thread: ${storedThreadId}`, "info");
-      }
+      // Try to restore streaming state for stored thread (now async)
+      const tryRestoreStored = async () => {
+        try {
+          const restored = await restoreStreamingState(storedThreadId);
+          if (restored) {
+            debugLog.addEvent("Initialization", `Restored streaming state for stored thread: ${storedThreadId}`, "info");
+          }
+        } catch (error) {
+          console.warn('[SmartChatInterface] Error restoring state for stored thread:', error);
+        }
+      };
+      tryRestoreStored();
       debugLog.addEvent("Initialization", `Loading stored thread: ${storedThreadId}`, "info");
     } else {
       setInitialLoading(false);
@@ -462,8 +464,8 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       }
     }
     
-    // Prevent multiple concurrent requests
-    if (isProcessing || isLoading) {
+    // Prevent multiple concurrent requests - ONLY useStreamingChat state
+    if (isStreaming) {
       toast({
         title: "Please wait",
         description: "Another request is currently being processed.",
@@ -487,8 +489,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     // Force chat area to jump to bottom on send
     window.dispatchEvent(new Event('chat:forceScrollToBottom'));
     
-    // Set local loading state for immediate UI feedback
-    setLocalLoading(true, "Analyzing your question...");
+    // NO manual loading states - useStreamingChat handles all states
     
     // Ensure we stay pinned to bottom as processing begins
     window.dispatchEvent(new Event('chat:forceScrollToBottom'));
@@ -564,7 +565,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       
       // Use GPT-based query classification with conversation context
       debugLog.addEvent("Query Classification", `Classifying query: "${message.substring(0, 30)}${message.length > 30 ? '...' : ''}"`, "info");
-      updateProcessingStage("Analyzing your question...");
+      // NO manual processing stage updates - useStreamingChat handles all states
       
       // Get conversation context for better classification
       const conversationContext = chatHistory.slice(-5).map(msg => ({
@@ -581,19 +582,8 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
         reasoning: queryClassification.reasoning
       })}` , "success");
       
-      updateProcessingStage("Generating response...");
-      
-      // Create processing placeholder only for non-journal-specific queries
-      if (queryClassification.category !== QueryCategory.JOURNAL_SPECIFIC) {
-        processingMessageId = await createProcessingMessage(threadId, "Processing your request...");
-        if (processingMessageId) {
-          debugLog.addEvent("Database", `Created processing message with ID: ${processingMessageId}`, "success");
-        }
-      } else if (processingMessageId) {
-        // Safety: if a placeholder exists, remove it for streaming path
-        await updateProcessingMessage(processingMessageId, null);
-        processingMessageId = null;
-      }
+      // NO manual processing stage updates - useStreamingChat handles all states
+      // NO database processing messages - useStreamingChat handles all processing indicators
       
       // Route ALL queries to chat-with-rag (restored original design)
       debugLog.addEvent("Routing", "Using chat-with-rag for all queries with streaming", "info");
@@ -612,9 +602,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
         }
       );
       
-      // Streaming owns the lifecycle; ensure local loader is cleared immediately
-      setLocalLoading(false);
-      updateProcessingStage(null);
+      // Streaming owns the lifecycle - NO manual state clearing needed
       
       // Skip the rest since streaming handles the response
       return;
@@ -683,11 +671,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
         }
       }
     } finally {
-      // Clear local loading state - only if still on originating thread
-      if (threadId === currentThreadIdRef.current) {
-        setLocalLoading(false);
-        updateProcessingStage(null);
-      }
+      // NO manual state clearing - useStreamingChat handles all error states
     }
   };
 
@@ -736,8 +720,8 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       return;
     }
 
-    // Prevent deletion if currently processing
-    if (isProcessing || processingStatus === 'processing') {
+    // Prevent deletion if currently processing - ONLY useStreamingChat state
+    if (isStreaming) {
       toast({
         title: "Cannot delete conversation",
         description: "Please wait for the current request to complete before deleting this conversation.",
@@ -838,14 +822,14 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     }
   };
 
-  // Check if deletion should be disabled - use realtime processing state
-  const isDeletionDisabled = isProcessing || processingStatus === 'processing' || isLoading;
+  // Check if deletion should be disabled - ONLY useStreamingChat state
+  const isDeletionDisabled = isStreaming;
 
-  // Thread-scoped loading indicator: during streaming, only show for current thread
-  const showLoadingForThisThread = isLoading || isProcessing || isStreaming;
+  // Thread-scoped loading indicator - ONLY useStreamingChat state
+  const showLoadingForThisThread = isStreaming;
   
-  // Calculate if any processing is active (for disabling UI controls)
-  const isProcessingActive = isLoading || isProcessing || isStreaming || (processingStatus === 'processing');
+  // Calculate if any processing is active - ONLY useStreamingChat state
+  const isProcessingActive = isStreaming;
   
   // Notify parent of processing state changes
   useEffect(() => {
@@ -864,8 +848,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
               size="sm"
               onClick={() => {
                 stopStreaming(currentThreadId);
-                setLocalLoading(false);
-                updateProcessingStage(null);
+                // NO manual state clearing - useStreamingChat handles cancellation
               }}
               aria-label="Cancel processing"
             >
@@ -916,7 +899,6 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
           <ChatArea 
             chatMessages={chatHistory}
             isLoading={showLoadingForThisThread}
-            processingStage={processingStage || undefined}
             threadId={currentThreadId}
             onInteractiveOptionClick={handleInteractiveOptionClick}
           />

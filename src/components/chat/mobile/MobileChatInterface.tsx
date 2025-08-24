@@ -81,11 +81,9 @@ export default function MobileChatInterface({
     currentThreadIdRef.current = threadId;
   }, [threadId]);
   
+  // Use realtime hook ONLY for message subscriptions (NO processing states)
   const {
-    isLoading,
-    isProcessing,
-    processingStatus,
-    setLocalLoading
+    // Only used for message subscription management
   } = useChatRealtime(threadId);
   
   const { isKeyboardVisible } = useUnifiedKeyboard();
@@ -152,7 +150,7 @@ export default function MobileChatInterface({
              return [...prev, { role: 'assistant', content: response, analysis }];
            });
            setShowSuggestions(false);
-           setLocalLoading(false);
+            // NO manual state clearing - useStreamingChat handles it
            
            debugLog.addEvent("Streaming Response", `[Mobile] Assistant message added to UI for thread ${originThreadId}`, "success");
          }
@@ -229,11 +227,11 @@ export default function MobileChatInterface({
                 debugLog.addEvent("Streaming Watchdog", `[Mobile] Assistant message already exists in database`, "info");
               }
 
-              setLocalLoading(false);
+              // NO manual state clearing - useStreamingChat handles it
             }, 800); // Reduced delay for faster first message experience
           } catch (e) {
             console.warn('[Mobile Streaming Watchdog] Exception scheduling fallback:', (e as any)?.message || e);
-            setLocalLoading(false);
+            // NO manual state clearing - useStreamingChat handles it
           }
         }
     },
@@ -321,9 +319,9 @@ export default function MobileChatInterface({
     };
   }, [isIOSDevice, user]);
 
-  // Use unified auto-scroll hook
+  // Use unified auto-scroll hook - ONLY useStreamingChat dependencies
   const { scrollElementRef, scrollToBottom } = useAutoScroll({
-    dependencies: [messages, isLoading, isProcessing, isStreaming],
+    dependencies: [messages, isStreaming],
     delay: 50,
     scrollThreshold: 100
   });
@@ -341,13 +339,13 @@ export default function MobileChatInterface({
     };
   }, [scrollToBottom]);
 
-  // Notify parent of processing state changes for sidebar control
+  // Notify parent of processing state changes - ONLY useStreamingChat states
   useEffect(() => {
-    const isProcessingActive = isLoading || isProcessing || isStreaming;
+    const isProcessingActive = isStreaming;
     if (onProcessingStateChange) {
       onProcessingStateChange(isProcessingActive);
     }
-  }, [isLoading, isProcessing, isStreaming, onProcessingStateChange]);
+  }, [isStreaming, onProcessingStateChange]);
 
   // Realtime: append assistant messages saved by backend
   useEffect(() => {
@@ -552,7 +550,8 @@ export default function MobileChatInterface({
       return;
     }
 
-    if (isProcessing || isLoading) {
+    // Prevent multiple concurrent requests - ONLY useStreamingChat state
+    if (isStreaming) {
       toast({
         title: "Please wait",
         description: "Another request is currently being processed.",
@@ -810,7 +809,8 @@ export default function MobileChatInterface({
       return;
     }
 
-    if (isProcessing || processingStatus === 'processing') {
+    // Prevent deletion if currently processing - ONLY useStreamingChat state
+    if (isStreaming) {
       console.log('[MobileChat] Cannot delete thread while processing');
       toast({
         title: "Cannot delete conversation",
@@ -909,10 +909,11 @@ export default function MobileChatInterface({
     }
   };
 
-  const isDeletionDisabled = isProcessing || processingStatus === 'processing' || isLoading;
+  // Check if deletion should be disabled - ONLY useStreamingChat state
+  const isDeletionDisabled = isStreaming;
   
-  // Calculate if any processing is active (for disabling UI controls)
-  const isProcessingActive = isLoading || isProcessing || isStreaming || (processingStatus === 'processing');
+  // Calculate if any processing is active - ONLY useStreamingChat state
+  const isProcessingActive = isStreaming;
 
   return (
     <div className="mobile-chat-interface">
@@ -924,7 +925,11 @@ export default function MobileChatInterface({
               <Button 
                 variant="ghost" 
                 size="icon" 
-                className={`mr-2 ${isProcessingActive ? 'opacity-50 cursor-not-allowed' : ''}`}
+                className={`mr-2 ${
+                  isProcessingActive 
+                    ? 'text-muted-foreground/50 cursor-not-allowed' 
+                    : 'text-muted-foreground hover:text-destructive'
+                }`}
                 disabled={isProcessingActive}
                 title={isProcessingActive ? "Please wait while processing..." : "Toggle Menu"}
               >
@@ -1065,7 +1070,7 @@ export default function MobileChatInterface({
                       size="sm"
                       className="px-3 py-2 h-auto justify-start text-sm text-left bg-muted/50 hover:bg-muted w-full"
                       onClick={() => handleSendMessage(question.text)}
-                      disabled={isLoading || isProcessing}
+                      disabled={isStreaming}
                     >
                       <div className="flex items-start w-full">
                         <span className="mr-2">{question.icon}</span>
@@ -1103,7 +1108,7 @@ export default function MobileChatInterface({
                   showStreamingDots={true}
                 />
               </ChatErrorBoundary>
-            ) : (!isStreaming && (isLoading || isProcessing)) ? (
+            ) : (!isStreaming && false) ? ( // NO fallback processing states
               <ChatErrorBoundary>
                 <MobileChatMessage 
                   message={{ role: 'assistant', content: '' }}
@@ -1121,7 +1126,7 @@ export default function MobileChatInterface({
       {/* Chat Input */}
       <MobileChatInput 
         onSendMessage={handleSendMessage} 
-        isLoading={isLoading || isProcessing}
+        isLoading={isStreaming}
         userId={userId || user?.id}
       />
       

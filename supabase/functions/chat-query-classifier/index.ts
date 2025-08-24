@@ -86,7 +86,7 @@ async function gptClassifyMessage(
   Use the conversation context provided to you to classify the latest user message and return ONE JSON object that exactly matches the schema. Be decisive and consistent. Below we have the categories and information about what happens downstream in SOuLO app's back end code if you classify a certain way
 
 **STRONG TRIGGER WORD OVERRIDE (HIGHEST PRIORITY):**
-- Messages containing "analyze", "score me", "rate me", "evaluate me", "assess me", "tell me about my", "what am I like", "scale of [number]" should ALWAYS be JOURNAL_SPECIFIC regardless of typos or informal grammar
+- Messages similar to "analyze me", "score me", "rate me", "evaluate me", "assess me", "you tell me about my", "what am I like", "scale of [number]", "you help me uncover this" should ALWAYS be JOURNAL_SPECIFIC regardless of typos or informal grammar
 - Messages with personal pronouns + analysis requests ("analyze if I", "score me on", "rate my") = JOURNAL_SPECIFIC
 - Numerical scoring requests ("scale of 100", "1 to 10", "rate from 1-5") = JOURNAL_SPECIFIC
 - Requests like "Can you help me uncover this?" , "I want you to tell me this about me" 

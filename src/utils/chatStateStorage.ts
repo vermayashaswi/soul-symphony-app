@@ -6,6 +6,7 @@ export interface ChatStreamingState {
   currentUserMessage: string;
   showBackendAnimation: boolean;
   dynamicMessages: string[];
+  translatedDynamicMessages?: string[];
   currentMessageIndex: number;
   useThreeDotFallback: boolean;
   queryCategory: string;
@@ -13,6 +14,8 @@ export interface ChatStreamingState {
   processingStartTime: number | null;
   activeRequestId?: string | null;
   pausedDueToBackground?: boolean;
+  savedAt?: number;
+  navigationSafe?: boolean;
 }
 
 const CHAT_STATE_PREFIX = 'chat_streaming_state_';
