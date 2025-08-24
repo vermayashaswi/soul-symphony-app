@@ -381,7 +381,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     });
   }, [threadId, updateThreadState]);
 
-  // Generate streaming messages based on category with Capacitor parity
+  // Generate streaming messages based on category - journal queries get GPT messages, others get dots
   const generateStreamingMessages = useCallback(async (
     message: string, 
     category: string, 
@@ -392,8 +392,9 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     const activeThreadId = targetThreadId || threadId;
     if (!activeThreadId) return;
 
-    // Force three-dot fallback for Capacitor to match mobile web behavior
-    if (isCapacitor || category !== 'JOURNAL_SPECIFIC') {
+    // Journal-specific queries get GPT-generated streaming messages
+    // Non-journal queries get three-dot animation
+    if (category !== 'JOURNAL_SPECIFIC') {
       updateThreadState(activeThreadId, {
         useThreeDotFallback: true,
         dynamicMessages: [],
@@ -743,6 +744,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
         category: messageCategory,
         userTimezone, // Pass timezone directly to edge functions
       }, { attempts: 3, baseDelay: 900 }, targetThreadId);
+      
       // Check if request is still active (not superseded by another request)
       const currentThreadState = getThreadState(targetThreadId);
       if (currentThreadState.activeRequestId !== requestId) {
@@ -759,6 +761,17 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
           return;
         }
         throw new Error(error?.message || 'Request failed');
+      }
+
+      // Extract userStatusMessage from smart-query-planner response for journal-specific queries
+      if (messageCategory === 'JOURNAL_SPECIFIC' && data?.userStatusMessage) {
+        console.log(`[useStreamingChat] Displaying userStatusMessage: ${data.userStatusMessage}`);
+        updateThreadState(targetThreadId, {
+          dynamicMessages: [data.userStatusMessage],
+          translatedDynamicMessages: [data.userStatusMessage],
+          useThreeDotFallback: false,
+          currentMessageIndex: 0
+        });
       }
 
       const text = data?.response ?? data?.data ?? data?.message ?? (typeof data === 'string' ? data : null);

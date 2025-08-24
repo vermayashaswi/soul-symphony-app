@@ -159,10 +159,10 @@ const ChatArea: React.FC<ChatAreaProps> = ({
         </div>
       ))}
 
-      {/* Show streaming messages or typing indicator */}
+      {/* Show streaming messages for journal queries or typing indicator for others */}
       {(isLoading || isStreaming) && (
         <div className="flex justify-start mb-4">
-          {streamingMessage ? (
+          {streamingMessage && streamingMessage.trim() ? (
             <div className="flex gap-3 max-w-[80%]">
               <div className="mt-1">
                 <ParticleAvatar className="h-8 w-8" size={32} />

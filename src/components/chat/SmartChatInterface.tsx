@@ -115,7 +115,11 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     startStreamingChat,
     queryCategory,
     restoreStreamingState,
-    stopStreaming
+    stopStreaming,
+    useThreeDotFallback,
+    dynamicMessages,
+    translatedDynamicMessages,
+    currentMessageIndex
   } = useStreamingChat({
       threadId: currentThreadId,
     onFinalResponse: async (response, analysis, originThreadId, requestId) => {
@@ -906,7 +910,11 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
             onInteractiveOptionClick={handleInteractiveOptionClick}
             onUserMessageSent={userMessageSent}
             isStreaming={isStreaming}
-            streamingMessage={streamingMessages[0]?.message || ''}
+            streamingMessage={
+              !useThreeDotFallback && dynamicMessages && dynamicMessages.length > 0 
+                ? (translatedDynamicMessages[currentMessageIndex] || dynamicMessages[currentMessageIndex])
+                : ''
+            }
           />
         )}
         
