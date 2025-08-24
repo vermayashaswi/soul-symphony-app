@@ -2,7 +2,6 @@ import { Capacitor } from '@capacitor/core';
 import { LocalNotifications, ScheduleOptions } from '@capacitor/local-notifications';
 import { enhancedNotificationService } from './enhancedNotificationService';
 import { enhancedAndroidNotificationService, type AndroidNotificationStatus } from './enhancedAndroidNotificationService';
-import { getNotificationTimezoneConfig, debugNotificationTiming } from '@/utils/notification-timezone-helper';
 
 export type JournalReminderTime = 'morning' | 'afternoon' | 'evening' | 'night';
 
@@ -37,8 +36,6 @@ class JournalReminderService {
     night: { hour: 22, minute: 0 }
   };
 
-  private userTimezone: string | null = null;
-
   static getInstance(): JournalReminderService {
     if (!JournalReminderService.instance) {
       JournalReminderService.instance = new JournalReminderService();
@@ -63,17 +60,10 @@ class JournalReminderService {
     console.error(`[JournalReminderService] ${message}`, error);
   }
 
-  async requestPermissionsAndSetup(times: JournalReminderTime[], userTimezone?: string): Promise<boolean> {
+  async requestPermissionsAndSetup(times: JournalReminderTime[]): Promise<boolean> {
     console.log('[JournalReminderService] Setting up reminders for times using enhanced Android service:', times);
     
     this.ensureInitialized();
-    
-    // Set user timezone for proper scheduling
-    const timezoneConfig = getNotificationTimezoneConfig(userTimezone);
-    this.userTimezone = timezoneConfig.userTimezone;
-    
-    console.log('[JournalReminderService] Timezone configuration:', timezoneConfig);
-    debugNotificationTiming(this.userTimezone);
     
     try {
       // Clear any existing reminders first
@@ -92,7 +82,7 @@ class JournalReminderService {
         }
         
         // Schedule reminders using enhanced service
-        const scheduleResult = await enhancedAndroidNotificationService.scheduleJournalReminders(times, this.userTimezone);
+        const scheduleResult = await enhancedAndroidNotificationService.scheduleJournalReminders(times);
         
         if (scheduleResult.success) {
           console.log('[JournalReminderService] Enhanced Android reminders scheduled:', scheduleResult);
@@ -328,11 +318,10 @@ class JournalReminderService {
   }
 
   private getNextReminderTime(time: JournalReminderTime): Date {
-    const { hour, minute } = this.TIME_MAPPINGS[time];
-    const timezone = this.userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
-    
-    // Create the target time in user's timezone
     const now = new Date();
+    const { hour, minute } = this.TIME_MAPPINGS[time];
+    
+    // Start with today's target time
     const today = new Date();
     today.setHours(hour, minute, 0, 0);
     
@@ -341,7 +330,7 @@ class JournalReminderService {
       today.setDate(today.getDate() + 1);
     }
     
-    this.log(`Reminder ${time} scheduled for ${today.toLocaleString()} (timezone: ${timezone})`);
+    this.log(`Reminder ${time} scheduled for ${today.toLocaleString()}`);
     return today;
   }
 
