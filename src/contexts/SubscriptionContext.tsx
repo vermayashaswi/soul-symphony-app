@@ -175,25 +175,15 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
   // Fetch subscription data when user changes
   useEffect(() => {
     if (user) {
-      // Emergency fix: Detect iPhone and skip delays
-      const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
-      const isIPhone = /iphone/i.test(userAgent.toLowerCase());
-      
-      if (isIPhone) {
-        // Skip delay for iPhone to prevent loading issues
+      // Add small delay to allow trial setup trigger to complete
+      const timer = setTimeout(() => {
         fetchSubscriptionData();
-        subscriptionErrorHandler.reset();
-      } else {
-        // Add small delay for other devices to allow trial setup trigger to complete
-        const timer = setTimeout(() => {
-          fetchSubscriptionData();
-        }, 500);
-        
-        // Reset error handler when user changes
-        subscriptionErrorHandler.reset();
-        
-        return () => clearTimeout(timer);
-      }
+      }, 500);
+      
+      // Reset error handler when user changes
+      subscriptionErrorHandler.reset();
+      
+      return () => clearTimeout(timer);
     } else {
       fetchSubscriptionData();
     }
