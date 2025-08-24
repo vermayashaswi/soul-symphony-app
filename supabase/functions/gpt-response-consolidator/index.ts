@@ -398,6 +398,14 @@ Your response MUST be structured with:
     - NEVER mention "UTC" in your response - use the user's local timezone context instead
     - Timezone Status: ${timezoneConversion.isValid ? 'Validated' : 'Using fallback due to conversion issues'}
     
+    **CRITICAL DATE & TIME CONTEXT:**
+    CURRENT DATE: ${new Date().toISOString().split('T')[0]} (YYYY-MM-DD format)
+    CURRENT YEAR: ${new Date().getFullYear()}
+    - ALWAYS use current year ${new Date().getFullYear()} for relative time references like "current month", "this month", "last month"
+    - When analyzing temporal patterns, ensure dates align with current year
+    - For "current month": Use ${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')} as the current month reference
+    - For "last month": Calculate previous month using current year unless explicitly stated otherwise
+    
     **USER QUESTION:** "${userMessage}"
     
     **COMPREHENSIVE ANALYSIS RESULTS:**

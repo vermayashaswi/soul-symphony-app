@@ -818,6 +818,14 @@ You are provided with this database schema: ${databaseSchemaContext} **CRITICAL 
 - For percentage queries: Use proper calculations with ROUND((count * 100.0 / total), 1)
 - Include timezone in timeRange objects: "timezone": "${userTimezone}"
 
+**CRITICAL DATE HANDLING:**
+- ALWAYS use current year ${new Date().getFullYear()} for relative time references like "current month", "this month", "last month"
+- For "current month": Use '${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-01T00:00:00+${userTimezone.includes('/') ? '05:30' : '+00:00'}' as start date
+- For "last month": Calculate previous month using current year unless explicitly stated otherwise
+- Examples of CORRECT date ranges:
+  * Current month (August 2025): '2025-08-01T00:00:00+05:30' to '2025-09-01T00:00:00+05:30'
+  * Last month (July 2025): '2025-07-01T00:00:00+05:30' to '2025-08-01T00:00:00+05:30'
+
 **VECTOR SEARCH:**
 - Use semantic queries that match user's language and intent
 - Append relevant emotions/themes from database context
@@ -825,6 +833,8 @@ You are provided with this database schema: ${databaseSchemaContext} **CRITICAL 
 
 USER QUERY: "${message}"
 USER TIMEZONE: "${userTimezone}"
+CURRENT DATE: ${new Date().toISOString().split('T')[0]} (YYYY-MM-DD format)
+CURRENT YEAR: ${new Date().getFullYear()}
 CONVERSATION CONTEXT: ${last.length > 0 ? last.map(m => `${m.role || m.sender}: ${m.content || 'N/A'}`).join('\n  ') : 'None'}
 
 **CRITICAL CONVERSATION CONTEXT INSTRUCTIONS:**
