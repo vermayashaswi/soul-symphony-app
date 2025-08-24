@@ -97,6 +97,28 @@ const SmartChat = () => {
       console.log('[SmartChat] Creating new thread for user:', user.id);
       
       const newThreadId = uuidv4();
+      
+      // iPhone Fix: Skip complex verification for iPhone users
+      const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
+      const isIPhone = /iphone/i.test(userAgent);
+      
+      if (isIPhone) {
+        console.log('[iPhone Fix] Quick thread creation for iPhone');
+        setCurrentThreadId(newThreadId);
+        localStorage.setItem("lastActiveChatThreadId", newThreadId);
+        
+        // Create thread in background without waiting
+        supabase.from('chat_threads').insert({
+          id: newThreadId,
+          user_id: user.id,
+          title: "New Conversation",
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+        
+        return newThreadId;
+      }
+      
       const { error } = await supabase
         .from('chat_threads')
         .insert({

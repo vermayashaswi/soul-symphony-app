@@ -281,17 +281,17 @@ export default function MobileChatInterface({
     debugLog.addEvent("Platform Detection", `iOS device detected: ${isiOS}`, "info");
   }, []);
 
-  // iPhone emergency bypass - prevent indefinite loading
+  // iPhone emergency bypass - prevent indefinite loading  
   useEffect(() => {
     if (isIOSDevice) {
-      console.log('[iPhone Fix] Setting up emergency bypass timer');
+      console.log('[iPhone Fix] Setting up emergency bypass timer - reduced to 1 second');
       const emergencyTimeout = setTimeout(() => {
         if (initialLoading) {
           console.log('[iPhone Fix] Emergency bypass triggered - forcing loading to false');
           setInitialLoading(false);
           debugLog.addEvent("iPhone Emergency Bypass", "Forced loading state to false after timeout", "warning");
         }
-      }, 3000); // 3 second maximum loading time for iPhone
+      }, 1000); // Reduced to 1 second maximum loading time for iPhone
       
       return () => clearTimeout(emergencyTimeout);
     }
@@ -413,8 +413,12 @@ export default function MobileChatInterface({
     if (isIOSDevice) {
       console.log('[iPhone Fix] Immediate thread loading for iPhone');
       debugLog.addEvent("Thread Initialization", "iPhone - immediate loading", "info");
+      // Skip complex verification for iPhone - load immediately
+      loadWithIOSDelay();
+      setInitialLoading(false); // Force immediate loading completion
+    } else {
+      loadWithIOSDelay();
     }
-    loadWithIOSDelay();
   }, [threadId, user?.id, restoreStreamingState, isIOSDevice]);
   
   useEffect(() => {
