@@ -369,12 +369,13 @@ const location = useLocation();
         userMetadataKeys: currentUser.user_metadata ? Object.keys(currentUser.user_metadata) : []
       });
       
-      // Emergency fix: Remove iOS delays that cause loading issues
+      // Increased delay for mobile stability, extra delay for iOS
       if (isMobileDevice) {
         const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
         const isIOS = /iphone|ipad|ipod/i.test(userAgent.toLowerCase());
-        // Skip delays for faster loading, especially on iPhone
-        logProfile(`Mobile device detected (${isIOS ? 'iOS' : 'other'}), proceeding without delay for fast loading`, 'AuthContext');
+        const delay = isIOS ? 3500 : 2000; // Extended delay for iOS browsers
+        logProfile(`Mobile device detected (${isIOS ? 'iOS' : 'other'}), adding ${delay}ms stabilization delay`, 'AuthContext');
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
       
       const profileCreated = await ensureProfileExistsService(currentUser);

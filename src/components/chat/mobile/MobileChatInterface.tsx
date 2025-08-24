@@ -17,7 +17,7 @@ import { getThreadMessages, saveMessage, updateUserMessageClassification } from 
 import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
 import { processChatMessage } from "@/services/chatService";
 import { MentalHealthInsights } from "@/hooks/use-mental-health-insights";
-
+import { useChatRealtime } from "@/hooks/use-chat-realtime";
 import { updateThreadProcessingStatus, generateThreadTitle } from "@/utils/chat/threadUtils";
 import { useUnifiedKeyboard } from "@/hooks/use-unified-keyboard";
 import { useEnhancedSwipeGestures } from "@/hooks/use-enhanced-swipe-gestures";
@@ -79,19 +79,12 @@ export default function MobileChatInterface({
     currentThreadIdRef.current = threadId;
   }, [threadId]);
   
-  
-  // Emergency iPhone loading bypass - IMMEDIATE
-  useEffect(() => {
-    const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
-    const isIPhone = /iphone/i.test(userAgent.toLowerCase());
-    
-    if (isIPhone) {
-      // IMMEDIATE force loading completion for iPhone
-      console.log('[MobileChatInterface] IMMEDIATE iPhone bypass - forcing loading completion NOW');
-      setInitialLoading(false);
-      setIsIOSDevice(true);
-    }
-  }, []);
+  const {
+    isLoading,
+    isProcessing,
+    processingStatus,
+    setLocalLoading
+  } = useChatRealtime(threadId);
   
   const { isKeyboardVisible } = useUnifiedKeyboard();
   
@@ -156,7 +149,8 @@ export default function MobileChatInterface({
              }
              return [...prev, { role: 'assistant', content: response, analysis }];
            });
-            setShowSuggestions(false);
+           setShowSuggestions(false);
+           setLocalLoading(false);
            
            debugLog.addEvent("Streaming Response", `[Mobile] Assistant message added to UI for thread ${originThreadId}`, "success");
          }
@@ -233,10 +227,11 @@ export default function MobileChatInterface({
                 debugLog.addEvent("Streaming Watchdog", `[Mobile] Assistant message already exists in database`, "info");
               }
 
+              setLocalLoading(false);
             }, 800); // Reduced delay for faster first message experience
           } catch (e) {
             console.warn('[Mobile Streaming Watchdog] Exception scheduling fallback:', (e as any)?.message || e);
-            
+            setLocalLoading(false);
           }
         }
     },
@@ -286,15 +281,50 @@ export default function MobileChatInterface({
     debugLog.addEvent("Platform Detection", `iOS device detected: ${isiOS}`, "info");
   }, []);
 
-  // DISABLED iOS user verification - causing loading loops
-  // iPhone users get immediate access without verification
+  // iOS-specific user verification with retry logic
+  useEffect(() => {
+    if (!isIOSDevice || user) return;
+
+    let retryCount = 0;
+    const maxRetries = 5;
+    const retryDelay = 1000;
+
+    const verifyUser = () => {
+      if (user) {
+        debugLog.addEvent("iOS User Verification", "User verified successfully", "success");
+        return;
+      }
+
+      retryCount++;
+      if (retryCount <= maxRetries) {
+        debugLog.addEvent("iOS User Verification", `Retry ${retryCount}/${maxRetries} - User not yet available`, "warning");
+        userVerificationTimeoutRef.current = setTimeout(verifyUser, retryDelay);
+      } else {
+        debugLog.addEvent("iOS User Verification", "Max retries reached - user verification failed", "error");
+        toast({
+          title: "Authentication Issue",
+          description: "Please refresh the page if the chat doesn't load.",
+          variant: "destructive"
+        });
+      }
+    };
+
+    // Start verification after a brief delay for iOS session stabilization
+    userVerificationTimeoutRef.current = setTimeout(verifyUser, 2000);
+
+    return () => {
+      if (userVerificationTimeoutRef.current) {
+        clearTimeout(userVerificationTimeoutRef.current);
+      }
+    };
+  }, [isIOSDevice, user]);
 
   // Track user message sending for auto-scroll
   const [userJustSentMessage, setUserJustSentMessage] = useState(false);
 
   // Auto-scroll setup for mobile chat area
   const { scrollElementRef, scrollToBottom } = useAutoScroll({
-    dependencies: [messages, streamingMessages, isStreaming],
+    dependencies: [messages, streamingMessages, isLoading, isStreaming],
     enabled: true,
     delay: 50,
     smooth: true,
@@ -373,10 +403,11 @@ export default function MobileChatInterface({
   }, [threadId]);
 
   useEffect(() => {
-    // IMMEDIATE thread loading - no delays for iPhone
-    const loadThreadData = () => {
+    // iOS-specific delay before thread loading
+    const loadWithIOSDelay = () => {
       if (threadId) {
         loadThreadMessages(threadId);
+        // Try to restore streaming state for this thread
         const restored = restoreStreamingState(threadId);
         if (restored) {
           debugLog.addEvent("Thread Initialization", `Restored streaming state for thread: ${threadId}`, "info");
@@ -384,9 +415,10 @@ export default function MobileChatInterface({
         debugLog.addEvent("Thread Initialization", `Loading current thread: ${threadId}`, "info");
       } else {
         const storedThreadId = localStorage.getItem("lastActiveChatThreadId");
-        if (storedThreadId) {
+        if (storedThreadId && user?.id) {
           setThreadId(storedThreadId);
           loadThreadMessages(storedThreadId);
+          // Try to restore streaming state for stored thread
           const restored = restoreStreamingState(storedThreadId);
           if (restored) {
             debugLog.addEvent("Thread Initialization", `Restored streaming state for stored thread: ${storedThreadId}`, "info");
@@ -399,13 +431,14 @@ export default function MobileChatInterface({
       }
     };
 
-    if (isIOSDevice) {
-      // IMMEDIATE loading for iPhone - no delays
-      debugLog.addEvent("Thread Initialization", "iPhone device - IMMEDIATE loading", "info");
-      loadThreadData();
+    if (isIOSDevice && !user) {
+      // For iOS, wait longer for user authentication to stabilize
+      debugLog.addEvent("Thread Initialization", "iOS device - waiting for user authentication", "info");
+      const timeout = setTimeout(loadWithIOSDelay, 3000);
+      return () => clearTimeout(timeout);
     } else {
       // For non-iOS or when user is available, load immediately
-      loadThreadData();
+      loadWithIOSDelay();
     }
   }, [threadId, user?.id, restoreStreamingState, isIOSDevice]);
   
@@ -431,22 +464,16 @@ export default function MobileChatInterface({
   };
 
   const loadThreadMessages = async (currentThreadId: string) => {
-    if (!currentThreadId) {
-      setInitialLoading(false);
-      return;
-    }
-    
-    // SKIP user validation for iPhone - force load with mock data
-    if (isIOSDevice && !user?.id) {
-      debugLog.addEvent("iPhone Override", "Loading without user validation", "info");
-      setMessages([]);
-      setShowSuggestions(true);
-      setInitialLoading(false);
-      return;
-    }
-    
-    if (!user?.id) {
-      setInitialLoading(false);
+    if (!currentThreadId || !user?.id) {
+      // iOS-specific timeout for loader - prevent infinite loading
+      if (isIOSDevice) {
+        setTimeout(() => {
+          setInitialLoading(false);
+          debugLog.addEvent("iOS Loading Timeout", "Loader timeout triggered for iOS", "warning");
+        }, 8000);
+      } else {
+        setInitialLoading(false);
+      }
       return;
     }
     
@@ -518,6 +545,14 @@ export default function MobileChatInterface({
       return;
     }
 
+    if (isProcessing || isLoading) {
+      toast({
+        title: "Please wait",
+        description: "Another request is currently being processed.",
+        variant: "default"
+      });
+      return;
+    }
 
     let currentThreadId = threadId;
     let isFirstMessage = false;
@@ -767,6 +802,16 @@ export default function MobileChatInterface({
       return;
     }
 
+    if (isProcessing || processingStatus === 'processing') {
+      console.log('[MobileChat] Cannot delete thread while processing');
+      toast({
+        title: "Cannot delete conversation",
+        description: "Please wait for the current request to complete before deleting this conversation.",
+        variant: "destructive"
+      });
+      setShowDeleteDialog(false);
+      return;
+    }
 
     try {
       console.log('[MobileChat] Deleting thread:', threadId);
@@ -856,7 +901,7 @@ export default function MobileChatInterface({
     }
   };
 
-  const isDeletionDisabled = false;
+  const isDeletionDisabled = isProcessing || processingStatus === 'processing' || isLoading;
 
   return (
     <div className="mobile-chat-interface">
@@ -864,18 +909,18 @@ export default function MobileChatInterface({
       <div className="sticky top-0 z-40 w-full bg-background border-b">
         <div className="container flex h-14 max-w-screen-lg items-center">
           <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-            <SheetTrigger asChild disabled={isStreaming}>
+            <SheetTrigger asChild disabled={isLoading || isProcessing || isStreaming}>
               <Button 
                 variant="ghost" 
                 size="icon" 
-                disabled={isStreaming}
+                disabled={isLoading || isProcessing || isStreaming}
                 className={`mr-2 transition-opacity ${
-                  isStreaming
+                  isLoading || isProcessing || isStreaming
                     ? "text-muted-foreground/50 opacity-50 cursor-not-allowed"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
                 title={
-                  isStreaming
+                  isLoading || isProcessing || isStreaming
                     ? "Menu disabled during processing"
                     : "Open menu"
                 }
@@ -1013,7 +1058,7 @@ export default function MobileChatInterface({
                       size="sm"
                       className="px-3 py-2 h-auto justify-start text-sm text-left bg-muted/50 hover:bg-muted w-full"
                       onClick={() => handleSendMessage(question.text)}
-                      disabled={false}
+                      disabled={isLoading || isProcessing}
                     >
                       <div className="flex items-start w-full">
                         <span className="mr-2">{question.icon}</span>
@@ -1054,13 +1099,23 @@ export default function MobileChatInterface({
               />
             )}
             
+            {/* Show loading indicator if loading but not streaming */}
+            {(isLoading || isProcessing) && !isStreaming && (
+              <MobileChatMessage
+                message={{ role: 'assistant', content: '' }}
+                showAnalysis={false}
+                isLoading={true}
+                streamingMessage={undefined}
+                showStreamingDots={false}
+              />
+            )}
           </div>
         )}
       
       {/* Chat Input */}
       <MobileChatInput 
         onSendMessage={handleSendMessage} 
-        isLoading={false}
+        isLoading={isLoading || isProcessing}
         userId={userId || user?.id}
       />
       
