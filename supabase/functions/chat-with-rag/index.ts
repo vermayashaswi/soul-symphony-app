@@ -130,12 +130,6 @@ serve(async (req) => {
     
     // No processing message creation - handled by frontend streaming
     let assistantMessageId = null;
-          console.log(`[chat-with-rag] Created assistant message: ${assistantMessageId}`);
-        }
-      } catch (error) {
-        console.error('[chat-with-rag] Exception creating assistant message:', error);
-      }
-    }
     
     // Enhanced timezone handling with validation
     const { normalizeTimezone } = await import('../_shared/timezoneUtils.ts');
