@@ -45,6 +45,16 @@ class EnhancedJournalReminderService {
   private async ensureInitialized(): Promise<void> {
     if (this.initialized) return;
     
+    // Skip LocalNotifications entirely for Capacitor Android to prevent blocking
+    const isAndroidCapacitor = Capacitor.getPlatform() === 'android' && Capacitor.isNativePlatform();
+    
+    if (isAndroidCapacitor) {
+      console.log('[EnhancedJournalReminderService] Skipping initialization for Capacitor Android - LocalNotifications disabled');
+      this.platformInfo = { platform: 'android', isNative: true, capabilities: { nativeNotifications: false } };
+      this.initialized = true;
+      return;
+    }
+    
     try {
       this.platformInfo = await enhancedPlatformService.detectPlatform();
       await this.setupNotificationChannels();
@@ -111,6 +121,14 @@ class EnhancedJournalReminderService {
    */
   async requestPermissionsAndSetup(times: JournalReminderTime[]): Promise<boolean> {
     await this.ensureInitialized();
+    
+    // Skip LocalNotifications entirely for Capacitor Android to prevent blocking
+    const isAndroidCapacitor = Capacitor.getPlatform() === 'android' && Capacitor.isNativePlatform();
+    
+    if (isAndroidCapacitor) {
+      console.log('[EnhancedJournalReminderService] Skipping permission setup for Capacitor Android - notifications disabled');
+      return false;
+    }
     
     try {
       if (this.platformInfo?.isNative) {
@@ -666,6 +684,14 @@ class EnhancedJournalReminderService {
   async testReminder(): Promise<boolean> {
     console.log('🧪 Testing enhanced journal reminder');
     
+    // Skip LocalNotifications entirely for Capacitor Android to prevent blocking
+    const isAndroidCapacitor = Capacitor.getPlatform() === 'android' && Capacitor.isNativePlatform();
+    
+    if (isAndroidCapacitor) {
+      console.log('[EnhancedJournalReminderService] Skipping test reminder for Capacitor Android');
+      return false;
+    }
+    
     try {
       await this.ensureInitialized();
       
@@ -748,6 +774,21 @@ class EnhancedJournalReminderService {
     channelsCreated: boolean;
     platformInfo: any;
   }> {
+    // Skip LocalNotifications entirely for Capacitor Android to prevent blocking
+    const isAndroidCapacitor = Capacitor.getPlatform() === 'android' && Capacitor.isNativePlatform();
+    
+    if (isAndroidCapacitor) {
+      console.log('[EnhancedJournalReminderService] Skipping notification status for Capacitor Android');
+      return {
+        strategy: 'disabled',
+        activeReminders: 0,
+        permissionState: 'disabled',
+        verified: false,
+        channelsCreated: false,
+        platformInfo: { platform: 'android', isNative: true, capabilities: { nativeNotifications: false } }
+      };
+    }
+    
     try {
       await this.ensureInitialized();
       
@@ -798,6 +839,14 @@ class EnhancedJournalReminderService {
    * Initialize reminders on app start if enabled
    */
   async initializeOnAppStart(): Promise<void> {
+    // Skip LocalNotifications entirely for Capacitor Android to prevent blocking
+    const isAndroidCapacitor = Capacitor.getPlatform() === 'android' && Capacitor.isNativePlatform();
+    
+    if (isAndroidCapacitor) {
+      console.log('[EnhancedJournalReminderService] Skipping app start initialization for Capacitor Android');
+      return;
+    }
+    
     try {
       await this.ensureInitialized();
       
