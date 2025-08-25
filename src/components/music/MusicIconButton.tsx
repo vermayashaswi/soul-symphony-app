@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { useMusicPlayer } from '@/contexts/MusicPlayerContext';
 import { musicCategories } from '@/config/musicCategories';
+import { TranslatableText } from '@/components/translation/TranslatableText';
 
 const iconMap = {
   Moon,
@@ -80,8 +81,12 @@ const MusicIconButton: React.FC<MusicIconButtonProps> = ({ className = "" }) => 
             className="absolute top-10 right-0 z-[9999] w-64 bg-background/95 backdrop-blur-md border border-border/50 rounded-lg shadow-lg overflow-hidden"
           >
             <div className="p-3 border-b border-border/30">
-              <h3 className="text-sm font-semibold text-foreground">Choose Music Type</h3>
-              <p className="text-xs text-muted-foreground mt-1">Binaural beats for different moods</p>
+              <h3 className="text-sm font-semibold text-foreground">
+                <TranslatableText text="Choose Music Type" />
+              </h3>
+              <p className="text-xs text-muted-foreground mt-1">
+                <TranslatableText text="Binaural beats for different moods" />
+              </p>
             </div>
 
             <div className="p-2 space-y-1 max-h-64 overflow-y-auto">
@@ -102,8 +107,12 @@ const MusicIconButton: React.FC<MusicIconButtonProps> = ({ className = "" }) => 
                         <Icon className="h-4 w-4 text-white" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="font-medium text-sm text-foreground">{category.name}</div>
-                        <div className="text-xs text-muted-foreground truncate">{category.description}</div>
+                        <div className="font-medium text-sm text-foreground">
+                          <TranslatableText text={category.name} />
+                        </div>
+                        <div className="text-xs text-muted-foreground truncate">
+                          <TranslatableText text={category.description} />
+                        </div>
                       </div>
                     </div>
                   </Button>
