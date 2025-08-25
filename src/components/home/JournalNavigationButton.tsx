@@ -101,7 +101,7 @@ const JournalNavigationButton: React.FC = () => {
         className="journal-arrow-button"
         style={{
           ...getAnimationCenterStyles(undefined, undefined, true, 1.07),
-          zIndex: isInArrowTutorialStep ? 10000 : 40,
+          zIndex: isInArrowTutorialStep ? 10000 : 10,
           margin: 0,
           padding: 0,
           pointerEvents: 'auto',

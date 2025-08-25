@@ -9,6 +9,7 @@ import LanguageSelector from '@/components/LanguageSelector';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTutorial } from '@/contexts/TutorialContext';
+import MusicIconButton from '@/components/music/MusicIconButton';
 
 const JournalHeader: React.FC = () => {
   const { user } = useAuth();
@@ -81,53 +82,60 @@ const JournalHeader: React.FC = () => {
   };
 
   return (
-    <div className={`p-4 flex flex-col journal-header-container ${isInWelcomeTutorialStep ? 'tutorial-target' : ''}`}>
-      <div className="flex justify-between items-start w-full relative">
-        <div className={`relative max-w-[65%] ${isInWelcomeTutorialStep ? 'z-[9999]' : ''}`}>
-          <h1
-            className={`text-2xl font-bold text-theme break-words hyphens-auto ${isInWelcomeTutorialStep ? 'tutorial-highlight' : ''}`}
-            style={{
-              fontWeight: 700,
-              letterSpacing: '0.005em',
-              WebkitFontSmoothing: 'antialiased',
-              MozOsxFontSmoothing: 'grayscale',
-              display: isInWelcomeTutorialStep ? 'block' : '-webkit-box',
-              WebkitLineClamp: isInWelcomeTutorialStep ? 'none' : '2',
-              WebkitBoxOrient: 'vertical',
-              overflow: isInWelcomeTutorialStep ? 'visible' : 'hidden',
-              maxHeight: isInWelcomeTutorialStep ? 'none' : '60px',
-              visibility: 'visible',
-              opacity: 1
-            }}
-          >
-            <TranslatableText text={getJournalName()} forceTranslate={true} />
-          </h1>
-        </div>
+    <div className={`p-4 journal-header-container relative ${isInWelcomeTutorialStep ? 'tutorial-target' : ''}`}>
+      {/* Journal title - allow wrapping with fixed right margin for absolutely positioned elements */}
+      <div className={`relative pr-32 ${isInWelcomeTutorialStep ? 'z-[9999]' : ''}`}>
+        <h1
+          className={`journal-title-responsive font-black text-theme break-words hyphens-auto ${isInWelcomeTutorialStep ? 'tutorial-highlight' : ''}`}
+          style={{
+            fontSize: '125%', // 25% increase from base size
+            fontWeight: 900, // Extra bold
+            letterSpacing: '0.005em',
+            WebkitFontSmoothing: 'antialiased',
+            MozOsxFontSmoothing: 'grayscale',
+            visibility: 'visible',
+            opacity: 1,
+            wordBreak: 'break-word',
+            lineHeight: 1.2
+          }}
+          title={getJournalName()} // Show full name on hover
+        >
+          <TranslatableText text={getJournalName()} forceTranslate={true} />
+        </h1>
+      </div>
 
-        <div className={`flex items-center ${isInWelcomeTutorialStep ? 'z-[9999]' : 'z-50'}`}>
-          <motion.div
-            variants={dateStripVariants}
-            initial="hidden"
-            animate="visible"
-            className={`px-3 py-1 rounded-l-md whitespace-nowrap ${theme === 'dark' ? 'bg-gray-800/80' : 'bg-gray-100/80'} ${isInWelcomeTutorialStep ? 'tutorial-highlight' : ''}`}
-          >
-            <div
-              className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-black'}`}
-              style={{
-                fontWeight: 500,
-                letterSpacing: '0.01em',
-                WebkitFontSmoothing: 'antialiased',
-                MozOsxFontSmoothing: 'grayscale',
-                visibility: 'visible',
-                opacity: 1
-              }}
-            >
-              <TranslatableText text={formattedDate} forceTranslate={true} />
-            </div>
-          </motion.div>
-          <div className="ml-2 relative z-[1000] pointer-events-auto">
-            <LanguageSelector />
-          </div>
+      {/* FIXED POSITION: Date strip - top right */}
+      <motion.div
+        variants={dateStripVariants}
+        initial="hidden"
+        animate="visible"
+        className={`absolute top-4 right-4 px-3 py-1 rounded-l-md whitespace-nowrap ${theme === 'dark' ? 'bg-gray-800/80' : 'bg-gray-100/80'} ${isInWelcomeTutorialStep ? 'tutorial-highlight z-[9999]' : 'z-50'}`}
+      >
+        <div
+          className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-black'}`}
+          style={{
+            fontWeight: 500,
+            letterSpacing: '0.01em',
+            WebkitFontSmoothing: 'antialiased',
+            MozOsxFontSmoothing: 'grayscale',
+            visibility: 'visible',
+            opacity: 1
+          }}
+        >
+          <TranslatableText text={formattedDate} forceTranslate={true} />
+        </div>
+      </motion.div>
+      
+      {/* Right side icons - positioned absolutely with perfect alignment */}
+      <div className="absolute top-12 right-4 flex items-center gap-2">
+        {/* Language selector */}
+        <div className={`h-8 w-8 flex items-center justify-center ${isInWelcomeTutorialStep ? 'z-[9999]' : 'z-[1000]'}`}>
+          <LanguageSelector />
+        </div>
+        
+        {/* Music icon button */}
+        <div className={`h-8 w-8 flex items-center justify-center ${isInWelcomeTutorialStep ? 'z-[9999]' : 'z-[1000]'}`}>
+          <MusicIconButton />
         </div>
       </div>
     </div>

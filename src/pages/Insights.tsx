@@ -26,6 +26,7 @@ function InsightsContent() {
   const [isSticky, setIsSticky] = useState(false);
   const timeToggleRef = useRef<HTMLDivElement>(null);
   const scrollPositionRef = useRef<number>(0);
+  const containerRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
 
   // FETCH INSIGHTS DATA: Now uses separated data for stats vs charts
@@ -46,22 +47,26 @@ function InsightsContent() {
   }, [prefetchTranslationsForRoute]);
 
   useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
     const handleScroll = () => {
-      scrollPositionRef.current = window.scrollY;
+      const scrollTop = container.scrollTop;
+      scrollPositionRef.current = scrollTop;
       
       const scrollThreshold = isMobile ? 40 : 90;
-      const nextIsSticky = window.scrollY > scrollThreshold;
+      const nextIsSticky = scrollTop > scrollThreshold;
       
       if (isSticky !== nextIsSticky) {
         setIsSticky(nextIsSticky);
       }
     };
 
-    window.addEventListener('scroll', handleScroll);
+    container.addEventListener('scroll', handleScroll);
     handleScroll();
     
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [isMobile, isSticky]); 
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [isMobile, isSticky]);
 
   // When timeRange changes, reset both independently-scoped dates to today
   useEffect(() => {
@@ -79,12 +84,17 @@ function InsightsContent() {
 
   const handleTimeRangeChange = (value: string) => {
     if (value) {
-      scrollPositionRef.current = window.scrollY;
+      const container = containerRef.current;
+      if (container) {
+        scrollPositionRef.current = container.scrollTop;
+      }
       setTimeRange(value as TimeRange);
       setEmotionChartDate(new Date());
       setMoodCalendarDate(new Date());
       setTimeout(() => {
-        window.scrollTo({ top: scrollPositionRef.current });
+        if (container) {
+          container.scrollTop = scrollPositionRef.current;
+        }
       }, 10);
     }
   };
@@ -92,7 +102,10 @@ function InsightsContent() {
   useEffect(() => {
     if (!loading) {
       setTimeout(() => {
-        window.scrollTo({ top: scrollPositionRef.current });
+        const container = containerRef.current;
+        if (container) {
+          container.scrollTop = scrollPositionRef.current;
+        }
       }, 100);
     }
   }, [loading, statsInsightsData]);
@@ -101,6 +114,7 @@ function InsightsContent() {
 
   return (
     <div 
+      ref={containerRef}
       className="min-h-screen pb-20 insights-container"
       style={{
         position: 'fixed',

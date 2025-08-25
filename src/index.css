@@ -461,3 +461,50 @@ body {
 .onboarding-language-select [data-radix-select-value] {
   color: white;
 }
+
+/* Music Player Styles */
+.music-player-dropdown {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Responsive text sizing for journal titles */
+@media (max-width: 640px) {
+  .journal-title-responsive {
+    font-size: clamp(1.25rem, 4vw, 1.5rem);
+    line-height: 1.2;
+  }
+}
+
+@media (max-width: 480px) {
+  .journal-title-responsive {
+    font-size: clamp(1rem, 5vw, 1.25rem);
+  }
+}
+
+/* Gradient animation for journal title */
+@keyframes gradientShift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* Enhanced responsive text sizing with 25% increase */
+@media (max-width: 640px) {
+  .journal-title-responsive {
+    font-size: clamp(1.5625rem, 5vw, 1.875rem); /* 25% increase from original clamp */
+    line-height: 1.2;
+  }
+}
+
+@media (max-width: 480px) {
+  .journal-title-responsive {
+    font-size: clamp(1.25rem, 6.25vw, 1.5625rem); /* 25% increase from original clamp */
+  }
+}
