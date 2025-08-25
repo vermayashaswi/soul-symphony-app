@@ -21,6 +21,11 @@ interface ChatAreaProps {
   processingStage?: string;
   threadId?: string | null;
   onInteractiveOptionClick?: (option: any) => void;
+  // Streaming state props for enhanced UX
+  isStreaming?: boolean;
+  streamingMessage?: string;
+  useThreeDotFallback?: boolean;
+  showBackendAnimation?: boolean;
 }
 
 const ChatArea: React.FC<ChatAreaProps> = ({ 
@@ -28,11 +33,15 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   isLoading, 
   processingStage,
   threadId,
-  onInteractiveOptionClick
+  onInteractiveOptionClick,
+  isStreaming = false,
+  streamingMessage,
+  useThreeDotFallback = false,
+  showBackendAnimation = false
 }) => {
   // Use unified auto-scroll hook
   const { scrollElementRef, scrollToBottom } = useAutoScroll({
-    dependencies: [chatMessages, isLoading, processingStage],
+    dependencies: [chatMessages, isLoading, processingStage, isStreaming, streamingMessage],
     delay: 50,
     scrollThreshold: 100
   });
@@ -151,7 +160,75 @@ const ChatArea: React.FC<ChatAreaProps> = ({
         </div>
       ))}
 
-      {isLoading && (
+      {/* Enhanced streaming and loading states */}
+      {isStreaming ? (
+        <div className="flex justify-start mb-4">
+          <div className="flex gap-3 max-w-[80%]">
+            <div className="mt-1">
+              <ParticleAvatar className="h-8 w-8" size={32} />
+            </div>
+            
+            <Card className="overflow-hidden">
+              <CardContent className="p-3">
+                {useThreeDotFallback || !streamingMessage ? (
+                  <div className="flex items-center space-x-1">
+                    <div className="flex space-x-1">
+                      <div 
+                        className="w-2 h-2 bg-muted-foreground rounded-full animate-pulse"
+                        style={{
+                          animationDelay: '0ms',
+                          animationDuration: '1.4s'
+                        }}
+                      ></div>
+                      <div 
+                        className="w-2 h-2 bg-muted-foreground rounded-full animate-pulse"
+                        style={{
+                          animationDelay: '200ms',
+                          animationDuration: '1.4s'
+                        }}
+                      ></div>
+                      <div 
+                        className="w-2 h-2 bg-muted-foreground rounded-full animate-pulse"
+                        style={{
+                          animationDelay: '400ms',
+                          animationDuration: '1.4s'
+                        }}
+                      ></div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground text-sm">{streamingMessage}</span>
+                    <div className="flex space-x-1">
+                      <div 
+                        className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-pulse"
+                        style={{
+                          animationDelay: '0ms',
+                          animationDuration: '1.4s'
+                        }}
+                      ></div>
+                      <div 
+                        className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-pulse"
+                        style={{
+                          animationDelay: '200ms',
+                          animationDuration: '1.4s'
+                        }}
+                      ></div>
+                      <div 
+                        className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-pulse"
+                        style={{
+                          animationDelay: '400ms',
+                          animationDuration: '1.4s'
+                        }}
+                      ></div>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      ) : isLoading && (
         <div className="flex justify-start mb-4">
           <TypingIndicator />
         </div>

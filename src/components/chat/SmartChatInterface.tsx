@@ -113,7 +113,11 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     startStreamingChat,
     queryCategory,
     restoreStreamingState,
-    stopStreaming
+    stopStreaming,
+    dynamicMessages,
+    translatedDynamicMessages,
+    currentMessageIndex,
+    useThreeDotFallback
   } = useStreamingChat({
       threadId: currentThreadId,
     onFinalResponse: async (response, analysis, originThreadId, requestId) => {
@@ -349,6 +353,21 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       window.removeEventListener('threadSelected' as any, onThreadChange);
     };
   }, [effectiveUserId, propsThreadId]);
+
+  // Listen for completed responses and reload messages
+  useEffect(() => {
+    const onResponseReady = (event: CustomEvent) => {
+      if (event.detail.threadId === currentThreadId) {
+        console.log(`[SmartChatInterface] Response ready for thread ${currentThreadId}, reloading messages`);
+        loadThreadMessages(currentThreadId);
+      }
+    };
+    
+    window.addEventListener('chatResponseReady' as any, onResponseReady);
+    return () => {
+      window.removeEventListener('chatResponseReady' as any, onResponseReady);
+    };
+  }, [currentThreadId]);
 
   // Auto-scroll is now handled by the useAutoScroll hook
 
@@ -901,6 +920,14 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
             isLoading={showLoadingForThisThread}
             threadId={currentThreadId}
             onInteractiveOptionClick={handleInteractiveOptionClick}
+            isStreaming={isStreaming}
+            streamingMessage={
+              useThreeDotFallback || dynamicMessages.length === 0
+                ? undefined
+                : translatedDynamicMessages[currentMessageIndex] || dynamicMessages[currentMessageIndex]
+            }
+            useThreeDotFallback={useThreeDotFallback}
+            showBackendAnimation={showBackendAnimation}
           />
         )}
         
