@@ -84,7 +84,8 @@ const JournalHeader: React.FC = () => {
   return (
     <div className={`p-4 flex flex-col journal-header-container ${isInWelcomeTutorialStep ? 'tutorial-target' : ''}`}>
       <div className="flex justify-between items-start w-full relative">
-        <div className={`relative max-w-[60%] mr-4 ${isInWelcomeTutorialStep ? 'z-[9999]' : ''}`}>
+        {/* Left side - Journal title with increased width */}
+        <div className={`relative max-w-[75%] mr-4 ${isInWelcomeTutorialStep ? 'z-[9999]' : ''}`}>
           <h1
             className={`journal-title-responsive font-bold text-theme break-words hyphens-auto overflow-hidden text-ellipsis ${isInWelcomeTutorialStep ? 'tutorial-highlight' : ''}`}
             style={{
@@ -102,7 +103,9 @@ const JournalHeader: React.FC = () => {
           </h1>
         </div>
 
-        <div className={`flex items-center gap-2 ${isInWelcomeTutorialStep ? 'z-[9999]' : 'z-50'}`}>
+        {/* Right side - Date at top, icons below */}
+        <div className={`flex flex-col items-end gap-2 ${isInWelcomeTutorialStep ? 'z-[9999]' : 'z-50'}`}>
+          {/* Date at the top */}
           <motion.div
             variants={dateStripVariants}
             initial="hidden"
@@ -123,11 +126,15 @@ const JournalHeader: React.FC = () => {
               <TranslatableText text={formattedDate} forceTranslate={true} />
             </div>
           </motion.div>
-          <div className="relative z-[1000] pointer-events-auto">
-            <LanguageSelector />
-          </div>
-          <div className="relative z-[1000] pointer-events-auto">
-            <MusicIconButton />
+          
+          {/* Icons below the date */}
+          <div className="flex items-center gap-2">
+            <div className="relative z-[1000] pointer-events-auto">
+              <LanguageSelector />
+            </div>
+            <div className="relative z-[1000] pointer-events-auto">
+              <MusicIconButton />
+            </div>
           </div>
         </div>
       </div>

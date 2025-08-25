@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Globe } from 'lucide-react';
 import {
   DropdownMenu,
@@ -72,6 +72,16 @@ const LanguageSelector = () => {
   const { currentLanguage, setLanguage, isTranslating } = useTranslation();
   const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
+
+  // Listen for music dropdown events to close this dropdown
+  useEffect(() => {
+    const handleCloseLangDropdown = () => {
+      setIsOpen(false);
+    };
+    
+    window.addEventListener('closeLangDropdown', handleCloseLangDropdown);
+    return () => window.removeEventListener('closeLangDropdown', handleCloseLangDropdown);
+  }, []);
 
   const handleLanguageChange = async (languageCode: string) => {
     componentLogger.info('Language change requested', { 

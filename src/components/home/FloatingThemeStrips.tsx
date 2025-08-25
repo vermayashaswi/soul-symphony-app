@@ -300,7 +300,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
 
   return (
     <div className="relative w-full h-full overflow-hidden">
-      <div className="absolute top-[70px] right-6 z-50">
+      <div className="absolute top-[100px] right-6 z-50">
         <motion.div
           initial={{ scale: 1 }}
           animate={{ scale: [1, 1.05, 1] }}
@@ -309,8 +309,9 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
             repeat: Infinity,
             repeatType: "reverse"
           }}
-          className="px-1.5 py-0.5 text-center rounded-sm scale-75"
+          className="px-1.5 py-0.5 text-center rounded-sm"
           style={{
+            transform: 'scale(0.6)',
             backgroundColor: `${themeColor}50`,
             borderLeft: `3px solid ${themeColor}`,
             borderRight: `3px solid ${themeColor}`,

@@ -4,133 +4,118 @@ export const musicCategories: MusicCategory[] = [
   {
     id: 'sleep',
     name: 'Sleep',
-    description: 'Deep relaxation and sleep induction',
+    description: 'Drift into peaceful rest',
     icon: 'Moon',
-    color: 'hsl(240, 100%, 85%)', // Soft purple
+    color: '#8B5FBF',
     frequencies: [
-      {
-        name: 'Deep Sleep Delta 1',
-        baseFrequency: 100,
-        binauralBeat: 1.5,
-        duration: 600 // 10 minutes
-      },
-      {
-        name: 'Deep Sleep Delta 2',
-        baseFrequency: 110,
-        binauralBeat: 2.5,
-        duration: 600
-      },
-      {
-        name: 'REM Sleep',
-        baseFrequency: 120,
-        binauralBeat: 3.5,
-        duration: 600
-      },
-      {
-        name: 'Sleep Transition',
-        baseFrequency: 90,
-        binauralBeat: 1.0,
-        duration: 600
-      }
+      { name: 'Delta Waves', baseFrequency: 80, binauralBeat: 1.5, duration: 300 },
+      { name: 'Theta Entry', baseFrequency: 120, binauralBeat: 6, duration: 180 },
+      { name: 'Deep Delta', baseFrequency: 60, binauralBeat: 0.5, duration: 600 },
+      { name: 'REM Support', baseFrequency: 100, binauralBeat: 4, duration: 240 }
     ]
   },
   {
     id: 'meditation',
     name: 'Meditation',
-    description: 'Deep meditation and mindfulness',
+    description: 'Find inner peace and mindfulness',
     icon: 'Heart',
-    color: 'hsl(142, 76%, 65%)', // Soft green
+    color: '#FF6B8A',
     frequencies: [
-      {
-        name: 'Theta Meditation 1',
-        baseFrequency: 200,
-        binauralBeat: 6.0,
-        duration: 900 // 15 minutes
-      },
-      {
-        name: 'Theta Meditation 2',
-        baseFrequency: 180,
-        binauralBeat: 7.0,
-        duration: 900
-      },
-      {
-        name: 'Deep Theta',
-        baseFrequency: 160,
-        binauralBeat: 5.5,
-        duration: 900
-      },
-      {
-        name: 'Mindfulness',
-        baseFrequency: 220,
-        binauralBeat: 6.5,
-        duration: 900
-      }
+      { name: 'Alpha Calm', baseFrequency: 200, binauralBeat: 10, duration: 360 },
+      { name: 'Theta Deep', baseFrequency: 150, binauralBeat: 6, duration: 480 },
+      { name: 'Alpha Flow', baseFrequency: 180, binauralBeat: 8, duration: 300 },
+      { name: 'Mindful State', baseFrequency: 220, binauralBeat: 12, duration: 420 }
     ]
   },
   {
     id: 'focus',
     name: 'Focus',
-    description: 'Enhanced concentration and productivity',
+    description: 'Enhance concentration and productivity',
     icon: 'Brain',
-    color: 'hsl(217, 91%, 65%)', // Bright blue
+    color: '#4ECDC4',
     frequencies: [
-      {
-        name: 'Alpha Focus 1',
-        baseFrequency: 250,
-        binauralBeat: 10.0,
-        duration: 1200 // 20 minutes
-      },
-      {
-        name: 'Alpha Focus 2',
-        baseFrequency: 280,
-        binauralBeat: 12.0,
-        duration: 1200
-      },
-      {
-        name: 'Beta Concentration',
-        baseFrequency: 300,
-        binauralBeat: 15.0,
-        duration: 1200
-      },
-      {
-        name: 'Study Mode',
-        baseFrequency: 260,
-        binauralBeat: 11.0,
-        duration: 1200
-      }
+      { name: 'Beta Alert', baseFrequency: 300, binauralBeat: 20, duration: 240 },
+      { name: 'Gamma Focus', baseFrequency: 400, binauralBeat: 40, duration: 180 },
+      { name: 'SMR Concentration', baseFrequency: 250, binauralBeat: 14, duration: 360 },
+      { name: 'High Beta', baseFrequency: 350, binauralBeat: 25, duration: 300 }
     ]
   },
   {
     id: 'relaxation',
     name: 'Relaxation',
-    description: 'Stress relief and gentle calm',
+    description: 'Unwind and release stress',
     icon: 'Leaf',
-    color: 'hsl(45, 93%, 65%)', // Warm yellow
+    color: '#95E1D3',
     frequencies: [
-      {
-        name: 'Alpha Relaxation 1',
-        baseFrequency: 150,
-        binauralBeat: 8.0,
-        duration: 720 // 12 minutes
-      },
-      {
-        name: 'Alpha Relaxation 2',
-        baseFrequency: 170,
-        binauralBeat: 9.0,
-        duration: 720
-      },
-      {
-        name: 'Stress Relief',
-        baseFrequency: 130,
-        binauralBeat: 8.5,
-        duration: 720
-      },
-      {
-        name: 'Gentle Calm',
-        baseFrequency: 190,
-        binauralBeat: 7.5,
-        duration: 720
-      }
+      { name: 'Alpha Relaxation', baseFrequency: 160, binauralBeat: 10, duration: 300 },
+      { name: 'Theta Calm', baseFrequency: 140, binauralBeat: 5, duration: 420 },
+      { name: 'Peaceful Alpha', baseFrequency: 200, binauralBeat: 8, duration: 360 },
+      { name: 'Stress Relief', baseFrequency: 120, binauralBeat: 7, duration: 480 }
+    ]
+  },
+  {
+    id: 'creativity',
+    name: 'Creativity',
+    description: 'Unlock creative flow and inspiration',
+    icon: 'Palette',
+    color: '#FFB347',
+    frequencies: [
+      { name: 'Alpha Creative', baseFrequency: 220, binauralBeat: 10, duration: 360 },
+      { name: 'Theta Inspiration', baseFrequency: 150, binauralBeat: 6, duration: 300 },
+      { name: 'Creative Flow', baseFrequency: 180, binauralBeat: 8, duration: 420 },
+      { name: 'Artistic Mind', baseFrequency: 200, binauralBeat: 9, duration: 300 }
+    ]
+  },
+  {
+    id: 'energy',
+    name: 'Energy',
+    description: 'Boost vitality and motivation',
+    icon: 'Zap',
+    color: '#FF6B35',
+    frequencies: [
+      { name: 'Beta Energy', baseFrequency: 320, binauralBeat: 20, duration: 180 },
+      { name: 'High Alert', baseFrequency: 380, binauralBeat: 30, duration: 240 },
+      { name: 'Motivation Wave', baseFrequency: 280, binauralBeat: 16, duration: 300 },
+      { name: 'Power Boost', baseFrequency: 350, binauralBeat: 25, duration: 180 }
+    ]
+  },
+  {
+    id: 'anxiety-relief',
+    name: 'Anxiety Relief',
+    description: 'Calm nerves and reduce stress',
+    icon: 'Shield',
+    color: '#A8E6CF',
+    frequencies: [
+      { name: 'Calming Alpha', baseFrequency: 180, binauralBeat: 8, duration: 360 },
+      { name: 'Peace Theta', baseFrequency: 140, binauralBeat: 5, duration: 480 },
+      { name: 'Gentle Calm', baseFrequency: 160, binauralBeat: 7, duration: 300 },
+      { name: 'Stress Release', baseFrequency: 120, binauralBeat: 6, duration: 420 }
+    ]
+  },
+  {
+    id: 'deep-work',
+    name: 'Deep Work',
+    description: 'Enter the zone for focused tasks',
+    icon: 'Target',
+    color: '#6C5CE7',
+    frequencies: [
+      { name: 'Focus Beta', baseFrequency: 300, binauralBeat: 18, duration: 300 },
+      { name: 'Deep Concentration', baseFrequency: 260, binauralBeat: 15, duration: 480 },
+      { name: 'Work Flow', baseFrequency: 320, binauralBeat: 22, duration: 360 },
+      { name: 'Sustained Attention', baseFrequency: 280, binauralBeat: 16, duration: 420 }
+    ]
+  },
+  {
+    id: 'power-nap',
+    name: 'Power Nap',
+    description: 'Quick rejuvenation and rest',
+    icon: 'Cloud',
+    color: '#DDA0DD',
+    frequencies: [
+      { name: 'Light Sleep', baseFrequency: 100, binauralBeat: 4, duration: 120 },
+      { name: 'Restorative Theta', baseFrequency: 140, binauralBeat: 6, duration: 180 },
+      { name: 'Quick Rest', baseFrequency: 120, binauralBeat: 5, duration: 90 },
+      { name: 'Energy Recovery', baseFrequency: 160, binauralBeat: 8, duration: 150 }
     ]
   }
 ];

@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, Pause, Volume2, Moon, Heart, Brain, Leaf } from 'lucide-react';
+import { Play, Pause, Volume2, Moon, Heart, Brain, Leaf, Palette, Zap, Shield, Target, Cloud } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { useMusicPlayer } from '@/contexts/MusicPlayerContext';
@@ -10,7 +10,12 @@ const iconMap = {
   Moon,
   Heart, 
   Brain,
-  Leaf
+  Leaf,
+  Palette,
+  Zap,
+  Shield,
+  Target,
+  Cloud
 };
 
 interface MusicIconButtonProps {
@@ -72,7 +77,7 @@ const MusicIconButton: React.FC<MusicIconButtonProps> = ({ className = "" }) => 
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -10, scale: 0.95 }}
             transition={{ duration: 0.15 }}
-            className="absolute top-10 right-0 z-50 w-64 bg-background/95 backdrop-blur-md border border-border/50 rounded-lg shadow-lg overflow-hidden"
+            className="absolute top-10 right-0 z-[9999] w-64 bg-background/95 backdrop-blur-md border border-border/50 rounded-lg shadow-lg overflow-hidden"
           >
             <div className="p-3 border-b border-border/30">
               <h3 className="text-sm font-semibold text-foreground">Choose Music Type</h3>
@@ -127,16 +132,6 @@ const MusicIconButton: React.FC<MusicIconButtonProps> = ({ className = "" }) => 
         )}
       </AnimatePresence>
 
-      {/* Now Playing Indicator */}
-      {isPlaying && trackInfo && (
-        <motion.div
-          initial={{ opacity: 0, y: 5 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="absolute top-10 right-0 text-xs text-muted-foreground bg-background/80 backdrop-blur-sm px-2 py-1 rounded border border-border/50"
-        >
-          Playing: {trackInfo.name} ({trackInfo.index + 1}/{trackInfo.total})
-        </motion.div>
-      )}
     </div>
   );
 };

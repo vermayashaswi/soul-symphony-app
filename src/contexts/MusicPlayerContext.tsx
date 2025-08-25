@@ -107,7 +107,11 @@ export function MusicPlayerProvider({ children }: MusicPlayerProviderProps) {
 
   const toggleDropdown = useCallback(() => {
     setState(prev => ({ ...prev, isDropdownOpen: !prev.isDropdownOpen }));
-  }, []);
+    // Close language selector when music dropdown opens
+    if (!state.isDropdownOpen) {
+      window.dispatchEvent(new CustomEvent('closeLangDropdown'));
+    }
+  }, [state.isDropdownOpen]);
 
   const closeDropdown = useCallback(() => {
     setState(prev => ({ ...prev, isDropdownOpen: false }));
