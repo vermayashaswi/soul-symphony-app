@@ -13,6 +13,8 @@ export interface NotificationSettings {
   reminders: NotificationReminder[];
 }
 
+export type NotificationPermissionState = 'granted' | 'denied' | 'default' | 'unsupported';
+
 class UnifiedNotificationService {
   private static instance: UnifiedNotificationService;
   private isNative = false;
@@ -39,7 +41,7 @@ class UnifiedNotificationService {
     this.startPolling();
   }
 
-  async requestPermissions(): Promise<{ success: boolean; error?: string; granted?: boolean; state?: string; strategy?: string; scheduledCount?: number }> {
+  async requestPermissions(): Promise<{ success: boolean; error?: string }> {
     await this.initialize();
 
     try {
@@ -50,21 +52,17 @@ class UnifiedNotificationService {
         if (permissionResult.display !== 'granted') {
           return { 
             success: false, 
-            granted: false,
-            state: 'denied',
             error: 'Native notification permissions not granted' 
           };
         }
         
         console.log('[UnifiedNotificationService] Native permissions granted');
-        return { success: true, granted: true, state: 'granted' };
+        return { success: true };
       } else {
         // Request web permissions
         if (!('Notification' in window)) {
           return { 
             success: false, 
-            granted: false,
-            state: 'unsupported',
             error: 'Web notifications not supported' 
           };
         }
@@ -74,24 +72,32 @@ class UnifiedNotificationService {
         if (permission !== 'granted') {
           return { 
             success: false, 
-            granted: false,
-            state: permission,
             error: 'Web notification permissions not granted' 
           };
         }
 
         console.log('[UnifiedNotificationService] Web permissions granted');
-        return { success: true, granted: true, state: 'granted' };
+        return { success: true };
       }
     } catch (error) {
       console.error('[UnifiedNotificationService] Permission request failed:', error);
       return { 
         success: false, 
-        granted: false,
-        state: 'error',
         error: error instanceof Error ? error.message : 'Unknown error' 
       };
     }
+  }
+
+  // Enhanced permissions method for components that expect extended format
+  async requestPermissionsEnhanced(): Promise<{ success: boolean; error?: string; granted: boolean; state: NotificationPermissionState }> {
+    const result = await this.requestPermissions();
+    const state = this.checkPermissionStatus();
+    
+    return {
+      ...result,
+      granted: result.success,
+      state: state
+    };
   }
 
   async saveReminderSettings(settings: NotificationSettings): Promise<{ success: boolean; error?: string }> {
@@ -342,7 +348,7 @@ class UnifiedNotificationService {
     console.log(`[UnifiedNotificationService] Toast: ${title} - ${description}`);
   }
 
-  showTutorialToast(title: string, description: string) {
+  showTutorialToast(title: string, description: string, componentId?: string) {
     console.log(`[UnifiedNotificationService] Tutorial Toast: ${title} - ${description}`);
   }
 
@@ -363,9 +369,8 @@ class UnifiedNotificationService {
   }
 
   getNotificationSettings() {
-    return this.getReminderSettings().then(settings => 
-      settings || { enabled: false, reminders: [] }
-    );
+    // Return synchronous object for compatibility
+    return { enabled: false, reminders: [] };
   }
 
   setupJournalReminder(enabled: boolean, frequency: string, times: string[]) {
@@ -426,12 +431,15 @@ class UnifiedNotificationService {
     return this.testNotification();
   }
 
-  checkPermissionStatus() {
-    return this.requestPermissions();
+  checkPermissionStatus(): NotificationPermissionState {
+    if (!('Notification' in window)) {
+      return 'unsupported';
+    }
+    return Notification.permission as NotificationPermissionState;
   }
 
-  getPermissionInfo() {
-    return this.requestPermissions();
+  getPermissionInfo(): NotificationPermissionState {
+    return this.checkPermissionStatus();
   }
 
   // Stop polling when service is destroyed
@@ -451,18 +459,21 @@ export { unifiedNotificationService as newNotificationService };
 export { unifiedNotificationService as notificationService };
 export const showToast = (title: string, description: string, duration?: number, componentId?: string) => 
   unifiedNotificationService.showToast(title, description, duration, componentId);
-export const showTutorialToast = (title: string, description: string) => 
-  unifiedNotificationService.showTutorialToast(title, description);
+export const showTutorialToast = (title: string, description: string, componentId?: string) => 
+  unifiedNotificationService.showTutorialToast(title, description, componentId);
 export const showTranslatedToast = async (
   titleKey: string, 
   descriptionKey: string, 
   translate: any,
-  duration?: number
+  duration?: number,
+  interpolations?: Record<string, string>,
+  componentId?: string
 ) => console.log(`Translated toast: ${titleKey} - ${descriptionKey}`);
 export const showTranslatedTutorialToast = async (
   titleKey: string,
   descriptionKey: string,
-  translate: any
+  translate: any,
+  componentId?: string
 ) => console.log(`Translated tutorial toast: ${titleKey} - ${descriptionKey}`);
 
 export const clearAllToasts = () => unifiedNotificationService.clearAllToasts();
@@ -473,10 +484,10 @@ export const getNotificationSettings = () => unifiedNotificationService.getNotif
 export const setupJournalReminder = (enabled: boolean, frequency: string, times: string[]) => 
   unifiedNotificationService.setupJournalReminder(enabled, frequency, times);
 export const initializeCapacitorNotifications = () => unifiedNotificationService.initializeCapacitorNotifications();
+export const checkPermissionStatus = () => unifiedNotificationService.checkPermissionStatus();
 
 // Type exports for compatibility
 export type NotificationFrequency = 'once' | 'twice' | 'thrice';
 export type NotificationTime = 'morning' | 'afternoon' | 'evening' | 'night';
 export type JournalReminderTime = NotificationTime;
-export type NotificationPermissionState = 'granted' | 'denied' | 'default' | 'unsupported';
 export type UnifiedNotificationSettings = NotificationSettings;
