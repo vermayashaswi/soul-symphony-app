@@ -182,7 +182,7 @@ export const InsightCard = ({ title, delay, badge, badgeColor, ...props }: Insig
             <div className="flex-1">
               <h3 className="text-2xl font-bold">
                 <EnhancedTranslatableText 
-                  text={`${props.data.entryCount} ${props.data.entryCount === 1 ? 'entry' : 'entries'}`} 
+                  text={`${props.data.entryCount} entries`} 
                   forceTranslate={true}
                   enableFontScaling={true}
                   scalingContext="general"

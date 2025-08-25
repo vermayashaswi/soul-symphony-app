@@ -6,7 +6,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { journalReminderService, JournalReminderTime } from '@/services/journalReminderService';
-import { unifiedNotificationService } from '@/services/unifiedNotificationService';
+import { enhancedAndroidNotificationService } from '@/services/enhancedAndroidNotificationService';
 import { toast } from 'sonner';
 
 const TIME_OPTIONS: { value: JournalReminderTime; label: string; time: string }[] = [
@@ -81,8 +81,7 @@ export const JournalReminderSettings: React.FC = () => {
   const handleTestNotification = async () => {
     setIsLoading(true);
     try {
-      const result = await unifiedNotificationService.testNotification();
-      const success = result.success;
+      const success = await enhancedAndroidNotificationService.testNotification();
       if (success) {
         toast.success('Test notification sent! Check your notification panel.');
       } else {
