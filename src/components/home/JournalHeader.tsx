@@ -126,12 +126,12 @@ const JournalHeader: React.FC = () => {
       </motion.div>
       
       {/* FIXED POSITION: Globe icon (Language Selector) */}
-      <div className={`absolute top-16 right-12 z-[1000] pointer-events-auto ${isInWelcomeTutorialStep ? 'z-[9999]' : ''}`}>
+      <div className={`absolute top-12 right-12 z-[1000] pointer-events-auto ${isInWelcomeTutorialStep ? 'z-[9999]' : ''}`}>
         <LanguageSelector />
       </div>
       
       {/* FIXED POSITION: Play icon (Music Button) */}
-      <div className={`absolute top-16 right-4 z-[1000] pointer-events-auto ${isInWelcomeTutorialStep ? 'z-[9999]' : ''}`}>
+      <div className={`absolute top-12 right-4 z-[1000] pointer-events-auto ${isInWelcomeTutorialStep ? 'z-[9999]' : ''}`}>
         <MusicIconButton />
       </div>
     </div>

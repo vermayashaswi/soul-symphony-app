@@ -300,39 +300,6 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
 
   return (
     <div className="relative w-full h-full overflow-hidden">
-      <div className="absolute top-[100px] right-6 z-50">
-        <motion.div
-          initial={{ scale: 1 }}
-          animate={{ scale: [1, 1.05, 1] }}
-          transition={{
-            duration: 2,
-            repeat: Infinity,
-            repeatType: "reverse"
-          }}
-          className="px-1.5 py-0.5 text-center rounded-sm"
-          style={{
-            transform: 'scale(0.6)',
-            backgroundColor: `${themeColor}50`,
-            borderLeft: `3px solid ${themeColor}`,
-            borderRight: `3px solid ${themeColor}`,
-            boxShadow: `0 0 1px 0 ${themeColor}40`,
-            backdropFilter: 'blur(4px)',
-          }}
-        >
-          <TranslatableText 
-            text={translatedLabel || "2-week themes"} 
-            forceTranslate={true}
-            className="text-xs font-medium whitespace-nowrap"
-            style={{
-              color: isDarkMode ? '#ffffff' : '#000000',
-              fontWeight: 500,
-              letterSpacing: '0.01em',
-              WebkitFontSmoothing: 'antialiased',
-              MozOsxFontSmoothing: 'grayscale'
-            }}
-          />
-        </motion.div>
-      </div>
       
       <div className="absolute inset-x-0 top-20 bottom-80 pointer-events-none">
         {themesToShow.slice(0, 6).map((themeItem, index) => {

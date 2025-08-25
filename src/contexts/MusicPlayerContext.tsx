@@ -8,7 +8,6 @@ const LAST_CATEGORY_STORAGE_KEY = 'soul-symphony-last-category';
 interface MusicPlayerContextType extends MusicPlayerState {
   togglePlay: () => Promise<void>;
   selectCategory: (category: MusicCategory) => Promise<void>;
-  setVolume: (volume: number) => void;
   stop: () => void;
   toggleDropdown: () => void;
   closeDropdown: () => void;
@@ -33,19 +32,10 @@ export function MusicPlayerProvider({ children }: MusicPlayerProviderProps) {
   const [state, setState] = useState<MusicPlayerState>({
     isPlaying: false,
     currentCategory: null,
-    volume: 0.3,
+    volume: 0.8,
     isDropdownOpen: false
   });
 
-  // Load saved preferences
-  useEffect(() => {
-    const savedVolume = localStorage.getItem(VOLUME_STORAGE_KEY);
-    if (savedVolume) {
-      const volume = parseFloat(savedVolume);
-      setState(prev => ({ ...prev, volume }));
-      binauralMusicService.setVolume(volume);
-    }
-  }, []);
 
   const togglePlay = useCallback(async () => {
     try {
@@ -85,12 +75,6 @@ export function MusicPlayerProvider({ children }: MusicPlayerProviderProps) {
     }
   }, []);
 
-  const setVolume = useCallback((volume: number) => {
-    const clampedVolume = Math.max(0, Math.min(1, volume));
-    binauralMusicService.setVolume(clampedVolume);
-    localStorage.setItem(VOLUME_STORAGE_KEY, clampedVolume.toString());
-    setState(prev => ({ ...prev, volume: clampedVolume }));
-  }, []);
 
   const stop = useCallback(() => {
     binauralMusicService.stop();
@@ -129,7 +113,6 @@ export function MusicPlayerProvider({ children }: MusicPlayerProviderProps) {
     ...state,
     togglePlay,
     selectCategory,
-    setVolume,
     stop,
     toggleDropdown,
     closeDropdown,

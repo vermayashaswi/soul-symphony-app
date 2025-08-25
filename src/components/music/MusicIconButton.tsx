@@ -1,8 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, Pause, Volume2, Moon, Heart, Brain, Leaf, Palette, Zap, Shield, Target, Cloud } from 'lucide-react';
+import { Play, Pause, Moon, Heart, Brain, Leaf, Palette, Zap, Shield, Target, Cloud } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Slider } from '@/components/ui/slider';
 import { useMusicPlayer } from '@/contexts/MusicPlayerContext';
 import { musicCategories } from '@/config/musicCategories';
 import { TranslatableText } from '@/components/translation/TranslatableText';
@@ -27,11 +26,9 @@ const MusicIconButton: React.FC<MusicIconButtonProps> = ({ className = "" }) => 
   const {
     isPlaying,
     currentCategory,
-    volume,
     isDropdownOpen,
     togglePlay,
     selectCategory,
-    setVolume,
     toggleDropdown,
     closeDropdown,
     getCurrentTrackInfo
@@ -115,24 +112,6 @@ const MusicIconButton: React.FC<MusicIconButtonProps> = ({ className = "" }) => 
                   </Button>
                 );
               })}
-            </div>
-
-            {/* Volume Control */}
-            <div className="p-3 border-t border-border/30 bg-muted/20">
-              <div className="flex items-center gap-2">
-                <Volume2 className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                <Slider
-                  value={[volume]}
-                  onValueChange={(values) => setVolume(values[0])}
-                  max={1}
-                  min={0}
-                  step={0.1}
-                  className="flex-1"
-                />
-                <span className="text-xs text-muted-foreground w-8 text-right">
-                  {Math.round(volume * 100)}%
-                </span>
-              </div>
             </div>
           </motion.div>
         )}

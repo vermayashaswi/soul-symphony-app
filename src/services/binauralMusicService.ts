@@ -63,7 +63,7 @@ export class BinauralMusicService {
     this.rightOscillator.type = 'sine';
 
     // Set volume
-    this.gainNode.gain.setValueAtTime(0.3, this.audioContext.currentTime);
+    this.gainNode.gain.setValueAtTime(0.8, this.audioContext.currentTime);
 
     // Connect audio nodes
     this.leftOscillator.connect(splitter);
