@@ -2,8 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
+import { safeQuery, assertUserSession } from '@/utils/supabaseTypeHelpers';
 import { useSessionTrackingContext } from '@/contexts/SessionTrackingContext';
 import { Loader2, RefreshCw, BarChart3, Clock, MousePointer, Globe } from 'lucide-react';
+import type { Database } from '@/integrations/supabase/types';
+
+type UserSessionRow = Database['public']['Tables']['user_sessions']['Row'];
 
 interface SessionData {
   id: string;
@@ -20,6 +24,22 @@ interface SessionData {
   is_active: boolean;
 }
 
+// Helper function to convert Supabase row to SessionData
+const mapUserSessionToSessionData = (session: UserSessionRow): SessionData => ({
+  id: session.id,
+  session_start: session.session_start,
+  session_end: session.session_end || undefined,
+  device_type: session.device_type || undefined,
+  country: session.country || undefined,
+  app_language: session.app_language || undefined,
+  start_page: session.start_page || undefined,
+  most_interacted_page: session.most_interacted_page || undefined,
+  total_page_views: session.total_page_views || undefined,
+  pages_visited: session.pages_visited || undefined,
+  page_interactions: session.page_interactions || undefined,
+  is_active: session.is_active
+});
+
 export const SessionAnalyticsDashboard: React.FC = () => {
   const [sessions, setSessions] = useState<SessionData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -31,8 +51,7 @@ export const SessionAnalyticsDashboard: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      const { data, error: fetchError } = await supabase
-        .from('user_sessions')
+      const { data, error: fetchError } = await safeQuery.userSessions(supabase)
         .select('*')
         .order('session_start', { ascending: false })
         .limit(10);
@@ -41,7 +60,8 @@ export const SessionAnalyticsDashboard: React.FC = () => {
         throw fetchError;
       }
 
-      setSessions(data || []);
+      const typedSessions = (data || []).map((session: any) => assertUserSession(session)).filter(Boolean);
+      setSessions(typedSessions);
     } catch (err) {
       console.error('Error fetching sessions:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch sessions');
