@@ -119,8 +119,8 @@ const Home = () => {
       {/* Journal content with summary and quote */}
       <JournalContent />
 
-      {/* Header with journal name and date - ensure visibility during tutorial */}
-      <div className={`relative ${isInWelcomeTutorialStep ? 'z-[9999]' : 'z-20'} flex flex-col`}>
+      {/* Header with journal name and date - lower z-index to avoid stacking context conflicts */}
+      <div className={`relative ${isInWelcomeTutorialStep ? 'z-[1000]' : 'z-20'} flex flex-col`}>
         <JournalHeader />
         
       </div>
