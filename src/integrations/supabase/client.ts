@@ -15,34 +15,5 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
       const fetchOptions = options || {};
       return fetch(url, { ...fetchOptions });
     }
-  },
-  realtime: {
-    params: {
-      eventsPerSecond: 10
-    },
-    // Enhanced WebSocket configuration for mobile environments
-    heartbeatIntervalMs: 30000,
-    reconnectAfterMs: (tries: number) => Math.min(tries * 1000, 5000),
-    logger: console.log,
-    // Mobile-specific transport configuration
-    transport: (typeof window !== 'undefined' && window.WebSocket) ? 'websocket' as any : 'fallback' as any,
-    timeout: 7000,
-    // Add mobile environment detection and fallback handling
-    encode: (payload: any, callback: (data: string) => void) => {
-      try {
-        callback(JSON.stringify(payload));
-      } catch (error) {
-        console.error('[Supabase] Encoding error:', error);
-        callback('{}');
-      }
-    },
-    decode: (payload: string, callback: (decoded: any) => void) => {
-      try {
-        callback(JSON.parse(payload));
-      } catch (error) {
-        console.error('[Supabase] Decoding error:', error);
-        callback({});
-      }
-    }
   }
 });

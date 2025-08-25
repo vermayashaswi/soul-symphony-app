@@ -5,7 +5,6 @@ import { Menu, Plus, Trash2 } from "lucide-react";
 import MobileChatMessage from "./MobileChatMessage";
 import MobileChatInput from "./MobileChatInput";
 import { supabase } from "@/integrations/supabase/client";
-import { safeQuery, assertChatMessage, assertChatThread, isValidRecord } from "@/utils/supabaseTypeHelpers";
 import { ChatThreadList } from "@/components/chat/ChatThreadList";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
@@ -159,26 +158,23 @@ export default function MobileChatInterface({
          // Update user message with classification data if available
          if (analysis?.classification && requestId) {
            try {
-               // Find the most recent user message to update with classification
-               const { data: recentUserMessages } = await supabase
-                 .from('chat_messages')
-                 .select('id')
-                 .eq('thread_id', originThreadId as any)
-                 .eq('sender', 'user' as any)
-                 .order('created_at', { ascending: false })
-                 .limit(1);
+             // Find the most recent user message to update with classification
+             const { data: recentUserMessages } = await supabase
+               .from('chat_messages')
+               .select('id')
+               .eq('thread_id', originThreadId)
+               .eq('sender', 'user')
+               .order('created_at', { ascending: false })
+               .limit(1);
 
-              if (recentUserMessages && recentUserMessages.length > 0) {
-                const firstMessage = assertChatMessage(recentUserMessages[0]);
-                if (firstMessage?.id) {
-                  await updateUserMessageClassification(
-                    firstMessage.id,
-                    analysis.classification,
-                    user.id
-                  );
-                  debugLog.addEvent("Classification", "Updated user message with classification data", "success");
-                }
-              }
+             if (recentUserMessages && recentUserMessages.length > 0) {
+               await updateUserMessageClassification(
+                 recentUserMessages[0].id,
+                 analysis.classification,
+                 user.id
+               );
+               debugLog.addEvent("Classification", "Updated user message with classification data", "success");
+             }
            } catch (classificationError) {
              console.warn('[Mobile] Failed to update user message classification:', classificationError);
            }
@@ -192,13 +188,13 @@ export default function MobileChatInterface({
               // Double-check still on same thread
               if (!currentThreadIdRef.current || currentThreadIdRef.current !== originThreadId) return;
 
-                // Check if message already exists in database
-                const { data: recent, error: recentErr } = await supabase
-                  .from('chat_messages')
-                  .select('id, content, sender, created_at')
-                  .eq('thread_id', originThreadId as any)
-                  .order('created_at', { ascending: false })
-                  .limit(5);
+              // Check if message already exists in database
+              const { data: recent, error: recentErr } = await supabase
+                .from('chat_messages')
+                .select('id, content, sender, created_at')
+                .eq('thread_id', originThreadId)
+                .order('created_at', { ascending: false })
+                .limit(5);
 
               if (recentErr) {
                 console.warn('[Mobile Streaming Watchdog] Failed to fetch recent messages:', recentErr.message);
@@ -210,25 +206,20 @@ export default function MobileChatInterface({
                  try {
                    const correlationId = requestId || `assistant-${originThreadId}-${Date.now()}`;
 
-                     const { data: savedMsg, error: saveError } = await supabase
-                       .from('chat_messages')
-                       .insert({
-                         thread_id: originThreadId,
-                         content: response,
-                         sender: 'assistant',
-                         role: 'assistant',
-                         request_correlation_id: correlationId,
-                         analysis_data: analysis || null
-                       } as any)
-                       .select()
-                       .single();
+                   const { data: savedMsg, error: saveError } = await supabase.from('chat_messages').insert({
+                     thread_id: originThreadId,
+                     content: response,
+                     sender: 'assistant',
+                     role: 'assistant',
+                     request_correlation_id: correlationId,
+                     analysis_data: analysis || null
+                   }).select().single();
                    
                    if (saveError) {
                      console.warn('[Mobile Streaming Watchdog] Persist failed:', saveError);
-                    } else {
-                      const message = assertChatMessage(savedMsg);
-                      debugLog.addEvent("Streaming Watchdog", `[Mobile] Successfully persisted assistant message: ${message?.id}`, "success");
-                    }
+                   } else {
+                     debugLog.addEvent("Streaming Watchdog", `[Mobile] Successfully persisted assistant message: ${savedMsg?.id}`, "success");
+                   }
                 } catch (e) {
                   console.warn('[Mobile Streaming Watchdog] Persist fallback failed:', (e as any)?.message || e);
                 }
@@ -503,8 +494,8 @@ export default function MobileChatInterface({
       const { data: threadData, error: threadError } = await supabase
         .from('chat_threads')
         .select('id')
-        .eq('id', currentThreadId as any)
-        .eq('user_id', user.id as any)
+        .eq('id', currentThreadId)
+        .eq('user_id', user.id)
         .single();
         
       if (threadError || !threadData) {
@@ -598,7 +589,7 @@ export default function MobileChatInterface({
               title: "New Conversation",
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString()
-            } as any);
+            });
           
           if (error) {
             throw new Error(`Failed to create thread: ${error.message}`);
@@ -627,7 +618,7 @@ export default function MobileChatInterface({
       const { count, error } = await supabase
         .from('chat_messages')
         .select('*', { count: 'exact', head: true })
-        .eq('thread_id', currentThreadId as any);
+        .eq('thread_id', currentThreadId);
         
       isFirstMessage = !error && count === 0;
     }
@@ -765,8 +756,8 @@ export default function MobileChatInterface({
       const { data: threadData, error: threadError } = await supabase
         .from('chat_threads')
         .select('id, title')
-        .eq('id', selectedThreadId as any)
-        .eq('user_id', user.id as any)
+        .eq('id', selectedThreadId)
+        .eq('user_id', user.id)
         .single();
         
       if (threadError || !threadData) {
@@ -837,7 +828,7 @@ export default function MobileChatInterface({
       const { error: messagesError } = await supabase
         .from('chat_messages')
         .delete()
-        .eq('thread_id', threadId as any);
+        .eq('thread_id', threadId);
         
       if (messagesError) {
         console.error('[MobileChat] Error deleting messages:', messagesError);
@@ -848,8 +839,8 @@ export default function MobileChatInterface({
       const { error: threadError } = await supabase
         .from('chat_threads')
         .delete()
-        .eq('id', threadId as any)
-        .eq('user_id', user.id as any); // Extra safety check
+        .eq('id', threadId)
+        .eq('user_id', user.id); // Extra safety check
         
       if (threadError) {
         console.error('[MobileChat] Error deleting thread:', threadError);
@@ -868,7 +859,7 @@ export default function MobileChatInterface({
       const { data: threads, error: threadsError } = await supabase
         .from('chat_threads')
         .select('*')
-        .eq('user_id', user.id as any)
+        .eq('user_id', user.id)
         .order('updated_at', { ascending: false })
         .limit(1);
 
@@ -878,13 +869,10 @@ export default function MobileChatInterface({
 
       if (threads && threads.length > 0) {
         // Switch to the most recent remaining thread
-        const firstThread = assertChatThread(threads[0]);
-        if (firstThread?.id) {
-          console.log('[MobileChat] Switching to thread:', firstThread.id);
-          setThreadId(firstThread.id);
-          localStorage.setItem("lastActiveChatThreadId", firstThread.id);
-          await loadThreadMessages(firstThread.id);
-        }
+        console.log('[MobileChat] Switching to thread:', threads[0].id);
+        setThreadId(threads[0].id);
+        localStorage.setItem("lastActiveChatThreadId", threads[0].id);
+        await loadThreadMessages(threads[0].id);
       } else {
         // No threads left, create a new one
         console.log('[MobileChat] No remaining threads, creating new one');

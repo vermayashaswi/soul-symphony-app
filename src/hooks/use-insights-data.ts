@@ -118,18 +118,18 @@ export const useInsightsData = (
         userId
       });
 
-      const entries = allEntries?.filter((entry: any) => {
-        if (!(entry as any)?.created_at) return false;
-        const entryDate = new Date((entry as any).created_at);
+      const entries = allEntries?.filter(entry => {
+        if (!entry.created_at) return false;
+        const entryDate = new Date(entry.created_at);
         return entryDate >= startDate && entryDate <= endDate;
       }) || [];
 
       console.log(`Filtered ${entries.length} entries for ${timeRange} with currentDate ${effectiveBaseDate.toISOString()}`);
 
-      const processedEntries = entries.map((entry: any) => {
-        if ((entry as any)?.emotions && typeof (entry as any).emotions === 'string') {
+      const processedEntries = entries.map(entry => {
+        if (entry.emotions && typeof entry.emotions === 'string') {
           try {
-            (entry as any).emotions = JSON.parse((entry as any).emotions);
+            entry.emotions = JSON.parse(entry.emotions);
           } catch (e) {
             console.error('Error parsing emotions JSON string:', e);
           }
@@ -142,12 +142,12 @@ export const useInsightsData = (
       const journalActivity = calculateJournalActivity(processedEntries, timeRange);
       const aggregatedEmotionData = processEmotionData(processedEntries, timeRange);
 
-      const processedAllEntries = allEntries?.map((entry: any) => {
-        if (((entry as any).sentiment == null || Number((entry as any).sentiment) === 0) && (entry as any).emotions) {
+      const processedAllEntries = allEntries?.map(entry => {
+        if ((entry.sentiment == null || Number(entry.sentiment) === 0) && entry.emotions) {
           try {
-            const emotions = typeof (entry as any).emotions === 'string' 
-              ? JSON.parse((entry as any).emotions) 
-              : (entry as any).emotions;
+            const emotions = typeof entry.emotions === 'string' 
+              ? JSON.parse(entry.emotions) 
+              : entry.emotions;
             
             if (emotions && typeof emotions === 'object') {
               let totalSentiment = 0;

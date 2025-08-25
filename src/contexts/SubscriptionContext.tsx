@@ -72,8 +72,8 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
         throw statusError;
       }
 
-      if (statusData && (statusData as any).length > 0) {
-        const subscriptionData = (statusData as any)[0];
+      if (statusData && statusData.length > 0) {
+        const subscriptionData = statusData[0];
         
         // Map subscription tier - ensure only 'free' or 'premium'
         const userTier = (subscriptionData.current_tier === 'premium') ? 'premium' : 'free';
@@ -98,7 +98,7 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('subscription_tier, subscription_status, trial_ends_at, is_premium')
-          .eq('id' as any, user.id as any)
+          .eq('id', user.id)
           .maybeSingle();
 
         if (profileError) {
@@ -107,9 +107,9 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
 
         if (profileData) {
           // Map subscription tier - ensure only 'free' or 'premium'
-          const userTier = ((profileData as any).subscription_tier === 'premium') ? 'premium' : 'free';
-          const userStatus = ((profileData as any).subscription_status as SubscriptionStatus) || 'free';
-          const userTrialEndDate = (profileData as any).trial_ends_at ? new Date((profileData as any).trial_ends_at) : null;
+          const userTier = (profileData.subscription_tier === 'premium') ? 'premium' : 'free';
+          const userStatus = (profileData.subscription_status as SubscriptionStatus) || 'free';
+          const userTrialEndDate = profileData.trial_ends_at ? new Date(profileData.trial_ends_at) : null;
           
           setTier(userTier);
           setStatus(userStatus);
@@ -119,7 +119,7 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
             tier: userTier,
             status: userStatus,
             trialEndDate: userTrialEndDate,
-            isPremium: (profileData as any).is_premium
+            isPremium: profileData.is_premium
           });
         } else {
           // User profile doesn't exist yet, default to free
@@ -138,7 +138,7 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
           });
 
         if (!eligibilityError && eligibilityData !== null) {
-          setIsTrialEligible(eligibilityData as any);
+          setIsTrialEligible(eligibilityData);
         }
       }
       

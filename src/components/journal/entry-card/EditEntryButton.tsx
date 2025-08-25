@@ -166,8 +166,8 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
         .update({ 
           "refined text": contentToSave, // Only update refined text with English content
           "Edit_Status": 1
-        } as any)
-        .eq('id' as any, entryId as any);
+        })
+        .eq('id', entryId);
         
       if (updateError) {
         console.error("Error updating entry:", updateError);

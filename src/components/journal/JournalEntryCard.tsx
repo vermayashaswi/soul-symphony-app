@@ -237,8 +237,8 @@ export function JournalEntryCard({
       
       const { error } = await supabase
         .from('Journal Entries')
-        .update({ user_feedback: feedback.toString() } as any)
-        .eq('id' as any, safeEntry.id as any);
+        .update({ user_feedback: feedback.toString() })
+        .eq('id', safeEntry.id);
     
       if (error) {
         console.error('Error saving user feedback:', error);

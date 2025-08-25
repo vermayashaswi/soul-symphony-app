@@ -40,7 +40,7 @@ export function ThemeLoader({ entryId, initialThemes = [], content, isProcessing
         const { data, error } = await supabase
           .from('Journal Entries')
           .select('*')
-          .eq('id' as any, entryId as any)
+          .eq('id', entryId)
           .single();
 
         if (error) {
@@ -50,7 +50,7 @@ export function ThemeLoader({ entryId, initialThemes = [], content, isProcessing
         }
 
         if (data) {
-          const entryData = data as unknown as EntryData;
+          const entryData = data as EntryData;
           
           if (entryData.original_language) {
             setEntryLanguage(entryData.original_language);

@@ -1,7 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 import { LocalNotifications, ScheduleOptions } from '@capacitor/local-notifications';
 import { supabase } from '@/integrations/supabase/client';
-import { notificationFallbackService } from './notificationFallbackService';
 
 interface NotificationReminder {
   id: string;
@@ -33,8 +32,6 @@ class UnifiedNotificationService {
   private isWebView: boolean;
   private permissionCache: NotificationPermissionState | null = null;
   private realtimeChannel: any = null;
-  private fallbackPollingActive = false;
-  private connectionHealthy = false;
 
   private constructor() {
     this.isNative = Capacitor.isNativePlatform();
@@ -556,55 +553,10 @@ class UnifiedNotificationService {
     };
   }
 
-  // Start fallback polling when real-time fails
-  private startFallbackPolling(): void {
-    if (this.fallbackPollingActive) {
-      return;
-    }
-    
-    console.log('[UnifiedNotificationService] Starting fallback polling mode');
-    this.fallbackPollingActive = true;
-    this.connectionHealthy = false;
-    
-    // Use the fallback service
-    notificationFallbackService.startPolling().catch(error => {
-      console.error('[UnifiedNotificationService] Fallback polling failed to start:', error);
-    });
-  }
-
-  // Stop fallback polling when real-time is restored
-  private stopFallbackPolling(): void {
-    if (!this.fallbackPollingActive) {
-      return;
-    }
-    
-    console.log('[UnifiedNotificationService] Stopping fallback polling mode');
-    this.fallbackPollingActive = false;
-    this.connectionHealthy = true;
-    
-    notificationFallbackService.stopPolling();
-  }
-
-  // Get connection health status
-  getConnectionHealth(): { healthy: boolean; fallbackActive: boolean; strategy: string } {
-    return {
-      healthy: this.connectionHealthy,
-      fallbackActive: this.fallbackPollingActive,
-      strategy: this.connectionHealthy ? 'realtime' : (this.fallbackPollingActive ? 'polling' : 'none')
-    };
-  }
-
   // Legacy method compatibility
   getDebugReport(): string {
     const debugInfo = this.getDebugInfo();
-    const connectionHealth = this.getConnectionHealth();
-    const fallbackStatus = notificationFallbackService.getStatus();
-    
-    return JSON.stringify({
-      ...debugInfo,
-      connectionHealth,
-      fallbackStatus
-    }, null, 2);
+    return JSON.stringify(debugInfo, null, 2);
   }
 }
 

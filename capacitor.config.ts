@@ -80,22 +80,7 @@ const config: CapacitorConfig = {
     loadOnMainThread: true,
     handlePermissions: true,
     allowNavigationBarColorChange: true,
-    navigationBarColor: "#FFFFFF",
-    // WebSocket and network configuration for real-time features
-    allowFileAccess: true,
-    allowFileAccessFromFileURLs: true,
-    allowUniversalAccessFromFileURLs: true,
-    // Enhanced network security for WebSocket connections
-    domStorageEnabled: true,
-    javaScriptEnabled: true,
-    // Custom WebView settings for better WebSocket support
-    mixedContentMode: 'compatibility',
-    // Allow WebSocket connections from all origins for Supabase realtime
-    allowedNavigationHosts: [
-      "kwnwhgucnzqxndzjayyq.supabase.co",
-      "*.supabase.co",
-      "realtime.supabase.co"
-    ]
+    navigationBarColor: "#FFFFFF"
   }
 };
 

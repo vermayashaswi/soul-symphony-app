@@ -144,7 +144,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
             const { data: recent, error: recentErr } = await supabase
               .from('chat_messages')
               .select('id, content, sender, created_at')
-              .eq('thread_id', originThreadId as any)
+              .eq('thread_id', originThreadId)
               .order('created_at', { ascending: false })
               .limit(5);
 
@@ -162,19 +162,19 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
                 const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
                 const idempotencyKey = hex.slice(0, 32);
 
-                const messageInsert = {
-                  thread_id: originThreadId as any,
+                await supabase.from('chat_messages').upsert({
+                  thread_id: originThreadId,
                   content: response,
                   sender: 'assistant',
                   role: 'assistant',
                   idempotency_key: idempotencyKey
-                };
-                
-                await supabase.from('chat_messages').upsert(messageInsert as any);
+                }, { onConflict: 'thread_id,idempotency_key' });
               } catch (e) {
                 console.warn('[Streaming Watchdog] Persist fallback failed:', (e as any)?.message || e);
               }
             }
+
+            // NO manual state clearing - useStreamingChat handles it
           }, 1200);
         } catch (e) {
           console.warn('[Streaming Watchdog] Exception scheduling fallback:', (e as any)?.message || e);
@@ -389,9 +389,9 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       const { data: threadData, error: threadError } = await supabase
         .from('chat_threads')
         .select('id')
-        .eq('id', threadId as any)
-        .eq('user_id', effectiveUserId as any)
-        .maybeSingle();
+        .eq('id', threadId)
+        .eq('user_id', effectiveUserId)
+        .single();
         
       if (threadError || !threadData) {
         debugLog.addEvent("Thread Loading", `Thread not found or doesn't belong to user: ${threadError?.message || "Unknown error"}`, "error");
@@ -753,7 +753,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       const { error: messagesError } = await supabase
         .from('chat_messages')
         .delete()
-        .eq('thread_id', currentThreadId as any);
+        .eq('thread_id', currentThreadId);
       
       if (messagesError) {
         console.error("[Desktop] Error deleting messages:", messagesError);
@@ -763,7 +763,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       const { error: threadError } = await supabase
         .from('chat_threads')
         .delete()
-        .eq('id', currentThreadId as any);
+        .eq('id', currentThreadId);
       
       if (threadError) {
         console.error("[Desktop] Error deleting thread:", threadError);
@@ -778,58 +778,50 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       const { data: threads, error } = await supabase
         .from('chat_threads')
         .select('*')
-        .eq('user_id', effectiveUserId as any)
+        .eq('user_id', effectiveUserId)
         .order('updated_at', { ascending: false })
         .limit(1);
 
       if (error) throw error;
 
       if (threads && threads.length > 0) {
-        const firstThread = threads[0] as any;
-        if (firstThread && typeof firstThread === 'object' && 'id' in firstThread) {
-          if (!propsThreadId) {
-            setLocalThreadId(firstThread.id);
-          }
-          if (onSelectThread) {
-            onSelectThread(firstThread.id);
-          }
-          loadThreadMessages(firstThread.id);
-          window.dispatchEvent(
-            new CustomEvent('threadSelected', { 
-              detail: { threadId: firstThread.id } 
-            })
-          );
+        if (!propsThreadId) {
+          setLocalThreadId(threads[0].id);
         }
+        if (onSelectThread) {
+          onSelectThread(threads[0].id);
+        }
+        loadThreadMessages(threads[0].id);
+        window.dispatchEvent(
+          new CustomEvent('threadSelected', { 
+            detail: { threadId: threads[0].id } 
+          })
+        );
       } else {
         // Create a new thread if none remain
-        const threadInsert = {
-          user_id: effectiveUserId as any,
-          title: "New Conversation",
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
-        
         const { data: newThread, error: insertError } = await supabase
           .from('chat_threads')
-          .insert(threadInsert as any)
+          .insert({
+            user_id: effectiveUserId,
+            title: "New Conversation",
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
           .select()
-          .maybeSingle();
+          .single();
 
         if (!insertError && newThread) {
-          const createdThread = newThread as any;
-          if (createdThread && typeof createdThread === 'object' && 'id' in createdThread) {
-            if (!propsThreadId) {
-              setLocalThreadId(createdThread.id);
-            }
-            if (onSelectThread) {
-              onSelectThread(createdThread.id);
-            }
-            window.dispatchEvent(
-              new CustomEvent('threadSelected', { 
-                detail: { threadId: createdThread.id } 
-              })
-            );
+          if (!propsThreadId) {
+            setLocalThreadId(newThread.id);
           }
+          if (onSelectThread) {
+            onSelectThread(newThread.id);
+          }
+          window.dispatchEvent(
+            new CustomEvent('threadSelected', { 
+              detail: { threadId: newThread.id } 
+            })
+          );
         }
       }
 

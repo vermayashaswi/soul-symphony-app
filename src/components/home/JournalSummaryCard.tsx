@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { db } from '@/utils/supabaseClient';
 import { supabase } from '@/integrations/supabase/client';
 import { useTheme } from '@/hooks/use-theme';
 import FloatingThemeStrips from './FloatingThemeStrips';
@@ -102,10 +101,12 @@ const JournalSummaryCard: React.FC = () => {
         
         try {
           // Fetch journal entries for theme data with proper date formatting (using themes column)
-          const { data: journalEntries, error: entriesError } = await db.journalEntries.selectByUser(user.id, {
-            startDate: sevenDaysAgo.toISOString(),
-            columns: 'themes, sentiment'
-          });
+          const { data: journalEntries, error: entriesError } = await supabase
+            .from('Journal Entries')
+            .select('themes, sentiment')
+            .eq('user_id', user.id)
+            .gte('created_at', sevenDaysAgo.toISOString())
+            .not('themes', 'is', null);
           
           console.log('JournalSummaryCard: Fetched journal entries', {
             entriesCount: journalEntries?.length || 0,
@@ -119,11 +120,11 @@ const JournalSummaryCard: React.FC = () => {
             // Process journal entries to extract theme data
             const themesWithSentiment: ThemeData[] = [];
             
-            journalEntries.forEach((entry: any) => {
-              if (entry?.themes && Array.isArray(entry.themes)) {
+            journalEntries.forEach(entry => {
+              if (entry.themes && Array.isArray(entry.themes)) {
                 const sentimentScore = entry.sentiment != null ? Number(entry.sentiment) : 0;
                 
-                entry.themes.forEach((theme: any) => {
+                entry.themes.forEach(theme => {
                   if (theme && typeof theme === 'string') {
                     themesWithSentiment.push({
                       theme,

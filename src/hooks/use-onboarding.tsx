@@ -1,7 +1,6 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { db } from '@/utils/supabaseClient';
 import { User } from '@supabase/supabase-js';
 
 export function useOnboarding() {
@@ -19,7 +18,11 @@ export function useOnboarding() {
       if (user) {
         console.log('[Onboarding] Checking status for authenticated user:', user.id);
         
-        const { data: profile, error } = await db.profiles.select(user.id);
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('onboarding_completed, display_name')
+          .eq('id', user.id)
+          .single();
         
         if (error) {
           console.error('[Onboarding] Error fetching profile:', error);
@@ -28,10 +31,10 @@ export function useOnboarding() {
           setOnboardingComplete(isComplete);
         } else {
           console.log('[Onboarding] Profile data:', profile);
-          isComplete = (profile as any)?.onboarding_completed || false;
+          isComplete = profile.onboarding_completed || false;
           setOnboardingComplete(isComplete);
-          if ((profile as any)?.display_name) {
-            setDisplayName((profile as any).display_name);
+          if (profile.display_name) {
+            setDisplayName(profile.display_name);
           }
         }
       } else {
@@ -81,9 +84,13 @@ export function useOnboarding() {
       // Update database if user is authenticated
       if (user) {
         console.log('[Onboarding] Updating database onboarding status for user:', user.id);
-        const { error } = await db.profiles.update(user.id, { 
-          onboarding_completed: true
-        });
+        const { error } = await supabase
+          .from('profiles')
+          .update({ 
+            onboarding_completed: true,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', user.id);
         
         if (error) {
           console.error('[Onboarding] Error updating onboarding status:', error);
@@ -104,9 +111,13 @@ export function useOnboarding() {
       // Update database if user is authenticated
       if (user) {
         console.log('[Onboarding] Resetting database onboarding status for user:', user.id);
-        const { error } = await db.profiles.update(user.id, { 
-          onboarding_completed: false
-        });
+        const { error } = await supabase
+          .from('profiles')
+          .update({ 
+            onboarding_completed: false,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', user.id);
         
         if (error) {
           console.error('[Onboarding] Error resetting onboarding status:', error);
@@ -122,9 +133,13 @@ export function useOnboarding() {
     
     try {
       // Save the name to the profile
-      const { error } = await db.profiles.update(userId, { 
-        display_name: name
-      });
+      const { error } = await supabase
+        .from('profiles')
+        .update({ 
+          display_name: name,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', userId);
       
       if (error) {
         console.error('Error saving display name to profile:', error);

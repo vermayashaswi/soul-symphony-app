@@ -1,5 +1,4 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { db } from '@/utils/supabaseClient';
 import { supabase } from '@/integrations/supabase/client';
 import { showEdgeFunctionRetryToast } from '@/utils/toast-messages';
 import { saveChatStreamingState, getChatStreamingState, clearChatStreamingState } from '@/utils/chatStateStorage';
@@ -116,11 +115,14 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
       
       if (!processingStartTime) {
         // If no processing time, check for very recent assistant messages
-        const { data: recentMessages, error } = await db.chatMessages.selectByThreadAndSender(
-          threadId, 
-          'assistant', 
-          { columns: 'id, created_at, content', limit: 1 }
-        );
+        const { data: recentMessages, error } = await supabase
+          .from('chat_messages')
+          .select('id, created_at, content')
+          .eq('thread_id', threadId)
+          .eq('sender', 'assistant')
+          .gte('created_at', new Date(Date.now() - 5 * 60 * 1000).toISOString()) // Last 5 minutes
+          .order('created_at', { ascending: false })
+          .limit(1);
 
         if (!error && recentMessages && recentMessages.length > 0) {
           console.log(`[useStreamingChat] Found recent assistant message for thread ${threadId}`);
@@ -133,11 +135,14 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
       const searchStartTime = new Date(processingStartTime - 30000); // 30 seconds before processing started
       
       // Query for assistant messages created around the processing time
-      const { data: messages, error } = await db.chatMessages.selectByThreadAndSender(
-        threadId, 
-        'assistant', 
-        { columns: 'id, created_at, content', limit: 3 }
-      );
+      const { data: messages, error } = await supabase
+        .from('chat_messages')
+        .select('id, created_at, content')
+        .eq('thread_id', threadId)
+        .eq('sender', 'assistant')
+        .gte('created_at', searchStartTime.toISOString())
+        .order('created_at', { ascending: false })
+        .limit(3);
 
       if (error) {
         console.warn('[useStreamingChat] Error checking message completion:', error);
@@ -149,12 +154,12 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
       
       if (hasCompletedResponse) {
         // Check if we have a non-processing message
-        const latestMessage = messages[0] as any;
-        const isProcessingMessage = (latestMessage as any)?.content?.includes('...') || 
-                                   (latestMessage as any)?.content?.length < 10;
+        const latestMessage = messages[0];
+        const isProcessingMessage = latestMessage.content.includes('...') || 
+                                   latestMessage.content.length < 10;
         
         if (!isProcessingMessage) {
-          console.log(`[useStreamingChat] Found completed response for thread ${threadId}, message created at:`, (latestMessage as any)?.created_at);
+          console.log(`[useStreamingChat] Found completed response for thread ${threadId}, message created at:`, latestMessage.created_at);
           return true;
         }
       }
@@ -864,10 +869,14 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     // Fetch user timezone from profiles table
     let userTimezone = 'UTC';
     try {
-      const { data: profile, error: profileError } = await db.profiles.select(userId);
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('timezone')
+        .eq('id', userId)
+        .single();
       
-      if (!profileError && (profile as any)?.timezone) {
-        userTimezone = (profile as any).timezone;
+      if (!profileError && profile?.timezone) {
+        userTimezone = profile.timezone;
         console.log(`[useStreamingChat] Using user timezone: ${userTimezone}`);
       } else {
         console.log(`[useStreamingChat] No timezone found in profile, using UTC`);
