@@ -145,12 +145,18 @@ export function JournalEntryCard({
       return '';
     }
 
+    // Debug sentiment processing
+    console.log(`[JournalEntryCard] Entry ${safeEntry.id} sentiment score: ${score}`);
+
     if (score > 0.2) {
-      return 'border-green-500 border-2';
+      console.log(`[JournalEntryCard] Entry ${safeEntry.id} - Positive sentiment (${score}) - applying green border`);
+      return 'border-sentiment-positive border-2';
     } else if (score >= -0.1 && score <= 0.2) {
-      return 'border-yellow-400 border-2';
+      console.log(`[JournalEntryCard] Entry ${safeEntry.id} - Neutral sentiment (${score}) - applying yellow border`);
+      return 'border-sentiment-neutral border-2';
     } else {
-      return 'border-[#ea384c] border-2';
+      console.log(`[JournalEntryCard] Entry ${safeEntry.id} - Negative sentiment (${score}) - applying red border`);
+      return 'border-sentiment-negative border-2';
     }
   };
   
