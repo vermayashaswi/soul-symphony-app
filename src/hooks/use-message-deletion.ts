@@ -56,7 +56,7 @@ export const setupGlobalMessageDeletionListener = (userId: string) => {
         .from('chat_threads')
         .select('id, user_id')
         .eq('id', deletedMessage.thread_id)
-        .eq('user_id', userId)
+        .eq('user_id' as any, userId as any)
         .single()
         .then(({ data: thread, error }) => {
           if (!error && thread) {

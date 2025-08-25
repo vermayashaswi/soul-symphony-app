@@ -285,7 +285,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
         const { data, error } = await supabase
           .from('profiles')
           .select('tutorial_completed, tutorial_step')
-          .eq('id', user.id)
+          .eq('id' as any, user.id as any)
           .single();
         
         if (error) {
@@ -294,13 +294,13 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
           return;
         }
         
-        const shouldActivate = data?.tutorial_completed === 'NO';
-        const startingStep = data?.tutorial_step || 0;
+        const shouldActivate = (data as any)?.tutorial_completed === 'NO';
+        const startingStep = (data as any)?.tutorial_step || 0;
         
         console.log('[TutorialContext] Tutorial status check result:', {
           shouldActivate,
           startingStep,
-          tutorialCompleted: data?.tutorial_completed,
+          tutorialCompleted: (data as any)?.tutorial_completed,
           currentPath: location.pathname,
           isAppRoute: isAppRoute(location.pathname)
         });
@@ -324,7 +324,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
           }
         }
         
-        setTutorialCompleted(data?.tutorial_completed === 'YES');
+        setTutorialCompleted((data as any)?.tutorial_completed === 'YES');
         setTutorialChecked(true);
       } catch (error) {
         console.error('[TutorialContext] Error in tutorial check:', error);
@@ -384,8 +384,8 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     try {
       const { error } = await supabase
         .from('profiles')
-        .update({ tutorial_step: step })
-        .eq('id', user.id);
+        .update({ tutorial_step: step } as any)
+        .eq('id' as any, user.id as any);
         
       if (error) {
         console.error('[TutorialContext] Error updating tutorial step:', error);
@@ -420,8 +420,8 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
           tutorial_completed: 'YES',
           tutorial_step: steps.length,
           onboarding_completed: true
-        })
-        .eq('id', user.id);
+        } as any)
+        .eq('id' as any, user.id as any);
         
       if (error) {
         console.error('[TutorialContext] Error completing tutorial:', error);
@@ -538,7 +538,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       const { data: currentProfile, error: fetchError } = await supabase
         .from('profiles')
         .select('subscription_status, subscription_tier, is_premium, trial_ends_at')
-        .eq('id', user.id)
+        .eq('id' as any, user.id as any)
         .single();
         
       if (fetchError) {
@@ -547,10 +547,10 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       }
       
       console.log('[TutorialContext] Current subscription status before skip:', {
-        status: currentProfile.subscription_status,
-        tier: currentProfile.subscription_tier,
-        isPremium: currentProfile.is_premium,
-        trialEndsAt: currentProfile.trial_ends_at
+        status: (currentProfile as any)?.subscription_status,
+        tier: (currentProfile as any)?.subscription_tier,
+        isPremium: (currentProfile as any)?.is_premium,
+        trialEndsAt: (currentProfile as any)?.trial_ends_at
       });
       
       // Update tutorial completion while preserving subscription status
@@ -559,13 +559,13 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
         .update({ 
           tutorial_completed: 'YES',
           // Explicitly preserve subscription fields to prevent any trigger issues
-          subscription_status: currentProfile.subscription_status,
-          subscription_tier: currentProfile.subscription_tier,
-          is_premium: currentProfile.is_premium,
-          trial_ends_at: currentProfile.trial_ends_at,
+          subscription_status: (currentProfile as any)?.subscription_status,
+          subscription_tier: (currentProfile as any)?.subscription_tier,
+          is_premium: (currentProfile as any)?.is_premium,
+          trial_ends_at: (currentProfile as any)?.trial_ends_at,
           updated_at: new Date().toISOString()
-        })
-        .eq('id', user.id);
+        } as any)
+        .eq('id' as any, user.id as any);
         
       if (error) {
         console.error('[TutorialContext] Error skipping tutorial:', error);
@@ -604,8 +604,8 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
           tutorial_completed: 'NO',
           tutorial_step: 0,
           updated_at: new Date().toISOString()
-        })
-        .eq('id', user.id);
+        } as any)
+        .eq('id' as any, user.id as any);
         
       if (error) {
         console.error('[TutorialContext] Error resetting tutorial:', error);

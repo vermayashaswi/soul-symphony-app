@@ -58,7 +58,7 @@ export const FeatureFlagsProvider = ({ children }: { children: ReactNode }) => {
         const { data: overrides, error: overridesError } = await supabase
           .from('user_feature_flags')
           .select('feature_flag_id, is_enabled')
-          .eq('user_id', user.id);
+          .eq('user_id' as any, user.id as any);
 
         if (overridesError) {
           console.warn('Error fetching user feature flag overrides:', overridesError);
@@ -70,8 +70,8 @@ export const FeatureFlagsProvider = ({ children }: { children: ReactNode }) => {
       // Build flags object
       const computedFlags: FeatureFlags = { ...defaultFlags };
 
-      allFlags?.forEach((flag) => {
-        if (flag.name in computedFlags) {
+      allFlags?.forEach((flag: any) => {
+        if (flag?.name in computedFlags) {
           // Check for user-specific override first
           const userOverride = userOverrides.find(o => o.feature_flag_id === flag.id);
           if (userOverride) {

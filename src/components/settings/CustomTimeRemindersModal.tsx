@@ -108,8 +108,8 @@ export function CustomTimeRemindersModal({
 
       const { error } = await supabase
         .from('profiles')
-        .update({ reminder_settings: reminderSettings as any })
-        .eq('id', user.id);
+        .update({ reminder_settings: reminderSettings } as any)
+        .eq('id' as any, user.id as any);
 
       if (error) {
         console.error('Error saving reminder settings:', error);

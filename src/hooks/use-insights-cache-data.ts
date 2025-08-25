@@ -90,30 +90,30 @@ export const useInsightsCacheData = (
       }
 
       // Filter entries within 3-month cache range
-      const cachedEntries = allEntries?.filter(entry => {
-        if (!entry.created_at) return false;
-        const entryDate = new Date(entry.created_at);
+      const cachedEntries = allEntries?.filter((entry: any) => {
+        if (!(entry as any)?.created_at) return false;
+        const entryDate = new Date((entry as any).created_at);
         return isWithinInterval(entryDate, cacheRange);
       }) || [];
 
       console.log(`[useInsightsCacheData] Cached ${cachedEntries.length} entries out of ${allEntries?.length || 0} total`);
 
       // Process emotions data for all entries
-      const processedAllEntries = allEntries?.map(entry => {
-        if (entry.emotions && typeof entry.emotions === 'string') {
+      const processedAllEntries = allEntries?.map((entry: any) => {
+        if ((entry as any)?.emotions && typeof (entry as any).emotions === 'string') {
           try {
-            entry.emotions = JSON.parse(entry.emotions);
+            (entry as any).emotions = JSON.parse((entry as any).emotions);
           } catch (e) {
             console.error('Error parsing emotions JSON string:', e);
           }
         }
 
         // Calculate sentiment if missing
-        if ((entry.sentiment == null || Number(entry.sentiment) === 0) && entry.emotions) {
+        if (((entry as any).sentiment == null || Number((entry as any).sentiment) === 0) && (entry as any).emotions) {
           try {
-            const emotions = typeof entry.emotions === 'string' 
-              ? JSON.parse(entry.emotions) 
-              : entry.emotions;
+            const emotions = typeof (entry as any).emotions === 'string' 
+              ? JSON.parse((entry as any).emotions) 
+              : (entry as any).emotions;
             
             if (emotions && typeof emotions === 'object') {
               let totalSentiment = 0;

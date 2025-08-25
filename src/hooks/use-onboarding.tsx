@@ -21,7 +21,7 @@ export function useOnboarding() {
         const { data: profile, error } = await supabase
           .from('profiles')
           .select('onboarding_completed, display_name')
-          .eq('id', user.id)
+          .eq('id' as any, user.id as any)
           .single();
         
         if (error) {
@@ -31,10 +31,10 @@ export function useOnboarding() {
           setOnboardingComplete(isComplete);
         } else {
           console.log('[Onboarding] Profile data:', profile);
-          isComplete = profile.onboarding_completed || false;
+          isComplete = (profile as any)?.onboarding_completed || false;
           setOnboardingComplete(isComplete);
-          if (profile.display_name) {
-            setDisplayName(profile.display_name);
+          if ((profile as any)?.display_name) {
+            setDisplayName((profile as any).display_name);
           }
         }
       } else {
@@ -89,8 +89,8 @@ export function useOnboarding() {
           .update({ 
             onboarding_completed: true,
             updated_at: new Date().toISOString()
-          })
-          .eq('id', user.id);
+          } as any)
+          .eq('id' as any, user.id as any);
         
         if (error) {
           console.error('[Onboarding] Error updating onboarding status:', error);
@@ -116,8 +116,8 @@ export function useOnboarding() {
           .update({ 
             onboarding_completed: false,
             updated_at: new Date().toISOString()
-          })
-          .eq('id', user.id);
+          } as any)
+          .eq('id' as any, user.id as any);
         
         if (error) {
           console.error('[Onboarding] Error resetting onboarding status:', error);
@@ -138,8 +138,8 @@ export function useOnboarding() {
         .update({ 
           display_name: name,
           updated_at: new Date().toISOString()
-        })
-        .eq('id', userId);
+        } as any)
+        .eq('id' as any, userId as any);
       
       if (error) {
         console.error('Error saving display name to profile:', error);
