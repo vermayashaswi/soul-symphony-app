@@ -1,43 +1,47 @@
 import { Capacitor } from '@capacitor/core';
 import { LocalNotifications, ScheduleOptions } from '@capacitor/local-notifications';
-import { notificationDebugLogger } from './notificationDebugLogger';
-import { timezoneNotificationHelper, JournalReminderTime } from './timezoneNotificationHelper';
+import { supabase } from '@/integrations/supabase/client';
+
+interface NotificationReminder {
+  id: string;
+  enabled: boolean;
+  time: string;
+  label: string;
+}
+
+interface NotificationSettings {
+  reminders: NotificationReminder[];
+}
 
 export interface UnifiedNotificationSettings {
-  enabled: boolean;
-  times: JournalReminderTime[];
-  timezone: string;
-  lastUpdated: string;
+  reminders: NotificationReminder[];
 }
 
-export interface UnifiedNotificationResult {
+export type NotificationPermissionState = 'default' | 'granted' | 'denied' | 'unsupported';
+
+interface NotificationResult {
   success: boolean;
-  error?: string;
-  strategy: 'native' | 'web' | 'hybrid';
-  scheduledCount: number;
-  verificationPassed: boolean;
-  debugInfo: any;
+  message: string;
+  permissionGranted?: boolean;
+  strategy?: 'native' | 'web' | 'hybrid';
 }
 
-export interface NotificationVerificationResult {
-  expectedCount: number;
-  actualCount: number;
-  successRate: number;
-  pendingNotifications: any[];
-  healthStatus: 'healthy' | 'degraded' | 'failed';
-}
-
-/**
- * Unified notification service with comprehensive timezone support, 
- * WebView detection, and debug logging
- */
 class UnifiedNotificationService {
   private static instance: UnifiedNotificationService;
-  private isNative = false;
-  private isWebView = false;
-  private strategy: 'native' | 'web' | 'hybrid' = 'web';
-  private healthCheckInterval?: number;
-  private activeSettings: UnifiedNotificationSettings | null = null;
+  private isNative: boolean;
+  private isWebView: boolean;
+  private permissionCache: NotificationPermissionState | null = null;
+  private realtimeChannel: any = null;
+
+  private constructor() {
+    this.isNative = Capacitor.isNativePlatform();
+    this.isWebView = Capacitor.getPlatform() === 'android' || Capacitor.getPlatform() === 'ios';
+    console.log('[UnifiedNotificationService] Initialized', { 
+      isNative: this.isNative, 
+      isWebView: this.isWebView,
+      platform: Capacitor.getPlatform()
+    });
+  }
 
   static getInstance(): UnifiedNotificationService {
     if (!UnifiedNotificationService.instance) {
@@ -46,709 +50,415 @@ class UnifiedNotificationService {
     return UnifiedNotificationService.instance;
   }
 
-  constructor() {
-    this.initializePlatformDetection();
-  }
-
-  /**
-   * Enhanced platform and WebView detection
-   */
-  private initializePlatformDetection(): void {
-    this.isNative = Capacitor.isNativePlatform();
-    this.isWebView = this.detectWebView();
-    this.strategy = this.determineBestStrategy();
-
-    notificationDebugLogger.logEvent('PLATFORM_DETECTION', {
-      isNative: this.isNative,
-      isWebView: this.isWebView,
-      strategy: this.strategy,
-      platform: Capacitor.getPlatform(),
-      userAgent: navigator.userAgent,
-      capabilities: this.getPlatformCapabilities()
-    });
-
-    console.log(`[UnifiedNotificationService] Initialized with strategy: ${this.strategy}`, {
-      isNative: this.isNative,
-      isWebView: this.isWebView,
-      platform: Capacitor.getPlatform()
-    });
-  }
-
-  /**
-   * Enhanced WebView detection
-   */
-  private detectWebView(): boolean {
-    const userAgent = navigator.userAgent.toLowerCase();
-    
-    // Enhanced WebView detection patterns
-    const webViewPatterns = [
-      /.*wv\).*(chrome)\/.*/, // Standard WebView pattern
-      /.*android.*version\/.*chrome\/.*mobile.*safari.*/, // Android WebView
-      /.*mobile.*safari.*version\/.*/, // iOS WebView  
-      /capacitor/i, // Capacitor specific
-      /cordova/i, // Cordova/PhoneGap
-    ];
-
-    const hasWebViewPattern = webViewPatterns.some(pattern => pattern.test(userAgent));
-    
-    // Additional Capacitor-specific checks
-    const isCapacitorWebView = !!(window as any).Capacitor && 
-                              this.isNative && 
-                              !userAgent.includes('chrome/');
-
-    // Check for missing features that indicate WebView
-    const missingFeatures = !(window as any).chrome || !navigator.serviceWorker;
-
-    return hasWebViewPattern || isCapacitorWebView || (this.isNative && missingFeatures);
-  }
-
-  /**
-   * Determine the best notification strategy based on platform capabilities
-   */
-  private determineBestStrategy(): 'native' | 'web' | 'hybrid' {
-    if (this.isNative && !this.isWebView) {
-      return 'native';
-    } else if (this.isWebView) {
-      return 'hybrid'; // Use both native and web fallbacks
-    } else {
-      return 'web';
-    }
-  }
-
-  /**
-   * Get platform capabilities for debugging
-   */
-  private getPlatformCapabilities(): any {
-    return {
-      hasServiceWorker: 'serviceWorker' in navigator,
-      hasNotificationAPI: 'Notification' in window,
-      hasLocalStorage: 'localStorage' in window,
-      hasWebView: this.isWebView,
-      hasCapacitor: !!(window as any).Capacitor,
-      platform: Capacitor.getPlatform(),
-      plugins: Object.keys((window as any).Capacitor?.Plugins || {})
-    };
-  }
-
-  /**
-   * Request comprehensive permissions and setup notifications
-   */
-  async requestPermissionsAndSetup(times: JournalReminderTime[]): Promise<UnifiedNotificationResult> {
-    notificationDebugLogger.logUserAction('SETUP_REMINDERS', {
-      times,
-      strategy: this.strategy,
-      timezone: timezoneNotificationHelper.getUserTimezone()
-    });
-
+  // Unified permission checking with proper caching
+  async checkPermissionStatus(): Promise<NotificationPermissionState> {
     try {
-      // Clear any existing notifications first
-      await this.clearAllNotifications();
-
-      let result: UnifiedNotificationResult;
-
-      switch (this.strategy) {
-        case 'native':
-          result = await this.setupNativeNotifications(times);
-          break;
-        case 'hybrid':
-          result = await this.setupHybridNotifications(times);
-          break;
-        case 'web':
-          result = await this.setupWebNotifications(times);
-          break;
-        default:
-          throw new Error(`Unknown strategy: ${this.strategy}`);
+      if (this.isNative) {
+        const status = await LocalNotifications.checkPermissions();
+        console.log('[UnifiedNotificationService] Native permission status:', status);
+        
+        if (status.display === 'granted') {
+          this.permissionCache = 'granted';
+        } else if (status.display === 'denied') {
+          this.permissionCache = 'denied';
+        } else {
+          this.permissionCache = 'default';
+        }
+      } else {
+        if (!('Notification' in window)) {
+          this.permissionCache = 'unsupported';
+        } else {
+          this.permissionCache = Notification.permission as NotificationPermissionState;
+        }
       }
-
-      if (result.success) {
-        this.activeSettings = {
-          enabled: true,
-          times,
-          timezone: timezoneNotificationHelper.getUserTimezone(),
-          lastUpdated: new Date().toISOString()
-        };
-        this.saveSettings(this.activeSettings);
-        this.startHealthCheck();
-      }
-
-      notificationDebugLogger.logEvent('SETUP_COMPLETE', result, result.success, result.error);
-      return result;
-
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      notificationDebugLogger.logEvent('SETUP_FAILED', { error: errorMsg }, false, errorMsg);
-      
+      console.error('[UnifiedNotificationService] Error checking permissions:', error);
+      this.permissionCache = 'unsupported';
+    }
+
+    return this.permissionCache;
+  }
+
+  // Unified permission requesting with fallback strategies
+  async requestPermissions(): Promise<NotificationResult> {
+    try {
+      if (this.isNative) {
+        const currentStatus = await LocalNotifications.checkPermissions();
+        
+        if (currentStatus.display === 'granted') {
+          this.permissionCache = 'granted';
+          return { 
+            success: true, 
+            message: 'Permissions already granted',
+            permissionGranted: true,
+            strategy: 'native'
+          };
+        }
+
+        const requestResult = await LocalNotifications.requestPermissions();
+        console.log('[UnifiedNotificationService] Native permission request result:', requestResult);
+        
+        const granted = requestResult.display === 'granted';
+        this.permissionCache = granted ? 'granted' : 'denied';
+        
+        return {
+          success: granted,
+          message: granted ? 'Native permissions granted' : 'Native permissions denied',
+          permissionGranted: granted,
+          strategy: 'native'
+        };
+      } else {
+        if (!('Notification' in window)) {
+          return {
+            success: false,
+            message: 'Notifications not supported in this browser',
+            permissionGranted: false,
+            strategy: 'web'
+          };
+        }
+
+        const permission = await Notification.requestPermission();
+        this.permissionCache = permission as NotificationPermissionState;
+        
+        const granted = permission === 'granted';
+        return {
+          success: granted,
+          message: granted ? 'Web permissions granted' : 'Web permissions denied',
+          permissionGranted: granted,
+          strategy: 'web'
+        };
+      }
+    } catch (error) {
+      console.error('[UnifiedNotificationService] Error requesting permissions:', error);
+      this.permissionCache = 'denied';
       return {
         success: false,
-        error: errorMsg,
-        strategy: this.strategy,
-        scheduledCount: 0,
-        verificationPassed: false,
-        debugInfo: { error: errorMsg }
+        message: `Permission request failed: ${error}`,
+        permissionGranted: false,
+        strategy: this.isNative ? 'native' : 'web'
       };
     }
   }
 
-  /**
-   * Setup native notifications with timezone awareness
-   */
-  private async setupNativeNotifications(times: JournalReminderTime[]): Promise<UnifiedNotificationResult> {
+  // Save reminder settings and trigger backend scheduling
+  async saveReminderSettings(settings: NotificationSettings): Promise<NotificationResult> {
     try {
-      // Request permissions
-      const permissions = await LocalNotifications.requestPermissions();
-      notificationDebugLogger.logPermissionRequest('NATIVE', permissions);
+      console.log('[UnifiedNotificationService] Saving reminder settings:', settings);
 
-      if (permissions.display !== 'granted') {
-        throw new Error('Native notification permissions denied');
-      }
-
-      // Create notification channels (Android)
-      if (Capacitor.getPlatform() === 'android') {
-        await this.createAndroidChannels();
-      }
-
-      // Schedule timezone-aware notifications
-      const scheduledCount = await this.scheduleNativeNotifications(times);
-
-      // Verify notifications were scheduled
-      const verification = await this.verifyNotifications(times.length);
-
-      return {
-        success: true,
-        strategy: 'native',
-        scheduledCount,
-        verificationPassed: verification.healthStatus === 'healthy',
-        debugInfo: {
-          permissions,
-          verification,
-          timezone: timezoneNotificationHelper.getUserTimezone()
-        }
-      };
-
-    } catch (error) {
-      throw new Error(`Native setup failed: ${error}`);
-    }
-  }
-
-  /**
-   * Setup hybrid notifications (WebView with native fallback)
-   */
-  private async setupHybridNotifications(times: JournalReminderTime[]): Promise<UnifiedNotificationResult> {
-    const results = {
-      native: null as any,
-      web: null as any
-    };
-
-    try {
-      // Try native first
-      try {
-        results.native = await this.setupNativeNotifications(times);
-        notificationDebugLogger.logEvent('HYBRID_NATIVE_SUCCESS', results.native);
-      } catch (error) {
-        notificationDebugLogger.logEvent('HYBRID_NATIVE_FAILED', { error }, false);
-        
-        // Fallback to web notifications
-        results.web = await this.setupWebNotifications(times);
-        notificationDebugLogger.logEvent('HYBRID_WEB_FALLBACK', results.web);
-      }
-
-      const successfulResult = results.native || results.web;
-      
-      return {
-        success: !!successfulResult,
-        strategy: 'hybrid',
-        scheduledCount: successfulResult?.scheduledCount || 0,
-        verificationPassed: successfulResult?.verificationPassed || false,
-        debugInfo: {
-          nativeResult: results.native,
-          webResult: results.web,
-          strategy: results.native ? 'native' : 'web'
-        }
-      };
-
-    } catch (error) {
-      throw new Error(`Hybrid setup failed: ${error}`);
-    }
-  }
-
-  /**
-   * Setup web notifications with timezone awareness
-   */
-  private async setupWebNotifications(times: JournalReminderTime[]): Promise<UnifiedNotificationResult> {
-    try {
-      // Request web notification permission
-      const permission = await Notification.requestPermission();
-      notificationDebugLogger.logPermissionRequest('WEB', { permission });
-
-      if (permission !== 'granted') {
-        throw new Error('Web notification permissions denied');
-      }
-
-      // Schedule web notifications using setTimeout with timezone awareness
-      const scheduledCount = this.scheduleWebNotifications(times);
-
-      return {
-        success: true,
-        strategy: 'web',
-        scheduledCount,
-        verificationPassed: true, // Web notifications are immediate
-        debugInfo: {
-          permission,
-          hasServiceWorker: 'serviceWorker' in navigator,
-          timezone: timezoneNotificationHelper.getUserTimezone()
-        }
-      };
-
-    } catch (error) {
-      throw new Error(`Web setup failed: ${error}`);
-    }
-  }
-
-  /**
-   * Schedule native notifications with absolute timestamps
-   */
-  private async scheduleNativeNotifications(times: JournalReminderTime[]): Promise<number> {
-    const notifications: any[] = [];
-    const daysToSchedule = 30; // Schedule 30 days in advance
-
-    for (const time of times) {
-      const absoluteTimes = timezoneNotificationHelper.generateAbsoluteTimesInTimezone(time, daysToSchedule);
-      
-      absoluteTimes.forEach((absoluteTime, index) => {
-        const notificationId = this.generateNotificationId(time, index);
-        
-        notifications.push({
-          id: notificationId,
-          title: this.getNotificationTitle(time),
-          body: this.getNotificationBody(time),
-          schedule: {
-            at: absoluteTime,
-            allowWhileIdle: true
-          },
-          sound: 'default',
-          channelId: 'journal-reminders-priority',
-          actionTypeId: 'JOURNAL_REMINDER',
-          extra: {
-            reminderTime: time,
-            scheduledFor: absoluteTime.toISOString(),
-            timezone: timezoneNotificationHelper.getUserTimezone(),
-            isAbsolute: true
-          }
-        });
-      });
-    }
-
-    // Schedule in batches to avoid overwhelming the system
-    const batchSize = 10;
-    let scheduledCount = 0;
-
-    for (let i = 0; i < notifications.length; i += batchSize) {
-      const batch = notifications.slice(i, i + batchSize);
-      await LocalNotifications.schedule({ notifications: batch });
-      scheduledCount += batch.length;
-      
-      notificationDebugLogger.logEvent('BATCH_SCHEDULED', {
-        batchNumber: Math.floor(i / batchSize) + 1,
-        batchSize: batch.length,
-        totalScheduled: scheduledCount
-      });
-
-      // Small delay between batches
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
-
-    notificationDebugLogger.logScheduleAttempt(
-      times, 
-      'native', 
-      { success: true, scheduledCount, totalNotifications: notifications.length }
-    );
-
-    return scheduledCount;
-  }
-
-  /**
-   * Schedule web notifications with timezone awareness
-   */
-  private scheduleWebNotifications(times: JournalReminderTime[]): number {
-    let scheduledCount = 0;
-    
-    times.forEach(time => {
-      const nextTime = timezoneNotificationHelper.getNextReminderTimeInTimezone(time);
-      const delay = nextTime.getTime() - Date.now();
-      
-      if (delay > 0) {
-        setTimeout(() => {
-          this.showWebNotification(time);
-          // Reschedule for next day
-          this.scheduleNextWebNotification(time);
-        }, delay);
-        
-        scheduledCount++;
-        
-        notificationDebugLogger.logEvent('WEB_SCHEDULED', {
-          time,
-          nextTime: timezoneNotificationHelper.formatTimeForUser(nextTime),
-          delay: `${Math.round(delay / 1000)}s`
-        });
-      }
-    });
-
-    return scheduledCount;
-  }
-
-  /**
-   * Show web notification
-   */
-  private showWebNotification(time: JournalReminderTime): void {
-    if (Notification.permission !== 'granted') return;
-
-    const notification = new Notification(this.getNotificationTitle(time), {
-      body: this.getNotificationBody(time),
-      icon: '/favicon.ico',
-      badge: '/favicon.ico',
-      tag: `journal-${time}`,
-      requireInteraction: false,
-      data: { time, action: 'open_journal' }
-    });
-
-    notificationDebugLogger.logEvent('WEB_NOTIFICATION_SHOWN', {
-      time,
-      timestamp: new Date().toISOString()
-    });
-
-    setTimeout(() => notification.close(), 8000);
-
-    notification.onclick = () => {
-      window.focus();
-      notification.close();
-      window.location.href = '/app/voice-entry';
-    };
-  }
-
-  /**
-   * Schedule next occurrence of web notification
-   */
-  private scheduleNextWebNotification(time: JournalReminderTime): void {
-    // Add 24 hours to get next day's notification
-    const nextTime = new Date(Date.now() + 24 * 60 * 60 * 1000);
-    const targetTime = timezoneNotificationHelper.getNextReminderTimeInTimezone(time);
-    const delay = targetTime.getTime() - Date.now();
-
-    if (delay > 0) {
-      setTimeout(() => {
-        this.showWebNotification(time);
-        this.scheduleNextWebNotification(time);
-      }, delay);
-    }
-  }
-
-  /**
-   * Create Android notification channels
-   */
-  private async createAndroidChannels(): Promise<void> {
-    const channels = [
-      {
-        id: 'journal-reminders-priority',
-        name: 'Journal Reminders',
-        description: 'Daily journal entry reminders with high priority',
-        importance: 4 as any, // HIGH
-        sound: 'default',
-        vibration: true,
-        lights: true,
-        lightColor: '#8b5cf6'
-      }
-    ];
-
-    for (const channel of channels) {
-      await LocalNotifications.createChannel(channel);
-    }
-
-    notificationDebugLogger.logEvent('ANDROID_CHANNELS_CREATED', { channels });
-  }
-
-  /**
-   * Verify notifications were scheduled correctly
-   */
-  private async verifyNotifications(expectedTimes: number): Promise<NotificationVerificationResult> {
-    try {
-      if (!this.isNative) {
+      // Get current user
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
         return {
-          expectedCount: expectedTimes,
-          actualCount: expectedTimes, // Web notifications are immediate
-          successRate: 100,
-          pendingNotifications: [],
-          healthStatus: 'healthy'
+          success: false,
+          message: 'User not authenticated'
         };
       }
 
-      const result = await LocalNotifications.getPending();
-      const actualCount = result.notifications.length;
-      const successRate = expectedTimes > 0 ? Math.round((actualCount / expectedTimes) * 100) : 0;
-      
-      let healthStatus: 'healthy' | 'degraded' | 'failed';
-      if (successRate >= 80) {
-        healthStatus = 'healthy';
-      } else if (successRate >= 50) {
-        healthStatus = 'degraded';
-      } else {
-        healthStatus = 'failed';
+      // Update user profile with new settings
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ reminder_settings: settings as any })
+        .eq('id', user.id);
+
+      if (updateError) {
+        console.error('[UnifiedNotificationService] Error updating profile:', updateError);
+        return {
+          success: false,
+          message: `Failed to save settings: ${updateError.message}`
+        };
       }
 
-      const verification: NotificationVerificationResult = {
-        expectedCount: expectedTimes,
-        actualCount,
-        successRate,
-        pendingNotifications: result.notifications,
-        healthStatus
-      };
-
-      notificationDebugLogger.logVerification(expectedTimes, actualCount, result.notifications);
+      // Schedule notifications via edge function
+      const { error: scheduleError } = await supabase.functions.invoke('notification-scheduler');
       
-      return verification;
+      if (scheduleError) {
+        console.error('[UnifiedNotificationService] Error scheduling notifications:', scheduleError);
+        return {
+          success: false,
+          message: `Failed to schedule notifications: ${scheduleError.message}`
+        };
+      }
 
-    } catch (error) {
-      notificationDebugLogger.logEvent('VERIFICATION_FAILED', { error }, false);
+      console.log('[UnifiedNotificationService] Settings saved and notifications scheduled successfully');
       return {
-        expectedCount: expectedTimes,
-        actualCount: 0,
-        successRate: 0,
-        pendingNotifications: [],
-        healthStatus: 'failed'
+        success: true,
+        message: 'Reminder settings saved and notifications scheduled'
+      };
+
+    } catch (error) {
+      console.error('[UnifiedNotificationService] Error in saveReminderSettings:', error);
+      return {
+        success: false,
+        message: `Unexpected error: ${error}`
       };
     }
   }
 
-  /**
-   * Clear all notifications
-   */
-  async clearAllNotifications(): Promise<void> {
+  // Get reminder settings with proper format handling
+  async getReminderSettings(): Promise<NotificationSettings> {
     try {
-      if (this.isNative) {
-        await LocalNotifications.cancel({ notifications: [] });
-        await LocalNotifications.removeAllDeliveredNotifications();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        return { reminders: [] };
       }
-      
-      // Clear web timeouts (stored in localStorage)
-      localStorage.removeItem('web_notification_timeouts');
-      
-      notificationDebugLogger.logEvent('NOTIFICATIONS_CLEARED', {
-        strategy: this.strategy,
-        isNative: this.isNative
-      });
 
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('reminder_settings')
+        .eq('id', user.id)
+        .single();
+
+      if (profile?.reminder_settings) {
+        // Handle both old and new formats
+        const settings = profile.reminder_settings as any;
+        if (settings && typeof settings === 'object' && settings.reminders) {
+          return settings as NotificationSettings;
+        } else {
+          // Convert old format to new format if needed
+          return { reminders: [] };
+        }
+      }
+
+      return { reminders: [] };
     } catch (error) {
-      notificationDebugLogger.logEvent('CLEAR_FAILED', { error }, false);
+      console.error('[UnifiedNotificationService] Error getting reminder settings:', error);
+      return { reminders: [] };
     }
   }
 
-  /**
-   * Disable all reminders
-   */
-  async disableReminders(): Promise<void> {
-    await this.clearAllNotifications();
-    this.stopHealthCheck();
-    this.activeSettings = null;
-    this.saveSettings({ enabled: false, times: [], timezone: '', lastUpdated: '' });
-    
-    notificationDebugLogger.logEvent('REMINDERS_DISABLED', {
-      strategy: this.strategy
-    });
+  // Start listening for real-time notification delivery
+  startRealtimeListener(): void {
+    if (this.realtimeChannel) {
+      return; // Already listening
+    }
+
+    console.log('[UnifiedNotificationService] Starting real-time notification listener');
+
+    this.realtimeChannel = supabase
+      .channel('unified-notification-delivery')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'notification_queue',
+          filter: 'status=eq.sent'
+        },
+        (payload) => {
+          console.log('[UnifiedNotificationService] Real-time notification delivery:', payload);
+          this.handleRealtimeNotification(payload.new);
+        }
+      )
+      .subscribe((status) => {
+        console.log('[UnifiedNotificationService] Real-time subscription status:', status);
+      });
   }
 
-  /**
-   * Test notification functionality
-   */
-  async testNotification(): Promise<boolean> {
+  // Stop real-time listener
+  stopRealtimeListener(): void {
+    if (this.realtimeChannel) {
+      supabase.removeChannel(this.realtimeChannel);
+      this.realtimeChannel = null;
+      console.log('[UnifiedNotificationService] Stopped real-time notification listener');
+    }
+  }
+
+  // Handle real-time notification with proper user verification
+  private async handleRealtimeNotification(notification: any): Promise<void> {
+    console.log('[UnifiedNotificationService] Handling real-time notification:', notification);
+
     try {
-      notificationDebugLogger.logEvent('TEST_NOTIFICATION_START', {
-        strategy: this.strategy,
-        isNative: this.isNative,
-        isWebView: this.isWebView
-      });
+      // Check if notification is for current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || notification.user_id !== user.id) {
+        return;
+      }
 
+      // Display notification immediately using best available method
       if (this.isNative) {
-        const permissions = await LocalNotifications.checkPermissions();
-        if (permissions.display !== 'granted') {
-          throw new Error('No native permissions');
-        }
-
-        await LocalNotifications.schedule({
-          notifications: [{
-            id: 99999,
-            title: '🧪 Test Journal Reminder',
-            body: 'Your notifications are working correctly!',
-            schedule: { at: new Date(Date.now() + 2000) },
-            channelId: 'journal-reminders-priority'
-          }]
-        });
+        await this.showNativeNotification(notification.title, notification.body);
       } else {
-        if (Notification.permission !== 'granted') {
-          throw new Error('No web permissions');
-        }
-
-        new Notification('🧪 Test Journal Reminder', {
-          body: 'Your notifications are working correctly!',
-          icon: '/favicon.ico'
-        });
+        await this.showWebNotification(notification.title, notification.body);
       }
 
-      notificationDebugLogger.logEvent('TEST_NOTIFICATION_SUCCESS', {
-        strategy: this.strategy,
-        timestamp: new Date().toISOString()
-      });
-
-      return true;
-
     } catch (error) {
-      notificationDebugLogger.logEvent('TEST_NOTIFICATION_FAILED', { error }, false);
-      return false;
+      console.error('[UnifiedNotificationService] Error handling real-time notification:', error);
     }
   }
 
-  /**
-   * Start health check monitoring
-   */
-  private startHealthCheck(): void {
-    this.stopHealthCheck();
-    
-    const HEALTH_CHECK_INTERVAL = 2 * 60 * 60 * 1000; // 2 hours
-    
-    this.healthCheckInterval = window.setInterval(async () => {
-      await this.performHealthCheck();
-    }, HEALTH_CHECK_INTERVAL);
+  // Show native notification with proper configuration
+  private async showNativeNotification(title: string, body: string): Promise<void> {
+    try {
+      const options: ScheduleOptions = {
+        notifications: [{
+          id: Date.now(),
+          title,
+          body,
+          schedule: { at: new Date() },
+          sound: 'default',
+          smallIcon: 'ic_notification',
+          iconColor: '#FFA500',
+          extra: {
+            timestamp: Date.now(),
+            type: 'journal_reminder'
+          }
+        }]
+      };
 
-    notificationDebugLogger.logEvent('HEALTH_CHECK_STARTED', {
-      interval: HEALTH_CHECK_INTERVAL,
-      strategy: this.strategy
-    });
+      await LocalNotifications.schedule(options);
+      console.log('[UnifiedNotificationService] Native notification scheduled');
+    } catch (error) {
+      console.error('[UnifiedNotificationService] Error showing native notification:', error);
+    }
   }
 
-  /**
-   * Perform comprehensive health check
-   */
-  private async performHealthCheck(): Promise<void> {
-    if (!this.activeSettings?.enabled) {
-      this.stopHealthCheck();
-      return;
+  // Show web notification with proper fallbacks
+  private async showWebNotification(title: string, body: string): Promise<void> {
+    try {
+      if ('Notification' in window && Notification.permission === 'granted') {
+        const notification = new Notification(title, {
+          body,
+          icon: '/favicon.ico',
+          badge: '/favicon.ico',
+          tag: 'journal-reminder',
+          requireInteraction: false,
+          data: {
+            timestamp: Date.now(),
+            type: 'journal_reminder'
+          }
+        });
+
+        // Auto-close after 5 seconds
+        setTimeout(() => notification.close(), 5000);
+
+        // Handle click to navigate to journal
+        notification.onclick = () => {
+          window.focus();
+          notification.close();
+          if (window.location.pathname !== '/app/journal') {
+            window.location.href = '/app/journal';
+          }
+        };
+
+        console.log('[UnifiedNotificationService] Web notification displayed');
+      }
+    } catch (error) {
+      console.error('[UnifiedNotificationService] Error showing web notification:', error);
     }
+  }
+
+  // Test notification with appropriate strategy
+  async testNotification(): Promise<NotificationResult> {
+    const title = 'Test Journal Reminder 📝';
+    const body = 'This is a test notification from your journal app!';
 
     try {
-      const verification = await this.verifyNotifications(this.activeSettings.times.length);
-      
-      notificationDebugLogger.logEvent('HEALTH_CHECK', {
-        verification,
-        settings: this.activeSettings,
-        status: verification.healthStatus
-      });
-
-      // If health is degraded, attempt to refresh notifications
-      if (verification.healthStatus === 'degraded' || verification.healthStatus === 'failed') {
-        notificationDebugLogger.logEvent('HEALTH_CHECK_REFRESH', {
-          reason: `Health status: ${verification.healthStatus}`
-        });
-        
-        await this.requestPermissionsAndSetup(this.activeSettings.times);
+      if (this.isNative) {
+        await this.showNativeNotification(title, body);
+        return {
+          success: true,
+          message: 'Native test notification sent',
+          strategy: 'native'
+        };
+      } else {
+        await this.showWebNotification(title, body);
+        return {
+          success: true,
+          message: 'Web test notification sent',
+          strategy: 'web'
+        };
       }
-
     } catch (error) {
-      notificationDebugLogger.logEvent('HEALTH_CHECK_FAILED', { error }, false);
+      return {
+        success: false,
+        message: `Test notification failed: ${error}`,
+        strategy: this.isNative ? 'native' : 'web'
+      };
     }
   }
 
-  /**
-   * Stop health check monitoring
-   */
-  private stopHealthCheck(): void {
-    if (this.healthCheckInterval) {
-      clearInterval(this.healthCheckInterval);
-      this.healthCheckInterval = undefined;
-    }
+  // Clear permission cache to force refresh
+  clearPermissionCache(): void {
+    this.permissionCache = null;
   }
 
-  /**
-   * Get comprehensive notification status
-   */
-  async getNotificationStatus(): Promise<any> {
-    const systemStatus = await notificationDebugLogger.getSystemStatus();
-    const verification = this.activeSettings ? 
-      await this.verifyNotifications(this.activeSettings.times.length) : null;
-
+  // Get comprehensive debug information
+  getDebugInfo(): any {
     return {
-      ...systemStatus,
-      activeSettings: this.activeSettings,
-      strategy: this.strategy,
-      verification,
-      debugInfo: timezoneNotificationHelper.getTimezoneDebugInfo(),
-      recentEvents: notificationDebugLogger.getFilteredEvents({
-        since: new Date(Date.now() - 24 * 60 * 60 * 1000) // Last 24 hours
-      })
+      isNative: this.isNative,
+      isWebView: this.isWebView,
+      platform: Capacitor.getPlatform(),
+      permissionCache: this.permissionCache,
+      realtimeActive: !!this.realtimeChannel,
+      webNotificationSupport: 'Notification' in window,
+      webPermission: 'Notification' in window ? Notification.permission : 'unsupported',
+      capacitorVersion: (window as any).Capacitor?.version || 'unknown'
     };
   }
 
-  /**
-   * Get debug report
-   */
-  getDebugReport(): string {
-    return notificationDebugLogger.generateDebugReport();
-  }
-
-  // Helper methods
-
-  private generateNotificationId(time: JournalReminderTime, dayOffset: number): number {
-    const timeIds = {
-      morning: 1000,
-      afternoon: 2000,
-      evening: 3000,
-      night: 4000
-    };
-    return timeIds[time] + dayOffset;
-  }
-
-  private getNotificationTitle(time: JournalReminderTime): string {
-    const titles = {
-      morning: "🌅 Good Morning! Time for your journal",
-      afternoon: "☀️ Afternoon reflection time", 
-      evening: "🌙 Evening journal reminder",
-      night: "✨ End your day with journaling"
-    };
-    return titles[time];
-  }
-
-  private getNotificationBody(time: JournalReminderTime): string {
-    const bodies = {
-      morning: "Start your day by recording your thoughts and intentions",
-      afternoon: "Take a moment to reflect on your day so far",
-      evening: "Capture your evening thoughts and experiences",
-      night: "Reflect on your day before you rest"
-    };
-    return bodies[time];
-  }
-
-  private saveSettings(settings: Partial<UnifiedNotificationSettings>): void {
-    Object.entries(settings).forEach(([key, value]) => {
-      if (value !== undefined) {
-        localStorage.setItem(`unified_notification_${key}`, 
-          typeof value === 'string' ? value : JSON.stringify(value));
-      }
-    });
-  }
-
-  getSettings(): UnifiedNotificationSettings {
-    const enabled = localStorage.getItem('unified_notification_enabled') === 'true';
-    const timesStr = localStorage.getItem('unified_notification_times');
-    const timezone = localStorage.getItem('unified_notification_timezone') || 'UTC';
-    const lastUpdated = localStorage.getItem('unified_notification_lastUpdated') || '';
+  // Initialize service with auto-start features
+  async initialize(): Promise<void> {
+    console.log('[UnifiedNotificationService] Initializing service');
     
-    let times: JournalReminderTime[] = [];
-    if (timesStr) {
-      try {
-        times = JSON.parse(timesStr);
-      } catch (error) {
-        console.warn('Failed to parse notification times:', error);
-      }
-    }
+    // Start real-time listener
+    this.startRealtimeListener();
+    
+    // Check initial permission status
+    await this.checkPermissionStatus();
+    
+    console.log('[UnifiedNotificationService] Service initialized');
+  }
 
-    return { enabled, times, timezone, lastUpdated };
+  // Cleanup method
+  async cleanup(): Promise<void> {
+    this.stopRealtimeListener();
+    this.clearPermissionCache();
+    console.log('[UnifiedNotificationService] Service cleaned up');
+  }
+
+  // Legacy method compatibility
+  async requestPermissionsAndSetup(times: any): Promise<NotificationResult> {
+    const permissionResult = await this.requestPermissions();
+    if (permissionResult.success) {
+      const settings: NotificationSettings = {
+        reminders: times.map((time: any, index: number) => ({
+          id: `${index}`,
+          enabled: true,
+          time: time,
+          label: `Reminder ${index + 1}`
+        }))
+      };
+      return await this.saveReminderSettings(settings);
+    }
+    return permissionResult;
+  }
+
+  // Legacy method compatibility
+  async disableReminders(): Promise<void> {
+    const settings: NotificationSettings = { reminders: [] };
+    await this.saveReminderSettings(settings);
+  }
+
+  // Legacy method compatibility
+  getSettings(): Promise<NotificationSettings> {
+    return this.getReminderSettings();
+  }
+
+  // Legacy method compatibility
+  async getNotificationStatus(): Promise<any> {
+    const settings = await this.getReminderSettings();
+    const permission = await this.checkPermissionStatus();
+    return {
+      settings,
+      permission,
+      debugInfo: this.getDebugInfo()
+    };
+  }
+
+  // Legacy method compatibility
+  getDebugReport(): string {
+    const debugInfo = this.getDebugInfo();
+    return JSON.stringify(debugInfo, null, 2);
   }
 }
 
