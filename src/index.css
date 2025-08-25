@@ -461,3 +461,23 @@ body {
 .onboarding-language-select [data-radix-select-value] {
   color: white;
 }
+
+/* Music Player Styles */
+.music-player-dropdown {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Responsive text sizing for journal titles */
+@media (max-width: 640px) {
+  .journal-title-responsive {
+    font-size: clamp(1.25rem, 4vw, 1.5rem);
+    line-height: 1.2;
+  }
+}
+
+@media (max-width: 480px) {
+  .journal-title-responsive {
+    font-size: clamp(1rem, 5vw, 1.25rem);
+  }
+}

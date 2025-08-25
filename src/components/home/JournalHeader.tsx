@@ -83,22 +83,18 @@ const JournalHeader: React.FC = () => {
   return (
     <div className={`p-4 flex flex-col journal-header-container ${isInWelcomeTutorialStep ? 'tutorial-target' : ''}`}>
       <div className="flex justify-between items-start w-full relative">
-        <div className={`relative max-w-[65%] ${isInWelcomeTutorialStep ? 'z-[9999]' : ''}`}>
+        <div className={`relative flex-1 mr-4 ${isInWelcomeTutorialStep ? 'z-[9999]' : ''}`}>
           <h1
-            className={`text-2xl font-bold text-theme break-words hyphens-auto ${isInWelcomeTutorialStep ? 'tutorial-highlight' : ''}`}
+            className={`journal-title-responsive font-bold text-theme break-words hyphens-auto ${isInWelcomeTutorialStep ? 'tutorial-highlight' : ''}`}
             style={{
               fontWeight: 700,
               letterSpacing: '0.005em',
               WebkitFontSmoothing: 'antialiased',
               MozOsxFontSmoothing: 'grayscale',
-              display: isInWelcomeTutorialStep ? 'block' : '-webkit-box',
-              WebkitLineClamp: isInWelcomeTutorialStep ? 'none' : '2',
-              WebkitBoxOrient: 'vertical',
-              overflow: isInWelcomeTutorialStep ? 'visible' : 'hidden',
-              maxHeight: isInWelcomeTutorialStep ? 'none' : '60px',
               visibility: 'visible',
               opacity: 1
             }}
+            title={getJournalName()} // Show full name on hover
           >
             <TranslatableText text={getJournalName()} forceTranslate={true} />
           </h1>
