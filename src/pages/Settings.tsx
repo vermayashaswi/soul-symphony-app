@@ -8,7 +8,8 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useTheme } from '@/hooks/use-theme';
 import { setupJournalReminder, initializeCapacitorNotifications, NotificationFrequency, NotificationTime } from '@/services/notificationService';
-import { enhancedNotificationService } from '@/services/enhancedNotificationService';
+import { newNotificationService, type NotificationReminder } from '@/services/newNotificationService';
+import { CustomTimeRemindersModal } from '@/components/settings/CustomTimeRemindersModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -407,54 +408,37 @@ function SettingsContent() {
   };
   
   const handleToggleNotifications = async (checked: boolean) => {
-    console.log('[Settings] Enhanced notification toggle clicked:', checked);
+    console.log('[Settings] New notification toggle clicked:', checked);
     
     if (checked) {
       try {
-        console.log('[Settings] Requesting notification permission via enhanced service...');
+        console.log('[Settings] Requesting notification permissions...');
         
-        const result = await enhancedNotificationService.requestPermissions();
-        console.log('[Settings] Enhanced permission result:', result);
+        const result = await newNotificationService.requestPermissions();
+        console.log('[Settings] Permission result:', result);
         
-        // Update debug info after permission request
-        const newDebugInfo = await enhancedNotificationService.getPermissionInfo();
-        setNotificationDebugInfo(newDebugInfo);
-        setNotificationPermissionState(result.state);
-        
-        if (result.granted) {
+        if (result.success) {
           setNotificationsEnabled(true);
-          setShowNotificationSettings(true);
-          localStorage.setItem('notification_enabled', 'true');
+          setNotificationPermissionState('granted');
+          setShowCustomTimeModal(true);
           
           toast.success(
             <div className="flex items-center gap-2">
               <CheckCircle className="h-4 w-4 text-green-500" />
               <span>
-                <TranslatableText text="Notifications enabled! Set your preferences." forceTranslate={true} />
-                {result.plugin && (
-                  <div className="text-xs text-muted-foreground mt-1">
-                    Using {result.plugin}
-                  </div>
-                )}
+                <TranslatableText text="Notifications enabled! Set your reminder times." forceTranslate={true} />
               </span>
             </div>
           );
         } else {
           setNotificationsEnabled(false);
-          
-          let errorMessage = "Notification permission denied. ";
-          if (result.error) {
-            errorMessage += result.error;
-          } else if (result.plugin) {
-            errorMessage += `${result.plugin} permission was denied.`;
-          }
-          errorMessage += " Please check your device settings.";
+          setNotificationPermissionState('denied');
           
           toast.error(
             <div className="flex items-center gap-2">
               <XCircle className="h-4 w-4 text-red-500" />
               <span>
-                <TranslatableText text={errorMessage} forceTranslate={true} />
+                <TranslatableText text={result.error || "Notification permission denied"} forceTranslate={true} />
               </span>
             </div>
           );
@@ -474,10 +458,13 @@ function SettingsContent() {
         );
       }
     } else {
+      // Disable notifications
       setNotificationsEnabled(false);
-      setNotificationPermissionState(await enhancedNotificationService.checkPermissionStatus());
-      localStorage.removeItem('notification_enabled');
-      localStorage.removeItem('notification_times');
+      setNotificationReminders([]);
+      setNotificationPermissionState('default');
+      
+      // Clear settings from database
+      await newNotificationService.saveReminderSettings({ reminders: [] });
       
       toast.info(<TranslatableText text="Notifications disabled" forceTranslate={true} />);
     }
@@ -932,7 +919,7 @@ function SettingsContent() {
                       <Button 
                         variant="outline" 
                         size="sm"
-                        onClick={() => setShowNotificationSettings(true)}
+                        onClick={() => setShowCustomTimeModal(true)}
                       >
                         <TranslatableText text="Customize" />
                       </Button>
@@ -956,9 +943,25 @@ function SettingsContent() {
                   
                 </div>
                 
-                {notificationsEnabled && (
+                {notificationsEnabled && notificationReminders.length > 0 && (
                   <div className="pt-2 text-sm text-muted-foreground">
-                    {getNotificationSummary()}
+                    <div className="flex items-center gap-2 mb-1">
+                      <Clock className="h-3 w-3" />
+                      <span>
+                        <TranslatableText 
+                          text={`${notificationReminders.filter(r => r.enabled).length} active reminder${notificationReminders.filter(r => r.enabled).length !== 1 ? 's' : ''}`} 
+                        />
+                      </span>
+                    </div>
+                    <div className="text-xs space-y-1">
+                      {notificationReminders.filter(r => r.enabled).map(reminder => (
+                        <div key={reminder.id} className="flex items-center gap-2">
+                          <span>{reminder.time}</span>
+                          <span>-</span>
+                          <span>{reminder.label}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
