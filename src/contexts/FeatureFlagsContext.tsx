@@ -1,7 +1,7 @@
 
 import React, { createContext, useContext, useMemo, ReactNode, useEffect, useState } from "react";
 import { FeatureFlags, AppFeatureFlag } from "../types/featureFlags";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/utils/supabaseClient";
 import { useSafeAuth } from "./AuthContext";
 
 type FeatureFlagsContextValue = {
@@ -42,9 +42,7 @@ export const FeatureFlagsProvider = ({ children }: { children: ReactNode }) => {
       setError(null);
 
       // Fetch all feature flags
-      const { data: allFlags, error: flagsError } = await supabase
-        .from('feature_flags')
-        .select('*');
+      const { data: allFlags, error: flagsError } = await db.featureFlags.selectAll();
 
       if (flagsError) {
         console.error('Error fetching feature flags:', flagsError);
@@ -55,10 +53,7 @@ export const FeatureFlagsProvider = ({ children }: { children: ReactNode }) => {
       // Fetch user-specific overrides if user is authenticated
       let userOverrides: any[] = [];
       if (user) {
-        const { data: overrides, error: overridesError } = await supabase
-          .from('user_feature_flags')
-          .select('feature_flag_id, is_enabled')
-          .eq('user_id' as any, user.id as any);
+        const { data: overrides, error: overridesError } = await db.userFeatureFlags.selectByUser(user.id);
 
         if (overridesError) {
           console.warn('Error fetching user feature flag overrides:', overridesError);

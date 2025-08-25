@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { db } from '@/utils/supabaseClient';
 import { AppFeatureFlag } from '@/types/featureFlags';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -19,11 +19,7 @@ export const useFeatureFlagAdmin = () => {
       setLoading(true);
 
       // First, get the feature flag ID
-      const { data: flagData, error: flagError } = await supabase
-        .from('feature_flags')
-        .select('id')
-        .eq('name' as any, flagName as any)
-        .single();
+      const { data: flagData, error: flagError } = await db.featureFlags.selectByName(flagName);
 
       if (flagError || !flagData) {
         toast.error('Feature flag not found');
@@ -31,15 +27,13 @@ export const useFeatureFlagAdmin = () => {
       }
 
       // Upsert user feature flag override
-      const { error: upsertError } = await supabase
-        .from('user_feature_flags')
-        .upsert({
-          user_id: user.id,
-          feature_flag_id: (flagData as any)?.id,
-          is_enabled: enabled,
-        } as any, {
-          onConflict: 'user_id,feature_flag_id'
-        });
+      const { error: upsertError } = await db.userFeatureFlags.upsert({
+        user_id: user.id,
+        feature_flag_id: flagData?.id || '',
+        is_enabled: enabled,
+      }, {
+        onConflict: 'user_id,feature_flag_id'
+      });
 
       if (upsertError) {
         console.error('Error setting user feature flag:', upsertError);
@@ -68,11 +62,7 @@ export const useFeatureFlagAdmin = () => {
       setLoading(true);
 
       // Get the feature flag ID
-      const { data: flagData, error: flagError } = await supabase
-        .from('feature_flags')
-        .select('id')
-        .eq('name' as any, flagName as any)
-        .single();
+      const { data: flagData, error: flagError } = await db.featureFlags.selectByName(flagName);
 
       if (flagError || !flagData) {
         toast.error('Feature flag not found');
@@ -80,11 +70,7 @@ export const useFeatureFlagAdmin = () => {
       }
 
       // Remove user override
-      const { error: deleteError } = await supabase
-        .from('user_feature_flags')
-        .delete()
-        .eq('user_id' as any, user.id as any)
-        .eq('feature_flag_id' as any, (flagData as any)?.id as any);
+      const { error: deleteError } = await db.userFeatureFlags.delete(user.id, flagData?.id || '');
 
       if (deleteError) {
         console.error('Error removing user feature flag:', deleteError);

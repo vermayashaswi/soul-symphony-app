@@ -1,5 +1,6 @@
 import { useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { db } from '@/utils/supabaseClient';
 
 export interface MessageDeletionEvent {
   messageId: string;
@@ -52,13 +53,9 @@ export const setupGlobalMessageDeletionListener = (userId: string) => {
       console.log(`[GlobalDeletion] Message deleted: ${deletedMessage.id}`);
       
       // Find which thread this message belonged to by checking the thread ownership
-      supabase
-        .from('chat_threads')
-        .select('id, user_id')
-        .eq('id', deletedMessage.thread_id)
-        .eq('user_id' as any, userId as any)
-        .single()
-        .then(({ data: thread, error }) => {
+      db.chatThreads.selectByUser(userId)
+        .then(({ data: threads, error }) => {
+          const thread = threads?.find(t => t.id === deletedMessage.thread_id);
           if (!error && thread) {
             // Emit custom event for message deletion
             const deleteEvent = new CustomEvent('chatMessageDeleted', {
