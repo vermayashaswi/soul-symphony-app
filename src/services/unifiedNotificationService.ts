@@ -267,32 +267,68 @@ class UnifiedNotificationService {
     }
   }
 
-  // Start listening for real-time notification delivery
-  startRealtimeListener(): void {
+  // Start listening for real-time notification delivery (async version)
+  private async startRealtimeListener(): Promise<void> {
     if (this.realtimeChannel) {
-      return; // Already listening
+      console.log('[UnifiedNotificationService] Real-time listener already active');
+      return;
     }
 
-    console.log('[UnifiedNotificationService] Starting real-time notification listener');
-
-    this.realtimeChannel = supabase
-      .channel('unified-notification-delivery')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'notification_queue',
-          filter: 'status=eq.sent'
-        },
-        (payload) => {
-          console.log('[UnifiedNotificationService] Real-time notification delivery:', payload);
-          this.handleRealtimeNotification(payload.new);
-        }
-      )
-      .subscribe((status) => {
-        console.log('[UnifiedNotificationService] Real-time subscription status:', status);
+    try {
+      console.log('[UnifiedNotificationService] Starting real-time listener for notifications');
+      
+      // Add timeout for WebSocket connection in problematic environments
+      const timeoutPromise = new Promise<void>((_, reject) => {
+        setTimeout(() => reject(new Error('Real-time connection timeout')), 10000);
       });
+
+      const connectionPromise = new Promise<void>((resolve, reject) => {
+        this.realtimeChannel = supabase
+          .channel('unified-notification-delivery')
+          .on(
+            'postgres_changes',
+            {
+              event: 'UPDATE',
+              schema: 'public',
+              table: 'notification_queue',
+              filter: 'status=eq.sent'
+            },
+            (payload) => {
+              console.log('[UnifiedNotificationService] Real-time notification delivery:', payload);
+              this.handleRealtimeNotification(payload.new);
+            }
+          )
+          .subscribe((status) => {
+            console.log('[UnifiedNotificationService] Real-time subscription status:', status);
+            if (status === 'SUBSCRIBED') {
+              resolve();
+            } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+              reject(new Error(`Real-time connection failed: ${status}`));
+            }
+          });
+      });
+
+      // Race between connection and timeout
+      await Promise.race([connectionPromise, timeoutPromise]);
+        
+      console.log('[UnifiedNotificationService] Real-time listener started successfully');
+    } catch (error) {
+      console.error('[UnifiedNotificationService] Failed to start real-time listener:', error);
+      this.realtimeChannel = null;
+      
+      // Check if we're in a problematic environment
+      const isAndroidWebView = navigator.userAgent.includes('Android') && 
+                              (window.location.href.includes('capacitor://') || 
+                               (window as any).Capacitor?.isNative);
+      
+      if (isAndroidWebView) {
+        console.log('[UnifiedNotificationService] Android WebView detected, will retry real-time connection later');
+        // Don't throw error for Android WebView, let app continue
+        return;
+      }
+      
+      throw error;
+    }
   }
 
   // Stop real-time listener
@@ -440,15 +476,35 @@ class UnifiedNotificationService {
 
   // Initialize service with auto-start features
   async initialize(): Promise<void> {
-    console.log('[UnifiedNotificationService] Initializing service');
+    console.log('[UnifiedNotificationService] Starting non-blocking initialization');
     
-    // Start real-time listener
-    this.startRealtimeListener();
-    
-    // Check initial permission status
-    await this.checkPermissionStatus();
-    
-    console.log('[UnifiedNotificationService] Service initialized');
+    try {
+      // Check initial permission status (non-blocking)
+      await this.checkPermissionStatus();
+      
+      // Start real-time listener in background (non-blocking)
+      this.startRealtimeListenerBackground();
+      
+      console.log('[UnifiedNotificationService] Non-blocking initialization completed');
+    } catch (error) {
+      console.error('[UnifiedNotificationService] Initialization failed:', error);
+      // Don't throw error to prevent blocking app startup
+    }
+  }
+
+  private startRealtimeListenerBackground(): void {
+    // Start real-time listener asynchronously without blocking
+    setTimeout(async () => {
+      try {
+        console.log('[UnifiedNotificationService] Starting background real-time listener');
+        await this.startRealtimeListener();
+        console.log('[UnifiedNotificationService] Background real-time listener started successfully');
+      } catch (error) {
+        console.error('[UnifiedNotificationService] Background real-time listener failed:', error);
+        // Retry after delay
+        setTimeout(() => this.startRealtimeListenerBackground(), 5000);
+      }
+    }, 1000); // Delay to ensure app is fully loaded
   }
 
   // Cleanup method

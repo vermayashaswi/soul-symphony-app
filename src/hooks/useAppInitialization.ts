@@ -36,8 +36,15 @@ export const useAppInitialization = () => {
           console.log('[AppInit] Skipping service worker on native environment');
         }
         
-        // Initialize enhanced journal reminder service
-        await enhancedJournalReminderService.initializeOnAppStart();
+        // Initialize enhanced journal reminder service (non-blocking for native)
+        if (nativeIntegrationService.isRunningNatively()) {
+          // On native, don't block on journal reminder service
+          enhancedJournalReminderService.initializeOnAppStart().catch(error => {
+            console.error('[AppInit] Journal reminder service failed on native, continuing anyway:', error);
+          });
+        } else {
+          await enhancedJournalReminderService.initializeOnAppStart();
+        }
         
         // Safety: ensure splash screen is hidden if plugin exists
         await nativeIntegrationService.tryHideSplashScreenSafe();
