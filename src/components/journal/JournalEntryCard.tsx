@@ -135,7 +135,10 @@ export function JournalEntryCard({
 
     let score = 0;
     try {
-      if (typeof safeEntry.sentiment === 'string') {
+      // Handle numeric sentiment values first (most common in database)
+      if (typeof safeEntry.sentiment === 'number') {
+        score = safeEntry.sentiment;
+      } else if (typeof safeEntry.sentiment === 'string') {
         score = parseFloat(safeEntry.sentiment);
       } else if (typeof safeEntry.sentiment === 'object' && safeEntry.sentiment !== null) {
         score = (safeEntry.sentiment as any).score || 0;
@@ -146,7 +149,7 @@ export function JournalEntryCard({
     }
 
     // Debug sentiment processing
-    console.log(`[JournalEntryCard] Entry ${safeEntry.id} sentiment score: ${score}`);
+    console.log(`[JournalEntryCard] Entry ${safeEntry.id} sentiment score: ${score} (type: ${typeof safeEntry.sentiment})`);
 
     if (score > 0.2) {
       console.log(`[JournalEntryCard] Entry ${safeEntry.id} - Positive sentiment (${score}) - applying green border`);
