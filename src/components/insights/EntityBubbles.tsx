@@ -124,25 +124,25 @@ const EntityBubbles: React.FC<EntityBubblesProps> = ({
         }
         
         console.log(`Found ${entries?.length || 0} entries`);
-        console.log('Sample entities data:', entries?.[0]?.entities);
+        console.log('Sample entities data:', (entries as any)?.[0]?.entities);
         
         // Process entries to extract entities and calculate sentiments
         const entityMap = new Map<string, { count: number, totalSentiment: number }>();
         
-        entries?.forEach(entry => {
-          if (!entry.entities || !entry.sentiment) return;
+        entries?.forEach((entry: any) => {
+          if (!entry?.entities || !entry?.sentiment) return;
           
           // Convert sentiment to number if it's a string
-          const sentimentScore = typeof entry.sentiment === 'string' 
+          const sentimentScore = typeof entry?.sentiment === 'string' 
             ? parseFloat(entry.sentiment) 
-            : Number(entry.sentiment);
+            : Number(entry?.sentiment || 0);
             
           if (isNaN(sentimentScore)) return;
           
           let entitiesArray: Array<Json> = [];
           
           // Handle different formats of entities data
-          if (typeof entry.entities === 'string') {
+          if (typeof entry?.entities === 'string') {
             // Case 1: entities is a JSON string
             try {
               const parsed = JSON.parse(entry.entities);
@@ -154,11 +154,11 @@ const EntityBubbles: React.FC<EntityBubblesProps> = ({
             }
           } 
           // Case 2: entities is already an array
-          else if (Array.isArray(entry.entities)) {
+          else if (Array.isArray(entry?.entities)) {
             entitiesArray = entry.entities;
           } 
           // Case 3: entities is an object with properties
-          else if (typeof entry.entities === 'object' && entry.entities !== null) {
+          else if (typeof entry?.entities === 'object' && entry.entities !== null) {
             entitiesArray = Object.entries(entry.entities).map(([key, value]) => {
               if (typeof value === 'object' && value !== null) {
                 return {

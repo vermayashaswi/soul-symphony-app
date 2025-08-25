@@ -129,12 +129,12 @@ const EntityStrips: React.FC<EntityStripsProps> = ({
         // Process entries to extract themes and calculate sentiments
         const themeMap = new Map<string, { count: number, totalSentiment: number }>();
         
-        entries?.forEach(entry => {
-          if (!entry.master_themes || !Array.isArray(entry.master_themes)) return;
+        entries?.forEach((entry: any) => {
+          if (!entry?.master_themes || !Array.isArray(entry.master_themes)) return;
           
           // Convert sentiment to number if it's a string
           let sentimentScore = 0;
-          if (entry.sentiment) {
+          if (entry?.sentiment) {
             if (typeof entry.sentiment === 'string') {
               if (entry.sentiment === 'positive') sentimentScore = 0.7;
               else if (entry.sentiment === 'negative') sentimentScore = -0.7;

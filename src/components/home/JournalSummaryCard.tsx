@@ -104,7 +104,7 @@ const JournalSummaryCard: React.FC = () => {
           const { data: journalEntries, error: entriesError } = await supabase
             .from('Journal Entries')
             .select('themes, sentiment')
-            .eq('user_id', user.id)
+            .eq('user_id' as any, user.id as any)
             .gte('created_at', sevenDaysAgo.toISOString())
             .not('themes', 'is', null);
           
@@ -120,11 +120,11 @@ const JournalSummaryCard: React.FC = () => {
             // Process journal entries to extract theme data
             const themesWithSentiment: ThemeData[] = [];
             
-            journalEntries.forEach(entry => {
-              if (entry.themes && Array.isArray(entry.themes)) {
+            journalEntries.forEach((entry: any) => {
+              if (entry?.themes && Array.isArray(entry.themes)) {
                 const sentimentScore = entry.sentiment != null ? Number(entry.sentiment) : 0;
                 
-                entry.themes.forEach(theme => {
+                entry.themes.forEach((theme: any) => {
                   if (theme && typeof theme === 'string') {
                     themesWithSentiment.push({
                       theme,
