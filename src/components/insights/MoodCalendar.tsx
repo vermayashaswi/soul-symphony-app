@@ -398,7 +398,7 @@ const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange, c
       <div className="text-center mb-4">
         <h2 className="text-lg font-semibold mb-1">
           <EnhancedTranslatableText 
-            text="Mood Trends" 
+            text="Sentiment" 
             forceTranslate={true}
             enableFontScaling={true}
             scalingContext="general"
