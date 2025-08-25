@@ -274,6 +274,15 @@ class UnifiedNotificationService {
       return;
     }
 
+    // Skip WebSocket entirely for Capacitor Android to prevent blocking
+    const isAndroidCapacitor = Capacitor.getPlatform() === 'android' && Capacitor.isNativePlatform();
+    
+    if (isAndroidCapacitor) {
+      console.log('[UnifiedNotificationService] Skipping real-time listener for Capacitor Android - using scheduled notifications only');
+      console.log('[UnifiedNotificationService] Notifications will be delivered via edge function scheduling system');
+      return;
+    }
+
     try {
       console.log('[UnifiedNotificationService] Starting real-time listener for notifications');
       
@@ -315,18 +324,6 @@ class UnifiedNotificationService {
     } catch (error) {
       console.error('[UnifiedNotificationService] Failed to start real-time listener:', error);
       this.realtimeChannel = null;
-      
-      // Check if we're in a problematic environment
-      const isAndroidWebView = navigator.userAgent.includes('Android') && 
-                              (window.location.href.includes('capacitor://') || 
-                               (window as any).Capacitor?.isNative);
-      
-      if (isAndroidWebView) {
-        console.log('[UnifiedNotificationService] Android WebView detected, will retry real-time connection later');
-        // Don't throw error for Android WebView, let app continue
-        return;
-      }
-      
       throw error;
     }
   }
