@@ -78,7 +78,7 @@ const MusicIconButton: React.FC<MusicIconButtonProps> = ({ className = "" }) => 
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -10, scale: 0.95 }}
             transition={{ duration: 0.15 }}
-            className="absolute top-10 right-0 z-[9999] w-64 bg-background/95 backdrop-blur-md border border-border/50 rounded-lg shadow-lg overflow-hidden"
+            className="absolute top-10 right-0 z-[10000] w-64 bg-background/95 backdrop-blur-md border border-border/50 rounded-lg shadow-lg overflow-hidden"
           >
             <div className="p-3 border-b border-border/30">
               <h3 className="text-sm font-semibold text-foreground">
