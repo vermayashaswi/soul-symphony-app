@@ -72,10 +72,7 @@ export function InsightsStatsGrid({ timeRange, insightsData }: InsightsStatsGrid
         title="Journal Activity"
         delay={0.2}
         badge={insightsData.journalActivity.maxStreak > 0 ? 
-          `Max streak: ${insightsData.journalActivity.maxStreak} ${timeRange === 'today' ? 
-            (insightsData.journalActivity.maxStreak === 1 ? 'entry' : 'entries') : 
-            (insightsData.journalActivity.maxStreak === 1 ? 'day' : 'days')
-          }` : 
+          `Max streak: ${insightsData.journalActivity.maxStreak} ${timeRange === 'today' ? 'entries' : 'days'}` : 
           undefined
         }
         badgeColor="bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-200"

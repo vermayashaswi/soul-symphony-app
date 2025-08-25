@@ -35,12 +35,11 @@ class UnifiedNotificationService {
 
   private constructor() {
     this.isNative = Capacitor.isNativePlatform();
-    this.isWebView = this.isNative; // WebView detection simplified
+    this.isWebView = Capacitor.getPlatform() === 'android' || Capacitor.getPlatform() === 'ios';
     console.log('[UnifiedNotificationService] Initialized', { 
       isNative: this.isNative, 
       isWebView: this.isWebView,
-      platform: Capacitor.getPlatform(),
-      userAgent: navigator.userAgent
+      platform: Capacitor.getPlatform()
     });
   }
 
@@ -80,47 +79,35 @@ class UnifiedNotificationService {
     return this.permissionCache;
   }
 
-  // Enhanced permission requesting with Android-specific handling
+  // Unified permission requesting with fallback strategies
   async requestPermissions(): Promise<NotificationResult> {
     try {
-      console.log('[UnifiedNotificationService] Requesting permissions, platform:', Capacitor.getPlatform());
-      
       if (this.isNative) {
-        // For Android, explicitly check and request LocalNotifications permissions
         const currentStatus = await LocalNotifications.checkPermissions();
-        console.log('[UnifiedNotificationService] Current native permissions:', currentStatus);
         
         if (currentStatus.display === 'granted') {
           this.permissionCache = 'granted';
-          await this.setupAndroidNotificationChannels();
           return { 
             success: true, 
-            message: 'Native permissions already granted',
+            message: 'Permissions already granted',
             permissionGranted: true,
             strategy: 'native'
           };
         }
 
-        // Request permissions - this WILL show Android permission popup
-        console.log('[UnifiedNotificationService] Requesting native permissions...');
         const requestResult = await LocalNotifications.requestPermissions();
         console.log('[UnifiedNotificationService] Native permission request result:', requestResult);
         
         const granted = requestResult.display === 'granted';
         this.permissionCache = granted ? 'granted' : 'denied';
         
-        if (granted) {
-          await this.setupAndroidNotificationChannels();
-        }
-        
         return {
           success: granted,
-          message: granted ? 'Native permissions granted successfully' : 'Native permissions denied by user',
+          message: granted ? 'Native permissions granted' : 'Native permissions denied',
           permissionGranted: granted,
           strategy: 'native'
         };
       } else {
-        // Web browser notification handling
         if (!('Notification' in window)) {
           return {
             success: false,
@@ -150,34 +137,6 @@ class UnifiedNotificationService {
         permissionGranted: false,
         strategy: this.isNative ? 'native' : 'web'
       };
-    }
-  }
-
-  // Setup Android notification channels for proper categorization
-  private async setupAndroidNotificationChannels(): Promise<void> {
-    if (!this.isNative || Capacitor.getPlatform() !== 'android') {
-      return;
-    }
-
-    try {
-      console.log('[UnifiedNotificationService] Setting up Android notification channels');
-      
-      // Create notification channel for journal reminders
-      await LocalNotifications.createChannel({
-        id: 'journal_reminders',
-        name: 'Journal Reminders',
-        description: 'Daily journal reminder notifications',
-        importance: 4, // High importance
-        visibility: 1, // Public visibility
-        sound: 'default.wav',
-        vibration: true,
-        lights: true,
-        lightColor: '#FFA500'
-      });
-
-      console.log('[UnifiedNotificationService] Android notification channels configured');
-    } catch (error) {
-      console.error('[UnifiedNotificationService] Error setting up Android channels:', error);
     }
   }
 
@@ -267,65 +226,32 @@ class UnifiedNotificationService {
     }
   }
 
-  // Start listening for real-time notification delivery (async version)
-  private async startRealtimeListener(): Promise<void> {
+  // Start listening for real-time notification delivery
+  startRealtimeListener(): void {
     if (this.realtimeChannel) {
-      console.log('[UnifiedNotificationService] Real-time listener already active');
-      return;
+      return; // Already listening
     }
 
-    // Skip WebSocket entirely for Capacitor Android to prevent blocking
-    const isAndroidCapacitor = Capacitor.getPlatform() === 'android' && Capacitor.isNativePlatform();
-    
-    if (isAndroidCapacitor) {
-      console.log('[UnifiedNotificationService] Skipping real-time listener for Capacitor Android - using scheduled notifications only');
-      console.log('[UnifiedNotificationService] Notifications will be delivered via edge function scheduling system');
-      return;
-    }
+    console.log('[UnifiedNotificationService] Starting real-time notification listener');
 
-    try {
-      console.log('[UnifiedNotificationService] Starting real-time listener for notifications');
-      
-      // Add timeout for WebSocket connection in problematic environments
-      const timeoutPromise = new Promise<void>((_, reject) => {
-        setTimeout(() => reject(new Error('Real-time connection timeout')), 10000);
+    this.realtimeChannel = supabase
+      .channel('unified-notification-delivery')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'notification_queue',
+          filter: 'status=eq.sent'
+        },
+        (payload) => {
+          console.log('[UnifiedNotificationService] Real-time notification delivery:', payload);
+          this.handleRealtimeNotification(payload.new);
+        }
+      )
+      .subscribe((status) => {
+        console.log('[UnifiedNotificationService] Real-time subscription status:', status);
       });
-
-      const connectionPromise = new Promise<void>((resolve, reject) => {
-        this.realtimeChannel = supabase
-          .channel('unified-notification-delivery')
-          .on(
-            'postgres_changes',
-            {
-              event: 'UPDATE',
-              schema: 'public',
-              table: 'notification_queue',
-              filter: 'status=eq.sent'
-            },
-            (payload) => {
-              console.log('[UnifiedNotificationService] Real-time notification delivery:', payload);
-              this.handleRealtimeNotification(payload.new);
-            }
-          )
-          .subscribe((status) => {
-            console.log('[UnifiedNotificationService] Real-time subscription status:', status);
-            if (status === 'SUBSCRIBED') {
-              resolve();
-            } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-              reject(new Error(`Real-time connection failed: ${status}`));
-            }
-          });
-      });
-
-      // Race between connection and timeout
-      await Promise.race([connectionPromise, timeoutPromise]);
-        
-      console.log('[UnifiedNotificationService] Real-time listener started successfully');
-    } catch (error) {
-      console.error('[UnifiedNotificationService] Failed to start real-time listener:', error);
-      this.realtimeChannel = null;
-      throw error;
-    }
   }
 
   // Stop real-time listener
@@ -360,7 +286,7 @@ class UnifiedNotificationService {
     }
   }
 
-  // Show native notification with Android-optimized configuration
+  // Show native notification with proper configuration
   private async showNativeNotification(title: string, body: string): Promise<void> {
     try {
       const options: ScheduleOptions = {
@@ -372,7 +298,6 @@ class UnifiedNotificationService {
           sound: 'default',
           smallIcon: 'ic_notification',
           iconColor: '#FFA500',
-          channelId: 'journal_reminders', // Use our custom channel
           extra: {
             timestamp: Date.now(),
             type: 'journal_reminder'
@@ -381,7 +306,7 @@ class UnifiedNotificationService {
       };
 
       await LocalNotifications.schedule(options);
-      console.log('[UnifiedNotificationService] Native notification scheduled with channel');
+      console.log('[UnifiedNotificationService] Native notification scheduled');
     } catch (error) {
       console.error('[UnifiedNotificationService] Error showing native notification:', error);
     }
@@ -473,35 +398,15 @@ class UnifiedNotificationService {
 
   // Initialize service with auto-start features
   async initialize(): Promise<void> {
-    console.log('[UnifiedNotificationService] Starting non-blocking initialization');
+    console.log('[UnifiedNotificationService] Initializing service');
     
-    try {
-      // Check initial permission status (non-blocking)
-      await this.checkPermissionStatus();
-      
-      // Start real-time listener in background (non-blocking)
-      this.startRealtimeListenerBackground();
-      
-      console.log('[UnifiedNotificationService] Non-blocking initialization completed');
-    } catch (error) {
-      console.error('[UnifiedNotificationService] Initialization failed:', error);
-      // Don't throw error to prevent blocking app startup
-    }
-  }
-
-  private startRealtimeListenerBackground(): void {
-    // Start real-time listener asynchronously without blocking
-    setTimeout(async () => {
-      try {
-        console.log('[UnifiedNotificationService] Starting background real-time listener');
-        await this.startRealtimeListener();
-        console.log('[UnifiedNotificationService] Background real-time listener started successfully');
-      } catch (error) {
-        console.error('[UnifiedNotificationService] Background real-time listener failed:', error);
-        // Retry after delay
-        setTimeout(() => this.startRealtimeListenerBackground(), 5000);
-      }
-    }, 1000); // Delay to ensure app is fully loaded
+    // Start real-time listener
+    this.startRealtimeListener();
+    
+    // Check initial permission status
+    await this.checkPermissionStatus();
+    
+    console.log('[UnifiedNotificationService] Service initialized');
   }
 
   // Cleanup method

@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Clock, Bell, Smartphone, Globe } from 'lucide-react';
 import { toast } from 'sonner';
-import { unifiedNotificationService } from '@/services/unifiedNotificationService';
+import { enhancedNotificationService } from '@/services/enhancedNotificationService';
 import { journalReminderService } from '@/services/journalReminderService';
 import { useTranslation } from '@/contexts/TranslationContext';
 
@@ -45,7 +45,7 @@ const JournalRemindersSettings: React.FC = () => {
 
   const checkPermissionStatus = async () => {
     try {
-      const status = await unifiedNotificationService.checkPermissionStatus();
+      const status = await enhancedNotificationService.checkPermissionStatus();
       setPermissionStatus(status);
     } catch (error) {
       console.error('Error checking permission status:', error);
@@ -56,8 +56,8 @@ const JournalRemindersSettings: React.FC = () => {
     if (enabled && permissionStatus !== 'granted') {
       setIsLoading(true);
       try {
-        const result = await unifiedNotificationService.requestPermissions();
-        if (!result.permissionGranted) {
+        const result = await enhancedNotificationService.requestPermissions();
+        if (!result.granted) {
           toast.error(await translate?.('Permission denied. Please enable notifications in your device settings.', 'en') || 'Permission denied');
           setIsLoading(false);
           return;

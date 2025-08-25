@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { unifiedNotificationService, NotificationPermissionState } from '@/services/unifiedNotificationService';
+import { enhancedNotificationService, NotificationPermissionState } from '@/services/enhancedNotificationService';
 
 export { type NotificationPermissionState };
 
@@ -16,12 +16,12 @@ export const useNotificationPermission = () => {
       console.log('[useNotificationPermission] Checking notification permission status with enhanced service');
       try {
         // Get debug info for troubleshooting
-        const info = unifiedNotificationService.getDebugInfo();
+        const info = await enhancedNotificationService.getPermissionInfo();
         setDebugInfo(info);
         console.log('[useNotificationPermission] Permission debug info:', info);
         
         // Check current permission status
-        const currentPermission = await unifiedNotificationService.checkPermissionStatus();
+        const currentPermission = await enhancedNotificationService.checkPermissionStatus();
         console.log('[useNotificationPermission] Current permission status:', currentPermission);
         
         setPermission(currentPermission);
@@ -48,18 +48,17 @@ export const useNotificationPermission = () => {
 
     try {
       // Use enhanced notification service for permission request
-      const result = await unifiedNotificationService.requestPermissions();
-      console.log('[useNotificationPermission] Unified service permission result:', result);
+      const result = await enhancedNotificationService.requestPermissions();
+      console.log('[useNotificationPermission] Enhanced service permission result:', result);
       
       // Update state based on result
-      const newPermission = result.permissionGranted ? 'granted' : 'denied';
-      setPermission(newPermission);
+      setPermission(result.state);
       
       // Update debug info
-      const newDebugInfo = unifiedNotificationService.getDebugInfo();
+      const newDebugInfo = await enhancedNotificationService.getPermissionInfo();
       setDebugInfo(newDebugInfo);
       
-      return result.permissionGranted || false;
+      return result.granted;
     } catch (error) {
       console.error('[useNotificationPermission] Error requesting notification permission:', error);
       setPermission('denied');
