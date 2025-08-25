@@ -110,9 +110,6 @@ const MusicIconButton: React.FC<MusicIconButtonProps> = ({ className = "" }) => 
                         <div className="font-medium text-sm text-foreground">
                           <TranslatableText text={category.name} />
                         </div>
-                        <div className="text-xs text-muted-foreground truncate">
-                          <TranslatableText text={category.description} />
-                        </div>
                       </div>
                     </div>
                   </Button>
