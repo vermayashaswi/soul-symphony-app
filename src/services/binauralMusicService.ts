@@ -42,49 +42,83 @@ export class BinauralMusicService {
     const settings = this.currentCategory.frequencies[this.currentTrackIndex];
     console.log(`[BinauralMusicService] Playing ${this.currentCategory.name} - Track ${this.currentTrackIndex + 1}`);
 
-    // Create oscillators for left and right channels
-    this.leftOscillator = this.audioContext.createOscillator();
-    this.rightOscillator = this.audioContext.createOscillator();
-    this.gainNode = this.audioContext.createGain();
-
-    // Create channel splitter and merger for stereo effect
-    const splitter = this.audioContext.createChannelSplitter(2);
-    const merger = this.audioContext.createChannelMerger(2);
-
-    // Configure left channel (base frequency)
-    this.leftOscillator.frequency.setValueAtTime(settings.baseFrequency, this.audioContext.currentTime);
-    this.leftOscillator.type = 'sine';
-
-    // Configure right channel (base + binaural beat)
-    this.rightOscillator.frequency.setValueAtTime(
-      settings.baseFrequency + settings.binauralBeat,
-      this.audioContext.currentTime
-    );
-    this.rightOscillator.type = 'sine';
-
-    // Set volume
-    this.gainNode.gain.setValueAtTime(0.8, this.audioContext.currentTime);
-
-    // Connect audio nodes
-    this.leftOscillator.connect(splitter);
-    this.rightOscillator.connect(splitter);
-    splitter.connect(merger, 0, 0); // Left channel
-    splitter.connect(merger, 1, 1); // Right channel
-    merger.connect(this.gainNode);
-    this.gainNode.connect(this.audioContext.destination);
-
-    // Start oscillators
-    this.leftOscillator.start();
-    this.rightOscillator.start();
-
-    this.isPlaying = true;
-
-    // Schedule next track
-    setTimeout(() => {
-      if (this.isPlaying && this.currentCategory) {
-        this.nextTrack();
+    try {
+      // Validate frequencies
+      if (settings.baseFrequency < 20 || settings.baseFrequency > 20000) {
+        console.warn('[BinauralMusicService] Base frequency out of audible range:', settings.baseFrequency);
       }
-    }, settings.duration * 1000);
+      if (settings.binauralBeat < 1 || settings.binauralBeat > 40) {
+        console.warn('[BinauralMusicService] Binaural beat out of effective range:', settings.binauralBeat);
+      }
+
+      // Create oscillators and gain nodes for proper stereo separation
+      this.leftOscillator = this.audioContext.createOscillator();
+      this.rightOscillator = this.audioContext.createOscillator();
+      this.gainNode = this.audioContext.createGain();
+
+      // Create separate gain nodes for left and right channels
+      const leftGain = this.audioContext.createGain();
+      const rightGain = this.audioContext.createGain();
+
+      // Create stereo panner for proper channel separation
+      const leftPanner = this.audioContext.createStereoPanner();
+      const rightPanner = this.audioContext.createStereoPanner();
+
+      // Configure left channel (base frequency) - pan fully left
+      this.leftOscillator.frequency.setValueAtTime(settings.baseFrequency, this.audioContext.currentTime);
+      this.leftOscillator.type = 'sine';
+      leftPanner.pan.setValueAtTime(-1, this.audioContext.currentTime); // Full left
+
+      // Configure right channel (base + binaural beat) - pan fully right
+      this.rightOscillator.frequency.setValueAtTime(
+        settings.baseFrequency + settings.binauralBeat,
+        this.audioContext.currentTime
+      );
+      this.rightOscillator.type = 'sine';
+      rightPanner.pan.setValueAtTime(1, this.audioContext.currentTime); // Full right
+
+      // Set individual channel volumes
+      leftGain.gain.setValueAtTime(0.3, this.audioContext.currentTime);
+      rightGain.gain.setValueAtTime(0.3, this.audioContext.currentTime);
+
+      // Set master volume with fade-in
+      this.gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
+      this.gainNode.gain.exponentialRampToValueAtTime(1, this.audioContext.currentTime + 0.1);
+
+      // Connect audio nodes properly for stereo separation
+      this.leftOscillator.connect(leftGain);
+      leftGain.connect(leftPanner);
+      leftPanner.connect(this.gainNode);
+
+      this.rightOscillator.connect(rightGain);
+      rightGain.connect(rightPanner);
+      rightPanner.connect(this.gainNode);
+
+      this.gainNode.connect(this.audioContext.destination);
+
+      // Start oscillators
+      this.leftOscillator.start();
+      this.rightOscillator.start();
+
+      this.isPlaying = true;
+
+      // Schedule next track with fade-out
+      setTimeout(() => {
+        if (this.isPlaying && this.currentCategory) {
+          // Fade out current track before switching
+          if (this.gainNode) {
+            this.gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext!.currentTime + 0.1);
+          }
+          setTimeout(() => {
+            this.nextTrack();
+          }, 100);
+        }
+      }, (settings.duration - 0.1) * 1000); // Start fade 100ms before end
+
+    } catch (error) {
+      console.error('[BinauralMusicService] Error creating audio nodes:', error);
+      this.isPlaying = false;
+    }
   }
 
   private nextTrack(): void {
