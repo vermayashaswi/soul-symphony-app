@@ -13,8 +13,6 @@ interface MusicPlayerContextType extends MusicPlayerState {
   toggleDropdown: () => void;
   closeDropdown: () => void;
   getCurrentTrackInfo: () => { name: string; index: number; total: number } | null;
-  smartPause: () => void;
-  smartResume: () => void;
 }
 
 const MusicPlayerContext = createContext<MusicPlayerContextType | undefined>(undefined);
@@ -38,8 +36,6 @@ export function MusicPlayerProvider({ children }: MusicPlayerProviderProps) {
     volume: 0.3,
     isDropdownOpen: false
   });
-
-  const [isSmartPaused, setIsSmartPaused] = useState(false);
 
   // Load saved preferences
   useEffect(() => {
@@ -117,21 +113,6 @@ export function MusicPlayerProvider({ children }: MusicPlayerProviderProps) {
     setState(prev => ({ ...prev, isDropdownOpen: false }));
   }, []);
 
-  const smartPause = useCallback(() => {
-    if (state.isPlaying) {
-      setIsSmartPaused(true);
-      binauralMusicService.pause();
-      setState(prev => ({ ...prev, isPlaying: false }));
-    }
-  }, [state.isPlaying]);
-
-  const smartResume = useCallback(() => {
-    if (isSmartPaused && state.currentCategory) {
-      setIsSmartPaused(false);
-      binauralMusicService.resume();
-      setState(prev => ({ ...prev, isPlaying: true }));
-    }
-  }, [isSmartPaused, state.currentCategory]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -152,9 +133,7 @@ export function MusicPlayerProvider({ children }: MusicPlayerProviderProps) {
     stop,
     toggleDropdown,
     closeDropdown,
-    getCurrentTrackInfo,
-    smartPause,
-    smartResume
+    getCurrentTrackInfo
   };
 
   return (

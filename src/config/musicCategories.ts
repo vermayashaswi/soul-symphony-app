@@ -8,10 +8,10 @@ export const musicCategories: MusicCategory[] = [
     icon: 'Moon',
     color: '#8B5FBF',
     frequencies: [
-      { name: 'Delta Waves', baseFrequency: 80, binauralBeat: 1.5, duration: 300 },
-      { name: 'Theta Entry', baseFrequency: 120, binauralBeat: 6, duration: 180 },
-      { name: 'Deep Delta', baseFrequency: 60, binauralBeat: 0.5, duration: 600 },
-      { name: 'REM Support', baseFrequency: 100, binauralBeat: 4, duration: 240 }
+      { name: 'Deep Sleep Delta', baseFrequency: 200, binauralBeat: 2, duration: 300 },
+      { name: 'Sleep Induction', baseFrequency: 180, binauralBeat: 4, duration: 180 },
+      { name: 'REM Cycle', baseFrequency: 220, binauralBeat: 6, duration: 600 },
+      { name: 'Dream State', baseFrequency: 160, binauralBeat: 1, duration: 240 }
     ]
   },
   {
