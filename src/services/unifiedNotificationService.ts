@@ -35,11 +35,12 @@ class UnifiedNotificationService {
 
   private constructor() {
     this.isNative = Capacitor.isNativePlatform();
-    this.isWebView = Capacitor.getPlatform() === 'android' || Capacitor.getPlatform() === 'ios';
+    this.isWebView = this.isNative; // WebView detection simplified
     console.log('[UnifiedNotificationService] Initialized', { 
       isNative: this.isNative, 
       isWebView: this.isWebView,
-      platform: Capacitor.getPlatform()
+      platform: Capacitor.getPlatform(),
+      userAgent: navigator.userAgent
     });
   }
 
@@ -79,35 +80,47 @@ class UnifiedNotificationService {
     return this.permissionCache;
   }
 
-  // Unified permission requesting with fallback strategies
+  // Enhanced permission requesting with Android-specific handling
   async requestPermissions(): Promise<NotificationResult> {
     try {
+      console.log('[UnifiedNotificationService] Requesting permissions, platform:', Capacitor.getPlatform());
+      
       if (this.isNative) {
+        // For Android, explicitly check and request LocalNotifications permissions
         const currentStatus = await LocalNotifications.checkPermissions();
+        console.log('[UnifiedNotificationService] Current native permissions:', currentStatus);
         
         if (currentStatus.display === 'granted') {
           this.permissionCache = 'granted';
+          await this.setupAndroidNotificationChannels();
           return { 
             success: true, 
-            message: 'Permissions already granted',
+            message: 'Native permissions already granted',
             permissionGranted: true,
             strategy: 'native'
           };
         }
 
+        // Request permissions - this WILL show Android permission popup
+        console.log('[UnifiedNotificationService] Requesting native permissions...');
         const requestResult = await LocalNotifications.requestPermissions();
         console.log('[UnifiedNotificationService] Native permission request result:', requestResult);
         
         const granted = requestResult.display === 'granted';
         this.permissionCache = granted ? 'granted' : 'denied';
         
+        if (granted) {
+          await this.setupAndroidNotificationChannels();
+        }
+        
         return {
           success: granted,
-          message: granted ? 'Native permissions granted' : 'Native permissions denied',
+          message: granted ? 'Native permissions granted successfully' : 'Native permissions denied by user',
           permissionGranted: granted,
           strategy: 'native'
         };
       } else {
+        // Web browser notification handling
         if (!('Notification' in window)) {
           return {
             success: false,
@@ -137,6 +150,34 @@ class UnifiedNotificationService {
         permissionGranted: false,
         strategy: this.isNative ? 'native' : 'web'
       };
+    }
+  }
+
+  // Setup Android notification channels for proper categorization
+  private async setupAndroidNotificationChannels(): Promise<void> {
+    if (!this.isNative || Capacitor.getPlatform() !== 'android') {
+      return;
+    }
+
+    try {
+      console.log('[UnifiedNotificationService] Setting up Android notification channels');
+      
+      // Create notification channel for journal reminders
+      await LocalNotifications.createChannel({
+        id: 'journal_reminders',
+        name: 'Journal Reminders',
+        description: 'Daily journal reminder notifications',
+        importance: 4, // High importance
+        visibility: 1, // Public visibility
+        sound: 'default.wav',
+        vibration: true,
+        lights: true,
+        lightColor: '#FFA500'
+      });
+
+      console.log('[UnifiedNotificationService] Android notification channels configured');
+    } catch (error) {
+      console.error('[UnifiedNotificationService] Error setting up Android channels:', error);
     }
   }
 
@@ -286,7 +327,7 @@ class UnifiedNotificationService {
     }
   }
 
-  // Show native notification with proper configuration
+  // Show native notification with Android-optimized configuration
   private async showNativeNotification(title: string, body: string): Promise<void> {
     try {
       const options: ScheduleOptions = {
@@ -298,6 +339,7 @@ class UnifiedNotificationService {
           sound: 'default',
           smallIcon: 'ic_notification',
           iconColor: '#FFA500',
+          channelId: 'journal_reminders', // Use our custom channel
           extra: {
             timestamp: Date.now(),
             type: 'journal_reminder'
@@ -306,7 +348,7 @@ class UnifiedNotificationService {
       };
 
       await LocalNotifications.schedule(options);
-      console.log('[UnifiedNotificationService] Native notification scheduled');
+      console.log('[UnifiedNotificationService] Native notification scheduled with channel');
     } catch (error) {
       console.error('[UnifiedNotificationService] Error showing native notification:', error);
     }
