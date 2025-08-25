@@ -3,9 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Play, Pause, Volume2, Moon, Heart, Brain, Leaf } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
-import { useMusicPlayer } from '@/hooks/useMusicPlayer';
+import { useMusicPlayer } from '@/contexts/MusicPlayerContext';
 import { musicCategories } from '@/config/musicCategories';
-import { MusicCategory } from '@/types/music';
 
 const iconMap = {
   Moon,
@@ -14,11 +13,11 @@ const iconMap = {
   Leaf
 };
 
-interface MusicPlayerProps {
+interface MusicIconButtonProps {
   className?: string;
 }
 
-const MusicPlayer: React.FC<MusicPlayerProps> = ({ className = "" }) => {
+const MusicIconButton: React.FC<MusicIconButtonProps> = ({ className = "" }) => {
   const {
     isPlaying,
     currentCategory,
@@ -50,36 +49,19 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ className = "" }) => {
 
   return (
     <div className={`relative ${className}`}>
-      {/* Main Play Button */}
-      <div className="flex items-center gap-2">
-        <Button
-          onClick={isPlaying ? togglePlay : toggleDropdown}
-          size="sm"
-          variant="outline"
-          className="h-10 px-3 bg-background/80 backdrop-blur-sm border-border/50 hover:bg-primary/5 hover:border-primary/30 transition-all duration-200"
-        >
-          {isPlaying ? (
-            <Pause className="h-4 w-4 text-primary" />
-          ) : (
-            <Play className="h-4 w-4 text-primary" />
-          )}
-          <span className="ml-2 text-sm font-medium">
-            {currentCategory ? currentCategory.name : 'Music'}
-          </span>
-        </Button>
-
-        {/* Quick pause when playing */}
-        {isPlaying && (
-          <Button
-            onClick={togglePlay}
-            size="sm"
-            variant="ghost"
-            className="h-8 w-8 p-0 hover:bg-primary/5"
-          >
-            <Pause className="h-3 w-3 text-muted-foreground" />
-          </Button>
+      {/* Music Icon Button */}
+      <Button
+        onClick={isPlaying ? togglePlay : toggleDropdown}
+        size="sm"
+        variant="ghost"
+        className="h-8 w-8 p-0 hover:bg-primary/5"
+      >
+        {isPlaying ? (
+          <Pause className="h-4 w-4 text-muted-foreground" />
+        ) : (
+          <Play className="h-4 w-4 text-muted-foreground" />
         )}
-      </div>
+      </Button>
 
       {/* Category Selection Dropdown */}
       <AnimatePresence>
@@ -90,7 +72,7 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ className = "" }) => {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -10, scale: 0.95 }}
             transition={{ duration: 0.15 }}
-            className="absolute top-12 left-0 z-50 w-64 bg-background/95 backdrop-blur-md border border-border/50 rounded-lg shadow-lg overflow-hidden"
+            className="absolute top-10 right-0 z-50 w-64 bg-background/95 backdrop-blur-md border border-border/50 rounded-lg shadow-lg overflow-hidden"
           >
             <div className="p-3 border-b border-border/30">
               <h3 className="text-sm font-semibold text-foreground">Choose Music Type</h3>
@@ -150,7 +132,7 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ className = "" }) => {
         <motion.div
           initial={{ opacity: 0, y: 5 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mt-2 text-xs text-muted-foreground"
+          className="absolute top-10 right-0 text-xs text-muted-foreground bg-background/80 backdrop-blur-sm px-2 py-1 rounded border border-border/50"
         >
           Playing: {trackInfo.name} ({trackInfo.index + 1}/{trackInfo.total})
         </motion.div>
@@ -159,4 +141,4 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ className = "" }) => {
   );
 };
 
-export default MusicPlayer;
+export default MusicIconButton;

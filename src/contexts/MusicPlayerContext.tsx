@@ -1,17 +1,45 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { binauralMusicService } from '@/services/binauralMusicService';
 import { MusicCategory, MusicPlayerState } from '@/types/music';
 
 const VOLUME_STORAGE_KEY = 'soul-symphony-music-volume';
 const LAST_CATEGORY_STORAGE_KEY = 'soul-symphony-last-category';
 
+interface MusicPlayerContextType extends MusicPlayerState {
+  togglePlay: () => Promise<void>;
+  selectCategory: (category: MusicCategory) => Promise<void>;
+  setVolume: (volume: number) => void;
+  stop: () => void;
+  toggleDropdown: () => void;
+  closeDropdown: () => void;
+  getCurrentTrackInfo: () => { name: string; index: number; total: number } | null;
+  smartPause: () => void;
+  smartResume: () => void;
+}
+
+const MusicPlayerContext = createContext<MusicPlayerContextType | undefined>(undefined);
+
 export function useMusicPlayer() {
+  const context = useContext(MusicPlayerContext);
+  if (context === undefined) {
+    throw new Error('useMusicPlayer must be used within a MusicPlayerProvider');
+  }
+  return context;
+}
+
+interface MusicPlayerProviderProps {
+  children: ReactNode;
+}
+
+export function MusicPlayerProvider({ children }: MusicPlayerProviderProps) {
   const [state, setState] = useState<MusicPlayerState>({
     isPlaying: false,
     currentCategory: null,
     volume: 0.3,
     isDropdownOpen: false
   });
+
+  const [isSmartPaused, setIsSmartPaused] = useState(false);
 
   // Load saved preferences
   useEffect(() => {
@@ -35,7 +63,6 @@ export function useMusicPlayer() {
           // Load last used category or default to focus
           const lastCategoryId = localStorage.getItem(LAST_CATEGORY_STORAGE_KEY);
           if (lastCategoryId) {
-            // This will be handled by category selection
             setState(prev => ({ ...prev, isDropdownOpen: true }));
             return;
           }
@@ -43,7 +70,7 @@ export function useMusicPlayer() {
         setState(prev => ({ ...prev, isPlaying: true }));
       }
     } catch (error) {
-      console.error('[useMusicPlayer] Error toggling play:', error);
+      console.error('[MusicPlayerProvider] Error toggling play:', error);
     }
   }, [state.isPlaying, state.currentCategory]);
 
@@ -58,7 +85,7 @@ export function useMusicPlayer() {
         isDropdownOpen: false
       }));
     } catch (error) {
-      console.error('[useMusicPlayer] Error selecting category:', error);
+      console.error('[MusicPlayerProvider] Error selecting category:', error);
     }
   }, []);
 
@@ -86,6 +113,22 @@ export function useMusicPlayer() {
     setState(prev => ({ ...prev, isDropdownOpen: false }));
   }, []);
 
+  const smartPause = useCallback(() => {
+    if (state.isPlaying) {
+      setIsSmartPaused(true);
+      binauralMusicService.pause();
+      setState(prev => ({ ...prev, isPlaying: false }));
+    }
+  }, [state.isPlaying]);
+
+  const smartResume = useCallback(() => {
+    if (isSmartPaused && state.currentCategory) {
+      setIsSmartPaused(false);
+      binauralMusicService.resume();
+      setState(prev => ({ ...prev, isPlaying: true }));
+    }
+  }, [isSmartPaused, state.currentCategory]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -93,7 +136,11 @@ export function useMusicPlayer() {
     };
   }, []);
 
-  return {
+  const getCurrentTrackInfo = useCallback(() => {
+    return binauralMusicService.getCurrentTrackInfo();
+  }, []);
+
+  const value: MusicPlayerContextType = {
     ...state,
     togglePlay,
     selectCategory,
@@ -101,6 +148,14 @@ export function useMusicPlayer() {
     stop,
     toggleDropdown,
     closeDropdown,
-    getCurrentTrackInfo: () => binauralMusicService.getCurrentTrackInfo()
+    getCurrentTrackInfo,
+    smartPause,
+    smartResume
   };
+
+  return (
+    <MusicPlayerContext.Provider value={value}>
+      {children}
+    </MusicPlayerContext.Provider>
+  );
 }

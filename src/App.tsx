@@ -6,6 +6,7 @@ import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
 import { TranslationLoadingOverlay } from '@/components/translation/TranslationLoadingOverlay';
 import { JournalProcessingInitializer } from './app/journal-processing-init';
 import { TutorialProvider } from './contexts/TutorialContext';
+import { MusicPlayerProvider } from '@/contexts/MusicPlayerContext';
 import TutorialOverlay from './components/tutorial/TutorialOverlay';
 import ErrorBoundary from './components/insights/ErrorBoundary';
 import { AuthErrorBoundary } from './components/error-boundaries/AuthErrorBoundary';
@@ -199,14 +200,15 @@ const App: React.FC = () => {
         <FeatureFlagsProvider>
           <SubscriptionProvider>
             <TutorialProvider>
-              
-              <JournalProcessingInitializer />
+              <MusicPlayerProvider>
+                <JournalProcessingInitializer />
               <PullToRefresh>
                 <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
                 <TutorialOverlay />
                 <Toaster />
                 <SonnerToaster position="top-right" />
               </PullToRefresh>
+              </MusicPlayerProvider>
             </TutorialProvider>
           </SubscriptionProvider>
         </FeatureFlagsProvider>

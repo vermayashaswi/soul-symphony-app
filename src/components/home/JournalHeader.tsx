@@ -9,6 +9,7 @@ import LanguageSelector from '@/components/LanguageSelector';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTutorial } from '@/contexts/TutorialContext';
+import MusicIconButton from '@/components/music/MusicIconButton';
 
 const JournalHeader: React.FC = () => {
   const { user } = useAuth();
@@ -83,16 +84,17 @@ const JournalHeader: React.FC = () => {
   return (
     <div className={`p-4 flex flex-col journal-header-container ${isInWelcomeTutorialStep ? 'tutorial-target' : ''}`}>
       <div className="flex justify-between items-start w-full relative">
-        <div className={`relative flex-1 mr-4 ${isInWelcomeTutorialStep ? 'z-[9999]' : ''}`}>
+        <div className={`relative max-w-[60%] mr-4 ${isInWelcomeTutorialStep ? 'z-[9999]' : ''}`}>
           <h1
-            className={`journal-title-responsive font-bold text-theme break-words hyphens-auto ${isInWelcomeTutorialStep ? 'tutorial-highlight' : ''}`}
+            className={`journal-title-responsive font-bold text-theme break-words hyphens-auto overflow-hidden text-ellipsis ${isInWelcomeTutorialStep ? 'tutorial-highlight' : ''}`}
             style={{
               fontWeight: 700,
               letterSpacing: '0.005em',
               WebkitFontSmoothing: 'antialiased',
               MozOsxFontSmoothing: 'grayscale',
               visibility: 'visible',
-              opacity: 1
+              opacity: 1,
+              whiteSpace: 'nowrap'
             }}
             title={getJournalName()} // Show full name on hover
           >
@@ -100,7 +102,7 @@ const JournalHeader: React.FC = () => {
           </h1>
         </div>
 
-        <div className={`flex items-center ${isInWelcomeTutorialStep ? 'z-[9999]' : 'z-50'}`}>
+        <div className={`flex items-center gap-2 ${isInWelcomeTutorialStep ? 'z-[9999]' : 'z-50'}`}>
           <motion.div
             variants={dateStripVariants}
             initial="hidden"
@@ -121,8 +123,11 @@ const JournalHeader: React.FC = () => {
               <TranslatableText text={formattedDate} forceTranslate={true} />
             </div>
           </motion.div>
-          <div className="ml-2 relative z-[1000] pointer-events-auto">
+          <div className="relative z-[1000] pointer-events-auto">
             <LanguageSelector />
+          </div>
+          <div className="relative z-[1000] pointer-events-auto">
+            <MusicIconButton />
           </div>
         </div>
       </div>

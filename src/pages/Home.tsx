@@ -5,7 +5,7 @@ import JournalHeader from '@/components/home/JournalHeader';
 import JournalNavigationButton from '@/components/home/JournalNavigationButton';
 import JournalContent from '@/components/home/JournalContent';
 import BackgroundElements from '@/components/home/BackgroundElements';
-import MusicPlayer from '@/components/music/MusicPlayer';
+
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -123,10 +123,6 @@ const Home = () => {
       <div className={`relative ${isInWelcomeTutorialStep ? 'z-[9999]' : 'z-20'} flex flex-col`}>
         <JournalHeader />
         
-        {/* Music Player positioned below header, left-aligned and sticky */}
-        <div className="absolute top-full left-4 mt-2">
-          <MusicPlayer />
-        </div>
       </div>
     </div>
   );
