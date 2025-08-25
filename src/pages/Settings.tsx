@@ -152,10 +152,13 @@ function SettingsContent() {
       console.log('[Settings] Initializing notifications with new service');
       
       try {
-        // Get current permission status using new service
-        const permissionResult = await newNotificationService.requestPermissions();
-        console.log('[Settings] Current permission state:', permissionResult);
-        setNotificationPermissionState(permissionResult.success ? 'granted' : 'denied');
+        // Import permission checker for non-intrusive checking
+        const { notificationPermissionChecker } = await import('@/services/notificationPermissionChecker');
+        
+        // ONLY CHECK permission status, don't request
+        const permissionStatus = await notificationPermissionChecker.checkPermissionStatus();
+        console.log('[Settings] Permission status check (no popup):', permissionStatus);
+        setNotificationPermissionState(permissionStatus === 'granted' ? 'granted' : 'denied');
         
         // Load existing reminder settings from Supabase
         const settings = await newNotificationService.getReminderSettings();
@@ -164,7 +167,7 @@ function SettingsContent() {
         if (settings && settings.reminders && settings.reminders.length > 0) {
           setNotificationReminders(settings.reminders);
           const hasEnabledReminders = settings.reminders.some(r => r.enabled);
-          setNotificationsEnabled(hasEnabledReminders && permissionResult.success);
+          setNotificationsEnabled(hasEnabledReminders && permissionStatus === 'granted');
         }
         
         // Background diagnostics - verify local time accuracy

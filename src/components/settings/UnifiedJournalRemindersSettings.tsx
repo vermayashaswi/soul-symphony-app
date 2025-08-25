@@ -57,6 +57,21 @@ export function UnifiedJournalRemindersSettings() {
     
     try {
       if (enabled) {
+        // First request permissions explicitly when user toggles ON
+        console.log('[UnifiedJournalRemindersSettings] User toggling reminders ON - requesting permissions');
+        
+        // Import permission checker for explicit permission request
+        const { notificationPermissionChecker } = await import('@/services/notificationPermissionChecker');
+        const permissionResult = await notificationPermissionChecker.requestPermissions();
+        
+        if (!permissionResult.granted) {
+          toast.error('❌ Permission Required', {
+            description: 'Please allow notifications to enable reminders'
+          });
+          return;
+        }
+        
+        // Now setup reminders with permissions granted
         const result = await unifiedNotificationService.requestPermissionsAndSetup([reminderTime]);
         
         if (result.success) {
