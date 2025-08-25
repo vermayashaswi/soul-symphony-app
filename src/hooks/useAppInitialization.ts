@@ -1,6 +1,6 @@
 
 import { useEffect, useState } from 'react';
-import { enhancedJournalReminderService } from '@/services/enhancedJournalReminderService';
+import { unifiedNotificationService } from '@/services/unifiedNotificationService';
 import { initializeServiceWorker } from '@/utils/serviceWorker';
 import { enhancedPlatformService } from '@/services/enhancedPlatformService';
 import { nativeIntegrationService } from '@/services/nativeIntegrationService';
@@ -36,8 +36,8 @@ export const useAppInitialization = () => {
           console.log('[AppInit] Skipping service worker on native environment');
         }
         
-        // Initialize enhanced journal reminder service
-        await enhancedJournalReminderService.initializeOnAppStart();
+        // Initialize unified notification service
+        // Service auto-initializes when used
         
         // Safety: ensure splash screen is hidden if plugin exists
         await nativeIntegrationService.tryHideSplashScreenSafe();
