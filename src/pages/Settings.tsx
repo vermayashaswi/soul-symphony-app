@@ -98,6 +98,8 @@ function SettingsContent() {
   const [backgroundDiagnostics, setBackgroundDiagnostics] = useState<any>(null);
   const [notificationPermissionState, setNotificationPermissionState] = useState<string>('checking');
   const [notificationDebugInfo, setNotificationDebugInfo] = useState<any>(null);
+  const [showCustomTimeModal, setShowCustomTimeModal] = useState(false);
+  const [notificationReminders, setNotificationReminders] = useState<NotificationReminder[]>([]);
   const { user, signOut } = useAuth();
   const { 
     isPremium, 
@@ -144,51 +146,37 @@ function SettingsContent() {
 
   const { resetTutorial } = useTutorial();
 
-  // Initialize notification state and check permissions using enhanced service
+  // Initialize notification state and check permissions using new service
   useEffect(() => {
     const initializeNotifications = async () => {
-      console.log('[Settings] Initializing notifications with enhanced service');
+      console.log('[Settings] Initializing notifications with new service');
       
       try {
-        // Get current permission status
-        const permissionState = await enhancedNotificationService.checkPermissionStatus();
-        console.log('[Settings] Current permission state:', permissionState);
-        setNotificationPermissionState(permissionState);
+        // Get current permission status using new service
+        const permissionResult = await newNotificationService.requestPermissions();
+        console.log('[Settings] Current permission state:', permissionResult);
+        setNotificationPermissionState(permissionResult.success ? 'granted' : 'denied');
         
-        // Get debug information
-        const debugInfo = await enhancedNotificationService.getPermissionInfo();
-        console.log('[Settings] Debug info:', debugInfo);
-        setNotificationDebugInfo(debugInfo);
+        // Load existing reminder settings from Supabase
+        const settings = await newNotificationService.getReminderSettings();
+        console.log('[Settings] Loaded reminder settings:', settings);
+        
+        if (settings && settings.reminders && settings.reminders.length > 0) {
+          setNotificationReminders(settings.reminders);
+          const hasEnabledReminders = settings.reminders.some(r => r.enabled);
+          setNotificationsEnabled(hasEnabledReminders && permissionResult.success);
+        }
         
         // Background diagnostics - verify local time accuracy
         const diagnostics = {
           localTime: new Date().toLocaleString(),
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           utcOffset: new Date().getTimezoneOffset(),
-          scheduledNotifications: debugInfo.nativeStatus?.scheduled || [],
           timestamp: Date.now()
         };
         setBackgroundDiagnostics(diagnostics);
         console.log('[Settings] Background diagnostics:', diagnostics);
         
-        // Load stored notification settings
-        const enabled = localStorage.getItem('notification_enabled') === 'true';
-        const times = localStorage.getItem('notification_times');
-        
-        if (enabled && permissionState === 'granted') {
-          setNotificationsEnabled(true);
-        }
-        
-        if (times) {
-          try {
-            const parsedTimes = JSON.parse(times) as NotificationTime[];
-            if (Array.isArray(parsedTimes) && parsedTimes.length > 0) {
-              setNotificationTimes(parsedTimes);
-            }
-          } catch (e) {
-            console.error('Error parsing notification times from localStorage', e);
-          }
-        }
       } catch (error) {
         console.error('[Settings] Error initializing notifications:', error);
         setNotificationPermissionState('error');
@@ -461,12 +449,41 @@ function SettingsContent() {
       // Disable notifications
       setNotificationsEnabled(false);
       setNotificationReminders([]);
-      setNotificationPermissionState('default');
       
       // Clear settings from database
       await newNotificationService.saveReminderSettings({ reminders: [] });
       
       toast.info(<TranslatableText text="Notifications disabled" forceTranslate={true} />);
+    }
+  };
+
+  const handleCustomTimeSave = async (reminders: NotificationReminder[]) => {
+    try {
+      console.log('[Settings] Saving custom reminder times:', reminders);
+      
+      // Save to database
+      await newNotificationService.saveReminderSettings({ reminders });
+      
+      // Update local state
+      setNotificationReminders(reminders);
+      setShowCustomTimeModal(false);
+      
+      const enabledCount = reminders.filter(r => r.enabled).length;
+      if (enabledCount > 0) {
+        setNotificationsEnabled(true);
+        toast.success(
+          <TranslatableText 
+            text={`${enabledCount} reminder${enabledCount === 1 ? '' : 's'} set successfully!`} 
+            forceTranslate={true} 
+          />
+        );
+      } else {
+        setNotificationsEnabled(false);
+        toast.info(<TranslatableText text="No reminders enabled" forceTranslate={true} />);
+      }
+    } catch (error) {
+      console.error('[Settings] Error saving custom times:', error);
+      toast.error(<TranslatableText text="Failed to save reminder times" forceTranslate={true} />);
     }
   };
   
@@ -602,12 +619,12 @@ function SettingsContent() {
   const handleTestNotification = async () => {
     try {
       console.log('[Settings] Testing notification...');
-      const success = await enhancedNotificationService.testNotification();
+      const result = await newNotificationService.testNotification();
       
-      if (success) {
+      if (result.success) {
         toast.success(<TranslatableText text="Test notification sent!" forceTranslate={true} />);
       } else {
-        toast.error(<TranslatableText text="Failed to send test notification" forceTranslate={true} />);
+        toast.error(<TranslatableText text={result.error || "Failed to send test notification"} forceTranslate={true} />);
       }
     } catch (error) {
       console.error('[Settings] Error testing notification:', error);
@@ -1406,6 +1423,14 @@ function SettingsContent() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Custom Time Reminders Modal */}
+        <CustomTimeRemindersModal
+          isOpen={showCustomTimeModal}
+          onClose={() => setShowCustomTimeModal(false)}
+          onSave={handleCustomTimeSave}
+          initialReminders={notificationReminders}
+        />
       </div>
     </SettingsLoadingWrapper>
   );
