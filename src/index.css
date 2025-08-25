@@ -181,6 +181,21 @@
     color: hsl(var(--delete-btn-text)) !important;
   }
   
+  /* Sentiment border utilities - Custom CSS classes to ensure they work */
+  .border-sentiment-positive {
+    border-color: hsl(var(--sentiment-positive)) !important;
+    border-width: 2px !important;
+  }
+  
+  .border-sentiment-neutral {
+    border-color: hsl(var(--sentiment-neutral)) !important;
+    border-width: 2px !important;
+  }
+  
+  .border-sentiment-negative {
+    border-color: hsl(var(--sentiment-negative)) !important;
+    border-width: 2px !important;
+  }
 }
 
 /* Add custom styles for scroll to top behavior */

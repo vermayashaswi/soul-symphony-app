@@ -150,13 +150,13 @@ export function JournalEntryCard({
 
     if (score > 0.2) {
       console.log(`[JournalEntryCard] Entry ${safeEntry.id} - Positive sentiment (${score}) - applying green border`);
-      return 'border-sentiment-positive border-2';
+      return 'border-sentiment-positive';
     } else if (score >= -0.1 && score <= 0.2) {
       console.log(`[JournalEntryCard] Entry ${safeEntry.id} - Neutral sentiment (${score}) - applying yellow border`);
-      return 'border-sentiment-neutral border-2';
+      return 'border-sentiment-neutral';
     } else {
       console.log(`[JournalEntryCard] Entry ${safeEntry.id} - Negative sentiment (${score}) - applying red border`);
-      return 'border-sentiment-negative border-2';
+      return 'border-sentiment-negative';
     }
   };
   
