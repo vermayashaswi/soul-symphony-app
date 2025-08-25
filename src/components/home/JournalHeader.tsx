@@ -86,16 +86,25 @@ const JournalHeader: React.FC = () => {
       {/* Journal title - allow wrapping with fixed right margin for absolutely positioned elements */}
       <div className={`relative pr-32 ${isInWelcomeTutorialStep ? 'z-[9999]' : ''}`}>
         <h1
-          className={`journal-title-responsive font-bold text-theme break-words hyphens-auto ${isInWelcomeTutorialStep ? 'tutorial-highlight' : ''}`}
+          className={`journal-title-responsive font-black text-theme break-words hyphens-auto ${isInWelcomeTutorialStep ? 'tutorial-highlight' : ''}`}
           style={{
-            fontWeight: 700,
+            fontSize: '125%', // 25% increase from base size
+            fontWeight: 900, // Extra bold
             letterSpacing: '0.005em',
             WebkitFontSmoothing: 'antialiased',
             MozOsxFontSmoothing: 'grayscale',
             visibility: 'visible',
             opacity: 1,
             wordBreak: 'break-word',
-            lineHeight: 1.2
+            lineHeight: 1.2,
+            background: theme === 'dark' 
+              ? 'linear-gradient(135deg, #ffffff 0%, #e2e8f0 25%, #cbd5e1 50%, #94a3b8 75%, #64748b 100%)'
+              : 'linear-gradient(135deg, #1e293b 0%, #334155 25%, #475569 50%, #64748b 75%, #94a3b8 100%)',
+            WebkitBackgroundClip: 'text',
+            backgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundSize: '200% 200%',
+            animation: 'gradientShift 8s ease-in-out infinite'
           }}
           title={getJournalName()} // Show full name on hover
         >
