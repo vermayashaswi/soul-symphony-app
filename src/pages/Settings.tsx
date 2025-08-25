@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useTheme } from '@/hooks/use-theme';
 import { setupJournalReminder, initializeCapacitorNotifications, NotificationFrequency, NotificationTime } from '@/services/notificationService';
-import { newNotificationService, type NotificationReminder } from '@/services/newNotificationService';
+import { unifiedNotificationService, type UnifiedNotificationSettings, type NotificationPermissionState } from '@/services/unifiedNotificationService';
 import { CustomTimeRemindersModal } from '@/components/settings/CustomTimeRemindersModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
@@ -99,7 +99,7 @@ function SettingsContent() {
   const [notificationPermissionState, setNotificationPermissionState] = useState<string>('checking');
   const [notificationDebugInfo, setNotificationDebugInfo] = useState<any>(null);
   const [showCustomTimeModal, setShowCustomTimeModal] = useState(false);
-  const [notificationReminders, setNotificationReminders] = useState<NotificationReminder[]>([]);
+  const [notificationReminders, setNotificationReminders] = useState<{ id: string; enabled: boolean; time: string; label: string }[]>([]);
   const { user, signOut } = useAuth();
   const { 
     isPremium, 
@@ -161,7 +161,7 @@ function SettingsContent() {
         setNotificationPermissionState(permissionStatus === 'granted' ? 'granted' : 'denied');
         
         // Load existing reminder settings from Supabase
-        const settings = await newNotificationService.getReminderSettings();
+        const settings = await unifiedNotificationService.getReminderSettings();
         console.log('[Settings] Loaded reminder settings:', settings);
         
         if (settings && settings.reminders && settings.reminders.length > 0) {
@@ -405,7 +405,7 @@ function SettingsContent() {
       try {
         console.log('[Settings] Requesting notification permissions...');
         
-        const result = await newNotificationService.requestPermissions();
+        const result = await unifiedNotificationService.requestPermissions();
         console.log('[Settings] Permission result:', result);
         
         if (result.success) {
@@ -429,7 +429,7 @@ function SettingsContent() {
             <div className="flex items-center gap-2">
               <XCircle className="h-4 w-4 text-red-500" />
               <span>
-                <TranslatableText text={result.error || "Notification permission denied"} forceTranslate={true} />
+                <TranslatableText text={result.message || "Notification permission denied"} forceTranslate={true} />
               </span>
             </div>
           );
@@ -454,18 +454,18 @@ function SettingsContent() {
       setNotificationReminders([]);
       
       // Clear settings from database
-      await newNotificationService.saveReminderSettings({ reminders: [] });
+      await unifiedNotificationService.saveReminderSettings({ reminders: [] });
       
       toast.info(<TranslatableText text="Notifications disabled" forceTranslate={true} />);
     }
   };
 
-  const handleCustomTimeSave = async (reminders: NotificationReminder[]) => {
+  const handleCustomTimeSave = async (reminders: { id: string; enabled: boolean; time: string; label: string }[]) => {
     try {
       console.log('[Settings] Saving custom reminder times:', reminders);
       
       // Save to database
-      await newNotificationService.saveReminderSettings({ reminders });
+      await unifiedNotificationService.saveReminderSettings({ reminders });
       
       // Update local state
       setNotificationReminders(reminders);
@@ -622,12 +622,12 @@ function SettingsContent() {
   const handleTestNotification = async () => {
     try {
       console.log('[Settings] Testing notification...');
-      const result = await newNotificationService.testNotification();
+      const result = await unifiedNotificationService.testNotification();
       
       if (result.success) {
         toast.success(<TranslatableText text="Test notification sent!" forceTranslate={true} />);
       } else {
-        toast.error(<TranslatableText text={result.error || "Failed to send test notification"} forceTranslate={true} />);
+        toast.error(<TranslatableText text={result.message || "Failed to send test notification"} forceTranslate={true} />);
       }
     } catch (error) {
       console.error('[Settings] Error testing notification:', error);

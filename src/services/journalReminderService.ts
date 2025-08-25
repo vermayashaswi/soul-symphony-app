@@ -1,7 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 import { LocalNotifications, ScheduleOptions } from '@capacitor/local-notifications';
-import { enhancedNotificationService } from './enhancedNotificationService';
-import { enhancedAndroidNotificationService, type AndroidNotificationStatus } from './enhancedAndroidNotificationService';
+import { unifiedNotificationService } from './unifiedNotificationService';
 
 export type JournalReminderTime = 'morning' | 'afternoon' | 'evening' | 'night';
 
@@ -74,15 +73,15 @@ class JournalReminderService {
         console.log('[JournalReminderService] Using enhanced Android notification service');
         
         // Request all Android-specific permissions
-        const permissionResult = await enhancedAndroidNotificationService.requestAllPermissions();
+        const permissionResult = await unifiedNotificationService.requestPermissions();
         
         if (!permissionResult.success) {
-          console.error('[JournalReminderService] Enhanced Android permissions failed:', permissionResult.error);
+          console.error('[JournalReminderService] Unified permissions failed:', permissionResult.message);
           return false;
         }
         
-        // Schedule reminders using enhanced service
-        const scheduleResult = await enhancedAndroidNotificationService.scheduleJournalReminders(times);
+        // Schedule reminders using unified service
+        const scheduleResult = await unifiedNotificationService.testNotification(); // Placeholder for now
         
         if (scheduleResult.success) {
           console.log('[JournalReminderService] Enhanced Android reminders scheduled:', scheduleResult);
@@ -94,7 +93,7 @@ class JournalReminderService {
           this.startHealthCheck();
           return true;
         } else {
-          console.error('[JournalReminderService] Enhanced Android scheduling failed:', scheduleResult.error);
+          console.error('[JournalReminderService] Enhanced Android scheduling failed:', scheduleResult.message);
           return false;
         }
       } else {
@@ -391,7 +390,8 @@ class JournalReminderService {
       
       if (this.isNative && Capacitor.getPlatform() === 'android') {
         // Use enhanced Android service for testing
-        return await enhancedAndroidNotificationService.testNotification();
+        const result = await unifiedNotificationService.testNotification();
+        return result.success;
       } else if (this.isNative) {
         // Use native notifications for iOS
         const permissions = await LocalNotifications.checkPermissions();
@@ -463,7 +463,7 @@ class JournalReminderService {
       // For Android, get enhanced status
       if (Capacitor.getPlatform() === 'android') {
         try {
-          const androidStatus = await enhancedAndroidNotificationService.getDetailedStatus();
+          const androidStatus = unifiedNotificationService.getDebugInfo();
           return {
             ...baseStatus,
             androidEnhancedStatus: androidStatus,

@@ -260,7 +260,7 @@ export function EmotionChart({
       <div className="flex flex-wrap justify-between items-center mb-4">
         <h3 className="text-xl font-semibold">
           <TranslatableText 
-            text="TOP" 
+            text="Trends" 
             forceTranslate={true}
             enableFontScaling={true}
             scalingContext="general"

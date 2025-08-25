@@ -62,6 +62,11 @@ export default {
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
 				},
+				sentiment: {
+					positive: 'hsl(var(--sentiment-positive))',
+					neutral: 'hsl(var(--sentiment-neutral))',
+					negative: 'hsl(var(--sentiment-negative))'
+				},
 				feelosophy: {
 					blue: '#E1F0FF',
 					navy: '#2D3142',

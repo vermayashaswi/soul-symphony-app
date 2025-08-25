@@ -135,7 +135,10 @@ export function JournalEntryCard({
 
     let score = 0;
     try {
-      if (typeof safeEntry.sentiment === 'string') {
+      // Handle numeric sentiment values first (most common in database)
+      if (typeof safeEntry.sentiment === 'number') {
+        score = safeEntry.sentiment;
+      } else if (typeof safeEntry.sentiment === 'string') {
         score = parseFloat(safeEntry.sentiment);
       } else if (typeof safeEntry.sentiment === 'object' && safeEntry.sentiment !== null) {
         score = (safeEntry.sentiment as any).score || 0;
@@ -145,12 +148,18 @@ export function JournalEntryCard({
       return '';
     }
 
+    // Debug sentiment processing
+    console.log(`[JournalEntryCard] Entry ${safeEntry.id} sentiment score: ${score} (type: ${typeof safeEntry.sentiment})`);
+
     if (score > 0.2) {
-      return 'border-green-500 border-2';
+      console.log(`[JournalEntryCard] Entry ${safeEntry.id} - Positive sentiment (${score}) - applying green border`);
+      return 'border-sentiment-positive';
     } else if (score >= -0.1 && score <= 0.2) {
-      return 'border-yellow-400 border-2';
+      console.log(`[JournalEntryCard] Entry ${safeEntry.id} - Neutral sentiment (${score}) - applying yellow border`);
+      return 'border-sentiment-neutral';
     } else {
-      return 'border-[#ea384c] border-2';
+      console.log(`[JournalEntryCard] Entry ${safeEntry.id} - Negative sentiment (${score}) - applying red border`);
+      return 'border-sentiment-negative';
     }
   };
   

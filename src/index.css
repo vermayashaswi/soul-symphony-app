@@ -42,6 +42,11 @@
     --delete-btn-bg: 0 84.2% 95%;
     --delete-btn-text: 0 84.2% 40%;
     
+    /* Sentiment border colors */
+    --sentiment-positive: 142 76% 36%; /* Green for positive sentiment */
+    --sentiment-neutral: 45 93% 47%;   /* Yellow for neutral sentiment */
+    --sentiment-negative: 0 65% 51%;   /* Red for negative sentiment */
+    
     /* Keyboard and mobile positioning variables */
     --keyboard-height: 0px;
     --mobile-browser-keyboard-height: 0px;
@@ -80,6 +85,11 @@
     --edit-btn-text: 217 91.2% 80%;
     --delete-btn-bg: 0 62.8% 20%;
     --delete-btn-text: 0 62.8% 80%;
+    
+    /* Sentiment border colors for dark mode */
+    --sentiment-positive: 142 69% 58%; /* Lighter green for dark mode */
+    --sentiment-neutral: 45 93% 47%;   /* Same yellow works in dark mode */
+    --sentiment-negative: 0 84% 60%;   /* Lighter red for dark mode */
   }
 }
 
@@ -170,6 +180,22 @@
   .delete-button-text {
     color: hsl(var(--delete-btn-text)) !important;
   }
+  
+  /* Sentiment border utilities - Custom CSS classes to ensure they work */
+  .border-sentiment-positive {
+    border-color: hsl(var(--sentiment-positive)) !important;
+    border-width: 2px !important;
+  }
+  
+  .border-sentiment-neutral {
+    border-color: hsl(var(--sentiment-neutral)) !important;
+    border-width: 2px !important;
+  }
+  
+  .border-sentiment-negative {
+    border-color: hsl(var(--sentiment-negative)) !important;
+    border-width: 2px !important;
+  }
 }
 
 /* Add custom styles for scroll to top behavior */
@@ -205,6 +231,11 @@ html {
     --edit-btn-text: 217 91.2% 80%;
     --delete-btn-bg: 0 62.8% 20%;
     --delete-btn-text: 0 62.8% 80%;
+    
+    /* Sentiment border colors for system dark mode */
+    --sentiment-positive: 142 69% 58%;
+    --sentiment-neutral: 45 93% 47%;
+    --sentiment-negative: 0 84% 60%;
   }
 }
 

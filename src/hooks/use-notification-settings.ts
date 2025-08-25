@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { enhancedNotificationService, NotificationPermissionState } from '@/services/enhancedNotificationService';
+import { unifiedNotificationService, NotificationPermissionState } from '@/services/unifiedNotificationService';
 import { journalReminderService } from '@/services/journalReminderService';
 
 interface NotificationSettings {
@@ -23,7 +23,7 @@ export const useNotificationSettings = () => {
       console.log('[useNotificationSettings] Loading notification settings');
       
       // Check permission status
-      const permissionState = await enhancedNotificationService.checkPermissionStatus();
+      const permissionState = await unifiedNotificationService.checkPermissionStatus();
       
       // Get journal reminder settings
       const reminderSettings = journalReminderService.getSettings();
