@@ -327,7 +327,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
                 borderRight: `3px solid ${themeColor}`,
                 boxShadow: `0 0 1px 0 ${themeColor}40`,
                 backdropFilter: 'blur(4px)',
-                zIndex: 15,
+                zIndex: 5,
               }}
               initial={{ 
                 x: direction ? -300 : '100vw',

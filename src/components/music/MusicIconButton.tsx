@@ -57,7 +57,7 @@ const MusicIconButton: React.FC<MusicIconButtonProps> = ({ className = "" }) => 
         onClick={isPlaying ? togglePlay : toggleDropdown}
         size="sm"
         variant="ghost"
-        className="h-8 w-8 p-0 hover:bg-primary/5"
+        className="h-8 w-8 p-0 hover:bg-primary/5 shadow-[0_0_8px_rgba(59,130,246,0.4)] hover:shadow-[0_0_12px_rgba(59,130,246,0.6)] transition-shadow duration-200"
       >
         {isPlaying ? (
           <Pause className="h-4 w-4 text-muted-foreground" />
@@ -75,7 +75,7 @@ const MusicIconButton: React.FC<MusicIconButtonProps> = ({ className = "" }) => 
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -10, scale: 0.95 }}
             transition={{ duration: 0.15 }}
-            className="absolute top-10 right-0 z-[10000] w-64 bg-background/95 backdrop-blur-md border border-border/50 rounded-lg shadow-lg overflow-hidden"
+            className="fixed top-10 right-4 z-[20000] w-64 bg-background backdrop-blur-md border border-border/50 rounded-lg shadow-lg overflow-hidden"
           >
             <div className="p-3 border-b border-border/30">
               <h3 className="text-sm font-semibold text-foreground">

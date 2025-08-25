@@ -96,15 +96,7 @@ const JournalHeader: React.FC = () => {
             visibility: 'visible',
             opacity: 1,
             wordBreak: 'break-word',
-            lineHeight: 1.2,
-            background: theme === 'dark' 
-              ? 'linear-gradient(135deg, #ffffff 0%, #e2e8f0 25%, #cbd5e1 50%, #94a3b8 75%, #64748b 100%)'
-              : 'linear-gradient(135deg, #1e293b 0%, #334155 25%, #475569 50%, #64748b 75%, #94a3b8 100%)',
-            WebkitBackgroundClip: 'text',
-            backgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundSize: '200% 200%',
-            animation: 'gradientShift 8s ease-in-out infinite'
+            lineHeight: 1.2
           }}
           title={getJournalName()} // Show full name on hover
         >
@@ -134,14 +126,17 @@ const JournalHeader: React.FC = () => {
         </div>
       </motion.div>
       
-      {/* FIXED POSITION: Globe icon (Language Selector) */}
-      <div className={`absolute top-12 right-12 z-[1000] pointer-events-auto ${isInWelcomeTutorialStep ? 'z-[9999]' : ''}`}>
-        <LanguageSelector />
-      </div>
-      
-      {/* FIXED POSITION: Play icon (Music Button) */}
-      <div className={`absolute top-12 right-4 z-[1000] pointer-events-auto ${isInWelcomeTutorialStep ? 'z-[9999]' : ''}`}>
-        <MusicIconButton />
+      {/* Right side icons - positioned absolutely with perfect alignment */}
+      <div className="absolute top-12 right-4 flex items-center gap-2">
+        {/* Language selector */}
+        <div className={`h-8 w-8 flex items-center justify-center ${isInWelcomeTutorialStep ? 'z-[9999]' : 'z-[1000]'}`}>
+          <LanguageSelector />
+        </div>
+        
+        {/* Music icon button */}
+        <div className={`h-8 w-8 flex items-center justify-center ${isInWelcomeTutorialStep ? 'z-[9999]' : 'z-[1000]'}`}>
+          <MusicIconButton />
+        </div>
       </div>
     </div>
   );
