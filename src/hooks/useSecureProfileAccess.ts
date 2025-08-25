@@ -27,7 +27,7 @@ export const useSecureProfileAccess = () => {
       const { data, error: profileError } = await supabase
         .from('profiles')
         .select('*')
-        .eq('id', user.id)
+        .eq('id' as any, user.id as any)
         .maybeSingle();
 
       if (profileError) {
@@ -54,8 +54,8 @@ export const useSecureProfileAccess = () => {
       .update({
         ...updates,
         updated_at: new Date().toISOString()
-      })
-      .eq('id', user.id);
+      } as any)
+      .eq('id' as any, user.id as any);
 
     if (error) {
       throw error;

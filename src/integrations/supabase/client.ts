@@ -25,7 +25,7 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     reconnectAfterMs: (tries: number) => Math.min(tries * 1000, 5000),
     logger: console.log,
     // Mobile-specific transport configuration
-    transport: (typeof window !== 'undefined' && window.WebSocket) ? 'websocket' : 'fallback',
+    transport: (typeof window !== 'undefined' && window.WebSocket) ? 'websocket' as any : 'fallback' as any,
     timeout: 7000,
     // Add mobile environment detection and fallback handling
     encode: (payload: any, callback: (data: string) => void) => {

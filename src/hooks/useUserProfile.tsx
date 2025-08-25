@@ -42,7 +42,7 @@ export const useUserProfile = (): UserProfileData & {
         const { data, error } = await supabase
           .from('profiles')
           .select('display_name, full_name, timezone, country')
-          .eq('id', user.id)
+          .eq('id' as any, user.id as any)
           .single();
 
         if (error && error.code !== 'PGRST116') {
@@ -51,19 +51,19 @@ export const useUserProfile = (): UserProfileData & {
         }
 
         // Handle display name priority: local storage > display_name > full_name
-        if (localName && (!data || !data.display_name)) {
+        if (localName && (!data || !(data as any)?.display_name)) {
           await updateDisplayName(localName);
           setDisplayName(localName);
           localStorage.removeItem('user_display_name');
-        } else if (data && data.display_name) {
-          setDisplayName(data.display_name);
-        } else if (data && data.full_name) {
-          setDisplayName(data.full_name);
+        } else if (data && (data as any)?.display_name) {
+          setDisplayName((data as any).display_name);
+        } else if (data && (data as any)?.full_name) {
+          setDisplayName((data as any).full_name);
         }
 
         // Set timezone from profile data
-        if (data && data.timezone) {
-          setTimezone(data.timezone);
+        if (data && (data as any)?.timezone) {
+          setTimezone((data as any).timezone);
         } else {
           // If profile exists but no timezone, update with browser timezone
           const browserTimezone = getBrowserTimezone();
@@ -74,8 +74,8 @@ export const useUserProfile = (): UserProfileData & {
         }
 
         // Set country from profile data
-        if (data && data.country) {
-          setCountry(data.country);
+        if (data && (data as any)?.country) {
+          setCountry((data as any).country);
         }
       } catch (error) {
         console.error('Error in profile fetching', error);
@@ -134,8 +134,8 @@ export const useUserProfile = (): UserProfileData & {
         .update({
           display_name: name,
           updated_at: new Date().toISOString()
-        })
-        .eq('id', user.id);
+        } as any)
+        .eq('id' as any, user.id as any);
 
       if (error) {
         throw error;
@@ -157,8 +157,8 @@ export const useUserProfile = (): UserProfileData & {
         .update({
           timezone: tz,
           updated_at: new Date().toISOString()
-        })
-        .eq('id', user.id);
+        } as any)
+        .eq('id' as any, user.id as any);
 
       if (error) {
         throw error;
@@ -180,8 +180,8 @@ export const useUserProfile = (): UserProfileData & {
         .update({
           country: countryCode,
           updated_at: new Date().toISOString()
-        })
-        .eq('id', user.id);
+        } as any)
+        .eq('id' as any, user.id as any);
 
       if (error) {
         throw error;

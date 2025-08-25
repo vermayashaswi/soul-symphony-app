@@ -33,14 +33,14 @@ export const useUserAvatar = (size: number = 192): UseUserAvatarReturn => {
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('avatar_url')
-        .eq('id', user.id)
+        .eq('id' as any, user.id as any)
         .maybeSingle();
 
       let sourceUrl = null;
 
       // Priority: profiles.avatar_url -> user_metadata.avatar_url
-      if (profile?.avatar_url) {
-        sourceUrl = profile.avatar_url;
+      if ((profile as any)?.avatar_url) {
+        sourceUrl = (profile as any).avatar_url;
       } else if (user.user_metadata?.avatar_url) {
         sourceUrl = user.user_metadata.avatar_url;
         
@@ -50,8 +50,8 @@ export const useUserAvatar = (size: number = 192): UseUserAvatarReturn => {
           .update({ 
             avatar_url: sourceUrl,
             updated_at: new Date().toISOString()
-          })
-          .eq('id', user.id);
+          } as any)
+          .eq('id' as any, user.id as any);
       }
 
       if (!sourceUrl) {
@@ -109,8 +109,8 @@ export const useUserAvatar = (size: number = 192): UseUserAvatarReturn => {
           .update({ 
             avatar_url: refreshedUser.user_metadata.avatar_url,
             updated_at: new Date().toISOString()
-          })
-          .eq('id', user.id);
+          } as any)
+          .eq('id' as any, user.id as any);
       }
       
       // Force refresh avatar with new data

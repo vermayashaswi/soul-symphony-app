@@ -108,7 +108,7 @@ class NotificationFallbackService {
 
       // Process each notification
       for (const notification of notifications) {
-        await this.deliverNotification(notification);
+        await this.deliverNotification(notification as any);
       }
     } catch (error) {
       console.error('[NotificationFallbackService] Error in polling check:', error);

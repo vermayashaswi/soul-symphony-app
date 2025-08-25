@@ -118,8 +118,8 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
         const { data: recentMessages, error } = await supabase
           .from('chat_messages')
           .select('id, created_at, content')
-          .eq('thread_id', threadId)
-          .eq('sender', 'assistant')
+          .eq('thread_id' as any, threadId as any)
+          .eq('sender' as any, 'assistant' as any)
           .gte('created_at', new Date(Date.now() - 5 * 60 * 1000).toISOString()) // Last 5 minutes
           .order('created_at', { ascending: false })
           .limit(1);
@@ -138,8 +138,8 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
       const { data: messages, error } = await supabase
         .from('chat_messages')
         .select('id, created_at, content')
-        .eq('thread_id', threadId)
-        .eq('sender', 'assistant')
+        .eq('thread_id' as any, threadId as any)
+        .eq('sender' as any, 'assistant' as any)
         .gte('created_at', searchStartTime.toISOString())
         .order('created_at', { ascending: false })
         .limit(3);
@@ -154,12 +154,12 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
       
       if (hasCompletedResponse) {
         // Check if we have a non-processing message
-        const latestMessage = messages[0];
-        const isProcessingMessage = latestMessage.content.includes('...') || 
-                                   latestMessage.content.length < 10;
+        const latestMessage = messages[0] as any;
+        const isProcessingMessage = (latestMessage as any)?.content?.includes('...') || 
+                                   (latestMessage as any)?.content?.length < 10;
         
         if (!isProcessingMessage) {
-          console.log(`[useStreamingChat] Found completed response for thread ${threadId}, message created at:`, latestMessage.created_at);
+          console.log(`[useStreamingChat] Found completed response for thread ${threadId}, message created at:`, (latestMessage as any)?.created_at);
           return true;
         }
       }
@@ -872,11 +872,11 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('timezone')
-        .eq('id', userId)
+        .eq('id' as any, userId as any)
         .single();
       
-      if (!profileError && profile?.timezone) {
-        userTimezone = profile.timezone;
+      if (!profileError && (profile as any)?.timezone) {
+        userTimezone = (profile as any).timezone;
         console.log(`[useStreamingChat] Using user timezone: ${userTimezone}`);
       } else {
         console.log(`[useStreamingChat] No timezone found in profile, using UTC`);
