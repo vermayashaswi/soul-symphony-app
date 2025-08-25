@@ -31,15 +31,11 @@ export function UnifiedJournalRemindersSettings() {
     getDetailedStatus();
   }, []);
 
-  const loadSettings = async () => {
-    try {
-      const settings = await unifiedNotificationService.getSettings();
-      setIsEnabled(settings.reminders.length > 0);
-      if (settings.reminders.length > 0) {
-        setReminderTime(settings.reminders[0].time as JournalReminderTime);
-      }
-    } catch (error) {
-      console.error('[UnifiedJournalRemindersSettings] Error loading settings:', error);
+  const loadSettings = () => {
+    const settings = unifiedNotificationService.getSettings();
+    setIsEnabled(settings.enabled);
+    if (settings.times.length > 0) {
+      setReminderTime(settings.times[0]);
     }
   };
 
@@ -81,12 +77,12 @@ export function UnifiedJournalRemindersSettings() {
         if (result.success) {
           setIsEnabled(true);
           toast.success('✅ Unified journal reminders enabled!', {
-            description: `Strategy: ${result.strategy}, Scheduled: 1 notification`
+            description: `Strategy: ${result.strategy}, Scheduled: ${result.scheduledCount} notifications`
           });
           await getDetailedStatus();
         } else {
           toast.error('❌ Failed to enable reminders', {
-            description: result.message || 'Unknown error occurred'
+            description: result.error || 'Unknown error occurred'
           });
         }
       } else {

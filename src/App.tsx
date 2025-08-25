@@ -23,7 +23,6 @@ import PullToRefresh from './components/system/PullToRefresh';
 
 import { useAppInitialization } from './hooks/useAppInitialization';
 import { logger } from './utils/logger';
-import { AppInitializer } from './components/layout/AppInitializer';
 
 const App: React.FC = () => {
   const [isInitialized, setIsInitialized] = useState(false);
@@ -201,7 +200,6 @@ const App: React.FC = () => {
           <SubscriptionProvider>
             <TutorialProvider>
               
-              <AppInitializer />
               <JournalProcessingInitializer />
               <PullToRefresh>
                 <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
