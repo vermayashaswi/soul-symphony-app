@@ -1,5 +1,6 @@
 package online.soulo.twa;
 
+import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.content.Context;
@@ -20,7 +21,7 @@ public class NotificationChannelSetup {
             journalChannel.setDescription("Daily reminders to write in your journal");
             journalChannel.enableLights(true);
             journalChannel.enableVibration(true);
-            journalChannel.setLockscreenVisibility(NotificationChannel.VISIBILITY_PUBLIC);
+            journalChannel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
             
             notificationManager.createNotificationChannel(journalChannel);
         }
