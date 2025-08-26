@@ -32,12 +32,22 @@
                 <data android:scheme="com.googleusercontent.apps.11083941790-vgbdbj6j313ggo6jbt9agp3bvrlilam8" />
             </intent-filter>
 
-            <!-- App deep link handling -->
-            <intent-filter>
+            <!-- App deep link handling with higher priority -->
+            <intent-filter android:priority="1000">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="online.soulo.twa" />
+            </intent-filter>
+            
+            <!-- PHASE 3: OAuth callback handling with web scheme support -->
+            <intent-filter android:priority="1000">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" 
+                      android:host="571d731e-b54b-453e-9f48-a2c79a572930.lovableproject.com"
+                      android:pathPrefix="/app/auth" />
             </intent-filter>
 
         </activity>
