@@ -14,7 +14,7 @@ public class MainActivity extends BridgeActivity {
         
         // Register custom plugins
         registerPlugin(NativeAlarmManager.class);
-        registerPlugin(NotificationPermissionHandler.class);
+        // NotificationPermissionHandler removed - NativeAlarmManager handles all permissions
         
         // Initialize notification channels
         NotificationChannelSetup.createNotificationChannels(this);
