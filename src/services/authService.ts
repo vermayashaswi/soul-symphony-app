@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { isAppRoute } from '@/routes/RouteHelpers';
 import { nativeIntegrationService } from './nativeIntegrationService';
 import { nativeAuthService } from './nativeAuthService';
+import { Browser } from '@capacitor/browser';
 
 /**
  * Gets the redirect URL for authentication
@@ -48,9 +49,19 @@ export const signInWithGoogle = async (): Promise<void> => {
     }
 
     if (data?.url) {
-      console.log('[AuthService] Redirecting to OAuth URL:', data.url);
-      setTimeout(() => {
-        window.location.href = data.url;
+      console.log('[AuthService] Opening OAuth URL in controlled browser:', data.url);
+      setTimeout(async () => {
+        try {
+          // Use Browser plugin for controlled in-app browsing
+          await Browser.open({
+            url: data.url,
+            windowName: '_self',
+            presentationStyle: 'popover'
+          });
+        } catch (browserError) {
+          console.error('[AuthService] Browser plugin failed, using fallback redirect:', browserError);
+          window.location.href = data.url;
+        }
       }, 100);
     }
   } catch (error: any) {
@@ -103,9 +114,18 @@ export const signInWithApple = async (): Promise<void> => {
     }
 
     if (data?.url) {
-      console.log('[AuthService] Redirecting to Apple OAuth URL:', data.url);
-      setTimeout(() => {
-        window.location.href = data.url;
+      console.log('[AuthService] Opening Apple OAuth URL in controlled browser:', data.url);
+      setTimeout(async () => {
+        try {
+          await Browser.open({
+            url: data.url,
+            windowName: '_self',
+            presentationStyle: 'popover'
+          });
+        } catch (browserError) {
+          console.error('[AuthService] Browser plugin failed, using fallback redirect:', browserError);
+          window.location.href = data.url;
+        }
       }, 100);
     }
   } catch (error: any) {

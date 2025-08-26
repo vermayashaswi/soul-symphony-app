@@ -15,6 +15,14 @@ const config: CapacitorConfig = {
       clientId: '11083941790-oi1vrl8bmsjajc0h1ka4f9q0qjmm80o9.apps.googleusercontent.com',
       forceCodeForRefreshToken: true,
     },
+    Browser: {
+      android: {
+        customTabsColor: "#8b5cf6"
+      },
+      ios: {
+        presentationStyle: "popover"
+      }
+    },
     App: {
       urlScheme: "online.soulo.twa"
     },
