@@ -7,6 +7,7 @@ import { useMusicPlayer } from '@/contexts/MusicPlayerContext';
 import { useTutorial } from '@/contexts/TutorialContext';
 import { musicCategories } from '@/config/musicCategories';
 import { TranslatableText } from '@/components/translation/TranslatableText';
+import { MusicPlayerControls } from './MusicPlayerControls';
 
 const iconMap = {
   Moon,
@@ -160,6 +161,13 @@ const MusicIconButton: React.FC<MusicIconButtonProps> = ({ className = "" }) => 
           <Play className="h-4 w-4 text-muted-foreground" />
         )}
       </Button>
+
+      {/* Music Player Controls */}
+      {isPlaying && (
+        <div className="absolute top-10 right-0 z-40">
+          <MusicPlayerControls />
+        </div>
+      )}
 
       {/* Portal-rendered dropdown */}
       {renderDropdown()}
