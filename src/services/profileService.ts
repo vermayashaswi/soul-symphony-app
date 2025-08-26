@@ -11,14 +11,32 @@ import { enhancedLocationService } from '@/services/enhanced-location-service';
 const MAX_PROFILE_CREATION_RETRIES = 3;
 
 /**
- * Get user's timezone using browser API
+ * Get user's timezone using browser API with country awareness
  */
-const getUserTimezone = (): string => {
+const getUserTimezone = (country?: string): string => {
   try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    
+    // If we have country info, validate browser timezone against country
+    if (country && country !== 'DEFAULT') {
+      // Import timezone utils for validation
+      const { getCountryPrimaryTimezone, normalizeTimezone } = require('../../supabase/functions/_shared/timezoneUtils');
+      const normalizedBrowser = normalizeTimezone(browserTimezone);
+      const expectedTimezone = getCountryPrimaryTimezone(country);
+      
+      // Special case: if country is India but browser returned UTC, use Asia/Kolkata
+      if (country === 'IN' && normalizedBrowser === 'UTC') {
+        console.log('[ProfileService] Country-aware timezone: using Asia/Kolkata for India instead of UTC');
+        return 'Asia/Kolkata';
+      }
+      
+      return normalizedBrowser;
+    }
+    
+    return browserTimezone;
   } catch (error) {
     console.error('Error detecting timezone:', error);
-    return 'UTC'; // Default fallback
+    return 'UTC'; // Default fallback only when detection fails
   }
 };
 
@@ -118,9 +136,7 @@ const updateMissingProfileFields = async (userId: string, user: User): Promise<b
     // Detect location data (timezone and country) using enhanced service
     const locationData = await enhancedLocationService.detectUserLocation();
     
-    const updateData: any = {
-      updated_at: new Date().toISOString()
-    };
+    const updateData: any = {};
     
     // Add timezone and country from enhanced location detection
     if (locationData.timezone !== 'UTC') {
@@ -217,8 +233,7 @@ const createProfileManually = async (user: User): Promise<boolean> => {
         avatar_url: avatarUrl || null, 
         timezone: locationData.timezone,
         country: locationData.country !== 'DEFAULT' ? locationData.country : null,
-        onboarding_completed: false,
-        updated_at: new Date().toISOString()
+        onboarding_completed: false
       };
       
       logProfile(`Creating profile manually with data (attempt ${attempt})`, 'ProfileService', profileData);
@@ -283,11 +298,8 @@ export const updateUserProfile = async (user: User | null, metadata: Record<stri
       metadataKeys: Object.keys(metadata)
     });
     
-    // Add timezone to metadata if not provided
-    if (!metadata.timezone) {
-      metadata.timezone = getUserTimezone();
-      logProfile(`Adding detected timezone to metadata: ${metadata.timezone}`, 'ProfileService');
-    }
+    // Only add timezone if explicitly provided to prevent overwrites
+    // Do not automatically add timezone to prevent overriding valid existing timezones
     
     const { data, error } = await supabase.auth.updateUser({
       data: metadata,
@@ -302,9 +314,7 @@ export const updateUserProfile = async (user: User | null, metadata: Record<stri
       // Ensure avatar_url is updated in the profiles table too
       logProfile('Updating profile table with new metadata', 'ProfileService');
       
-      const updateData = {
-        updated_at: new Date().toISOString()
-      } as any;
+      const updateData = {} as any;
       
       // Only add fields that are provided
       if (metadata.avatar_url) updateData.avatar_url = metadata.avatar_url;
@@ -362,8 +372,7 @@ export const startUserTrial = async (userId: string): Promise<boolean> => {
         subscription_status: 'trial',
         subscription_tier: 'premium', // Set to premium during trial
         is_premium: true,
-        trial_ends_at: trialEndDate.toISOString(),
-        updated_at: new Date().toISOString()
+        trial_ends_at: trialEndDate.toISOString()
       })
       .eq('id', userId);
 

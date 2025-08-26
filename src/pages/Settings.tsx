@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useTheme } from '@/hooks/use-theme';
 import { setupJournalReminder, initializeCapacitorNotifications, NotificationFrequency, NotificationTime } from '@/services/notificationService';
-import { newNotificationService, type NotificationReminder } from '@/services/newNotificationService';
+import { nativeNotificationService, type NotificationReminder } from '@/services/nativeNotificationService';
 import { CustomTimeRemindersModal } from '@/components/settings/CustomTimeRemindersModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
@@ -161,7 +161,7 @@ function SettingsContent() {
         setNotificationPermissionState(permissionStatus === 'granted' ? 'granted' : 'denied');
         
         // Load existing reminder settings from Supabase
-        const settings = await newNotificationService.getReminderSettings();
+        const settings = await nativeNotificationService.getReminderSettings();
         console.log('[Settings] Loaded reminder settings:', settings);
         
         if (settings && settings.reminders && settings.reminders.length > 0) {
@@ -405,10 +405,10 @@ function SettingsContent() {
       try {
         console.log('[Settings] Requesting notification permissions...');
         
-        const result = await newNotificationService.requestPermissions();
+        const result = await nativeNotificationService.requestPermissions();
         console.log('[Settings] Permission result:', result);
         
-        if (result.success) {
+        if (result.granted) {
           setNotificationsEnabled(true);
           setNotificationPermissionState('granted');
           setShowCustomTimeModal(true);
@@ -429,7 +429,7 @@ function SettingsContent() {
             <div className="flex items-center gap-2">
               <XCircle className="h-4 w-4 text-red-500" />
               <span>
-                <TranslatableText text={result.error || "Notification permission denied"} forceTranslate={true} />
+                <TranslatableText text="Notification permission denied" forceTranslate={true} />
               </span>
             </div>
           );
@@ -454,7 +454,7 @@ function SettingsContent() {
       setNotificationReminders([]);
       
       // Clear settings from database
-      await newNotificationService.saveReminderSettings({ reminders: [] });
+      await nativeNotificationService.saveAndScheduleSettings({ reminders: [] });
       
       toast.info(<TranslatableText text="Notifications disabled" forceTranslate={true} />);
     }
@@ -465,7 +465,7 @@ function SettingsContent() {
       console.log('[Settings] Saving custom reminder times:', reminders);
       
       // Save to database
-      await newNotificationService.saveReminderSettings({ reminders });
+      await nativeNotificationService.saveAndScheduleSettings({ reminders });
       
       // Update local state
       setNotificationReminders(reminders);
@@ -622,7 +622,7 @@ function SettingsContent() {
   const handleTestNotification = async () => {
     try {
       console.log('[Settings] Testing notification...');
-      const result = await newNotificationService.testNotification();
+      const result = await nativeNotificationService.testNotification();
       
       if (result.success) {
         toast.success(<TranslatableText text="Test notification sent!" forceTranslate={true} />);

@@ -5,8 +5,18 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { TranslatableText } from '@/components/translation/TranslatableText';
-import { journalReminderService, JournalReminderTime } from '@/services/journalReminderService';
-import { enhancedAndroidNotificationService } from '@/services/enhancedAndroidNotificationService';
+import { nativeNotificationService } from '@/services/nativeNotificationService';
+import { JournalReminderTime } from '@/services/toastService';
+// Helper function to convert time names to HH:MM format
+const getTimeString = (time: JournalReminderTime): string => {
+  switch (time) {
+    case 'morning': return '08:00';
+    case 'afternoon': return '14:00';
+    case 'evening': return '19:00';
+    case 'night': return '22:00';
+    default: return '19:00';
+  }
+};
 import { toast } from 'sonner';
 
 const TIME_OPTIONS: { value: JournalReminderTime; label: string; time: string }[] = [
@@ -17,7 +27,7 @@ const TIME_OPTIONS: { value: JournalReminderTime; label: string; time: string }[
 ];
 
 export const JournalReminderSettings: React.FC = () => {
-  const [settings, setSettings] = useState(journalReminderService.getSettings());
+  const [settings, setSettings] = useState({ enabled: false, times: [] as JournalReminderTime[] });
   const [isLoading, setIsLoading] = useState(false);
   const [systemStatus, setSystemStatus] = useState<any>(null);
 
@@ -36,21 +46,32 @@ export const JournalReminderSettings: React.FC = () => {
         }
         
         console.log('[JournalReminderSettings] User enabling reminders');
-        const success = await journalReminderService.requestPermissionsAndSetup(settings.times);
+        const result = await nativeNotificationService.requestPermissions();
         
-        if (success) {
+        if (result.granted) {
+          // Convert times to proper format for native service
+          const reminderSettings = {
+            reminders: settings.times.map((time, index) => ({
+              id: `${time}-${index}`,
+              enabled: true,
+              time: getTimeString(time),
+              label: `${time.charAt(0).toUpperCase() + time.slice(1)} Reminder`
+            }))
+          };
+          
+          await nativeNotificationService.saveAndScheduleSettings(reminderSettings);
           setSettings(prev => ({ ...prev, enabled: true }));
           toast.success('Journal reminders enabled!');
           
           // Update system status
-          const status = await journalReminderService.getNotificationStatus();
+          const status = await nativeNotificationService.getDetailedStatus();
           setSystemStatus(status);
         } else {
           toast.error('Failed to enable reminders. Please check your notification settings and try again.');
         }
       } else {
         console.log('[JournalReminderSettings] User disabling reminders');
-        await journalReminderService.disableReminders();
+        await nativeNotificationService.clearScheduledNotifications();
         setSettings(prev => ({ ...prev, enabled: false }));
         toast.success('Journal reminders disabled');
       }
@@ -71,7 +92,16 @@ export const JournalReminderSettings: React.FC = () => {
     
     // If reminders are currently enabled, update them
     if (settings.enabled && newTimes.length > 0) {
-      journalReminderService.requestPermissionsAndSetup(newTimes);
+      // Update scheduled reminders with new times
+      const reminderSettings = {
+        reminders: newTimes.map((time, index) => ({
+          id: `${time}-${index}`,
+          enabled: true,
+          time: getTimeString(time),
+          label: `${time.charAt(0).toUpperCase() + time.slice(1)} Reminder`
+        }))
+      };
+      nativeNotificationService.saveAndScheduleSettings(reminderSettings);
     } else if (settings.enabled && newTimes.length === 0) {
       // If no times selected, disable reminders
       handleToggleEnabled(false);
@@ -81,8 +111,8 @@ export const JournalReminderSettings: React.FC = () => {
   const handleTestNotification = async () => {
     setIsLoading(true);
     try {
-      const success = await enhancedAndroidNotificationService.testNotification();
-      if (success) {
+      const result = await nativeNotificationService.testNotification();
+      if (result.success) {
         toast.success('Test notification sent! Check your notification panel.');
       } else {
         toast.error('Failed to send test notification.');
@@ -98,7 +128,7 @@ export const JournalReminderSettings: React.FC = () => {
   const handleRefreshStatus = async () => {
     setIsLoading(true);
     try {
-      const status = await journalReminderService.getNotificationStatus();
+      const status = await nativeNotificationService.getDetailedStatus();
       setSystemStatus(status);
       toast.success('Status refreshed');
     } catch (error) {

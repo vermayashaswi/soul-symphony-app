@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLocation } from '@/contexts/LocationContext';
 import { supabase } from '@/integrations/supabase/client';
 import { secureEnsureProfile } from '@/services/secureProfileService';
+import { getCountryPrimaryTimezone, normalizeTimezone } from '../../supabase/functions/_shared/timezoneUtils';
 
 export interface UserProfileData {
   displayName: string | null;
@@ -61,9 +62,16 @@ export const useUserProfile = (): UserProfileData & {
           setDisplayName(data.full_name);
         }
 
-        // Set timezone from profile data
+        // Set timezone from profile data with validation
         if (data && data.timezone) {
-          setTimezone(data.timezone);
+          const validatedTimezone = validateTimezoneWithCountry(data.timezone, data.country);
+          if (validatedTimezone !== data.timezone) {
+            console.log(`[useUserProfile] Timezone validation: correcting ${data.timezone} to ${validatedTimezone} for country ${data.country}`);
+            await updateTimezone(validatedTimezone);
+            setTimezone(validatedTimezone);
+          } else {
+            setTimezone(data.timezone);
+          }
         } else {
           // If profile exists but no timezone, update with browser timezone
           const browserTimezone = getBrowserTimezone();
@@ -106,22 +114,33 @@ export const useUserProfile = (): UserProfileData & {
   const getBrowserTimezone = (): string | null => {
     try {
       const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      // Normalize legacy timezones
-      const legacyMap: Record<string, string> = {
-        'Asia/Calcutta': 'Asia/Kolkata',
-        'US/Eastern': 'America/New_York',
-        'US/Central': 'America/Chicago',
-        'US/Mountain': 'America/Denver',
-        'US/Pacific': 'America/Los_Angeles',
-        'US/Alaska': 'America/Anchorage',
-        'US/Hawaii': 'Pacific/Honolulu',
-        'Europe/Kiev': 'Europe/Kyiv',
-      };
-      return legacyMap[browserTimezone] || browserTimezone;
+      return normalizeTimezone(browserTimezone);
     } catch (error) {
       console.error('Error detecting timezone:', error);
       return null;
     }
+  };
+
+  const validateTimezoneWithCountry = (timezone: string, country: string | null): string => {
+    // If no country data, return timezone as-is
+    if (!country) return timezone;
+
+    // Get the expected primary timezone for the country
+    const expectedTimezone = getCountryPrimaryTimezone(country);
+    
+    // Special validation: if country is IN (India) but timezone is UTC, correct it
+    if (country === 'IN' && timezone === 'UTC') {
+      console.log(`[useUserProfile] Timezone/Country mismatch detected: correcting UTC to Asia/Kolkata for India`);
+      return 'Asia/Kolkata';
+    }
+
+    // For other countries, if timezone is UTC but country has a specific timezone, suggest correction
+    if (timezone === 'UTC' && expectedTimezone !== 'UTC') {
+      console.log(`[useUserProfile] Timezone/Country mismatch: user has UTC but country ${country} suggests ${expectedTimezone}`);
+      return expectedTimezone;
+    }
+
+    return timezone;
   };
 
   const updateDisplayName = async (name: string) => {
@@ -132,8 +151,7 @@ export const useUserProfile = (): UserProfileData & {
       const { error } = await supabase
         .from('profiles')
         .update({
-          display_name: name,
-          updated_at: new Date().toISOString()
+          display_name: name
         })
         .eq('id', user.id);
 
@@ -150,13 +168,18 @@ export const useUserProfile = (): UserProfileData & {
   const updateTimezone = async (tz: string) => {
     if (!user) return;
 
+    // Normalize and validate the timezone
+    const normalizedTimezone = normalizeTimezone(tz);
+    const validatedTimezone = validateTimezoneWithCountry(normalizedTimezone, country);
+    
+    console.log(`[useUserProfile] Updating timezone: ${tz} -> ${normalizedTimezone} -> ${validatedTimezone}`);
+
     try {
       // RLS policies ensure user can only update their own profile
       const { error } = await supabase
         .from('profiles')
         .update({
-          timezone: tz,
-          updated_at: new Date().toISOString()
+          timezone: validatedTimezone
         })
         .eq('id', user.id);
 
@@ -164,7 +187,8 @@ export const useUserProfile = (): UserProfileData & {
         throw error;
       }
       
-      setTimezone(tz);
+      setTimezone(validatedTimezone);
+      console.log(`[useUserProfile] Timezone updated successfully to: ${validatedTimezone}`);
     } catch (error) {
       console.error('Error updating timezone', error);
     }
@@ -178,8 +202,7 @@ export const useUserProfile = (): UserProfileData & {
       const { error } = await supabase
         .from('profiles')
         .update({
-          country: countryCode,
-          updated_at: new Date().toISOString()
+          country: countryCode
         })
         .eq('id', user.id);
 
