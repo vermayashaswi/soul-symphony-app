@@ -90,9 +90,34 @@ class NativeNotificationService {
 
     try {
       if (this.isNative) {
-        const hasPermission = await this.checkAndRequestPermissions();
-        const state = await this.checkPermissionStatus();
-        return { granted: hasPermission, state };
+        console.log('[NativeNotificationService] Requesting permissions on native platform');
+        
+        // Request notification permissions
+        const permissionResult = await LocalNotifications.requestPermissions();
+        
+        // For Android 12+, log exact alarm requirement  
+        if (Capacitor.getPlatform() === 'android') {
+          console.log('[NativeNotificationService] Android detected, exact alarm permission may be required for Android 12+');
+          notificationDebugLogger.logEvent('EXACT_ALARM_PERMISSION_CHECK', {
+            platform: 'android',
+            requiresExactAlarm: true,
+            message: 'Exact alarm permission required for reliable scheduling on Android 12+'
+          });
+        }
+        
+        const granted = permissionResult.display === 'granted';
+        
+        // Log permission result
+        notificationDebugLogger.logPermissionRequest('NATIVE_PERMISSION', {
+          granted,
+          platform: Capacitor.getPlatform(),
+          result: permissionResult
+        });
+        
+        return { 
+          granted, 
+          state: granted ? 'granted' : 'denied' 
+        };
       } else {
         // Web notifications
         if (!('Notification' in window)) {
@@ -100,6 +125,13 @@ class NativeNotificationService {
         }
 
         const permission = await Notification.requestPermission();
+        
+        notificationDebugLogger.logPermissionRequest('WEB_PERMISSION', {
+          granted: permission === 'granted',
+          platform: 'web',
+          result: permission
+        });
+        
         return { 
           granted: permission === 'granted', 
           state: permission as NotificationPermissionState 
@@ -107,6 +139,7 @@ class NativeNotificationService {
       }
     } catch (error) {
       console.error('[NativeNotificationService] Permission request failed:', error);
+      notificationDebugLogger.logPermissionRequest('REQUEST_ERROR', { error: error.message });
       return { granted: false, state: 'denied' };
     }
   }

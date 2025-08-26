@@ -1,40 +1,27 @@
 
 import React, { useState } from 'react';
-import { Bell, Clock, Bug } from 'lucide-react';
+import { Bell, Clock, Bug, Plus, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { nativeNotificationService } from '@/services/nativeNotificationService';
-import { timezoneNotificationHelper, JournalReminderTime } from '@/services/timezoneNotificationHelper';
+import { timezoneNotificationHelper } from '@/services/timezoneNotificationHelper';
 import { notificationDebugLogger } from '@/services/notificationDebugLogger';
 import { NotificationDebugPanel } from './NotificationDebugPanel';
-// Helper function to convert time names to HH:MM format
-const getTimeString = (time: JournalReminderTime): string => {
-  switch (time) {
-    case 'morning': return '08:00';
-    case 'afternoon': return '14:00';
-    case 'evening': return '19:00';
-    case 'night': return '22:00';
-    default: return '19:00';
-  }
-};
 import { toast } from 'sonner';
 
-const TIME_OPTIONS: { value: JournalReminderTime; label: string; time: string }[] = [
-  { value: 'morning', label: 'Morning', time: '8:00 AM' },
-  { value: 'afternoon', label: 'Afternoon', time: '2:00 PM' },
-  { value: 'evening', label: 'Evening', time: '7:00 PM' },
-  { value: 'night', label: 'Night', time: '10:00 PM' }
-];
+// Remove hardcoded time mappings - use exact user input instead
 
 export const JournalReminderSettings: React.FC = () => {
-  const [settings, setSettings] = useState({ enabled: false, times: [] as JournalReminderTime[] });
+  const [settings, setSettings] = useState({ enabled: false, exactTimes: [] as string[] });
   const [isLoading, setIsLoading] = useState(false);
   const [systemStatus, setSystemStatus] = useState<any>(null);
   const [timezoneInfo, setTimezoneInfo] = useState<any>(null);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
+  const [newReminderTime, setNewReminderTime] = useState('12:00');
 
   const handleToggleEnabled = async (enabled: boolean) => {
     if (isLoading) return;
@@ -43,27 +30,28 @@ export const JournalReminderSettings: React.FC = () => {
     
     try {
       if (enabled) {
-        // Need to select at least one time
-        if (settings.times.length === 0) {
-          toast.error('Please select at least one reminder time');
+        // Need to have at least one time
+        if (settings.exactTimes.length === 0) {
+          toast.error('Please add at least one reminder time');
           setIsLoading(false);
           return;
         }
         
-        console.log('[JournalReminderSettings] User enabling reminders');
+        console.log('[JournalReminderSettings] User enabling reminders with exact times:', settings.exactTimes);
         const result = await nativeNotificationService.requestPermissions();
         
         if (result.granted) {
-          // Convert times to proper format for native service
+          // Use exact times directly - NO CONVERSION OR MAPPING
           const reminderSettings = {
-            reminders: settings.times.map((time, index) => ({
-              id: `${time}-${index}`,
+            reminders: settings.exactTimes.map((time, index) => ({
+              id: `exact-${time}-${index}`,
               enabled: true,
-              time: getTimeString(time),
-              label: `${time.charAt(0).toUpperCase() + time.slice(1)} Reminder`
+              time: time, // Use exact HH:MM format (e.g., "12:40")
+              label: `Journal Reminder ${time}`
             }))
           };
           
+          console.log('[JournalReminderSettings] Scheduling with exact settings:', reminderSettings);
           await nativeNotificationService.saveAndScheduleSettings(reminderSettings);
           setSettings(prev => ({ ...prev, enabled: true }));
           toast.success('Journal reminders enabled!');
@@ -88,27 +76,52 @@ export const JournalReminderSettings: React.FC = () => {
     }
   };
 
-  const handleTimeToggle = (time: JournalReminderTime, checked: boolean) => {
-    const newTimes = checked 
-      ? [...settings.times, time]
-      : settings.times.filter(t => t !== time);
+  const handleAddReminderTime = async () => {
+    if (!newReminderTime || settings.exactTimes.includes(newReminderTime)) {
+      toast.error('Time already exists or invalid');
+      return;
+    }
     
-    setSettings(prev => ({ ...prev, times: newTimes }));
+    const newTimes = [...settings.exactTimes, newReminderTime];
+    setSettings(prev => ({ ...prev, exactTimes: newTimes }));
     
     // If reminders are currently enabled, update them
-    if (settings.enabled && newTimes.length > 0) {
-      // Update scheduled reminders with new times
+    if (settings.enabled) {
       const reminderSettings = {
         reminders: newTimes.map((time, index) => ({
-          id: `${time}-${index}`,
+          id: `exact-${time}-${index}`,
           enabled: true,
-          time: getTimeString(time),
-          label: `${time.charAt(0).toUpperCase() + time.slice(1)} Reminder`
+          time: time, // Use exact time
+          label: `Journal Reminder ${time}`
         }))
       };
-      nativeNotificationService.saveAndScheduleSettings(reminderSettings);
+      console.log('[JournalReminderSettings] Adding new time, updating settings:', reminderSettings);
+      await nativeNotificationService.saveAndScheduleSettings(reminderSettings);
+      toast.success(`Added reminder for ${newReminderTime}`);
+      
+      // Update system status
+      const status = await nativeNotificationService.getDetailedStatus();
+      setSystemStatus(status);
+    }
+  };
+
+  const handleRemoveReminderTime = async (timeToRemove: string) => {
+    const newTimes = settings.exactTimes.filter(t => t !== timeToRemove);
+    setSettings(prev => ({ ...prev, exactTimes: newTimes }));
+    
+    if (settings.enabled && newTimes.length > 0) {
+      const reminderSettings = {
+        reminders: newTimes.map((time, index) => ({
+          id: `exact-${time}-${index}`,
+          enabled: true,
+          time: time,
+          label: `Journal Reminder ${time}`
+        }))
+      };
+      await nativeNotificationService.saveAndScheduleSettings(reminderSettings);
+      toast.success(`Removed reminder for ${timeToRemove}`);
     } else if (settings.enabled && newTimes.length === 0) {
-      // If no times selected, disable reminders
+      // If no times left, disable reminders
       handleToggleEnabled(false);
     }
   };
@@ -186,47 +199,70 @@ export const JournalReminderSettings: React.FC = () => {
           />
         </div>
 
-        {/* Time Selection */}
-        {(settings.enabled || settings.times.length > 0) && (
-          <div className="space-y-3">
-            <Label className="text-sm font-medium">
-              <TranslatableText text="Reminder Times" />
-            </Label>
-            <div className="grid grid-cols-2 gap-2">
-              {TIME_OPTIONS.map(option => (
+        {/* Exact Time Management */}
+        <div className="space-y-3">
+          <Label className="text-sm font-medium">
+            <TranslatableText text="Reminder Times (Exact HH:MM)" />
+          </Label>
+          
+          {/* Add New Time */}
+          <div className="flex gap-2">
+            <Input
+              type="time"
+              value={newReminderTime}
+              onChange={(e) => setNewReminderTime(e.target.value)}
+              className="flex-1"
+              disabled={isLoading}
+            />
+            <Button
+              onClick={handleAddReminderTime}
+              disabled={isLoading}
+              size="sm"
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
+          
+          {/* Current Times */}
+          {settings.exactTimes.length > 0 && (
+            <div className="space-y-2">
+              {settings.exactTimes.map((time, index) => (
                 <div 
-                  key={option.value}
-                  className="flex items-center space-x-2 p-2 border rounded-lg hover:bg-muted/50"
+                  key={`${time}-${index}`}
+                  className="flex items-center justify-between p-2 border rounded-lg"
                 >
-                  <Switch
-                    id={`time-${option.value}`}
-                    checked={settings.times.includes(option.value)}
-                    onCheckedChange={(checked) => handleTimeToggle(option.value, checked)}
-                    disabled={isLoading}
-                  />
-                  <div className="flex-1">
-                    <Label 
-                      htmlFor={`time-${option.value}`}
-                      className="text-sm cursor-pointer"
-                    >
-                      <TranslatableText text={option.label} />
-                    </Label>
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <Clock className="h-3 w-3" />
-                      {option.time}
-                    </div>
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-primary" />
+                    <span className="font-mono text-sm">{time}</span>
+                    <span className="text-xs text-muted-foreground">
+                      ({timezoneNotificationHelper.formatTimeForUser(
+                        timezoneNotificationHelper.getNextExactReminderTimeInTimezone(
+                          parseInt(time.split(':')[0]), 
+                          parseInt(time.split(':')[1])
+                        ),
+                        'PPpp'
+                      )})
+                    </span>
                   </div>
+                  <Button
+                    onClick={() => handleRemoveReminderTime(time)}
+                    disabled={isLoading}
+                    size="sm"
+                    variant="ghost"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
 
-        {settings.enabled && settings.times.length === 0 && (
+        {settings.enabled && settings.exactTimes.length === 0 && (
           <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
             <p className="text-sm text-blue-800">
-              <TranslatableText text="Please select at least one reminder time to enable notifications." />
+              <TranslatableText text="Please add at least one reminder time to enable notifications." />
             </p>
           </div>
         )}
@@ -258,15 +294,18 @@ export const JournalReminderSettings: React.FC = () => {
             </div>
 
             {/* Next Notification Times */}
-            {settings.enabled && settings.times.length > 0 && timezoneInfo && (
+            {settings.enabled && settings.exactTimes.length > 0 && (
               <div className="text-xs space-y-1">
                 <div className="font-medium text-green-800 mb-2">Next Scheduled Times</div>
-                {settings.times.map(time => {
-                  const timeAware = timezoneNotificationHelper.getTimezoneAwareReminderTime(time);
+                {settings.exactTimes.map(time => {
+                  const [hour, minute] = time.split(':').map(Number);
+                  const exactTime = timezoneNotificationHelper.getNextExactReminderTimeInTimezone(hour, minute);
                   return (
                     <div key={time} className="flex justify-between">
-                      <span>{time.charAt(0).toUpperCase() + time.slice(1)}:</span>
-                      <span className="font-mono">{timeAware.nextOccurrence.toString()}</span>
+                      <span className="font-mono">{time}:</span>
+                      <span className="font-mono text-green-600">
+                        {timezoneNotificationHelper.formatTimeForUser(exactTime, 'PPpp')}
+                      </span>
                     </div>
                   );
                 })}
