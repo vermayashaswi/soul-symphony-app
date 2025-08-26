@@ -11,6 +11,9 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         
+        // Initialize notification channels
+        NotificationChannelSetup.createNotificationChannels(this);
+        
         // Configure immersive mode for status bar auto-hide
         setupImmersiveMode();
         
