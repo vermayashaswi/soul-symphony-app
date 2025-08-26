@@ -257,51 +257,6 @@ export type Database = {
           },
         ]
       }
-      notification_queue: {
-        Row: {
-          body: string
-          created_at: string
-          data: Json | null
-          error_message: string | null
-          id: string
-          notification_type: string
-          scheduled_for: string
-          sent_at: string | null
-          status: string | null
-          title: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          body: string
-          created_at?: string
-          data?: Json | null
-          error_message?: string | null
-          id?: string
-          notification_type: string
-          scheduled_for: string
-          sent_at?: string | null
-          status?: string | null
-          title: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          body?: string
-          created_at?: string
-          data?: Json | null
-          error_message?: string | null
-          id?: string
-          notification_type?: string
-          scheduled_for?: string
-          sent_at?: string | null
-          status?: string | null
-          title?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -615,6 +570,36 @@ export type Database = {
         }
         Relationships: []
       }
+      user_devices: {
+        Row: {
+          created_at: string
+          device_token: string
+          id: string
+          last_seen: string
+          platform: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          device_token: string
+          id?: string
+          last_seen?: string
+          platform: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          device_token?: string
+          id?: string
+          last_seen?: string
+          platform?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_feature_flags: {
         Row: {
           created_at: string
@@ -656,6 +641,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_notifications: {
+        Row: {
+          body: string
+          created_at: string
+          data: Json | null
+          id: string
+          scheduled_time: string
+          status: string
+          title: string
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          data?: Json | null
+          id?: string
+          scheduled_time: string
+          status?: string
+          title: string
+          type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          data?: Json | null
+          id?: string
+          scheduled_time?: string
+          status?: string
+          title?: string
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       user_sessions: {
         Row: {
@@ -1242,10 +1266,6 @@ export type Database = {
           p_user_id: string
         }
         Returns: string
-      }
-      schedule_journal_reminders: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
       }
       setup_user_trial_fallback: {
         Args: { user_id: string }

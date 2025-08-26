@@ -1,6 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 import { LocalNotifications, ScheduleOptions } from '@capacitor/local-notifications';
-import { enhancedNotificationService } from './enhancedNotificationService';
+import { unifiedNotificationService as enhancedNotificationService } from './unifiedNotificationService';
 import { enhancedAndroidNotificationService, type AndroidNotificationStatus } from './enhancedAndroidNotificationService';
 
 export type JournalReminderTime = 'morning' | 'afternoon' | 'evening' | 'night';

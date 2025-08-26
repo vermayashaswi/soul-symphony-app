@@ -16,7 +16,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { serviceWorkerManager, isPWA } from '@/utils/serviceWorker';
-import { pushNotificationService } from '@/services/pushNotificationService';
+import { fcmNotificationService as pushNotificationService } from '@/services/fcmNotificationService';
 import { periodicSyncService } from '@/services/periodicSyncService';
 import { backgroundSyncService } from '@/services/backgroundSyncService';
 import { toast } from 'sonner';

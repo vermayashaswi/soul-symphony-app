@@ -8,8 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Clock, Bell, Smartphone, Globe } from 'lucide-react';
 import { toast } from 'sonner';
-import { enhancedNotificationService } from '@/services/enhancedNotificationService';
-import { journalReminderService } from '@/services/journalReminderService';
+import { unifiedNotificationService as enhancedNotificationService } from '@/services/unifiedNotificationService';
+import { unifiedNotificationService as journalReminderService } from '@/services/unifiedNotificationService';
 import { useTranslation } from '@/contexts/TranslationContext';
 
 const JournalRemindersSettings: React.FC = () => {

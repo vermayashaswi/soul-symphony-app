@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { enhancedNotificationService, NotificationPermissionState } from '@/services/enhancedNotificationService';
+import { unifiedNotificationService as enhancedNotificationService, NotificationPermissionState } from '@/services/unifiedNotificationService';
 
 export { type NotificationPermissionState };
 
