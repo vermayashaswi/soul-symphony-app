@@ -11,6 +11,10 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         
+        // Register custom plugins
+        registerPlugin(NativeAlarmManager.class);
+        registerPlugin(NotificationPermissionHandler.class);
+        
         // Initialize notification channels
         NotificationChannelSetup.createNotificationChannels(this);
         
