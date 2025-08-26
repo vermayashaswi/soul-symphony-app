@@ -151,8 +151,7 @@ export const useUserProfile = (): UserProfileData & {
       const { error } = await supabase
         .from('profiles')
         .update({
-          display_name: name,
-          updated_at: new Date().toISOString()
+          display_name: name
         })
         .eq('id', user.id);
 
@@ -180,8 +179,7 @@ export const useUserProfile = (): UserProfileData & {
       const { error } = await supabase
         .from('profiles')
         .update({
-          timezone: validatedTimezone,
-          updated_at: new Date().toISOString()
+          timezone: validatedTimezone
         })
         .eq('id', user.id);
 
@@ -204,8 +202,7 @@ export const useUserProfile = (): UserProfileData & {
       const { error } = await supabase
         .from('profiles')
         .update({
-          country: countryCode,
-          updated_at: new Date().toISOString()
+          country: countryCode
         })
         .eq('id', user.id);
 
