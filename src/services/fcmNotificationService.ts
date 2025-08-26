@@ -16,15 +16,15 @@ export interface NotificationSettings {
 
 export type NotificationPermissionState = 'granted' | 'denied' | 'default' | 'unsupported';
 
-// Firebase configuration - these should be replaced with your actual Firebase config
+// Firebase configuration
 const firebaseConfig = {
-  apiKey: "your-api-key",
-  authDomain: "your-auth-domain",
-  projectId: "your-project-id",
-  storageBucket: "your-storage-bucket",
-  messagingSenderId: "your-sender-id",
-  appId: "your-app-id",
-  measurementId: "your-measurement-id"
+  apiKey: "AIzaSyDfLKNR7-3rRTHEpSc4Ppk8xfISSIYjnaw",
+  authDomain: "soulo-ec325.firebaseapp.com",
+  projectId: "soulo-ec325",
+  storageBucket: "soulo-ec325.firebasestorage.app",
+  messagingSenderId: "183251782093",
+  appId: "1:183251782093:web:e92b7ec31d0c651db3dc84",
+  measurementId: "G-PLRDN9V6GK"
 };
 
 class FCMNotificationService {
@@ -128,7 +128,7 @@ class FCMNotificationService {
         // Get FCM token
         try {
           const token = await getToken(this.messaging, {
-            vapidKey: 'YOUR_VAPID_KEY' // Replace with your VAPID key
+            vapidKey: 'BOQf7iPztx_NbsZeW8YZaxFaLTJRJgvHlIKsqv1QjohO2rSorShQPOvy0TnjKDWQ7jHZusBDaxGtgVzXV35_ypw'
           });
           
           if (token) {

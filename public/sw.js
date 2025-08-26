@@ -475,7 +475,57 @@ async function notifyAppOfPeriodicSync(type, itemCount) {
   });
 }
 
-// Handle push notifications
+// Import Firebase messaging for service worker
+importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compat.js');
+
+// Firebase configuration for service worker
+const firebaseConfig = {
+  apiKey: "AIzaSyDfLKNR7-3rRTHEpSc4Ppk8xfISSIYjnaw",
+  authDomain: "soulo-ec325.firebaseapp.com",
+  projectId: "soulo-ec325",
+  storageBucket: "soulo-ec325.firebasestorage.app",
+  messagingSenderId: "183251782093",
+  appId: "1:183251782093:web:e92b7ec31d0c651db3dc84",
+  measurementId: "G-PLRDN9V6GK"
+};
+
+// Initialize Firebase
+firebase.initializeApp(firebaseConfig);
+
+// Retrieve an instance of Firebase Messaging so that it can handle background messages.
+const messaging = firebase.messaging();
+
+// Handle background messages
+messaging.onBackgroundMessage((payload) => {
+  console.log('[SW] Received background message ', payload);
+
+  const notificationTitle = payload.notification?.title || 'Soulo Notification';
+  const notificationOptions = {
+    body: payload.notification?.body || 'New notification from Soulo',
+    icon: '/lovable-uploads/31ed88ef-f596-4b91-ba58-a4175eebe779.png',
+    badge: '/lovable-uploads/31ed88ef-f596-4b91-ba58-a4175eebe779.png',
+    tag: 'soulo-notification',
+    requireInteraction: false,
+    data: payload.data,
+    actions: [
+      {
+        action: 'open',
+        title: 'Open App',
+        icon: '/lovable-uploads/31ed88ef-f596-4b91-ba58-a4175eebe779.png'
+      },
+      {
+        action: 'dismiss',
+        title: 'Dismiss',
+        icon: '/lovable-uploads/31ed88ef-f596-4b91-ba58-a4175eebe779.png'
+      }
+    ]
+  };
+
+  return self.registration.showNotification(notificationTitle, notificationOptions);
+});
+
+// Handle push notifications (fallback for non-Firebase)
 self.addEventListener('push', (event) => {
   console.log('[SW] Push notification received');
   
