@@ -1,19 +1,19 @@
-// Re-export unified notification service for backward compatibility
-export * from './unifiedNotificationService';
-import { unifiedNotificationService, NotificationPermissionState } from './unifiedNotificationService';
+// Re-export native notification service for enhanced functionality
+export * from './nativeNotificationService';
+import { nativeNotificationService, NotificationPermissionState } from './nativeNotificationService';
 
 // Enhanced compatibility exports with extended methods
 class EnhancedNotificationServiceCompat {
   async requestPermissions() {
-    return unifiedNotificationService.requestPermissionsEnhanced();
+    return nativeNotificationService.requestPermissions();
   }
   
   async getPermissionInfo() {
-    return unifiedNotificationService.requestPermissionsEnhanced();
+    return nativeNotificationService.requestPermissions();
   }
   
   async checkPermissionStatus(): Promise<NotificationPermissionState> {
-    return unifiedNotificationService.checkPermissionStatus();
+    return nativeNotificationService.checkPermissionStatus();
   }
 }
 

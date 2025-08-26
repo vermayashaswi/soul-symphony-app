@@ -7,46 +7,42 @@ import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChevronDown, ChevronUp, Activity, AlertTriangle, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { unifiedNotificationService, UnifiedNotificationSettings } from '@/services/unifiedNotificationService';
-import { timezoneNotificationHelper, JournalReminderTime } from '@/services/timezoneNotificationHelper';
-import { notificationDebugLogger } from '@/services/notificationDebugLogger';
+import { nativeNotificationService, NotificationSettings } from '@/services/nativeNotificationService';
 
 const TIME_OPTIONS = [
-  { value: 'morning', label: '8:00 AM - Morning reflection' },
-  { value: 'afternoon', label: '2:00 PM - Afternoon check-in' },
-  { value: 'evening', label: '7:00 PM - Evening thoughts' },
-  { value: 'night', label: '10:00 PM - End of day' }
+  { value: '08:00', label: '8:00 AM - Morning reflection' },
+  { value: '14:00', label: '2:00 PM - Afternoon check-in' },
+  { value: '19:00', label: '7:00 PM - Evening thoughts' },
+  { value: '22:00', label: '10:00 PM - End of day' }
 ];
 
 export function UnifiedJournalRemindersSettings() {
   const [isEnabled, setIsEnabled] = useState(false);
-  const [reminderTime, setReminderTime] = useState<JournalReminderTime>('evening');
+  const [reminderTime, setReminderTime] = useState<string>('19:00');
   const [isLoading, setIsLoading] = useState(false);
   const [notificationStatus, setNotificationStatus] = useState<any>(null);
   const [debugExpanded, setDebugExpanded] = useState(false);
-  const [debugReport, setDebugReport] = useState<string>('');
+  const [scheduledCount, setScheduledCount] = useState(0);
 
   useEffect(() => {
     loadSettings();
     getDetailedStatus();
   }, []);
 
-  const loadSettings = () => {
-    const settings = unifiedNotificationService.getSettings();
-    setIsEnabled(settings.enabled);
-    if (settings.times.length > 0) {
-      setReminderTime(settings.times[0]);
+  const loadSettings = async () => {
+    const settings = await nativeNotificationService.getReminderSettings();
+    if (settings && settings.reminders.length > 0) {
+      const firstReminder = settings.reminders[0];
+      setIsEnabled(firstReminder.enabled);
+      setReminderTime(firstReminder.time);
     }
   };
 
   const getDetailedStatus = async () => {
     try {
-      const status = await unifiedNotificationService.getNotificationStatus();
+      const status = await nativeNotificationService.getDetailedStatus();
       setNotificationStatus(status);
-      
-      // Generate debug report
-      const report = unifiedNotificationService.getDebugReport();
-      setDebugReport(report);
+      setScheduledCount(status.scheduledCount);
     } catch (error) {
       console.error('Error getting notification status:', error);
     }
@@ -57,12 +53,9 @@ export function UnifiedJournalRemindersSettings() {
     
     try {
       if (enabled) {
-        // First request permissions explicitly when user toggles ON
-        console.log('[UnifiedJournalRemindersSettings] User toggling reminders ON - requesting permissions');
-        
-        // Import permission checker for explicit permission request
-        const { notificationPermissionChecker } = await import('@/services/notificationPermissionChecker');
-        const permissionResult = await notificationPermissionChecker.requestPermissions();
+        // First request permissions
+        console.log('[UnifiedJournalRemindersSettings] Requesting permissions...');
+        const permissionResult = await nativeNotificationService.requestPermissions();
         
         if (!permissionResult.granted) {
           toast.error('❌ Permission Required', {
@@ -71,13 +64,24 @@ export function UnifiedJournalRemindersSettings() {
           return;
         }
         
-        // Now setup reminders with permissions granted
-        const result = await unifiedNotificationService.requestPermissionsAndSetup([reminderTime]);
+        // Create reminder settings
+        const settings: NotificationSettings = {
+          reminders: [{
+            id: 'daily-reminder',
+            enabled: true,
+            time: reminderTime,
+            label: TIME_OPTIONS.find(t => t.value === reminderTime)?.label || 'Daily journal reminder'
+          }]
+        };
+        
+        // Save and schedule
+        const result = await nativeNotificationService.saveAndScheduleSettings(settings);
         
         if (result.success) {
           setIsEnabled(true);
-          toast.success('✅ Unified journal reminders enabled!', {
-            description: `Strategy: ${result.strategy}, Scheduled: ${result.scheduledCount} notifications`
+          setScheduledCount(result.scheduledCount || 0);
+          toast.success('✅ Native journal reminders enabled!', {
+            description: `Scheduled ${result.scheduledCount} notification${result.scheduledCount !== 1 ? 's' : ''}`
           });
           await getDetailedStatus();
         } else {
@@ -86,8 +90,21 @@ export function UnifiedJournalRemindersSettings() {
           });
         }
       } else {
-        await unifiedNotificationService.disableReminders();
+        // Disable reminders
+        await nativeNotificationService.clearScheduledNotifications();
+        
+        const settings: NotificationSettings = {
+          reminders: [{
+            id: 'daily-reminder',
+            enabled: false,
+            time: reminderTime,
+            label: 'Disabled'
+          }]
+        };
+        
+        await nativeNotificationService.saveAndScheduleSettings(settings);
         setIsEnabled(false);
+        setScheduledCount(0);
         toast.success('Reminders disabled');
         await getDetailedStatus();
       }
@@ -100,14 +117,28 @@ export function UnifiedJournalRemindersSettings() {
   };
 
   const handleTimeChange = async (newTime: string) => {
-    setReminderTime(newTime as JournalReminderTime);
+    setReminderTime(newTime);
     
     if (isEnabled) {
       setIsLoading(true);
       try {
-        await unifiedNotificationService.requestPermissionsAndSetup([newTime as JournalReminderTime]);
-        toast.success(`Reminder time updated to ${TIME_OPTIONS.find(t => t.value === newTime)?.label}`);
-        await getDetailedStatus();
+        const settings: NotificationSettings = {
+          reminders: [{
+            id: 'daily-reminder',
+            enabled: true,
+            time: newTime,
+            label: TIME_OPTIONS.find(t => t.value === newTime)?.label || 'Daily journal reminder'
+          }]
+        };
+        
+        const result = await nativeNotificationService.saveAndScheduleSettings(settings);
+        if (result.success) {
+          toast.success(`Reminder time updated to ${TIME_OPTIONS.find(t => t.value === newTime)?.label}`);
+          setScheduledCount(result.scheduledCount || 0);
+          await getDetailedStatus();
+        } else {
+          toast.error('Failed to update reminder time');
+        }
       } catch (error) {
         console.error('Error updating reminder time:', error);
         toast.error('Failed to update reminder time');
@@ -120,14 +151,14 @@ export function UnifiedJournalRemindersSettings() {
   const testReminder = async () => {
     setIsLoading(true);
     try {
-      const success = await unifiedNotificationService.testNotification();
-      if (success) {
+      const result = await nativeNotificationService.testNotification();
+      if (result.success) {
         toast.success('🧪 Test reminder sent!', {
           description: 'Check your notifications to confirm they\'re working.'
         });
       } else {
         toast.error('❌ Test reminder failed', {
-          description: 'Please check your notification settings.'
+          description: result.error || 'Please check your notification settings.'
         });
       }
     } catch (error) {
@@ -138,66 +169,59 @@ export function UnifiedJournalRemindersSettings() {
     }
   };
 
-  const clearDebugLogs = () => {
-    notificationDebugLogger.clearEvents();
-    toast.success('Debug logs cleared');
+  const clearDebugLogs = async () => {
+    await nativeNotificationService.clearScheduledNotifications();
+    toast.success('Scheduled notifications cleared');
     getDetailedStatus();
   };
 
   const getHealthStatusBadge = () => {
-    if (!notificationStatus?.verification) {
-      return <Badge variant="outline">Unknown</Badge>;
+    if (!notificationStatus || notificationStatus.permissionState === 'denied') {
+      return <Badge className="bg-red-500/10 text-red-500 border-red-500/20"><AlertTriangle className="w-3 h-3 mr-1" />Denied</Badge>;
     }
-
-    const { healthStatus } = notificationStatus.verification;
     
-    switch (healthStatus) {
-      case 'healthy':
-        return <Badge className="bg-green-500/10 text-green-500 border-green-500/20"><CheckCircle className="w-3 h-3 mr-1" />Healthy</Badge>;
-      case 'degraded':
-        return <Badge className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20"><AlertTriangle className="w-3 h-3 mr-1" />Degraded</Badge>;
-      case 'failed':
-        return <Badge className="bg-red-500/10 text-red-500 border-red-500/20"><AlertTriangle className="w-3 h-3 mr-1" />Failed</Badge>;
-      default:
-        return <Badge variant="outline">Unknown</Badge>;
+    if (notificationStatus.permissionState === 'granted' && scheduledCount > 0) {
+      return <Badge className="bg-green-500/10 text-green-500 border-green-500/20"><CheckCircle className="w-3 h-3 mr-1" />Active</Badge>;
     }
-  };
-
-  const formatTimezoneInfo = () => {
-    if (!notificationStatus?.debugInfo) return null;
     
-    const { debugInfo } = notificationStatus;
-    return {
-      userTimezone: debugInfo.userTimezone,
-      browserTimezone: debugInfo.browserTimezone,
-      currentUserTime: debugInfo.currentUserTime,
-      isDST: debugInfo.isDST
-    };
+    if (notificationStatus.permissionState === 'default') {
+      return <Badge className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20"><AlertTriangle className="w-3 h-3 mr-1" />Pending</Badge>;
+    }
+    
+    return <Badge variant="outline">Unknown</Badge>;
   };
 
   const getNextReminderTime = () => {
     if (!isEnabled) return null;
     
-    const nextTime = timezoneNotificationHelper.getTimezoneAwareReminderTime(reminderTime);
-    return nextTime.nextOccurrenceFormatted;
+    const [hours, minutes] = reminderTime.split(':').map(Number);
+    const now = new Date();
+    const nextTime = new Date();
+    nextTime.setHours(hours, minutes, 0, 0);
+    
+    if (nextTime <= now) {
+      nextTime.setDate(nextTime.getDate() + 1);
+    }
+    
+    return nextTime.toLocaleString();
   };
 
   return (
     <Card className="w-full">
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
-          Unified Journal Reminders
+          Native Journal Reminders
           <div className="flex gap-2">
             {getHealthStatusBadge()}
             {notificationStatus && (
               <Badge variant="outline" className="text-xs">
-                {notificationStatus.strategy} • {notificationStatus.scheduledCount || 0} active
+                {notificationStatus.platform} • {scheduledCount} scheduled
               </Badge>
             )}
           </div>
         </CardTitle>
         <CardDescription>
-          Advanced notification system with timezone support, WebView detection, and comprehensive debugging.
+          Direct native notifications using Capacitor LocalNotifications with proper Android scheduling.
         </CardDescription>
       </CardHeader>
 
@@ -209,23 +233,19 @@ export function UnifiedJournalRemindersSettings() {
               <p className="text-sm font-medium">Platform</p>
               <Badge variant="outline">
                 {notificationStatus.isNative ? '📱 Native' : '🌐 Web'}
-                {notificationStatus.isWebView ? ' (WebView)' : ''}
               </Badge>
-            </div>
-            <div>
-              <p className="text-sm font-medium">Strategy</p>
-              <Badge variant="outline">{notificationStatus.strategy}</Badge>
             </div>
             <div>
               <p className="text-sm font-medium">Permissions</p>
-              <Badge variant="outline">
-                {notificationStatus.permissions?.native?.display || 
-                 notificationStatus.permissions?.web || 'Unknown'}
-              </Badge>
+              <Badge variant="outline">{notificationStatus.permissionState}</Badge>
             </div>
             <div>
-              <p className="text-sm font-medium">Timezone</p>
-              <Badge variant="outline">{formatTimezoneInfo()?.userTimezone || 'UTC'}</Badge>
+              <p className="text-sm font-medium">Scheduled</p>
+              <Badge variant="outline">{scheduledCount} notifications</Badge>
+            </div>
+            <div>
+              <p className="text-sm font-medium">Supported</p>
+              <Badge variant="outline">{notificationStatus.isSupported ? '✅' : '❌'}</Badge>
             </div>
           </div>
         )}
@@ -235,7 +255,7 @@ export function UnifiedJournalRemindersSettings() {
           <div>
             <h3 className="text-base font-medium">Enable Daily Reminders</h3>
             <p className="text-sm text-muted-foreground">
-              Get intelligent notifications with timezone awareness and WebView compatibility
+              Get native Android notifications with repeating daily schedules
             </p>
             {getNextReminderTime() && (
               <p className="text-xs text-muted-foreground mt-1">
@@ -287,25 +307,25 @@ export function UnifiedJournalRemindersSettings() {
           </Button>
         </div>
 
-        {/* Verification Results */}
-        {notificationStatus?.verification && (
+        {/* Notification Status */}
+        {notificationStatus && (
           <div className="p-4 bg-muted/30 rounded-lg">
             <h4 className="font-medium mb-2 flex items-center">
               <Activity className="w-4 h-4 mr-2" />
-              Notification System Health
+              Native Notification Status
             </h4>
             <div className="grid grid-cols-3 gap-4 text-sm">
               <div>
-                <span className="text-muted-foreground">Expected:</span>
-                <div className="font-mono">{notificationStatus.verification.expectedCount}</div>
+                <span className="text-muted-foreground">Platform:</span>
+                <div className="font-mono">{notificationStatus.platform}</div>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Permission:</span>
+                <div className="font-mono">{notificationStatus.permissionState}</div>
               </div>
               <div>
                 <span className="text-muted-foreground">Scheduled:</span>
-                <div className="font-mono">{notificationStatus.verification.actualCount}</div>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Success Rate:</span>
-                <div className="font-mono">{notificationStatus.verification.successRate}%</div>
+                <div className="font-mono">{scheduledCount}</div>
               </div>
             </div>
           </div>
@@ -323,46 +343,47 @@ export function UnifiedJournalRemindersSettings() {
             </Button>
           </CollapsibleTrigger>
           <CollapsibleContent className="space-y-4 mt-4">
-            {/* Timezone Information */}
-            {formatTimezoneInfo() && (
+            {/* Native Debug Information */}
+            {notificationStatus && (
               <div className="p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
-                <h5 className="font-medium text-blue-800 dark:text-blue-200 mb-2">Timezone Information</h5>
+                <h5 className="font-medium text-blue-800 dark:text-blue-200 mb-2">Native Status Details</h5>
                 <div className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
-                  <div>User Timezone: <code>{formatTimezoneInfo()?.userTimezone}</code></div>
-                  <div>Browser Timezone: <code>{formatTimezoneInfo()?.browserTimezone}</code></div>
-                  <div>Current Time: <code>{formatTimezoneInfo()?.currentUserTime}</code></div>
-                  <div>DST Active: <code>{formatTimezoneInfo()?.isDST ? 'Yes' : 'No'}</code></div>
+                  <div>Platform: <code>{notificationStatus.platform}</code></div>
+                  <div>Is Native: <code>{notificationStatus.isNative ? 'Yes' : 'No'}</code></div>
+                  <div>Permission State: <code>{notificationStatus.permissionState}</code></div>
+                  <div>Scheduled Count: <code>{scheduledCount}</code></div>
+                  <div>Last Check: <code>{notificationStatus.debugInfo?.lastCheck}</code></div>
                 </div>
               </div>
             )}
 
-            {/* Recent Events */}
-            {notificationStatus?.recentEvents && (
+            {/* Scheduled Notifications */}
+            {notificationStatus?.pendingNotifications && (
               <div className="p-3 bg-gray-50 dark:bg-gray-950/30 border border-gray-200 dark:border-gray-800 rounded-lg">
                 <h5 className="font-medium text-gray-800 dark:text-gray-200 mb-2">
-                  Recent Events ({notificationStatus.recentEvents.length})
+                  Pending Notifications ({notificationStatus.pendingNotifications.length})
                 </h5>
                 <div className="max-h-40 overflow-y-auto text-xs font-mono space-y-1">
-                  {notificationStatus.recentEvents.slice(0, 10).map((event: any, index: number) => (
-                    <div key={index} className={`p-1 rounded ${event.success ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}`}>
-                      {new Date(event.timestamp).toLocaleTimeString()} - {event.event} {event.success ? '✅' : '❌'}
+                  {notificationStatus.pendingNotifications.slice(0, 5).map((notification: any, index: number) => (
+                    <div key={index} className="p-1 rounded text-gray-700 dark:text-gray-300">
+                      ID: {notification.id} - {notification.title} at {new Date(notification.schedule?.at).toLocaleString()}
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Debug Report */}
+            {/* Clear Scheduled Notifications */}
             <div className="p-3 bg-gray-50 dark:bg-gray-950/30 border border-gray-200 dark:border-gray-800 rounded-lg">
               <div className="flex justify-between items-center mb-2">
-                <h5 className="font-medium text-gray-800 dark:text-gray-200">Debug Report</h5>
+                <h5 className="font-medium text-gray-800 dark:text-gray-200">Maintenance</h5>
                 <Button variant="outline" size="sm" onClick={clearDebugLogs}>
-                  Clear Logs
+                  Clear All Scheduled
                 </Button>
               </div>
-              <pre className="text-xs max-h-60 overflow-y-auto whitespace-pre-wrap text-gray-700 dark:text-gray-300">
-                {debugReport}
-              </pre>
+              <p className="text-xs text-gray-600 dark:text-gray-400">
+                Use this to clear all scheduled notifications if there are issues.
+              </p>
             </div>
 
             {/* Export Debug Data */}
@@ -386,14 +407,14 @@ export function UnifiedJournalRemindersSettings() {
         </Collapsible>
 
         {/* Platform-specific Guidance */}
-        {notificationStatus?.isWebView && (
-          <div className="p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
-            <h4 className="font-medium text-amber-800 dark:text-amber-200 mb-2">
-              📱 WebView Environment Detected
+        {notificationStatus?.isNative && (
+          <div className="p-4 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg">
+            <h4 className="font-medium text-green-800 dark:text-green-200 mb-2">
+              📱 Native Platform Detected
             </h4>
-            <div className="text-sm text-amber-700 dark:text-amber-300 space-y-1">
-              <p>Enhanced compatibility mode active for Capacitor WebView.</p>
-              <p>Using {notificationStatus.strategy} strategy with automatic fallbacks.</p>
+            <div className="text-sm text-green-700 dark:text-green-300 space-y-1">
+              <p>Using Capacitor LocalNotifications for native scheduling.</p>
+              <p>Notifications will repeat daily at the specified time.</p>
             </div>
           </div>
         )}
@@ -408,7 +429,7 @@ export function UnifiedJournalRemindersSettings() {
                 <li>Add app to battery optimization whitelist</li>
                 <li>Enable "Allow background activity"</li>
                 <li>Set notification importance to "High"</li>
-                <li>Keep device connected to internet</li>
+                <li>Allow precise alarm permissions (Android 12+)</li>
               </ul>
             </div>
           </div>
