@@ -13,7 +13,7 @@ import { ThemeProvider } from './hooks/use-theme'
 import { initializeServiceWorker } from './utils/serviceWorker'
 import { backgroundSyncService } from './services/backgroundSyncService'
 import { periodicSyncService } from './services/periodicSyncService'
-import { pushNotificationService } from './services/pushNotificationService'
+import { fcmNotificationService as pushNotificationService } from './services/fcmNotificationService'
 import { mobileErrorHandler } from './services/mobileErrorHandler'
 import { mobileOptimizationService } from './services/mobileOptimizationService'
 

@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useNotificationPermissionSimple } from '@/hooks/use-notification-permission-simple';
-import { getNotificationSettings } from '@/services/notificationService';
+import { getNotificationSettings } from '@/services/unifiedNotificationService';
 
 interface NotificationStatusProps {
   className?: string;

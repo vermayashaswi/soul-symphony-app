@@ -16,7 +16,7 @@ import { RecordingButton } from '@/components/voice-recorder/RecordingButton';
 import { RecordingStatus } from '@/components/voice-recorder/RecordingStatus';
 import { PlaybackControls } from '@/components/voice-recorder/PlaybackControls';
 import { AnimatedPrompt } from '@/components/voice-recorder/AnimatedPrompt';
-import { clearAllToasts, ensureAllToastsCleared } from '@/services/notificationService';
+import { clearAllToasts, ensureAllToastsCleared } from '@/services/unifiedNotificationService';
 import { logger } from '@/utils/logger';
 
 interface VoiceRecorderProps {

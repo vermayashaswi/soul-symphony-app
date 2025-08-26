@@ -426,7 +426,7 @@ export function resetProcessingState(): void {
   }
   
   // Clear all toasts to ensure UI is clean
-  import('@/services/notificationService').then(({ clearAllToasts }) => {
+  import('@/services/unifiedNotificationService').then(({ clearAllToasts }) => {
     clearAllToasts();
   }).catch(error => {
     console.error('[Audio.ProcessingState] Error importing notificationService:', error);

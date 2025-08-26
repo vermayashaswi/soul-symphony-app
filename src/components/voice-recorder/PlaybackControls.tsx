@@ -4,7 +4,7 @@ import { Loader2, Play, RotateCcw, Pause } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
-import { clearAllToasts } from '@/services/notificationService';
+import { clearAllToasts } from '@/services/unifiedNotificationService';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useDebugLog } from '@/utils/debug/DebugContext';
 import { updateProcessingEntries } from '@/utils/audio/processing-state';

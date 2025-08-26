@@ -5,7 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { TranslatableText } from '@/components/translation/TranslatableText';
-import { journalReminderService, JournalReminderTime } from '@/services/journalReminderService';
+import { fcmNotificationService as journalReminderService } from '@/services/fcmNotificationService';
+
+type JournalReminderTime = 'morning' | 'afternoon' | 'evening' | 'night';
 import { enhancedAndroidNotificationService } from '@/services/enhancedAndroidNotificationService';
 import { toast } from 'sonner';
 

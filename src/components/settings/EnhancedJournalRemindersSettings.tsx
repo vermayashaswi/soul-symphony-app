@@ -5,7 +5,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { enhancedJournalReminderService, JournalReminderTime } from '@/services/enhancedJournalReminderService';
+import { fcmNotificationService as enhancedJournalReminderService } from '@/services/fcmNotificationService';
+
+type JournalReminderTime = 'morning' | 'afternoon' | 'evening' | 'night';
 import { enhancedPlatformService } from '@/services/enhancedPlatformService';
 
 const TIME_OPTIONS = [

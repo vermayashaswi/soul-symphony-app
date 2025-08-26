@@ -2,7 +2,7 @@
 /**
  * Audio recording validation utilities
  */
-import { clearAllToasts, ensureAllToastsCleared } from '@/services/notificationService';
+import { clearAllToasts, ensureAllToastsCleared } from '@/services/unifiedNotificationService';
 import { verifyUserAuthentication } from './auth-utils';
 import { 
   setProcessingLock, 

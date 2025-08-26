@@ -2,7 +2,7 @@
  * Main audio processing module
  * Orchestrates the audio recording and transcription process
  */
-import { clearAllToasts, ensureAllToastsCleared } from '@/services/notificationService';
+import { clearAllToasts, ensureAllToastsCleared } from '@/services/unifiedNotificationService';
 import { blobToBase64 } from './audio/blob-utils';
 import { supabase } from '@/integrations/supabase/client';
 import { processingStateManager, EntryProcessingState } from './journal/processing-state-manager';

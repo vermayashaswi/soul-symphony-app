@@ -8,7 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Loader2 } from 'lucide-react';
 import { reprocessJournalEntry } from '@/services/journalService';
 import { useTranslation } from '@/contexts/TranslationContext';
-import { showTranslatedToast } from '@/services/notificationService';
+import { showTranslatedToast } from '@/services/unifiedNotificationService';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { EnhancedTranslatableText } from '@/components/translation/EnhancedTranslatableText';

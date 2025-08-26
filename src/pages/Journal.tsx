@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, RefreshCw, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { clearAllToasts } from '@/services/notificationService';
+import { clearAllToasts } from '@/services/unifiedNotificationService';
 import { JournalErrorBoundary } from '@/components/journal/ErrorBoundary';
 import { supabase } from '@/integrations/supabase/client';
 import { TranslatableText } from '@/components/translation/TranslatableText';

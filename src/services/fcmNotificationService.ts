@@ -78,7 +78,7 @@ class FCMNotificationService {
     });
   }
 
-  async requestPermissions(): Promise<{ success: boolean; error?: string }> {
+  async requestPermissions(): Promise<{ success: boolean; error?: string; granted: boolean; state: NotificationPermissionState }> {
     await this.initialize();
 
     try {
@@ -89,34 +89,40 @@ class FCMNotificationService {
         const permissionResult = await PushNotifications.requestPermissions();
         
         if (permissionResult.receive !== 'granted') {
-          return { 
-            success: false, 
-            error: 'Push notification permissions not granted' 
-          };
+        return { 
+          success: false, 
+          error: 'Push notification permissions not granted',
+          granted: false,
+          state: 'denied'
+        };
         }
         
         // Register for push notifications
         await PushNotifications.register();
         
         console.log('[FCMNotificationService] Native push permissions granted');
-        return { success: true };
+        return { success: true, granted: true, state: 'granted' };
       } else {
         // Web platform FCM permissions
         if (!this.messaging) {
-          return { 
-            success: false, 
-            error: 'Firebase messaging not available' 
-          };
+        return { 
+          success: false, 
+          error: 'Firebase messaging not available',
+          granted: false,
+          state: 'unsupported'
+        };
         }
 
         // Request notification permission
         const permission = await Notification.requestPermission();
         
         if (permission !== 'granted') {
-          return { 
-            success: false, 
-            error: 'Web notification permissions not granted' 
-          };
+        return { 
+          success: false, 
+          error: 'Web notification permissions not granted',
+          granted: false,
+          state: 'denied'
+        };
         }
 
         // Get FCM token
@@ -133,27 +139,32 @@ class FCMNotificationService {
         }
 
         console.log('[FCMNotificationService] Web FCM permissions granted');
-        return { success: true };
+        return { success: true, granted: true, state: 'granted' };
       }
     } catch (error) {
       console.error('[FCMNotificationService] Permission request failed:', error);
       return { 
         success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error' 
+        error: error instanceof Error ? error.message : 'Unknown error',
+        granted: false,
+        state: 'denied'
       };
     }
   }
 
   // Enhanced permissions method for components that expect extended format
   async requestPermissionsEnhanced(): Promise<{ success: boolean; error?: string; granted: boolean; state: NotificationPermissionState }> {
+    return await this.requestPermissions();
+  }
+
+  // Add missing methods for PWA compatibility
+  isSupported(): boolean {
+    return 'Notification' in window;
+  }
+
+  async subscribe(): Promise<any> {
     const result = await this.requestPermissions();
-    const state = this.checkPermissionStatus();
-    
-    return {
-      ...result,
-      granted: result.success,
-      state: state
-    };
+    return result.granted ? { endpoint: 'fcm-subscription' } : null;
   }
 
   private async saveDeviceToken(token: string, platform: 'android' | 'ios' | 'web') {

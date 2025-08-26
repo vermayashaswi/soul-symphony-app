@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { enhancedNotificationService, NotificationPermissionState } from '@/services/enhancedNotificationService';
-import { journalReminderService } from '@/services/journalReminderService';
+import { fcmNotificationService, NotificationPermissionState } from '@/services/fcmNotificationService';
 
 interface NotificationSettings {
   enabled: boolean;
@@ -23,10 +22,10 @@ export const useNotificationSettings = () => {
       console.log('[useNotificationSettings] Loading notification settings');
       
       // Check permission status
-      const permissionState = await enhancedNotificationService.checkPermissionStatus();
+      const permissionState = fcmNotificationService.checkPermissionStatus();
       
-      // Get journal reminder settings
-      const reminderSettings = journalReminderService.getSettings();
+      // Get journal reminder settings (default to empty for now)
+      const reminderSettings = { enabled: false, times: [] };
       
       // Only consider enabled if permission is granted
       const actuallyEnabled = reminderSettings.enabled && permissionState === 'granted';

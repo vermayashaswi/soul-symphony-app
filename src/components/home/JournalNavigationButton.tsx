@@ -4,7 +4,7 @@ import { ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTutorial } from '@/contexts/TutorialContext';
 import { useTranslation } from '@/contexts/TranslationContext';
-import { showTranslatedToast, showTutorialToast, registerComponent, unregisterComponent } from '@/services/notificationService';
+import { showTranslatedToast, showTutorialToast, registerComponent, unregisterComponent } from '@/services/unifiedNotificationService';
 import { getAnimationCenterStyles } from '@/utils/arrow-positioning';
 import ButtonStateManager from './ButtonStateManager';
 
