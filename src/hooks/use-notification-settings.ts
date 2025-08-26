@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { nativeNotificationService, NotificationPermissionState } from '@/services/nativeNotificationService';
+import { enhancedNotificationService, NotificationPermissionState } from '@/services/enhancedNotificationService';
+import { journalReminderService } from '@/services/journalReminderService';
 
 interface NotificationSettings {
   enabled: boolean;
@@ -22,25 +23,23 @@ export const useNotificationSettings = () => {
       console.log('[useNotificationSettings] Loading notification settings');
       
       // Check permission status
-      const permissionState = await nativeNotificationService.checkPermissionStatus();
+      const permissionState = await enhancedNotificationService.checkPermissionStatus();
       
       // Get journal reminder settings
-      const reminderSettings = await nativeNotificationService.getReminderSettings();
+      const reminderSettings = journalReminderService.getSettings();
       
       // Only consider enabled if permission is granted
-      const hasEnabledReminders = reminderSettings?.reminders?.some(r => r.enabled) || false;
-      const actuallyEnabled = hasEnabledReminders && permissionState === 'granted';
-      const times = reminderSettings?.reminders?.map(r => r.time) || [];
+      const actuallyEnabled = reminderSettings.enabled && permissionState === 'granted';
       
       setSettings({
         enabled: actuallyEnabled,
-        times,
+        times: reminderSettings.times,
         permissionState
       });
       
       console.log('[useNotificationSettings] Settings loaded:', {
         enabled: actuallyEnabled,
-        timesCount: times.length,
+        timesCount: reminderSettings.times.length,
         permissionState
       });
       

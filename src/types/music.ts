@@ -14,15 +14,9 @@ export interface MusicCategory {
   frequencies: BinauralSettings[];
 }
 
-export type PlaybackMode = 'loop' | 'single' | 'once';
-
 export interface MusicPlayerState {
   isPlaying: boolean;
   currentCategory: MusicCategory | null;
   volume: number;
   isDropdownOpen: boolean;
-  playbackMode: PlaybackMode;
-  currentTrackIndex: number;
-  trackProgress: number; // 0-1
-  categoryProgress: number; // 0-1
 }

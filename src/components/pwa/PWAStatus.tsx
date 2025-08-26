@@ -16,7 +16,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { serviceWorkerManager, isPWA } from '@/utils/serviceWorker';
-import { nativeNotificationService } from '@/services/nativeNotificationService';
+import { pushNotificationService } from '@/services/pushNotificationService';
 import { periodicSyncService } from '@/services/periodicSyncService';
 import { backgroundSyncService } from '@/services/backgroundSyncService';
 import { toast } from 'sonner';
@@ -74,7 +74,7 @@ const PWAStatus: React.FC<PWAStatusProps> = ({ className, compact = false }) => 
       offlineSupport: 'caches' in window,
       backgroundSync: serviceWorkerManager.getCapabilities().backgroundSync,
       periodicSync: periodicSyncService.isSupported(),
-      pushNotifications: false, // Disabled - using native notifications
+      pushNotifications: pushNotificationService.isSupported(),
       installable: isPWA() || 'BeforeInstallPromptEvent' in window
     };
     
@@ -99,14 +99,14 @@ const PWAStatus: React.FC<PWAStatusProps> = ({ className, compact = false }) => 
 
   const handleEnablePushNotifications = async () => {
     try {
-      const result = await nativeNotificationService.requestPermissions();
-      if (result.granted) {
+      const subscription = await pushNotificationService.subscribe();
+      if (subscription) {
         setPushPermission('granted');
-        toast.success('Notifications enabled!');
+        toast.success('Push notifications enabled!');
       }
     } catch (error) {
-      console.error('Failed to enable notifications:', error);
-      toast.error('Failed to enable notifications');
+      console.error('Failed to enable push notifications:', error);
+      toast.error('Failed to enable push notifications');
     }
   };
 

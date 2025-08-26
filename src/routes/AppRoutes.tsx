@@ -18,7 +18,6 @@ import BlogPage from '@/pages/website/BlogPage';
 import BlogPostPage from '@/pages/website/BlogPostPage';
 import AccountDeletion from '@/pages/AccountDeletion';
 import DataDeletion from '@/pages/DataDeletion';
-import IOSComingSoon from '@/pages/IOSComingSoon';
 import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
 import SessionRouter from '@/components/routing/SessionRouter';
 import { AppSessionProvider } from '@/components/session/AppSessionProvider';
@@ -175,11 +174,6 @@ const AppRoutes = () => {
           nativeIntegrationService.isRunningNatively() ?
           <Navigate to="/app/home" replace /> :
           <DataDeletion />
-        } />
-        <Route path="/ios-coming-soon" element={
-          nativeIntegrationService.isRunningNatively() ?
-          <Navigate to="/app/home" replace /> :
-          <IOSComingSoon />
         } />
 
         {/* App Routes */}

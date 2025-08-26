@@ -4,4 +4,7 @@ import { unifiedNotificationService } from './unifiedNotificationService';
 
 // Legacy compatibility exports
 export default unifiedNotificationService;
-export const notificationService = unifiedNotificationService;
+export const enhancedJournalReminderService = unifiedNotificationService;
+
+// Additional legacy method compatibility
+export const initializeOnAppStart = () => Promise.resolve();

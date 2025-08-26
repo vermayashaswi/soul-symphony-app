@@ -8,7 +8,6 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { PhoneVoiceAnimation } from '@/components/website/PhoneVoiceAnimation';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
-import { useNavigate } from 'react-router-dom';
 
 // Lazy load the 3D background to improve initial load performance
 const ThreeDBackground = lazy(() => import('@/components/website/3DBackground'));
@@ -20,14 +19,9 @@ interface HeroSectionProps {
 
 const HeroSection: React.FC<HeroSectionProps> = ({ openAppStore, openPlayStore }) => {
   const isMobile = useIsMobile();
-  const navigate = useNavigate();
   const urlParams = new URLSearchParams(window.location.search);
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
   const shouldRenderMobile = isMobile.isMobile || mobileDemo;
-  
-  const handleAppStoreClick = () => {
-    navigate('/ios-coming-soon');
-  };
 
   return (
     <div
@@ -67,17 +61,14 @@ const HeroSection: React.FC<HeroSectionProps> = ({ openAppStore, openPlayStore }
               </span>
             </h1>
             <p className="text-base md:text-lg lg:text-xl text-gray-700 mb-3 md:mb-4 max-w-2xl mx-auto lg:mx-0 leading-relaxed">
-              <TranslatableText text="Designed to help you understand yourself, improve your mindset and grow with every word you share, because your VOICE needs to be heard - " />
-              <span className="font-bold text-primary">
-                <TranslatableText text="by YOU" />
-              </span>
+              <TranslatableText text="Journaling should be as simple as talking. Use voice and leave the rest to us." />
             </p>
             
             <div className="flex flex-col sm:flex-row gap-2 justify-center lg:justify-start mb-2 md:mb-3">
               <Button 
                 size="lg" 
                 className="gap-2 bg-black text-white hover:bg-gray-800 text-sm md:text-base" 
-                onClick={handleAppStoreClick}
+                onClick={openAppStore}
               >
                 <Apple className="h-4 w-4 md:h-5 md:w-5" />
                 <TranslatableText text="App Store" />

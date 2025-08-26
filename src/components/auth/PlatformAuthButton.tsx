@@ -6,7 +6,6 @@ import { nativeIntegrationService } from '@/services/nativeIntegrationService';
 import { nativeAuthService } from '@/services/nativeAuthService';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Browser } from '@capacitor/browser';
 
 interface PlatformAuthButtonProps {
   isLoading: boolean;
@@ -34,11 +33,11 @@ const PlatformAuthButton: React.FC<PlatformAuthButtonProps> = ({
         // Ensure native auth is initialized to avoid race conditions
         await nativeAuthService.initialize();
 
-        // PHASE 4: Shorter timeout for faster fallback
+        // Add timeout for native auth
         const timeoutPromise = new Promise<never>((_, reject) => {
           setTimeout(() => {
             reject(new Error('Native Google authentication timed out'));
-          }, 5000); // 5 seconds timeout for faster fallback
+          }, 15000); // 15 seconds timeout
         });
 
         const authPromise = nativeAuthService.signInWithGoogle();
@@ -100,18 +99,8 @@ const PlatformAuthButton: React.FC<PlatformAuthButtonProps> = ({
             }
 
             if (data?.url) {
-              console.log('[PlatformAuth] Opening OAuth URL in controlled browser:', data.url);
-              try {
-                // PHASE 2: Enhanced Browser plugin configuration for in-app OAuth
-                await Browser.open({
-                  url: data.url,
-                  windowName: '_self',
-                  presentationStyle: 'popover'
-                });
-              } catch (browserError) {
-                console.error('[PlatformAuth] Browser plugin failed, using fallback redirect:', browserError);
-                window.location.href = data.url;
-              }
+              console.log('[PlatformAuth] Redirecting to OAuth URL:', data.url);
+              window.location.href = data.url;
               return;
             }
 
