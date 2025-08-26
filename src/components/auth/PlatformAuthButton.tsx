@@ -34,11 +34,11 @@ const PlatformAuthButton: React.FC<PlatformAuthButtonProps> = ({
         // Ensure native auth is initialized to avoid race conditions
         await nativeAuthService.initialize();
 
-        // Add timeout for native auth (reduced timeout)
+        // PHASE 4: Shorter timeout for faster fallback
         const timeoutPromise = new Promise<never>((_, reject) => {
           setTimeout(() => {
             reject(new Error('Native Google authentication timed out'));
-          }, 8000); // 8 seconds timeout (reduced from 15)
+          }, 5000); // 5 seconds timeout for faster fallback
         });
 
         const authPromise = nativeAuthService.signInWithGoogle();
@@ -102,6 +102,7 @@ const PlatformAuthButton: React.FC<PlatformAuthButtonProps> = ({
             if (data?.url) {
               console.log('[PlatformAuth] Opening OAuth URL in controlled browser:', data.url);
               try {
+                // PHASE 2: Enhanced Browser plugin configuration for in-app OAuth
                 await Browser.open({
                   url: data.url,
                   windowName: '_self',

@@ -17,10 +17,19 @@ const config: CapacitorConfig = {
     },
     Browser: {
       android: {
-        customTabsColor: "#8b5cf6"
+        customTabsColor: "#8b5cf6",
+        enableUrlBarHiding: false,
+        showTitle: true,
+        toolbarColor: "#8b5cf6",
+        enableUrlBar: true,
+        hideToolbar: false
       },
       ios: {
-        presentationStyle: "popover"
+        presentationStyle: "popover",
+        allowOverScroll: false,
+        enableViewportScale: false,
+        allowInlineMediaPlayback: true,
+        hideToolbar: false
       }
     },
     App: {

@@ -9,10 +9,11 @@ import { Browser } from '@capacitor/browser';
  * Gets the redirect URL for authentication
  */
 export const getRedirectUrl = (): string => {
-  // CRITICAL FIX: For native apps, never use external URLs
+  // PHASE 1 FIX: Use web URLs for Browser plugin to prevent external redirects
   if (nativeIntegrationService.isRunningNatively()) {
-    console.log('[AuthService] Native app detected - using app URL scheme for redirect');
-    return 'online.soulo.twa://oauth/callback';
+    console.log('[AuthService] Native app detected - using web URL for Browser plugin OAuth');
+    // Use web URL for Browser plugin fallback to prevent external browser redirect
+    return `${window.location.origin}/app/auth`;
   }
 
   // For web, use current origin
