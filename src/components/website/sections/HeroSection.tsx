@@ -67,7 +67,11 @@ const HeroSection: React.FC<HeroSectionProps> = ({ openAppStore, openPlayStore }
               </span>
             </h1>
             <p className="text-base md:text-lg lg:text-xl text-gray-700 mb-3 md:mb-4 max-w-2xl mx-auto lg:mx-0 leading-relaxed">
-              <TranslatableText text='AI that just another "YOU". Designed to help you understand yourself, improve your mindset and grow with every word you TALK' />
+              <TranslatableText text="Designed to help you understand yourself, improve your mindset and grow with every word you share." />
+              <br /><br />
+              <span className="italic font-bold">
+                <TranslatableText text="Because your VOICE needs to be heard - by YOU" />
+              </span>
             </p>
             
             <div className="flex flex-col sm:flex-row gap-2 justify-center lg:justify-start mb-2 md:mb-3">
