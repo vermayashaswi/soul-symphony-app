@@ -1,7 +1,2 @@
-// Re-export unified notification service for backward compatibility
-export * from './unifiedNotificationService';
-import { unifiedNotificationService } from './unifiedNotificationService';
-
-// Legacy compatibility exports
-export default unifiedNotificationService;
-export const notificationService = unifiedNotificationService;
+// Re-export toast service for backward compatibility
+export * from './toastService';

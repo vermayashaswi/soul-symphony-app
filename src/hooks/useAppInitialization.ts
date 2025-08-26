@@ -1,6 +1,6 @@
 
 import { useEffect, useState } from 'react';
-import { unifiedNotificationService } from '@/services/unifiedNotificationService';
+import { nativeNotificationService } from '@/services/nativeNotificationService';
 import { initializeServiceWorker } from '@/utils/serviceWorker';
 import { enhancedPlatformService } from '@/services/enhancedPlatformService';
 import { nativeIntegrationService } from '@/services/nativeIntegrationService';
