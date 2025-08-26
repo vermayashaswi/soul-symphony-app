@@ -46,15 +46,14 @@ const config: CapacitorConfig = {
       presentationOptions: ["badge", "sound", "alert"]
     },
     LocalNotifications: {
-      smallIcon: "ic_notification",
+      smallIcon: "ic_stat_icon_config_sample",
       iconColor: "#8b5cf6",
-      sound: "default",
+      sound: "beep.wav",
       requestPermissionsOnLoad: true,
       attachments: [],
       enableAndroidExtraLargeIcon: true,
       androidAllowWhileIdle: true,
-      androidExact: true,
-      androidScheduleExact: true
+      androidExact: true
     }
   },
   ios: {

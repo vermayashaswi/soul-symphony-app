@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { nativeNotificationService, NotificationPermissionState } from '@/services/nativeNotificationService';
+import { enhancedNotificationService, NotificationPermissionState } from '@/services/enhancedNotificationService';
 
 export { type NotificationPermissionState };
 
@@ -10,18 +10,18 @@ export const useNotificationPermission = () => {
   const [initializationComplete, setInitializationComplete] = useState(false);
   const [debugInfo, setDebugInfo] = useState<any>(null);
 
-  // Native permission checking using the native service
+  // Enhanced permission checking using the enhanced service
   useEffect(() => {
     const checkPermission = async () => {
-      console.log('[useNotificationPermission] Checking notification permission status with native service');
+      console.log('[useNotificationPermission] Checking notification permission status with enhanced service');
       try {
         // Get debug info for troubleshooting
-        const info = await nativeNotificationService.getDetailedStatus();
+        const info = await enhancedNotificationService.getPermissionInfo();
         setDebugInfo(info);
         console.log('[useNotificationPermission] Permission debug info:', info);
         
         // Check current permission status
-        const currentPermission = await nativeNotificationService.checkPermissionStatus();
+        const currentPermission = await enhancedNotificationService.checkPermissionStatus();
         console.log('[useNotificationPermission] Current permission status:', currentPermission);
         
         setPermission(currentPermission);
@@ -40,22 +40,22 @@ export const useNotificationPermission = () => {
   }, []);
 
   const requestPermission = async (): Promise<boolean> => {
-    console.log('[useNotificationPermission] Permission request initiated using native service', {
+    console.log('[useNotificationPermission] Permission request initiated using enhanced service', {
       currentPermission: permission,
       isSupported,
       debugInfo
     });
 
     try {
-      // Use native notification service for permission request
-      const result = await nativeNotificationService.requestPermissions();
-      console.log('[useNotificationPermission] Native service permission result:', result);
+      // Use enhanced notification service for permission request
+      const result = await enhancedNotificationService.requestPermissions();
+      console.log('[useNotificationPermission] Enhanced service permission result:', result);
       
       // Update state based on result
       setPermission(result.state);
       
       // Update debug info
-      const newDebugInfo = await nativeNotificationService.getDetailedStatus();
+      const newDebugInfo = await enhancedNotificationService.getPermissionInfo();
       setDebugInfo(newDebugInfo);
       
       return result.granted;
