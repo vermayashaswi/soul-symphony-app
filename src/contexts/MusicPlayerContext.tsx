@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { binauralMusicService } from '@/services/binauralMusicService';
-import { MusicCategory, MusicPlayerState } from '@/types/music';
+import { MusicCategory, MusicPlayerState, PlaybackMode } from '@/types/music';
 
 const VOLUME_STORAGE_KEY = 'soul-symphony-music-volume';
 const LAST_CATEGORY_STORAGE_KEY = 'soul-symphony-last-category';
@@ -11,6 +11,9 @@ interface MusicPlayerContextType extends MusicPlayerState {
   stop: () => void;
   toggleDropdown: () => void;
   closeDropdown: () => void;
+  setPlaybackMode: (mode: PlaybackMode) => void;
+  previousTrack: () => void;
+  nextTrack: () => void;
   getCurrentTrackInfo: () => { name: string; index: number; total: number } | null;
 }
 
@@ -33,7 +36,11 @@ export function MusicPlayerProvider({ children }: MusicPlayerProviderProps) {
     isPlaying: false,
     currentCategory: null,
     volume: 0.8,
-    isDropdownOpen: false
+    isDropdownOpen: false,
+    playbackMode: 'loop',
+    currentTrackIndex: 0,
+    trackProgress: 0,
+    categoryProgress: 0
   });
 
 
@@ -68,7 +75,10 @@ export function MusicPlayerProvider({ children }: MusicPlayerProviderProps) {
         ...prev,
         currentCategory: category,
         isPlaying: true,
-        isDropdownOpen: false
+        isDropdownOpen: false,
+        currentTrackIndex: 0,
+        trackProgress: 0,
+        categoryProgress: 0
       }));
     } catch (error) {
       console.error('[MusicPlayerProvider] Error selecting category:', error);
@@ -81,8 +91,24 @@ export function MusicPlayerProvider({ children }: MusicPlayerProviderProps) {
     setState(prev => ({
       ...prev,
       isPlaying: false,
-      currentCategory: null
+      currentCategory: null,
+      currentTrackIndex: 0,
+      trackProgress: 0,
+      categoryProgress: 0
     }));
+  }, []);
+
+  const setPlaybackMode = useCallback((mode: PlaybackMode) => {
+    binauralMusicService.setPlaybackMode(mode);
+    setState(prev => ({ ...prev, playbackMode: mode }));
+  }, []);
+
+  const previousTrack = useCallback(() => {
+    binauralMusicService.previousTrack();
+  }, []);
+
+  const nextTrack = useCallback(() => {
+    binauralMusicService.skipToNextTrack();
   }, []);
 
   const toggleDropdown = useCallback(() => {
@@ -97,6 +123,21 @@ export function MusicPlayerProvider({ children }: MusicPlayerProviderProps) {
     setState(prev => ({ ...prev, isDropdownOpen: false }));
   }, []);
 
+  // Set up progress tracking
+  useEffect(() => {
+    binauralMusicService.setProgressCallback((trackProgress, categoryProgress) => {
+      setState(prev => ({
+        ...prev,
+        trackProgress,
+        categoryProgress,
+        currentTrackIndex: binauralMusicService.getCurrentTrackInfo()?.index || 0
+      }));
+    });
+
+    return () => {
+      binauralMusicService.setProgressCallback(() => {});
+    };
+  }, []);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -116,6 +157,9 @@ export function MusicPlayerProvider({ children }: MusicPlayerProviderProps) {
     stop,
     toggleDropdown,
     closeDropdown,
+    setPlaybackMode,
+    previousTrack,
+    nextTrack,
     getCurrentTrackInfo
   };
 
