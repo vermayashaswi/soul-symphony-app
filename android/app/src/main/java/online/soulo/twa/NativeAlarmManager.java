@@ -9,24 +9,35 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.provider.Settings;
-import androidx.core.app.NotificationCompat;
+import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import com.getcapacitor.annotation.Permission;
+import com.getcapacitor.annotation.PermissionCallback;
 import java.util.Calendar;
 import java.util.TimeZone;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
 
-@CapacitorPlugin(name = "NativeAlarmManager")
+@CapacitorPlugin(
+    name = "NativeAlarmManager",
+    permissions = {
+        @Permission(
+            strings = { android.Manifest.permission.POST_NOTIFICATIONS },
+            alias = "notifications"
+        )
+    }
+)
 public class NativeAlarmManager extends Plugin {
     
     private static final String CHANNEL_ID = "journal_reminders";
     private static final int BASE_REQUEST_CODE = 1000;
+    private static final int NOTIFICATION_PERMISSION_REQUEST_CODE = 1001;
 
     @PluginMethod
     public void checkPermissions(PluginCall call) {
@@ -58,33 +69,100 @@ public class NativeAlarmManager extends Plugin {
     public void requestPermissions(PluginCall call) {
         Context context = getContext();
         
-        // Request notification permission (Android 13+)
+        // Check notification permission first (Android 13+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS) 
                 != PackageManager.PERMISSION_GRANTED) {
-                requestPermissionForAlias("notifications", call, "POST_NOTIFICATIONS");
+                
+                // Store the call for later resolution
+                saveCall(call);
+                requestPermissionForAlias("notifications", call, "handleNotificationPermissionResult");
                 return;
             }
         }
         
-        // Request exact alarm permission (Android 12+)
+        // If notification permission is granted or not needed, check exact alarm permission
+        requestExactAlarmPermissionIfNeeded(call);
+    }
+    
+    private void requestExactAlarmPermissionIfNeeded(PluginCall call) {
+        Context context = getContext();
+        
+        // Check exact alarm permission (Android 12+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
             if (!alarmManager.canScheduleExactAlarms()) {
                 try {
                     Intent intent = new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM);
                     intent.setData(android.net.Uri.parse("package:" + context.getPackageName()));
-                    context.startActivity(intent);
+                    
+                    // Store call for later resolution
+                    saveCall(call);
+                    
+                    // Start activity and wait for result
+                    startActivityForResult(call, intent, "handleExactAlarmResult");
+                    return;
                 } catch (Exception e) {
-                    call.reject("Failed to request exact alarm permission", e);
+                    JSObject result = new JSObject();
+                    result.put("granted", false);
+                    call.resolve(result);
                     return;
                 }
             }
         }
         
+        // All permissions granted
         JSObject result = new JSObject();
         result.put("granted", true);
         call.resolve(result);
+    }
+    
+    @PermissionCallback
+    private void handleNotificationPermissionResult(PluginCall call) {
+        if (call == null) {
+            return;
+        }
+        
+        Context context = getContext();
+        boolean notificationGranted = true;
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            notificationGranted = ContextCompat.checkSelfPermission(context, 
+                android.Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED;
+        }
+        
+        if (notificationGranted) {
+            // Notification permission granted, now check exact alarm
+            requestExactAlarmPermissionIfNeeded(call);
+        } else {
+            // Notification permission denied
+            JSObject result = new JSObject();
+            result.put("granted", false);
+            call.resolve(result);
+        }
+    }
+    
+    @Override
+    protected void handleOnActivityResult(int requestCode, int resultCode, Intent data) {
+        super.handleOnActivityResult(requestCode, resultCode, data);
+        
+        PluginCall savedCall = getSavedCall();
+        if (savedCall == null) {
+            return;
+        }
+        
+        // Check if exact alarm permission was granted
+        Context context = getContext();
+        boolean exactAlarmGranted = true;
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+            exactAlarmGranted = alarmManager.canScheduleExactAlarms();
+        }
+        
+        JSObject result = new JSObject();
+        result.put("granted", exactAlarmGranted);
+        savedCall.resolve(result);
     }
     
     @PluginMethod

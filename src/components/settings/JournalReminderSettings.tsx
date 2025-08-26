@@ -26,6 +26,7 @@ export const JournalReminderSettings: React.FC = () => {
   const handleToggleEnabled = async (enabled: boolean) => {
     if (isLoading) return;
     
+    console.log('[JournalReminderSettings] Toggle request:', { enabled, currentSettings: settings });
     setIsLoading(true);
     
     try {
@@ -37,8 +38,9 @@ export const JournalReminderSettings: React.FC = () => {
           return;
         }
         
-        console.log('[JournalReminderSettings] User enabling reminders with exact times:', settings.exactTimes);
+        console.log('[JournalReminderSettings] Requesting permissions for enable...');
         const result = await nativeNotificationService.requestPermissions();
+        console.log('[JournalReminderSettings] Permission request result:', result);
         
         if (result.granted) {
           // Use exact times directly - NO CONVERSION OR MAPPING
@@ -57,10 +59,12 @@ export const JournalReminderSettings: React.FC = () => {
           toast.success('Journal reminders enabled!');
           
           // Update system status
+          console.log('[JournalReminderSettings] Refreshing system status after enable...');
           const status = await nativeNotificationService.getDetailedStatus();
           setSystemStatus(status);
         } else {
-          toast.error('Failed to enable reminders. Please check your notification settings and try again.');
+          console.log('[JournalReminderSettings] Permissions denied, state:', result.state);
+          toast.error(`Failed to enable reminders. Permission: ${result.state}. Please check your notification settings.`);
         }
       } else {
         console.log('[JournalReminderSettings] User disabling reminders');
@@ -70,9 +74,17 @@ export const JournalReminderSettings: React.FC = () => {
       }
     } catch (error) {
       console.error('[JournalReminderSettings] Error toggling reminders:', error);
-      toast.error('Failed to update reminder settings');
+      toast.error(`Failed to update reminder settings: ${error.message}`);
     } finally {
       setIsLoading(false);
+      
+      // Always refresh status after any toggle attempt
+      try {
+        const status = await nativeNotificationService.getDetailedStatus();
+        setSystemStatus(status);
+      } catch (e) {
+        console.error('[JournalReminderSettings] Error refreshing status:', e);
+      }
     }
   };
 

@@ -83,6 +83,8 @@ class NativeAlarmService {
   }
   
   async requestPermissions(): Promise<{ granted: boolean; state: NotificationPermissionState }> {
+    console.log('[NativeAlarmService] Starting permission request flow');
+    
     if (!(await this.isNativeSupported())) {
       // Web fallback
       if (!('Notification' in window)) {
@@ -97,15 +99,26 @@ class NativeAlarmService {
     }
     
     try {
+      console.log('[NativeAlarmService] Requesting native permissions via NativeAlarmManager');
       const result = await NativeAlarmManager.requestPermissions();
+      console.log('[NativeAlarmService] Native permission result:', result);
+      
+      // Wait a moment for permissions to update
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Check actual permission status after request
       const newStatus = await this.checkPermissionStatus();
+      console.log('[NativeAlarmService] Permission status after request:', newStatus);
+      
+      const finalGranted = result.granted && newStatus === 'granted';
+      console.log('[NativeAlarmService] Final permission granted:', finalGranted);
       
       return {
-        granted: result.granted && newStatus === 'granted',
+        granted: finalGranted,
         state: newStatus
       };
     } catch (error) {
-      console.error('Error requesting permissions:', error);
+      console.error('[NativeAlarmService] Error requesting permissions:', error);
       return { granted: false, state: 'denied' };
     }
   }
