@@ -76,7 +76,13 @@ public class NativeAlarmManager extends Plugin {
                 
                 // Store the call for later resolution
                 saveCall(call);
-                requestPermissionForAlias("notifications", call, "handleNotificationPermissionResult");
+                
+                // Request notification permission using proper Android API
+                ActivityCompat.requestPermissions(
+                    getActivity(),
+                    new String[]{android.Manifest.permission.POST_NOTIFICATIONS},
+                    NOTIFICATION_PERMISSION_REQUEST_CODE
+                );
                 return;
             }
         }
@@ -117,28 +123,28 @@ public class NativeAlarmManager extends Plugin {
         call.resolve(result);
     }
     
-    @PermissionCallback
-    private void handleNotificationPermissionResult(PluginCall call) {
-        if (call == null) {
-            return;
-        }
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         
-        Context context = getContext();
-        boolean notificationGranted = true;
-        
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            notificationGranted = ContextCompat.checkSelfPermission(context, 
-                android.Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED;
-        }
-        
-        if (notificationGranted) {
-            // Notification permission granted, now check exact alarm
-            requestExactAlarmPermissionIfNeeded(call);
-        } else {
-            // Notification permission denied
-            JSObject result = new JSObject();
-            result.put("granted", false);
-            call.resolve(result);
+        if (requestCode == NOTIFICATION_PERMISSION_REQUEST_CODE) {
+            PluginCall savedCall = getSavedCall();
+            if (savedCall == null) {
+                return;
+            }
+            
+            boolean notificationGranted = grantResults.length > 0 && 
+                grantResults[0] == PackageManager.PERMISSION_GRANTED;
+            
+            if (notificationGranted) {
+                // Notification permission granted, now check exact alarm
+                requestExactAlarmPermissionIfNeeded(savedCall);
+            } else {
+                // Notification permission denied
+                JSObject result = new JSObject();
+                result.put("granted", false);
+                savedCall.resolve(result);
+            }
         }
     }
     
