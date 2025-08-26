@@ -6,7 +6,8 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { nativeNotificationService } from '@/services/nativeNotificationService';
-import { JournalReminderTime } from '@/services/toastService';
+import { timezoneNotificationHelper, JournalReminderTime } from '@/services/timezoneNotificationHelper';
+import { notificationDebugLogger } from '@/services/notificationDebugLogger';
 // Helper function to convert time names to HH:MM format
 const getTimeString = (time: JournalReminderTime): string => {
   switch (time) {
@@ -30,6 +31,7 @@ export const JournalReminderSettings: React.FC = () => {
   const [settings, setSettings] = useState({ enabled: false, times: [] as JournalReminderTime[] });
   const [isLoading, setIsLoading] = useState(false);
   const [systemStatus, setSystemStatus] = useState<any>(null);
+  const [timezoneInfo, setTimezoneInfo] = useState<any>(null);
 
   const handleToggleEnabled = async (enabled: boolean) => {
     if (isLoading) return;
@@ -128,8 +130,17 @@ export const JournalReminderSettings: React.FC = () => {
   const handleRefreshStatus = async () => {
     setIsLoading(true);
     try {
+      // Initialize timezone helper and get status
+      await timezoneNotificationHelper.initializeUserTimezone();
       const status = await nativeNotificationService.getDetailedStatus();
+      const tzInfo = timezoneNotificationHelper.getTimezoneDebugInfo();
+      
       setSystemStatus(status);
+      setTimezoneInfo(tzInfo);
+      
+      // Log the refresh action
+      notificationDebugLogger.logUserAction('STATUS_REFRESH', { status, tzInfo });
+      
       toast.success('Status refreshed');
     } catch (error) {
       console.error('Error refreshing status:', error);
@@ -138,6 +149,11 @@ export const JournalReminderSettings: React.FC = () => {
       setIsLoading(false);
     }
   };
+
+  // Load initial status on mount
+  React.useEffect(() => {
+    handleRefreshStatus();
+  }, []);
 
 
   return (
@@ -212,53 +228,158 @@ export const JournalReminderSettings: React.FC = () => {
           </div>
         )}
 
-        {/* Enhanced Android Status Display */}
-        {systemStatus?.androidEnhancedStatus && (
-          <div className="space-y-2 p-3 bg-gray-50 border rounded-lg">
-            <h4 className="text-sm font-medium">System Status</h4>
+        {/* Enhanced System Status Display */}
+        {systemStatus && (
+          <div className="space-y-3 p-3 bg-gray-50 border rounded-lg">
+            <h4 className="text-sm font-medium flex items-center gap-2">
+              <Clock className="h-4 w-4" />
+              System Status
+            </h4>
+            
+            {/* Timezone Information */}
             <div className="text-xs space-y-1">
+              <div className="font-medium text-blue-800 mb-2">Timezone Information</div>
               <div className="flex justify-between">
-                <span>Notification Permission:</span>
-                <span className={systemStatus.androidEnhancedStatus.hasNotificationPermission ? 'text-green-600' : 'text-red-600'}>
-                  {systemStatus.androidEnhancedStatus.hasNotificationPermission ? 'Granted' : 'Denied'}
-                </span>
+                <span>User Timezone:</span>
+                <span className="font-mono">{systemStatus.userTimezone}</span>
               </div>
               <div className="flex justify-between">
-                <span>Channels Created:</span>
-                <span className={systemStatus.androidEnhancedStatus.channelsCreated ? 'text-green-600' : 'text-red-600'}>
-                  {systemStatus.androidEnhancedStatus.channelsCreated ? 'Yes' : 'No'}
-                </span>
+                <span>Device Timezone:</span>
+                <span className="font-mono">{systemStatus.deviceTimezone}</span>
               </div>
-              <div className="flex justify-between">
-                <span>Scheduled Count:</span>
-                <span>{systemStatus.androidEnhancedStatus.scheduledCount}</span>
-              </div>
-              {systemStatus.androidEnhancedStatus.lastError && (
-                <div className="text-red-600 text-xs">
-                  Error: {systemStatus.androidEnhancedStatus.lastError}
+              {systemStatus.timezoneMismatch && (
+                <div className="text-orange-600 text-xs bg-orange-50 p-2 rounded">
+                  ⚠️ Timezone mismatch detected. Notifications will use your profile timezone.
                 </div>
               )}
+            </div>
+
+            {/* Next Notification Times */}
+            {settings.enabled && settings.times.length > 0 && timezoneInfo && (
+              <div className="text-xs space-y-1">
+                <div className="font-medium text-green-800 mb-2">Next Scheduled Times</div>
+                {settings.times.map(time => {
+                  const timeAware = timezoneNotificationHelper.getTimezoneAwareReminderTime(time);
+                  return (
+                    <div key={time} className="flex justify-between">
+                      <span>{time.charAt(0).toUpperCase() + time.slice(1)}:</span>
+                      <span className="font-mono">{timeAware.nextOccurrence.toString()}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Android Enhanced Status */}
+            {systemStatus?.androidEnhancedStatus && (
+              <div className="text-xs space-y-1">
+                <div className="font-medium text-gray-800 mb-2">Android Status</div>
+                <div className="flex justify-between">
+                  <span>Notification Permission:</span>
+                  <span className={systemStatus.androidEnhancedStatus.hasNotificationPermission ? 'text-green-600' : 'text-red-600'}>
+                    {systemStatus.androidEnhancedStatus.hasNotificationPermission ? 'Granted' : 'Denied'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Scheduled Count:</span>
+                  <span>{systemStatus.androidEnhancedStatus.scheduledCount}</span>
+                </div>
+                {systemStatus.androidEnhancedStatus.lastError && (
+                  <div className="text-red-600 text-xs bg-red-50 p-2 rounded">
+                    Error: {systemStatus.androidEnhancedStatus.lastError}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* General Status */}
+            <div className="text-xs space-y-1">
+              <div className="font-medium text-gray-800 mb-2">General</div>
+              <div className="flex justify-between">
+                <span>Platform:</span>
+                <span>{systemStatus.platform}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Native Platform:</span>
+                <span className={systemStatus.isNative ? 'text-green-600' : 'text-blue-600'}>
+                  {systemStatus.isNative ? 'Yes' : 'Web'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Permission State:</span>
+                <span className={systemStatus.permissionState === 'granted' ? 'text-green-600' : 'text-red-600'}>
+                  {systemStatus.permissionState}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Debug Events (1h):</span>
+                <span>{systemStatus.debugInfo?.debugEvents || 0}</span>
+              </div>
             </div>
           </div>
         )}
 
         {/* Action Buttons */}
-        {settings.enabled && (
-          <div className="flex gap-2">
-            <button
-              onClick={handleTestNotification}
-              disabled={isLoading}
-              className="px-3 py-2 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
-            >
-              Test Notification
-            </button>
-            <button
-              onClick={handleRefreshStatus}
-              disabled={isLoading}
-              className="px-3 py-2 text-xs bg-gray-500 text-white rounded hover:bg-gray-600 disabled:opacity-50"
-            >
-              Refresh Status
-            </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleTestNotification}
+            disabled={isLoading}
+            className="px-3 py-2 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+          >
+            Test Notification
+          </button>
+          <button
+            onClick={handleRefreshStatus}
+            disabled={isLoading}
+            className="px-3 py-2 text-xs bg-gray-500 text-white rounded hover:bg-gray-600 disabled:opacity-50"
+          >
+            Refresh Status
+          </button>
+          <button
+            onClick={() => {
+              const report = notificationDebugLogger.generateDebugReport();
+              console.log('=== NOTIFICATION DEBUG REPORT ===');
+              console.log(report);
+              toast.success('Debug report generated (check console)');
+            }}
+            disabled={isLoading}
+            className="px-3 py-2 text-xs bg-purple-500 text-white rounded hover:bg-purple-600 disabled:opacity-50"
+          >
+            Debug Report
+          </button>
+        </div>
+
+        {/* Troubleshooting Guidance */}
+        {systemStatus?.permissionState === 'denied' && (
+          <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-sm text-red-800 mb-2">
+              <strong>Notifications Disabled</strong>
+            </p>
+            <p className="text-xs text-red-700">
+              Please enable notifications in your device settings and refresh this page.
+            </p>
+          </div>
+        )}
+
+        {systemStatus?.timezoneMismatch && (
+          <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
+            <p className="text-sm text-orange-800 mb-2">
+              <strong>Timezone Mismatch Detected</strong>
+            </p>
+            <p className="text-xs text-orange-700">
+              Your device timezone differs from your profile timezone. Notifications will fire based on your profile timezone ({systemStatus.userTimezone}).
+            </p>
+          </div>
+        )}
+
+        {systemStatus?.platform === 'android' && (
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-800 mb-2">
+              <strong>Android Optimization Tips</strong>
+            </p>
+            <p className="text-xs text-blue-700">
+              For reliable notifications: Disable battery optimization for this app and ensure "Do Not Disturb" allows notifications.
+            </p>
           </div>
         )}
       </CardContent>

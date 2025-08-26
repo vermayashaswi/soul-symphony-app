@@ -33,7 +33,7 @@ class TimezoneNotificationHelper {
   /**
    * Initialize user timezone from browser and profile
    */
-  private async initializeUserTimezone(): Promise<void> {
+  async initializeUserTimezone(): Promise<void> {
     try {
       // Get browser timezone as fallback
       const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;

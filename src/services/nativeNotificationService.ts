@@ -1,6 +1,8 @@
 import { Capacitor } from '@capacitor/core';
 import { LocalNotifications, LocalNotificationSchema } from '@capacitor/local-notifications';
 import { supabase } from '@/integrations/supabase/client';
+import { timezoneNotificationHelper, JournalReminderTime } from './timezoneNotificationHelper';
+import { notificationDebugLogger } from './notificationDebugLogger';
 
 export interface NotificationReminder {
   id: string;
@@ -114,10 +116,21 @@ class NativeNotificationService {
 
     if (!this.isNative) {
       console.log('[NativeNotificationService] Not native platform, skipping local scheduling');
+      notificationDebugLogger.logEvent('SCHEDULE_SKIP', { reason: 'not_native', platform: Capacitor.getPlatform() });
       return { success: true, scheduledCount: 0 };
     }
 
     try {
+      // Initialize timezone helper
+      await timezoneNotificationHelper.initializeUserTimezone();
+      const userTimezone = timezoneNotificationHelper.getUserTimezone();
+      
+      notificationDebugLogger.logEvent('SCHEDULE_START', { 
+        userTimezone, 
+        deviceTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        enabledCount: settings.reminders.filter(r => r.enabled).length 
+      });
+
       // Clear existing scheduled notifications
       await this.clearScheduledNotifications();
 
@@ -125,62 +138,100 @@ class NativeNotificationService {
       
       if (enabledReminders.length === 0) {
         console.log('[NativeNotificationService] No enabled reminders to schedule');
+        notificationDebugLogger.logEvent('SCHEDULE_COMPLETE', { scheduledCount: 0, reason: 'no_enabled_reminders' });
         return { success: true, scheduledCount: 0 };
       }
 
       // Check permissions before scheduling
       const hasPermission = await this.checkAndRequestPermissions();
       if (!hasPermission) {
+        const error = 'Notification permissions not granted';
+        notificationDebugLogger.logEvent('SCHEDULE_FAILED', { error }, false, error);
         return { 
           success: false, 
           scheduledCount: 0, 
-          error: 'Notification permissions not granted' 
+          error 
         };
       }
 
       const notifications: LocalNotificationSchema[] = [];
-      const now = new Date();
+      const schedulingDebug: any[] = [];
 
       enabledReminders.forEach((reminder, index) => {
-        const [hours, minutes] = reminder.time.split(':').map(Number);
-        
-        // Calculate next occurrence
-        const scheduleDate = new Date();
-        scheduleDate.setHours(hours, minutes, 0, 0);
-        
-        // If time has passed today, schedule for tomorrow
-        if (scheduleDate <= now) {
-          scheduleDate.setDate(scheduleDate.getDate() + 1);
+        try {
+          // Convert time string to JournalReminderTime for timezone helper
+          const timeKey = this.timeStringToReminderTime(reminder.time);
+          
+          // Get timezone-aware next occurrence in UTC
+          const nextOccurrenceUTC = timezoneNotificationHelper.getNextReminderTimeInTimezone(timeKey);
+          
+          // Log timezone calculation details
+          const debugInfo = {
+            reminderTime: reminder.time,
+            timeKey,
+            userTimezone,
+            nextOccurrenceUTC: nextOccurrenceUTC.toISOString(),
+            nextOccurrenceLocal: timezoneNotificationHelper.formatTimeForUser(nextOccurrenceUTC),
+            deviceTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+          };
+          schedulingDebug.push(debugInfo);
+
+          const notificationId = Date.now() + index;
+          this.scheduledNotificationIds.push(notificationId);
+
+          notifications.push({
+            id: notificationId,
+            title: '📝 Journal Reminder',
+            body: reminder.label || `Time to write in your journal! ${reminder.time}`,
+            schedule: {
+              at: nextOccurrenceUTC, // Use UTC time from timezone helper
+              repeats: true,
+              every: 'day'
+            },
+            sound: 'default',
+            actionTypeId: 'journal_reminder',
+            extra: {
+              reminderId: reminder.id,
+              reminderTime: reminder.time,
+              scheduledAt: nextOccurrenceUTC.toISOString(),
+              userTimezone,
+              debugInfo
+            }
+          });
+
+          console.log(`[NativeNotificationService] Scheduled ${reminder.time} for ${nextOccurrenceUTC.toISOString()} (${timezoneNotificationHelper.formatTimeForUser(nextOccurrenceUTC)})`);
+        } catch (error) {
+          console.error(`[NativeNotificationService] Error processing reminder ${reminder.time}:`, error);
+          notificationDebugLogger.logEvent('REMINDER_PROCESSING_ERROR', { 
+            reminder, 
+            error: error instanceof Error ? error.message : 'Unknown error' 
+          }, false);
         }
-
-        const notificationId = Date.now() + index;
-        this.scheduledNotificationIds.push(notificationId);
-
-        notifications.push({
-          id: notificationId,
-          title: '📝 Journal Reminder',
-          body: reminder.label || `Time to write in your journal! ${reminder.time}`,
-          schedule: {
-            at: scheduleDate,
-            repeats: true,
-            every: 'day'
-          },
-          sound: 'default',
-          actionTypeId: 'journal_reminder',
-          extra: {
-            reminderId: reminder.id,
-            reminderTime: reminder.time
-          }
-        });
       });
 
       if (notifications.length > 0) {
         await LocalNotifications.schedule({ notifications });
-        console.log(`[NativeNotificationService] Scheduled ${notifications.length} daily reminders`);
+        console.log(`[NativeNotificationService] Scheduled ${notifications.length} timezone-aware daily reminders`);
         
         // Verify scheduling
         const pending = await LocalNotifications.getPending();
         console.log(`[NativeNotificationService] Pending notifications count: ${pending.notifications.length}`);
+        
+        // Log detailed scheduling information
+        notificationDebugLogger.logEvent('SCHEDULE_SUCCESS', {
+          scheduledCount: notifications.length,
+          verifiedCount: pending.notifications.length,
+          userTimezone,
+          schedulingDetails: schedulingDebug,
+          pendingNotifications: pending.notifications.map(n => ({
+            id: n.id,
+            schedule: n.schedule,
+            extra: n.extra
+          }))
+        });
+
+        // Verify timezone drift
+        this.verifyTimezoneCalculations(schedulingDebug);
       }
 
       return { 
@@ -189,10 +240,12 @@ class NativeNotificationService {
       };
     } catch (error) {
       console.error('[NativeNotificationService] Error scheduling reminders:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      notificationDebugLogger.logEvent('SCHEDULE_FAILED', { error: errorMessage }, false, errorMessage);
       return { 
         success: false, 
         scheduledCount: 0, 
-        error: error instanceof Error ? error.message : 'Unknown error' 
+        error: errorMessage 
       };
     }
   }
@@ -233,21 +286,40 @@ class NativeNotificationService {
       if (this.isNative) {
         const hasPermission = await this.checkAndRequestPermissions();
         if (!hasPermission) {
-          return { success: false, error: 'Notification permissions not granted' };
+          const error = 'Notification permissions not granted';
+          notificationDebugLogger.logEvent('TEST_NOTIFICATION_FAILED', { error }, false, error);
+          return { success: false, error };
         }
 
+        // Schedule immediate test with timezone info
+        await timezoneNotificationHelper.initializeUserTimezone();
+        const userTimezone = timezoneNotificationHelper.getUserTimezone();
+        const testTime = new Date(Date.now() + 3000); // 3 seconds from now
+        
         await LocalNotifications.schedule({
           notifications: [{
             id: Date.now(),
             title: '🧪 Test Notification',
-            body: 'Your journal reminders are working perfectly!',
-            schedule: { at: new Date(Date.now() + 2000) }, // 2 seconds from now
+            body: `Your journal reminders are working perfectly! Timezone: ${userTimezone}`,
+            schedule: { at: testTime },
             sound: 'default',
-            actionTypeId: 'test_notification'
+            actionTypeId: 'test_notification',
+            extra: {
+              isTest: true,
+              userTimezone,
+              scheduledAt: testTime.toISOString(),
+              testType: 'immediate'
+            }
           }]
         });
         
-        console.log('[NativeNotificationService] Test notification scheduled');
+        console.log('[NativeNotificationService] Test notification scheduled for', testTime.toISOString());
+        notificationDebugLogger.logEvent('TEST_NOTIFICATION_SCHEDULED', {
+          scheduledAt: testTime.toISOString(),
+          userTimezone,
+          deviceTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+        });
+        
         return { success: true };
       } else {
         // Web notification fallback
@@ -256,16 +328,21 @@ class NativeNotificationService {
             body: 'Your journal reminders are working perfectly!',
             icon: '/favicon.ico'
           });
+          notificationDebugLogger.logEvent('WEB_TEST_NOTIFICATION', { platform: 'web' });
           return { success: true };
         } else {
-          return { success: false, error: 'Web notification permissions not granted' };
+          const error = 'Web notification permissions not granted';
+          notificationDebugLogger.logEvent('WEB_TEST_FAILED', { error }, false, error);
+          return { success: false, error };
         }
       }
     } catch (error) {
       console.error('[NativeNotificationService] Test notification failed:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      notificationDebugLogger.logEvent('TEST_NOTIFICATION_ERROR', { error: errorMessage }, false, errorMessage);
       return { 
         success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error' 
+        error: errorMessage 
       };
     }
   }
@@ -276,27 +353,59 @@ class NativeNotificationService {
     const permissionState = await this.checkPermissionStatus();
     const scheduledCount = await this.getScheduledNotificationsCount();
     
+    // Initialize timezone helper for status
+    await timezoneNotificationHelper.initializeUserTimezone();
+    const userTimezone = timezoneNotificationHelper.getUserTimezone();
+    const deviceTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    
     let pending = null;
+    let androidEnhancedStatus = null;
+    
     if (this.isNative) {
       try {
         pending = await LocalNotifications.getPending();
+        
+        // Enhanced Android status
+        if (Capacitor.getPlatform() === 'android') {
+          androidEnhancedStatus = await this.getAndroidEnhancedStatus();
+        }
       } catch (error) {
         console.error('[NativeNotificationService] Error getting pending notifications:', error);
       }
     }
 
-    return {
+    const status = {
       isNative: this.isNative,
       permissionState,
       scheduledCount,
       platform: Capacitor.getPlatform(),
       isSupported: this.isNative || 'Notification' in window,
       pendingNotifications: pending?.notifications || [],
+      userTimezone,
+      deviceTimezone,
+      timezoneMismatch: userTimezone !== deviceTimezone,
+      timezoneDebug: timezoneNotificationHelper.getTimezoneDebugInfo(),
+      androidEnhancedStatus,
       debugInfo: {
         scheduledIds: this.scheduledNotificationIds,
-        lastCheck: new Date().toISOString()
+        lastCheck: new Date().toISOString(),
+        debugEvents: notificationDebugLogger.getFilteredEvents({ 
+          since: new Date(Date.now() - 60 * 60 * 1000) // Last hour
+        }).length
       }
     };
+
+    // Log status check
+    notificationDebugLogger.logEvent('STATUS_CHECK', {
+      permissionState,
+      scheduledCount,
+      userTimezone,
+      deviceTimezone,
+      timezoneMismatch: status.timezoneMismatch,
+      platform: Capacitor.getPlatform()
+    });
+
+    return status;
   }
 
   async saveAndScheduleSettings(settings: NotificationSettings): Promise<{ success: boolean; error?: string; scheduledCount?: number }> {
@@ -373,6 +482,87 @@ class NativeNotificationService {
       return null;
     } catch (error) {
       console.error('[NativeNotificationService] Error getting reminder settings:', error);
+      return null;
+    }
+  }
+  
+  // Helper method to convert time string to JournalReminderTime
+  private timeStringToReminderTime(timeString: string): JournalReminderTime {
+    const [hours] = timeString.split(':').map(Number);
+    
+    if (hours >= 6 && hours < 12) return 'morning';
+    if (hours >= 12 && hours < 17) return 'afternoon';
+    if (hours >= 17 && hours < 22) return 'evening';
+    return 'night';
+  }
+
+  // Verify timezone calculations for debugging
+  private verifyTimezoneCalculations(schedulingDebug: any[]): void {
+    schedulingDebug.forEach(debug => {
+      const expectedUTC = new Date(debug.nextOccurrenceUTC);
+      const currentUTC = new Date();
+      
+      // Check if the scheduled time is reasonable (within 24 hours)
+      const timeDiff = expectedUTC.getTime() - currentUTC.getTime();
+      const isReasonable = timeDiff > 0 && timeDiff <= 24 * 60 * 60 * 1000;
+      
+      notificationDebugLogger.logEvent('TIMEZONE_VERIFICATION', {
+        reminderTime: debug.reminderTime,
+        expectedUTC: debug.nextOccurrenceUTC,
+        timeDiffMs: timeDiff,
+        timeDiffHours: Math.round(timeDiff / (60 * 60 * 1000) * 100) / 100,
+        isReasonable,
+        userTimezone: debug.userTimezone,
+        deviceTimezone: debug.deviceTimezone
+      }, isReasonable, isReasonable ? undefined : 'Unreasonable scheduling time detected');
+    });
+  }
+
+  // Get enhanced Android-specific status
+  private async getAndroidEnhancedStatus(): Promise<any> {
+    try {
+      // Basic Android status - can be extended with more platform-specific checks
+      const batteryOptimized = await this.checkBatteryOptimization();
+      const exactAlarmPermission = await this.checkExactAlarmPermission();
+      
+      return {
+        hasNotificationPermission: await this.checkAndRequestPermissions(),
+        channelsCreated: true, // Capacitor handles this automatically
+        scheduledCount: await this.getScheduledNotificationsCount(),
+        batteryOptimized,
+        exactAlarmPermission,
+        lastError: null
+      };
+    } catch (error) {
+      return {
+        hasNotificationPermission: false,
+        channelsCreated: false,
+        scheduledCount: 0,
+        batteryOptimized: null,
+        exactAlarmPermission: null,
+        lastError: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  // Check battery optimization status (Android-specific)
+  private async checkBatteryOptimization(): Promise<boolean | null> {
+    try {
+      // This would require additional Capacitor plugins for full implementation
+      // For now, return null to indicate unknown status
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  // Check exact alarm permission (Android 12+)
+  private async checkExactAlarmPermission(): Promise<boolean | null> {
+    try {
+      // This would require additional Capacitor plugins for full implementation
+      // For now, return null to indicate unknown status
+      return null;
+    } catch {
       return null;
     }
   }
