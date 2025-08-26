@@ -15,23 +15,6 @@ const config: CapacitorConfig = {
       clientId: '11083941790-oi1vrl8bmsjajc0h1ka4f9q0qjmm80o9.apps.googleusercontent.com',
       forceCodeForRefreshToken: true,
     },
-    Browser: {
-      android: {
-        customTabsColor: "#8b5cf6",
-        enableUrlBarHiding: false,
-        showTitle: true,
-        toolbarColor: "#8b5cf6",
-        enableUrlBar: true,
-        hideToolbar: false
-      },
-      ios: {
-        presentationStyle: "popover",
-        allowOverScroll: false,
-        enableViewportScale: false,
-        allowInlineMediaPlayback: true,
-        hideToolbar: false
-      }
-    },
     App: {
       urlScheme: "online.soulo.twa"
     },
@@ -62,7 +45,16 @@ const config: CapacitorConfig = {
     PushNotifications: {
       presentationOptions: ["badge", "sound", "alert"]
     },
-    // LocalNotifications removed - using native AlarmManager
+    LocalNotifications: {
+      smallIcon: "ic_stat_icon_config_sample",
+      iconColor: "#8b5cf6",
+      sound: "beep.wav",
+      requestPermissionsOnLoad: true,
+      attachments: [],
+      enableAndroidExtraLargeIcon: true,
+      androidAllowWhileIdle: true,
+      androidExact: true
+    }
   },
   ios: {
     contentInset: "never",

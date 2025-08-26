@@ -4,9 +4,4 @@
     <string name="title_activity_main">Soulo</string>
     <string name="package_name">online.soulo.twa</string>
     <string name="custom_url_scheme">online.soulo.twa</string>
-    
-    <!-- Notification channels -->
-    <string name="notification_channel_id">journal_reminders</string>
-    <string name="notification_channel_name">Journal Reminders</string>
-    <string name="notification_channel_description">Daily reminders to write in your journal</string>
 </resources>

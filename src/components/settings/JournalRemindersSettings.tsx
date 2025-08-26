@@ -8,18 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Clock, Bell, Smartphone, Globe } from 'lucide-react';
 import { toast } from 'sonner';
-import { nativeNotificationService } from '@/services/nativeNotificationService';
-
-// Helper function to convert time slots to HH:MM format
-const getTimeString = (time: 'morning' | 'afternoon' | 'evening' | 'night'): string => {
-  switch (time) {
-    case 'morning': return '08:00';
-    case 'afternoon': return '14:00';
-    case 'evening': return '19:00';
-    case 'night': return '22:00';
-    default: return '19:00';
-  }
-};
+import { enhancedNotificationService } from '@/services/enhancedNotificationService';
+import { journalReminderService } from '@/services/journalReminderService';
 import { useTranslation } from '@/contexts/TranslationContext';
 
 const JournalRemindersSettings: React.FC = () => {
@@ -55,7 +45,7 @@ const JournalRemindersSettings: React.FC = () => {
 
   const checkPermissionStatus = async () => {
     try {
-      const status = await nativeNotificationService.checkPermissionStatus();
+      const status = await enhancedNotificationService.checkPermissionStatus();
       setPermissionStatus(status);
     } catch (error) {
       console.error('Error checking permission status:', error);
@@ -66,7 +56,7 @@ const JournalRemindersSettings: React.FC = () => {
     if (enabled && permissionStatus !== 'granted') {
       setIsLoading(true);
       try {
-        const result = await nativeNotificationService.requestPermissions();
+        const result = await enhancedNotificationService.requestPermissions();
         if (!result.granted) {
           toast.error(await translate?.('Permission denied. Please enable notifications in your device settings.', 'en') || 'Permission denied');
           setIsLoading(false);
@@ -89,7 +79,7 @@ const JournalRemindersSettings: React.FC = () => {
         await scheduleReminder();
         toast.success(await translate?.('Journal reminders enabled', 'en') || 'Reminders enabled');
       } else {
-        await nativeNotificationService.clearScheduledNotifications();
+        await journalReminderService.disableReminders();
         toast.success(await translate?.('Journal reminders disabled', 'en') || 'Reminders disabled');
       }
     } catch (error) {
@@ -132,16 +122,7 @@ const JournalRemindersSettings: React.FC = () => {
         timeSlot = 'night';
       }
       
-      // Schedule with native service
-      const reminderSettings = {
-        reminders: [{
-          id: 'daily-reminder',
-          enabled: true,
-          time: getTimeString(timeSlot),
-          label: 'Daily Journal Reminder'
-        }]
-      };
-      await nativeNotificationService.saveAndScheduleSettings(reminderSettings);
+      await journalReminderService.requestPermissionsAndSetup([timeSlot]);
     } catch (error) {
       console.error('Error scheduling reminder:', error);
       throw error;

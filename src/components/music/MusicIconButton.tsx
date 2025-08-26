@@ -8,7 +8,6 @@ import { useTutorial } from '@/contexts/TutorialContext';
 import { musicCategories } from '@/config/musicCategories';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 
-
 const iconMap = {
   Moon,
   Heart, 
@@ -161,7 +160,6 @@ const MusicIconButton: React.FC<MusicIconButtonProps> = ({ className = "" }) => 
           <Play className="h-4 w-4 text-muted-foreground" />
         )}
       </Button>
-
 
       {/* Portal-rendered dropdown */}
       {renderDropdown()}

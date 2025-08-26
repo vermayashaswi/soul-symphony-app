@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useTheme } from '@/hooks/use-theme';
 import { setupJournalReminder, initializeCapacitorNotifications, NotificationFrequency, NotificationTime } from '@/services/notificationService';
-import { nativeNotificationService, type NotificationReminder } from '@/services/nativeNotificationService';
+import { newNotificationService, type NotificationReminder } from '@/services/newNotificationService';
 import { CustomTimeRemindersModal } from '@/components/settings/CustomTimeRemindersModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
@@ -161,7 +161,7 @@ function SettingsContent() {
         setNotificationPermissionState(permissionStatus === 'granted' ? 'granted' : 'denied');
         
         // Load existing reminder settings from Supabase
-        const settings = await nativeNotificationService.getReminderSettings();
+        const settings = await newNotificationService.getReminderSettings();
         console.log('[Settings] Loaded reminder settings:', settings);
         
         if (settings && settings.reminders && settings.reminders.length > 0) {
@@ -405,10 +405,10 @@ function SettingsContent() {
       try {
         console.log('[Settings] Requesting notification permissions...');
         
-        const result = await nativeNotificationService.requestPermissions();
+        const result = await newNotificationService.requestPermissions();
         console.log('[Settings] Permission result:', result);
         
-        if (result.granted) {
+        if (result.success) {
           setNotificationsEnabled(true);
           setNotificationPermissionState('granted');
           setShowCustomTimeModal(true);
@@ -429,7 +429,7 @@ function SettingsContent() {
             <div className="flex items-center gap-2">
               <XCircle className="h-4 w-4 text-red-500" />
               <span>
-                <TranslatableText text="Notification permission denied" forceTranslate={true} />
+                <TranslatableText text={result.error || "Notification permission denied"} forceTranslate={true} />
               </span>
             </div>
           );
@@ -454,7 +454,7 @@ function SettingsContent() {
       setNotificationReminders([]);
       
       // Clear settings from database
-      await nativeNotificationService.saveAndScheduleSettings({ reminders: [] });
+      await newNotificationService.saveReminderSettings({ reminders: [] });
       
       toast.info(<TranslatableText text="Notifications disabled" forceTranslate={true} />);
     }
@@ -465,7 +465,7 @@ function SettingsContent() {
       console.log('[Settings] Saving custom reminder times:', reminders);
       
       // Save to database
-      await nativeNotificationService.saveAndScheduleSettings({ reminders });
+      await newNotificationService.saveReminderSettings({ reminders });
       
       // Update local state
       setNotificationReminders(reminders);
@@ -572,14 +572,12 @@ function SettingsContent() {
     if (!notificationsEnabled) return <TranslatableText text="Disabled" />;
     
     const timeLabels = notificationTimes.map(time => {
-      const timeStr = typeof time === 'string' ? time : `${time.hour}:${time.minute}`;
-      const labels: Record<string, string> = {
+      return {
         'morning': 'Morning',
         'afternoon': 'Afternoon', 
         'evening': 'Evening',
         'night': 'Night'
-      };
-      return labels[timeStr] || timeStr;
+      }[time];
     }).join(", ");
     
     return (
@@ -624,7 +622,7 @@ function SettingsContent() {
   const handleTestNotification = async () => {
     try {
       console.log('[Settings] Testing notification...');
-      const result = await nativeNotificationService.testNotification();
+      const result = await newNotificationService.testNotification();
       
       if (result.success) {
         toast.success(<TranslatableText text="Test notification sent!" forceTranslate={true} />);
@@ -1343,7 +1341,7 @@ function SettingsContent() {
                 <div className="grid grid-cols-2 gap-3">
                   {timeOptions.map(option => (
                     <div 
-                      key={String(option.value)} 
+                      key={option.value} 
                       className={cn(
                         "border rounded-md px-3 py-2 flex items-center space-x-2 cursor-pointer",
                         notificationTimes.includes(option.value) 

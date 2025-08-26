@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, Apple, Play } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import SouloLogo from '@/components/SouloLogo';
 import { TranslatableText } from '@/components/translation/TranslatableText';
+import { LanguageSelector } from '@/components/translation/LanguageSelector';
 import { useTranslation } from '@/contexts/TranslationContext';
 
 const Navbar = () => {
@@ -43,18 +44,12 @@ const Navbar = () => {
           <Link to="/faq" className="text-gray-600 hover:text-primary text-sm">
             <TranslatableText text="FAQ" />
           </Link>
-          <Button size="sm" className="gap-2 bg-black text-white hover:bg-gray-800" asChild>
-            <Link to="/ios-coming-soon">
-              <Apple className="h-4 w-4" />
-              <TranslatableText text="App Store" />
-            </Link>
-          </Button>
-          <Button size="sm" className="gap-2 bg-primary hover:bg-primary/90" asChild>
-            <a href="https://play.google.com/store/apps/details?id=com.soulo.app" target="_blank" rel="noopener noreferrer">
-              <Play className="h-4 w-4" />
-              <TranslatableText text="Google Play" />
+          <Button size="sm" asChild>
+            <a href="https://apps.apple.com/app/soulo" target="_blank" rel="noopener noreferrer">
+              <TranslatableText text="Download on App Store" />
             </a>
           </Button>
+          <LanguageSelector />
         </div>
 
         {/* Mobile Navigation Toggle */}
@@ -87,18 +82,12 @@ const Navbar = () => {
             <Link to="/faq" className="text-gray-600 hover:text-primary" onClick={toggleMenu}>
               <TranslatableText text="FAQ" />
             </Link>
-            <Button size="sm" className="w-full gap-2 bg-black text-white hover:bg-gray-800" asChild>
-              <Link to="/ios-coming-soon" onClick={toggleMenu}>
-                <Apple className="h-4 w-4" />
-                <TranslatableText text="App Store" />
-              </Link>
-            </Button>
-            <Button size="sm" className="w-full gap-2 bg-primary hover:bg-primary/90" asChild>
-              <a href="https://play.google.com/store/apps/details?id=com.soulo.app" target="_blank" rel="noopener noreferrer" onClick={toggleMenu}>
-                <Play className="h-4 w-4" />
-                <TranslatableText text="Google Play" />
+            <Button size="sm" className="w-full" asChild>
+              <a href="https://apps.apple.com/app/soulo" target="_blank" rel="noopener noreferrer">
+                <TranslatableText text="Download on App Store" />
               </a>
             </Button>
+            <LanguageSelector />
           </div>
         </div>
       )}

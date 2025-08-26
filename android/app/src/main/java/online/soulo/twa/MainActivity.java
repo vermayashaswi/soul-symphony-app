@@ -2,7 +2,6 @@ package online.soulo.twa;
 
 import android.os.Bundle;
 import android.view.View;
-import android.content.Context;
 import android.view.WindowManager;
 import com.getcapacitor.BridgeActivity;
 
@@ -11,13 +10,6 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        
-        // Register custom plugins
-        registerPlugin(NativeAlarmManager.class);
-        // NotificationPermissionHandler removed - NativeAlarmManager handles all permissions
-        
-        // Initialize notification channels
-        NotificationChannelSetup.createNotificationChannels(this);
         
         // Configure immersive mode for status bar auto-hide
         setupImmersiveMode();

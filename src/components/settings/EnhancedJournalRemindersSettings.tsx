@@ -5,8 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { nativeNotificationService } from '@/services/nativeNotificationService';
-import { JournalReminderTime } from '@/services/toastService';
+import { enhancedJournalReminderService, JournalReminderTime } from '@/services/enhancedJournalReminderService';
 import { enhancedPlatformService } from '@/services/enhancedPlatformService';
 
 const TIME_OPTIONS = [
@@ -31,26 +30,11 @@ export function EnhancedJournalRemindersSettings() {
     getDetailedStatus();
   }, []);
 
-  const loadSettings = async () => {
-    try {
-      const reminderSettings = await nativeNotificationService.getReminderSettings();
-      const settings = {
-        enabled: reminderSettings?.reminders?.some(r => r.enabled) || false,
-        time: reminderSettings?.reminders?.[0]?.time || '19:00'
-      };
-      setIsEnabled(settings.enabled);
-      // Convert time to reminder time format
-      if (settings.time) {
-        const timeMap: Record<string, JournalReminderTime> = {
-          '08:00': 'morning',
-          '14:00': 'afternoon', 
-          '19:00': 'evening',
-          '22:00': 'night'
-        };
-        setReminderTime(timeMap[settings.time] || 'evening');
-      }
-    } catch (error) {
-      console.error('Error loading settings:', error);
+  const loadSettings = () => {
+    const settings = enhancedJournalReminderService.getSettings();
+    setIsEnabled(settings.enabled);
+    if (settings.times.length > 0) {
+      setReminderTime(settings.times[0]); // Use first time for UI simplicity
     }
   };
 
@@ -79,7 +63,7 @@ export function EnhancedJournalRemindersSettings() {
 
   const getDetailedStatus = async () => {
     try {
-      const status = await nativeNotificationService.getDetailedStatus();
+      const status = await enhancedJournalReminderService.getNotificationStatus();
       setNotificationStatus(status);
       setPermissionStatus(status.permissionState);
     } catch (error) {
@@ -92,19 +76,7 @@ export function EnhancedJournalRemindersSettings() {
     
     try {
       if (enabled) {
-        const result = await nativeNotificationService.requestPermissions();
-        if (result.granted) {
-          const reminderSettings = {
-            reminders: [{
-              id: 'daily-reminder',
-              enabled: true,
-              time: reminderTime,
-              label: 'Daily Journal Reminder'
-            }]
-          };
-          await nativeNotificationService.saveAndScheduleSettings(reminderSettings);
-        }
-        const success = result.granted;
+        const success = await enhancedJournalReminderService.requestPermissionsAndSetup([reminderTime]);
         
         if (success) {
           setIsEnabled(true);
@@ -118,7 +90,7 @@ export function EnhancedJournalRemindersSettings() {
           });
         }
       } else {
-        await nativeNotificationService.clearScheduledNotifications();
+        await enhancedJournalReminderService.disableReminders();
         setIsEnabled(false);
         toast.success('Reminders disabled');
         await getDetailedStatus();
@@ -150,22 +122,13 @@ export function EnhancedJournalRemindersSettings() {
   };
 
   const scheduleReminder = async (time: JournalReminderTime) => {
-    const reminderSettings = {
-      reminders: [{
-        id: 'daily-reminder',
-        enabled: true,
-        time: time,
-        label: 'Daily Journal Reminder'
-      }]
-    };
-    await nativeNotificationService.saveAndScheduleSettings(reminderSettings);
+    await enhancedJournalReminderService.requestPermissionsAndSetup([time]);
   };
 
   const testReminder = async () => {
     setIsLoading(true);
     try {
-      const result = await nativeNotificationService.testNotification();
-      const success = result.success;
+      const success = await enhancedJournalReminderService.testReminder();
       if (success) {
         toast.success('🧪 Test reminder sent!', {
           description: 'Check your notifications to confirm they\'re working.'
