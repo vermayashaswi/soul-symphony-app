@@ -6,7 +6,7 @@ import { Separator } from '@/components/ui/separator';
 import { AlertTriangle, CheckCircle, Clock, RefreshCw, TestTube } from 'lucide-react';
 import { nativeNotificationService } from '@/services/nativeNotificationService';
 import { notificationPermissionChecker } from '@/services/notificationPermissionChecker';
-import { notificationDebugLogger } from '@/services/notificationDebugLogger';
+// Debug logger removed - using native service debug
 import { timezoneNotificationHelper } from '@/services/timezoneNotificationHelper';
 import { useToast } from '@/hooks/use-toast';
 
@@ -28,7 +28,7 @@ export const NotificationDebugPanel: React.FC<NotificationDebugPanelProps> = ({ 
       const [detailedStatus, debugStatus, events, timezoneInfo] = await Promise.all([
         nativeNotificationService.getDetailedStatus(),
         notificationPermissionChecker.getDebugStatus(),
-        notificationDebugLogger.getFilteredEvents({ since: new Date(Date.now() - 60 * 60 * 1000) }),
+        [], // Debug events removed - using native debug
         timezoneNotificationHelper.getTimezoneDebugInfo()
       ]);
 
@@ -96,11 +96,10 @@ export const NotificationDebugPanel: React.FC<NotificationDebugPanelProps> = ({ 
   };
 
   const clearDebugEvents = () => {
-    notificationDebugLogger.clearEvents();
     setDebugEvents([]);
     toast({
       title: "Events Cleared",
-      description: "Debug events have been cleared"
+      description: "Debug events cleared (legacy function)"
     });
   };
 

@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { nativeNotificationService } from '@/services/nativeNotificationService';
 import { timezoneNotificationHelper } from '@/services/timezoneNotificationHelper';
-import { notificationDebugLogger } from '@/services/notificationDebugLogger';
+// Debug logger removed - using simplified debug in native service
 import { NotificationDebugPanel } from './NotificationDebugPanel';
 import { toast } from 'sonner';
 
