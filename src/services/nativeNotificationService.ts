@@ -54,12 +54,16 @@ class NativeNotificationService {
 
   async checkPermissionStatus(): Promise<NotificationPermissionState> {
     console.log('[NativeNotificationService] Checking permission status via native alarm service');
-    return await nativeAlarmService.checkPermissionStatus();
+    const status = await nativeAlarmService.checkPermissionStatus();
+    console.log('[NativeNotificationService] Permission status result:', status);
+    return status;
   }
 
   async requestPermissions(): Promise<{ granted: boolean; state: NotificationPermissionState }> {
     console.log('[NativeNotificationService] Starting permission request via native alarm service');
-    return await nativeAlarmService.requestPermissions();
+    const result = await nativeAlarmService.requestPermissions();
+    console.log('[NativeNotificationService] Permission request result:', result);
+    return result;
   }
 
   async scheduleReminders(settings: NotificationSettings): Promise<{ success: boolean; scheduledCount: number; error?: string }> {
