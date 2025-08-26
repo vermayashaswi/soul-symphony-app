@@ -1,13 +1,15 @@
 
 import React, { useState } from 'react';
-import { Bell, Clock } from 'lucide-react';
+import { Bell, Clock, Bug } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { nativeNotificationService } from '@/services/nativeNotificationService';
 import { timezoneNotificationHelper, JournalReminderTime } from '@/services/timezoneNotificationHelper';
 import { notificationDebugLogger } from '@/services/notificationDebugLogger';
+import { NotificationDebugPanel } from './NotificationDebugPanel';
 // Helper function to convert time names to HH:MM format
 const getTimeString = (time: JournalReminderTime): string => {
   switch (time) {
@@ -32,6 +34,7 @@ export const JournalReminderSettings: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [systemStatus, setSystemStatus] = useState<any>(null);
   const [timezoneInfo, setTimezoneInfo] = useState<any>(null);
+  const [showDebugPanel, setShowDebugPanel] = useState(false);
 
   const handleToggleEnabled = async (enabled: boolean) => {
     if (isLoading) return;
@@ -320,22 +323,32 @@ export const JournalReminderSettings: React.FC = () => {
         )}
 
         {/* Action Buttons */}
-        <div className="flex gap-2">
-          <button
+        <div className="flex gap-2 flex-wrap">
+          <Button
             onClick={handleTestNotification}
             disabled={isLoading}
-            className="px-3 py-2 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+            variant="outline"
+            size="sm"
           >
-            Test Notification
-          </button>
-          <button
+            Test Notification (30s)
+          </Button>
+          <Button
             onClick={handleRefreshStatus}
             disabled={isLoading}
-            className="px-3 py-2 text-xs bg-gray-500 text-white rounded hover:bg-gray-600 disabled:opacity-50"
+            variant="outline"
+            size="sm"
           >
             Refresh Status
-          </button>
-          <button
+          </Button>
+          <Button
+            onClick={() => setShowDebugPanel(true)}
+            variant="outline"
+            size="sm"
+          >
+            <Bug className="h-4 w-4 mr-2" />
+            Debug Panel
+          </Button>
+          <Button
             onClick={() => {
               const report = notificationDebugLogger.generateDebugReport();
               console.log('=== NOTIFICATION DEBUG REPORT ===');
@@ -343,10 +356,11 @@ export const JournalReminderSettings: React.FC = () => {
               toast.success('Debug report generated (check console)');
             }}
             disabled={isLoading}
-            className="px-3 py-2 text-xs bg-purple-500 text-white rounded hover:bg-purple-600 disabled:opacity-50"
+            variant="outline"
+            size="sm"
           >
-            Debug Report
-          </button>
+            Console Report
+          </Button>
         </div>
 
         {/* Troubleshooting Guidance */}
@@ -383,6 +397,11 @@ export const JournalReminderSettings: React.FC = () => {
           </div>
         )}
       </CardContent>
+      
+      <NotificationDebugPanel
+        isOpen={showDebugPanel}
+        onClose={() => setShowDebugPanel(false)}
+      />
     </Card>
   );
 };

@@ -110,15 +110,50 @@ class NotificationPermissionChecker {
   }
 
   /**
-   * Get platform information for debugging
+   * Get enhanced platform information for debugging
    */
   getPlatformInfo() {
+    const userAgent = window.navigator.userAgent;
+    const platform = Capacitor.getPlatform();
+    
     return {
       isNative: this.isNative,
-      platform: Capacitor.getPlatform(),
-      isWebView: Capacitor.getPlatform() === 'web' && 
-                  (window.navigator.userAgent.includes('wv') || 
-                   window.navigator.userAgent.includes('Android'))
+      platform,
+      isWebView: platform === 'web' && (userAgent.includes('wv') || userAgent.includes('Android')),
+      isAndroid: platform === 'android',
+      isIOS: platform === 'ios',
+      userAgent,
+      capacitorVersion: (window as any)?.Capacitor?.version || 'unknown',
+      supportsNotifications: 'Notification' in window || this.isNative,
+      batteryOptimizationWarning: platform === 'android' && userAgent.includes('Android')
+    };
+  }
+
+  /**
+   * Get comprehensive notification status for debugging
+   */
+  async getDebugStatus() {
+    const platformInfo = this.getPlatformInfo();
+    const permissionState = await this.checkPermissionStatus();
+    
+    let nativeStatus = null;
+    if (this.isNative) {
+      try {
+        nativeStatus = await LocalNotifications.checkPermissions();
+      } catch (error) {
+        nativeStatus = { error: error instanceof Error ? error.message : 'Unknown error' };
+      }
+    }
+
+    return {
+      platformInfo,
+      permissionState,
+      nativeStatus,
+      webNotificationAPI: {
+        supported: 'Notification' in window,
+        permission: typeof Notification !== 'undefined' ? Notification.permission : 'unsupported'
+      },
+      timestamp: new Date().toISOString()
     };
   }
 }
