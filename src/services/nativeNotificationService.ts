@@ -3,6 +3,7 @@ import { LocalNotifications, LocalNotificationSchema } from '@capacitor/local-no
 import { supabase } from '@/integrations/supabase/client';
 import { timezoneNotificationHelper, JournalReminderTime } from './timezoneNotificationHelper';
 import { notificationDebugLogger } from './notificationDebugLogger';
+import { androidNotificationPermissions } from './androidNotificationPermissions';
 
 export interface NotificationReminder {
   id: string;
@@ -92,19 +93,23 @@ class NativeNotificationService {
       if (this.isNative) {
         console.log('[NativeNotificationService] Requesting permissions on native platform');
         
-        // Request notification permissions
-        const permissionResult = await LocalNotifications.requestPermissions();
-        
-        // For Android 12+, log exact alarm requirement  
+        // For Android, handle Android-specific permissions first
         if (Capacitor.getPlatform() === 'android') {
-          console.log('[NativeNotificationService] Android detected, exact alarm permission may be required for Android 12+');
-          notificationDebugLogger.logEvent('EXACT_ALARM_PERMISSION_CHECK', {
-            platform: 'android',
-            requiresExactAlarm: true,
-            message: 'Exact alarm permission required for reliable scheduling on Android 12+'
+          console.log('[NativeNotificationService] Requesting Android-specific permissions...');
+          const androidSuccess = await androidNotificationPermissions.checkAndRequestAllPermissions();
+          
+          notificationDebugLogger.logEvent('ANDROID_PERMISSIONS_REQUEST', {
+            success: androidSuccess,
+            platform: 'android'
           });
+          
+          if (!androidSuccess) {
+            console.warn('[NativeNotificationService] Android-specific permissions not fully granted');
+          }
         }
         
+        // Request notification permissions
+        const permissionResult = await LocalNotifications.requestPermissions();
         const granted = permissionResult.display === 'granted';
         
         // Log permission result
@@ -225,6 +230,7 @@ class NativeNotificationService {
             },
             sound: 'default',
             actionTypeId: 'journal_reminder',
+            channelId: 'journal_reminders',
             extra: {
               reminderId: reminder.id,
               reminderTime: reminder.time,
@@ -341,6 +347,7 @@ class NativeNotificationService {
             schedule: { at: testTime },
             sound: 'default',
             actionTypeId: 'test_notification',
+            channelId: 'journal_reminders',
             extra: {
               isTest: true,
               userTimezone,
