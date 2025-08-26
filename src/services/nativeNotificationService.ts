@@ -159,20 +159,22 @@ class NativeNotificationService {
 
       enabledReminders.forEach((reminder, index) => {
         try {
-          // Convert time string to JournalReminderTime for timezone helper
-          const timeKey = this.timeStringToReminderTime(reminder.time);
+          // Parse exact time from HH:MM format instead of categorizing
+          const { hour, minute } = timezoneNotificationHelper.parseTimeString(reminder.time);
           
-          // Get timezone-aware next occurrence in UTC
-          const nextOccurrenceUTC = timezoneNotificationHelper.getNextReminderTimeInTimezone(timeKey);
+          // Get timezone-aware next occurrence in UTC using exact time
+          const nextOccurrenceUTC = timezoneNotificationHelper.getNextExactReminderTimeInTimezone(hour, minute);
           
-          // Log timezone calculation details
+          // Log detailed timezone calculation
           const debugInfo = {
             reminderTime: reminder.time,
-            timeKey,
+            exactHour: hour,
+            exactMinute: minute,
             userTimezone,
             nextOccurrenceUTC: nextOccurrenceUTC.toISOString(),
             nextOccurrenceLocal: timezoneNotificationHelper.formatTimeForUser(nextOccurrenceUTC),
-            deviceTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+            deviceTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            hoursFromNow: (nextOccurrenceUTC.getTime() - Date.now()) / (1000 * 60 * 60)
           };
           schedulingDebug.push(debugInfo);
 
@@ -193,13 +195,15 @@ class NativeNotificationService {
             extra: {
               reminderId: reminder.id,
               reminderTime: reminder.time,
+              exactHour: hour,
+              exactMinute: minute,
               scheduledAt: nextOccurrenceUTC.toISOString(),
               userTimezone,
               debugInfo
             }
           });
 
-          console.log(`[NativeNotificationService] Scheduled ${reminder.time} for ${nextOccurrenceUTC.toISOString()} (${timezoneNotificationHelper.formatTimeForUser(nextOccurrenceUTC)})`);
+          console.log(`[NativeNotificationService] Scheduled exact time ${reminder.time} for ${nextOccurrenceUTC.toISOString()} (${timezoneNotificationHelper.formatTimeForUser(nextOccurrenceUTC)})`);
         } catch (error) {
           console.error(`[NativeNotificationService] Error processing reminder ${reminder.time}:`, error);
           notificationDebugLogger.logEvent('REMINDER_PROCESSING_ERROR', { 
@@ -294,13 +298,13 @@ class NativeNotificationService {
         // Schedule immediate test with timezone info
         await timezoneNotificationHelper.initializeUserTimezone();
         const userTimezone = timezoneNotificationHelper.getUserTimezone();
-        const testTime = new Date(Date.now() + 3000); // 3 seconds from now
+        const testTime = timezoneNotificationHelper.getTestNotificationTime(); // 30 seconds from now
         
         await LocalNotifications.schedule({
           notifications: [{
             id: Date.now(),
-            title: '🧪 Test Notification',
-            body: `Your journal reminders are working perfectly! Timezone: ${userTimezone}`,
+            title: '🧪 Test Notification (30s)',
+            body: `Notification test successful! Timezone: ${userTimezone}. If you received this, your reminders will work.`,
             schedule: { at: testTime },
             sound: 'default',
             actionTypeId: 'test_notification',
@@ -308,16 +312,18 @@ class NativeNotificationService {
               isTest: true,
               userTimezone,
               scheduledAt: testTime.toISOString(),
-              testType: 'immediate'
+              testType: 'delayed_30s',
+              deviceTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone
             }
           }]
         });
         
-        console.log('[NativeNotificationService] Test notification scheduled for', testTime.toISOString());
+        console.log('[NativeNotificationService] Test notification scheduled for 30 seconds:', testTime.toISOString());
         notificationDebugLogger.logEvent('TEST_NOTIFICATION_SCHEDULED', {
           scheduledAt: testTime.toISOString(),
           userTimezone,
-          deviceTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+          deviceTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          testType: 'delayed_30s'
         });
         
         return { success: true };
