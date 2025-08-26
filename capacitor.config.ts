@@ -45,17 +45,7 @@ const config: CapacitorConfig = {
     PushNotifications: {
       presentationOptions: ["badge", "sound", "alert"]
     },
-    LocalNotifications: {
-      smallIcon: "ic_notification",
-      iconColor: "#8b5cf6",
-      sound: "default",
-      requestPermissionsOnLoad: true,
-      attachments: [],
-      enableAndroidExtraLargeIcon: true,
-      androidAllowWhileIdle: true,
-      androidExact: true,
-      androidScheduleExact: true
-    }
+    // LocalNotifications removed - using native AlarmManager
   },
   ios: {
     contentInset: "never",

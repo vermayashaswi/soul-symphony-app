@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { enhancedNotificationService, NotificationPermissionState } from '@/services/enhancedNotificationService';
-import { nativeNotificationService } from '@/services/nativeNotificationService';
+import { nativeNotificationService, NotificationPermissionState } from '@/services/nativeNotificationService';
 
 interface NotificationSettings {
   enabled: boolean;
@@ -23,7 +22,7 @@ export const useNotificationSettings = () => {
       console.log('[useNotificationSettings] Loading notification settings');
       
       // Check permission status
-      const permissionState = await enhancedNotificationService.checkPermissionStatus();
+      const permissionState = await nativeNotificationService.checkPermissionStatus();
       
       // Get journal reminder settings
       const reminderSettings = await nativeNotificationService.getReminderSettings();

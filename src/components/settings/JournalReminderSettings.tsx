@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { nativeNotificationService } from '@/services/nativeNotificationService';
 import { timezoneNotificationHelper } from '@/services/timezoneNotificationHelper';
-import { notificationDebugLogger } from '@/services/notificationDebugLogger';
+// Debug logger removed - using simplified debug in native service
 import { NotificationDebugPanel } from './NotificationDebugPanel';
 import { toast } from 'sonner';
 
@@ -154,8 +154,7 @@ export const JournalReminderSettings: React.FC = () => {
       setSystemStatus(status);
       setTimezoneInfo(tzInfo);
       
-      // Log the refresh action
-      notificationDebugLogger.logUserAction('STATUS_REFRESH', { status, tzInfo });
+      // Debug logging simplified - logged in native service
       
       toast.success('Status refreshed');
     } catch (error) {
@@ -388,17 +387,17 @@ export const JournalReminderSettings: React.FC = () => {
             Debug Panel
           </Button>
           <Button
-            onClick={() => {
-              const report = notificationDebugLogger.generateDebugReport();
-              console.log('=== NOTIFICATION DEBUG REPORT ===');
-              console.log(report);
-              toast.success('Debug report generated (check console)');
+            onClick={async () => {
+              const status = await nativeNotificationService.getDetailedStatus();
+              console.log('=== NATIVE NOTIFICATION DEBUG ===');
+              console.log(JSON.stringify(status, null, 2));
+              toast.success('Debug info logged to console');
             }}
             disabled={isLoading}
             variant="outline"
             size="sm"
           >
-            Console Report
+            Console Debug
           </Button>
         </div>
 

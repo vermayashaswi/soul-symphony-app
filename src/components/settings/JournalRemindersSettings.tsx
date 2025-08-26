@@ -8,7 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Clock, Bell, Smartphone, Globe } from 'lucide-react';
 import { toast } from 'sonner';
-import { enhancedNotificationService } from '@/services/enhancedNotificationService';
 import { nativeNotificationService } from '@/services/nativeNotificationService';
 
 // Helper function to convert time slots to HH:MM format
@@ -56,7 +55,7 @@ const JournalRemindersSettings: React.FC = () => {
 
   const checkPermissionStatus = async () => {
     try {
-      const status = await enhancedNotificationService.checkPermissionStatus();
+      const status = await nativeNotificationService.checkPermissionStatus();
       setPermissionStatus(status);
     } catch (error) {
       console.error('Error checking permission status:', error);
@@ -67,7 +66,7 @@ const JournalRemindersSettings: React.FC = () => {
     if (enabled && permissionStatus !== 'granted') {
       setIsLoading(true);
       try {
-        const result = await enhancedNotificationService.requestPermissions();
+        const result = await nativeNotificationService.requestPermissions();
         if (!result.granted) {
           toast.error(await translate?.('Permission denied. Please enable notifications in your device settings.', 'en') || 'Permission denied');
           setIsLoading(false);

@@ -2,6 +2,7 @@ package online.soulo.twa;
 
 import android.os.Bundle;
 import android.view.View;
+import android.content.Context;
 import android.view.WindowManager;
 import com.getcapacitor.BridgeActivity;
 

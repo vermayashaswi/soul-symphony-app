@@ -572,12 +572,14 @@ function SettingsContent() {
     if (!notificationsEnabled) return <TranslatableText text="Disabled" />;
     
     const timeLabels = notificationTimes.map(time => {
-      return {
+      const timeStr = typeof time === 'string' ? time : `${time.hour}:${time.minute}`;
+      const labels: Record<string, string> = {
         'morning': 'Morning',
         'afternoon': 'Afternoon', 
         'evening': 'Evening',
         'night': 'Night'
-      }[time];
+      };
+      return labels[timeStr] || timeStr;
     }).join(", ");
     
     return (
@@ -1341,7 +1343,7 @@ function SettingsContent() {
                 <div className="grid grid-cols-2 gap-3">
                   {timeOptions.map(option => (
                     <div 
-                      key={option.value} 
+                      key={String(option.value)} 
                       className={cn(
                         "border rounded-md px-3 py-2 flex items-center space-x-2 cursor-pointer",
                         notificationTimes.includes(option.value) 
