@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "183251782093",
+    "project_id": "soulo-ec325",
+    "storage_bucket": "soulo-ec325.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:183251782093:android:6d3fcecb9992e803b3dc84",
+        "android_client_info": {
+          "package_name": "online.soulo.twa"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDjcantCw04iFDsJiFX7k3NKj2DOoyrPqQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
