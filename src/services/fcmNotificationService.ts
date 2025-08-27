@@ -297,6 +297,16 @@ class FCMNotificationService {
         return { success: false, error: 'User not authenticated' };
       }
 
+      // Get user's timezone from profile
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('timezone')
+        .eq('id', user.id)
+        .single();
+
+      const userTimezone = profile?.timezone || 'UTC';
+      console.log('[FCMNotificationService] User timezone:', userTimezone);
+
       // First, clear existing reminder notifications
       await supabase
         .from('user_notifications')
@@ -304,16 +314,21 @@ class FCMNotificationService {
         .eq('user_id', user.id)
         .eq('type', 'journal_reminder');
 
-      // Insert new reminder settings
-      const notifications = settings.reminders.map(reminder => ({
-        user_id: user.id,
-        type: 'journal_reminder' as const,
-        scheduled_time: reminder.time,
-        title: reminder.label || 'Journal Reminder',
-        body: 'Time for your journal reflection',
-        status: reminder.enabled ? 'active' as const : 'inactive' as const,
-        data: { reminder_id: reminder.id }
-      }));
+      // Convert local time to UTC before saving
+      const notifications = settings.reminders.map(reminder => {
+        const utcTime = this.convertLocalTimeToUTC(reminder.time, userTimezone);
+        console.log('[FCMNotificationService] Converting', reminder.time, 'in', userTimezone, 'to UTC:', utcTime);
+        
+        return {
+          user_id: user.id,
+          type: 'journal_reminder' as const,
+          scheduled_time: utcTime,
+          title: reminder.label || 'Journal Reminder',
+          body: 'Time for your journal reflection',
+          status: reminder.enabled ? 'active' as const : 'inactive' as const,
+          data: { reminder_id: reminder.id }
+        };
+      });
 
       if (notifications.length > 0) {
         const { error } = await supabase
@@ -334,6 +349,35 @@ class FCMNotificationService {
         success: false, 
         error: error instanceof Error ? error.message : 'Unknown error' 
       };
+    }
+  }
+
+  private convertLocalTimeToUTC(localTime: string, timezone: string): string {
+    try {
+      // Create a date with the local time in the user's timezone
+      const today = new Date();
+      const [hours, minutes] = localTime.split(':').map(Number);
+      
+      // Set the time in the user's timezone
+      const localDate = new Date();
+      localDate.setHours(hours, minutes, 0, 0);
+      
+      // Convert to UTC using the Intl API
+      const utcDate = new Date(localDate.toLocaleString('en-US', { timeZone: 'UTC' }));
+      const localDateInTimezone = new Date(localDate.toLocaleString('en-US', { timeZone: timezone }));
+      
+      // Calculate the offset and adjust
+      const offset = localDateInTimezone.getTime() - utcDate.getTime();
+      const adjustedDate = new Date(localDate.getTime() - offset);
+      
+      const utcHours = adjustedDate.getUTCHours();
+      const utcMinutes = adjustedDate.getUTCMinutes();
+      
+      return `${utcHours.toString().padStart(2, '0')}:${utcMinutes.toString().padStart(2, '0')}`;
+    } catch (error) {
+      console.error('[FCMNotificationService] Error converting time to UTC:', error);
+      // Fallback to original time if conversion fails
+      return localTime;
     }
   }
 
