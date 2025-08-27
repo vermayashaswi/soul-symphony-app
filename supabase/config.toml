@@ -90,3 +90,9 @@ verify_jwt = true
 
 [functions.test-vector-fix]
 verify_jwt = false
+
+[functions.send-fcm-notification]
+verify_jwt = true
+
+[functions.schedule-journal-reminders]
+verify_jwt = false

@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { User, Settings } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { NotificationCenter } from '@/components/notifications/NotificationCenter';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { EnhancedAvatarImage } from '@/components/ui/EnhancedAvatarImage';
 
@@ -32,7 +32,7 @@ const Navbar = () => {
         </div>
         
         <div className="flex items-center gap-2">
-          <NotificationCenter />
+          <NotificationBell />
           
           <Button 
             variant="ghost" 
