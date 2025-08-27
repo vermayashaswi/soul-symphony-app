@@ -10,6 +10,7 @@ import { useUserProfile } from '@/hooks/useUserProfile';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTutorial } from '@/contexts/TutorialContext';
 import MusicIconButton from '@/components/music/MusicIconButton';
+import HomeNotificationBell from '@/components/home/HomeNotificationBell';
 
 const JournalHeader: React.FC = () => {
   const { user } = useAuth();
@@ -131,6 +132,11 @@ const JournalHeader: React.FC = () => {
         {/* Language selector */}
         <div className={`h-8 w-8 flex items-center justify-center ${isInWelcomeTutorialStep ? 'z-[9999]' : 'z-[1000]'}`}>
           <LanguageSelector />
+        </div>
+        
+        {/* Notification bell */}
+        <div className={`h-8 w-8 flex items-center justify-center ${isInWelcomeTutorialStep ? 'z-[9999]' : 'z-[1000]'}`}>
+          <HomeNotificationBell />
         </div>
         
         {/* Music icon button */}
