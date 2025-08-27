@@ -28,16 +28,16 @@ const PlatformAuthButton: React.FC<PlatformAuthButtonProps> = ({
 
       // CRITICAL: Always try native auth first in mobile apps
       if (nativeIntegrationService.isRunningNatively()) {
-        console.log('[PlatformAuth] Native environment - using native Google auth');
+        console.log('[PlatformAuth] Native environment - ENFORCING native-only Google auth');
         
         // Ensure native auth is initialized to avoid race conditions
         await nativeAuthService.initialize();
 
-        // Add timeout for native auth
+        // Enhanced timeout for native auth with retry logic
         const timeoutPromise = new Promise<never>((_, reject) => {
           setTimeout(() => {
-            reject(new Error('Native Google authentication timed out'));
-          }, 15000); // 15 seconds timeout
+            reject(new Error('Native Google authentication timed out after 20 seconds'));
+          }, 20000); // Increased to 20 seconds timeout
         });
 
         const authPromise = nativeAuthService.signInWithGoogle();
@@ -55,16 +55,18 @@ const PlatformAuthButton: React.FC<PlatformAuthButtonProps> = ({
           let userFriendlyMessage = 'Something went wrong with Google sign-in';
           
           if (nativeError.message?.includes('timeout')) {
-            userFriendlyMessage = 'Sign-in timed out. Please try again.';
+            userFriendlyMessage = 'Native sign-in timed out. Please ensure you have a stable internet connection and try again.';
           } else if (nativeError.message?.includes('cancelled')) {
-            userFriendlyMessage = 'Sign-in was cancelled. Please try again.';
+            userFriendlyMessage = 'Sign-in was cancelled.';
             shouldShowError = false; // Don't show error for user cancellation
           } else if (nativeError.message?.includes('network')) {
             userFriendlyMessage = 'Network error. Please check your connection and try again.';
           } else if (nativeError.message?.includes('token')) {
-            userFriendlyMessage = 'Authentication token error. Please try again.';
+            userFriendlyMessage = 'Authentication token error. Please restart the app and try again.';
           } else if (nativeError.message?.includes('not available')) {
-            userFriendlyMessage = 'Google sign-in is not available on this device.';
+            userFriendlyMessage = 'Google sign-in is not available on this device. Please contact support.';
+          } else if (nativeError.message?.includes('configuration')) {
+            userFriendlyMessage = 'Google sign-in configuration error. Please contact support.';
           }
 
           // Only show error toast for actual failures, not cancellations
@@ -73,48 +75,20 @@ const PlatformAuthButton: React.FC<PlatformAuthButtonProps> = ({
             toast.error(userFriendlyMessage);
           }
 
+          // CRITICAL: Do NOT fallback to external browser in native apps
+          console.log('[PlatformAuth] NATIVE-ONLY MODE: No external browser fallback will be attempted');
+          
           // Do not fallback if user explicitly cancelled
           if (nativeError.message?.includes('cancelled')) {
             return;
           }
 
-          // Fallback to web OAuth flow with correct redirect URL (supports native deep links)
-          console.log('[PlatformAuth] Falling back to web OAuth for Google');
-          try {
-            const redirectTo = getRedirectUrl();
-            const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
-              provider: 'google',
-              options: {
-                redirectTo,
-                queryParams: {
-                  access_type: 'offline',
-                  prompt: 'consent',
-                },
-              },
-            });
-
-            if (oauthError) {
-              console.error('[PlatformAuth] Web OAuth fallback error:', oauthError);
-              throw oauthError;
-            }
-
-            if (data?.url) {
-              console.log('[PlatformAuth] Redirecting to OAuth URL:', data.url);
-              window.location.href = data.url;
-              return;
-            }
-
-            // If no URL returned, throw to outer catch
-            throw new Error('OAuth flow did not return a redirect URL');
-          } catch (fallbackError: any) {
-            console.error('[PlatformAuth] Fallback OAuth flow failed:', fallbackError);
-            // Re-throw to be handled by outer catch
-            throw fallbackError;
-          }
+          // For native apps, throw the error to prevent any external browser fallback
+          throw nativeError;
         }
       }
 
-      // Web fallback
+      // Web-only fallback (only executed in web environment)
       console.log('[PlatformAuth] Web environment - using Supabase OAuth');
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -135,10 +109,11 @@ const PlatformAuthButton: React.FC<PlatformAuthButtonProps> = ({
       console.error('[PlatformAuth] Google sign-in failed:', {
         message: error.message,
         stack: error.stack,
-        name: error.name
+        name: error.name,
+        isNative: nativeIntegrationService.isRunningNatively()
       });
       
-      // FIXED: Don't show duplicate error toasts - only show if not already handled
+      // Enhanced error handling - avoid duplicate toasts
       if (!error.message?.includes('cancelled') && !error.alreadyHandled) {
         const errorMessage = error.message || 'Google sign-in failed';
         onError?.(errorMessage);
