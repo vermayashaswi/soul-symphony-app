@@ -1351,6 +1351,14 @@ export type Database = {
             }
         Returns: undefined
       }
+      sync_all_reminder_settings: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      sync_reminder_settings_to_notifications: {
+        Args: { p_user_id: string }
+        Returns: Json
+      }
       table_exists: {
         Args: { table_name: string }
         Returns: boolean

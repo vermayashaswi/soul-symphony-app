@@ -102,13 +102,19 @@ export function CustomTimeRemindersModal({
         return;
       }
 
-      const reminderSettings = {
-        reminders: reminders
-      };
+      // Convert reminders to the format expected by the database function
+      const reminderSettings = reminders.reduce((acc, reminder) => ({
+        ...acc,
+        [reminder.id]: {
+          time: reminder.time,
+          label: reminder.label,
+          enabled: reminder.enabled
+        }
+      }), {});
 
       const { error } = await supabase
         .from('profiles')
-        .update({ reminder_settings: reminderSettings as any })
+        .update({ reminder_settings: reminderSettings })
         .eq('id', user.id);
 
       if (error) {
@@ -117,7 +123,18 @@ export function CustomTimeRemindersModal({
         return;
       }
 
-      toast.success('Reminder settings saved successfully');
+      // Sync reminder settings to user_notifications with timezone conversion
+      const { error: syncError } = await supabase.rpc('sync_reminder_settings_to_notifications', {
+        p_user_id: user.id
+      });
+
+      if (syncError) {
+        console.error('Error syncing reminder notifications:', syncError);
+        toast.error('Reminders saved but scheduling failed. Please try again.');
+        return;
+      }
+
+      toast.success('Reminder settings saved and scheduled successfully');
       onSave(reminders);
       onClose();
     } catch (error) {
