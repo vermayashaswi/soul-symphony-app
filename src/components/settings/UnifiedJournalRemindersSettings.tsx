@@ -73,15 +73,27 @@ export function UnifiedJournalRemindersSettings() {
         // First request permissions explicitly when user toggles ON
         console.log('[UnifiedJournalRemindersSettings] User toggling reminders ON - requesting permissions');
         
-        // Import permission checker for explicit permission request
-        const { notificationPermissionChecker } = await import('@/services/notificationPermissionChecker');
-        const permissionResult = await notificationPermissionChecker.requestPermissions();
+        // Use FCM service for both permissions AND device token registration
+        const permissionResult = await unifiedNotificationService.requestPermissions();
         
         if (!permissionResult.granted) {
           toast.error('❌ Permission Required', {
             description: 'Please allow notifications to enable reminders'
           });
           return;
+        }
+
+        // Explicitly register device token after permissions are granted
+        console.log('[UnifiedJournalRemindersSettings] Permissions granted, registering device token...');
+        const tokenResult = await unifiedNotificationService.registerDeviceToken();
+        
+        if (!tokenResult.success) {
+          console.warn('[UnifiedJournalRemindersSettings] Device token registration failed:', tokenResult.error);
+          toast.error('⚠️ Device registration issue', {
+            description: 'Notifications may not work properly. Please try again.'
+          });
+        } else {
+          console.log('[UnifiedJournalRemindersSettings] Device token registered successfully');
         }
         
         // Now setup reminders with permissions granted

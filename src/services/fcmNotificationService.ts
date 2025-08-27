@@ -97,8 +97,14 @@ class FCMNotificationService {
         };
         }
         
-        // Register for push notifications
+        // Register for push notifications and automatically register device token
         await PushNotifications.register();
+        
+        // Auto-register device token for native platforms
+        const tokenResult = await this.registerDeviceToken();
+        if (!tokenResult.success) {
+          console.warn('[FCMNotificationService] Auto device token registration failed:', tokenResult.error);
+        }
         
         console.log('[FCMNotificationService] Native push permissions granted');
         return { success: true, granted: true, state: 'granted' };
@@ -125,7 +131,7 @@ class FCMNotificationService {
         };
         }
 
-        // Get FCM token and register device
+        // Get FCM token and register device automatically
         try {
           const token = await getToken(this.messaging, {
             vapidKey: 'BOQf7iPztx_NbsZeW8YZaxFaLTJRJgvHlIKsqv1QjohO2rSorShQPOvy0TnjKDWQ7jHZusBDaxGtgVzXV35_ypw'
@@ -133,6 +139,8 @@ class FCMNotificationService {
           
           if (token) {
             await this.saveDeviceToken(token, 'web');
+          } else {
+            console.warn('[FCMNotificationService] Failed to get FCM token - device may not be registered');
           }
         } catch (tokenError) {
           console.warn('[FCMNotificationService] Failed to get FCM token:', tokenError);
