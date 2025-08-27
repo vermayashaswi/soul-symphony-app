@@ -125,7 +125,10 @@ serve(async (req) => {
               title,
               body
             },
-            data: data || {},
+            data: {
+              ...(data || {}),
+              ...(actionUrl ? { action_url: actionUrl } : {})
+            },
             webpush: actionUrl ? {
               fcm_options: {
                 link: actionUrl
@@ -141,10 +144,7 @@ serve(async (req) => {
                 aps: {
                   category: actionUrl ? 'OPEN_URL' : undefined
                 }
-              },
-              fcm_options: actionUrl ? {
-                link: actionUrl
-              } : undefined
+              }
             }
           }
         };
