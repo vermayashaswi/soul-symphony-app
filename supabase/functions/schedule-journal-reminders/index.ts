@@ -26,19 +26,18 @@ serve(async (req) => {
     const currentMinute = now.getMinutes();
     const currentTime = `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`;
 
-    console.log('[Scheduler] Current time:', currentTime);
+    console.log('[Scheduler] Current UTC time:', currentTime, 'Full timestamp:', now.toISOString());
 
-    // Find active notifications scheduled for this time (within 5 minute window)
+    // Find active notifications scheduled for this time (exact hour:minute match)
     const { data: scheduledNotifications, error: notificationsError } = await supabase
       .from('user_notifications')
       .select(`
         *,
-        profiles!inner(id, full_name, display_name)
+        profiles!inner(id, full_name, display_name, timezone)
       `)
       .eq('status', 'active')
       .eq('type', 'journal_reminder')
-      .gte('scheduled_time', `${currentHour.toString().padStart(2, '0')}:${Math.max(0, currentMinute - 5).toString().padStart(2, '0')}`)
-      .lte('scheduled_time', `${currentHour.toString().padStart(2, '0')}:${Math.min(59, currentMinute + 5).toString().padStart(2, '0')}`);
+      .eq('scheduled_time', currentTime);
 
     if (notificationsError) {
       console.error('[Scheduler] Error fetching notifications:', notificationsError);

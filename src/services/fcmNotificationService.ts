@@ -176,23 +176,49 @@ class FCMNotificationService {
         return;
       }
 
-      // Insert or update device token with proper upsert key
-      const { error } = await supabase
-        .from('user_devices')
-        .upsert({
-          user_id: user.id,
-          device_token: token,
-          platform: platform,
-          last_seen: new Date().toISOString()
-        }, {
-          onConflict: 'user_id,platform',
-          ignoreDuplicates: false
-        });
+      console.log('[FCMNotificationService] Saving device token for user:', user.id, 'platform:', platform);
 
-      if (error) {
-        console.error('[FCMNotificationService] Error saving device token:', error);
+      // First check if device already exists
+      const { data: existingDevice } = await supabase
+        .from('user_devices')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('platform', platform)
+        .single();
+
+      if (existingDevice) {
+        // Update existing device
+        const { error } = await supabase
+          .from('user_devices')
+          .update({
+            device_token: token,
+            last_seen: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .eq('user_id', user.id)
+          .eq('platform', platform);
+
+        if (error) {
+          console.error('[FCMNotificationService] Error updating device token:', error);
+        } else {
+          console.log('[FCMNotificationService] Device token updated successfully');
+        }
       } else {
-        console.log('[FCMNotificationService] Device token saved successfully');
+        // Insert new device
+        const { error } = await supabase
+          .from('user_devices')
+          .insert({
+            user_id: user.id,
+            device_token: token,
+            platform: platform,
+            last_seen: new Date().toISOString()
+          });
+
+        if (error) {
+          console.error('[FCMNotificationService] Error inserting device token:', error);
+        } else {
+          console.log('[FCMNotificationService] Device token inserted successfully');
+        }
       }
     } catch (error) {
       console.error('[FCMNotificationService] Error in saveDeviceToken:', error);
@@ -211,7 +237,9 @@ class FCMNotificationService {
         // Set up token listener
         PushNotifications.addListener('registration', async (token) => {
           console.log('[FCMNotificationService] Native push registration token:', token.value);
-          await this.saveDeviceToken(token.value, 'android'); // or 'ios' based on platform detection
+          // Detect platform more accurately
+          const platform = Capacitor.getPlatform() === 'ios' ? 'ios' : 'android';
+          await this.saveDeviceToken(token.value, platform);
         });
 
         // Set up error listener
