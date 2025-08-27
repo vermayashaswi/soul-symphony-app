@@ -354,30 +354,74 @@ class FCMNotificationService {
 
   private convertLocalTimeToUTC(localTime: string, timezone: string): string {
     try {
-      // Create a date with the local time in the user's timezone
-      const today = new Date();
       const [hours, minutes] = localTime.split(':').map(Number);
       
-      // Set the time in the user's timezone
-      const localDate = new Date();
-      localDate.setHours(hours, minutes, 0, 0);
+      // Create a date for today in the user's timezone
+      const today = new Date();
+      const year = today.getFullYear();
+      const month = today.getMonth();
+      const day = today.getDate();
       
-      // Convert to UTC using the Intl API
-      const utcDate = new Date(localDate.toLocaleString('en-US', { timeZone: 'UTC' }));
-      const localDateInTimezone = new Date(localDate.toLocaleString('en-US', { timeZone: timezone }));
+      // Create a Date object representing the local time in the user's timezone
+      const localDateTime = new Date(year, month, day, hours, minutes, 0, 0);
       
-      // Calculate the offset and adjust
-      const offset = localDateInTimezone.getTime() - utcDate.getTime();
-      const adjustedDate = new Date(localDate.getTime() - offset);
+      // Get the timezone offset in minutes
+      const userTimezoneOffset = this.getTimezoneOffset(timezone);
       
-      const utcHours = adjustedDate.getUTCHours();
-      const utcMinutes = adjustedDate.getUTCMinutes();
+      // Convert to UTC by subtracting the timezone offset
+      const utcDateTime = new Date(localDateTime.getTime() - (userTimezoneOffset * 60 * 1000));
+      
+      const utcHours = utcDateTime.getUTCHours();
+      const utcMinutes = utcDateTime.getUTCMinutes();
       
       return `${utcHours.toString().padStart(2, '0')}:${utcMinutes.toString().padStart(2, '0')}`;
     } catch (error) {
       console.error('[FCMNotificationService] Error converting time to UTC:', error);
       // Fallback to original time if conversion fails
       return localTime;
+    }
+  }
+
+  private getTimezoneOffset(timezone: string): number {
+    try {
+      // Create a date and get the offset for the specific timezone
+      const now = new Date();
+      const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
+      const localTime = new Date(utcTime + this.getTimezoneOffsetMinutes(timezone) * 60000);
+      
+      // Return offset in minutes from UTC
+      return this.getTimezoneOffsetMinutes(timezone);
+    } catch (error) {
+      console.error('[FCMNotificationService] Error getting timezone offset:', error);
+      return 0; // Default to UTC
+    }
+  }
+
+  private getTimezoneOffsetMinutes(timezone: string): number {
+    // Common timezone offsets (in minutes from UTC)
+    const timezoneOffsets: { [key: string]: number } = {
+      'Asia/Kolkata': 330,      // UTC+5:30
+      'Asia/Calcutta': 330,     // UTC+5:30 (legacy)
+      'America/New_York': -300, // UTC-5 (EST) / UTC-4 (EDT) - simplified
+      'America/Los_Angeles': -480, // UTC-8 (PST) / UTC-7 (PDT) - simplified
+      'Europe/London': 0,       // UTC+0 (GMT) / UTC+1 (BST) - simplified
+      'UTC': 0,
+      // Add more as needed
+    };
+
+    if (timezoneOffsets[timezone] !== undefined) {
+      return timezoneOffsets[timezone];
+    }
+
+    // Fallback: try to get offset using Intl API
+    try {
+      const date = new Date();
+      const utcDate = new Date(date.toLocaleString('en-US', { timeZone: 'UTC' }));
+      const tzDate = new Date(date.toLocaleString('en-US', { timeZone: timezone }));
+      return (tzDate.getTime() - utcDate.getTime()) / (1000 * 60);
+    } catch (error) {
+      console.warn('[FCMNotificationService] Unknown timezone:', timezone, 'defaulting to UTC');
+      return 0;
     }
   }
 
