@@ -125,7 +125,7 @@ class FCMNotificationService {
         };
         }
 
-        // Get FCM token
+        // Get FCM token and register device
         try {
           const token = await getToken(this.messaging, {
             vapidKey: 'BOQf7iPztx_NbsZeW8YZaxFaLTJRJgvHlIKsqv1QjohO2rSorShQPOvy0TnjKDWQ7jHZusBDaxGtgVzXV35_ypw'
@@ -176,7 +176,7 @@ class FCMNotificationService {
         return;
       }
 
-      // Insert or update device token
+      // Insert or update device token with proper upsert key
       const { error } = await supabase
         .from('user_devices')
         .upsert({
@@ -184,6 +184,9 @@ class FCMNotificationService {
           device_token: token,
           platform: platform,
           last_seen: new Date().toISOString()
+        }, {
+          onConflict: 'user_id,platform',
+          ignoreDuplicates: false
         });
 
       if (error) {
@@ -193,6 +196,60 @@ class FCMNotificationService {
       }
     } catch (error) {
       console.error('[FCMNotificationService] Error in saveDeviceToken:', error);
+    }
+  }
+
+  // Enhanced method to register device token immediately
+  async registerDeviceToken(): Promise<{ success: boolean; error?: string }> {
+    await this.initialize();
+
+    try {
+      if (this.isNative) {
+        // For native platforms, get token from Capacitor Push Notifications
+        const { PushNotifications } = await import('@capacitor/push-notifications');
+        
+        // Set up token listener
+        PushNotifications.addListener('registration', async (token) => {
+          console.log('[FCMNotificationService] Native push registration token:', token.value);
+          await this.saveDeviceToken(token.value, 'android'); // or 'ios' based on platform detection
+        });
+
+        // Set up error listener
+        PushNotifications.addListener('registrationError', (error) => {
+          console.error('[FCMNotificationService] Native push registration error:', error);
+        });
+
+        return { success: true };
+      } else {
+        // Web platform - get FCM token
+        if (!this.messaging) {
+          return { 
+            success: false, 
+            error: 'Firebase messaging not available'
+          };
+        }
+
+        const token = await getToken(this.messaging, {
+          vapidKey: 'BOQf7iPztx_NbsZeW8YZaxFaLTJRJgvHlIKsqv1QjohO2rSorShQPOvy0TnjKDWQ7jHZusBDaxGtgVzXV35_ypw'
+        });
+        
+        if (token) {
+          await this.saveDeviceToken(token, 'web');
+          console.log('[FCMNotificationService] Web FCM token registered successfully');
+          return { success: true };
+        } else {
+          return { 
+            success: false, 
+            error: 'Failed to get FCM token'
+          };
+        }
+      }
+    } catch (error) {
+      console.error('[FCMNotificationService] Device token registration failed:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
     }
   }
 

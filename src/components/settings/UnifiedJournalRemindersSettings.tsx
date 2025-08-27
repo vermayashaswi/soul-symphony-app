@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChevronDown, ChevronUp, Activity, AlertTriangle, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { unifiedNotificationService, UnifiedNotificationSettings } from '@/services/unifiedNotificationService';
+import { fcmNotificationService as unifiedNotificationService, NotificationSettings as UnifiedNotificationSettings } from '@/services/fcmNotificationService';
 import { timezoneNotificationHelper, JournalReminderTime } from '@/services/timezoneNotificationHelper';
 import { notificationDebugLogger } from '@/services/notificationDebugLogger';
 
@@ -31,11 +31,24 @@ export function UnifiedJournalRemindersSettings() {
     getDetailedStatus();
   }, []);
 
-  const loadSettings = () => {
-    const settings = unifiedNotificationService.getSettings();
-    setIsEnabled(settings.enabled);
-    if (settings.times.length > 0) {
-      setReminderTime(settings.times[0]);
+  const loadSettings = async () => {
+    try {
+      const settings = await unifiedNotificationService.getReminderSettings();
+      if (settings && settings.reminders.length > 0) {
+        setIsEnabled(settings.reminders.some(r => r.enabled));
+        const enabledReminder = settings.reminders.find(r => r.enabled);
+        if (enabledReminder) {
+          // Convert HH:MM time format to reminder time
+          const time = enabledReminder.time;
+          const [hours] = time.split(':').map(Number);
+          if (hours >= 6 && hours < 12) setReminderTime('morning');
+          else if (hours >= 12 && hours < 17) setReminderTime('afternoon');
+          else if (hours >= 17 && hours < 22) setReminderTime('evening');
+          else setReminderTime('night');
+        }
+      }
+    } catch (error) {
+      console.error('Error loading reminder settings:', error);
     }
   };
 
@@ -72,12 +85,22 @@ export function UnifiedJournalRemindersSettings() {
         }
         
         // Now setup reminders with permissions granted
-        const result = await unifiedNotificationService.requestPermissionsAndSetup([reminderTime]);
+        // Create reminder settings and save to database
+        const reminderSettings: UnifiedNotificationSettings = {
+          reminders: [{
+            id: 'daily-reminder',
+            enabled: true,
+            time: getTimeFromReminderTime(reminderTime),
+            label: TIME_OPTIONS.find(t => t.value === reminderTime)?.label || 'Daily Reminder'
+          }]
+        };
+        
+        const result = await unifiedNotificationService.saveReminderSettings(reminderSettings);
         
         if (result.success) {
           setIsEnabled(true);
-          toast.success('✅ Unified journal reminders enabled!', {
-            description: `Strategy: ${result.strategy}, Scheduled: ${result.scheduledCount} notifications`
+          toast.success('✅ Journal reminders enabled!', {
+            description: 'Daily reminders have been set up successfully'
           });
           await getDetailedStatus();
         } else {
@@ -86,7 +109,9 @@ export function UnifiedJournalRemindersSettings() {
           });
         }
       } else {
-        await unifiedNotificationService.disableReminders();
+        // Disable reminders by saving empty settings
+        const emptySettings: UnifiedNotificationSettings = { reminders: [] };
+        await unifiedNotificationService.saveReminderSettings(emptySettings);
         setIsEnabled(false);
         toast.success('Reminders disabled');
         await getDetailedStatus();
@@ -105,9 +130,22 @@ export function UnifiedJournalRemindersSettings() {
     if (isEnabled) {
       setIsLoading(true);
       try {
-        await unifiedNotificationService.requestPermissionsAndSetup([newTime as JournalReminderTime]);
-        toast.success(`Reminder time updated to ${TIME_OPTIONS.find(t => t.value === newTime)?.label}`);
-        await getDetailedStatus();
+        const reminderSettings: UnifiedNotificationSettings = {
+          reminders: [{
+            id: 'daily-reminder',
+            enabled: true,
+            time: getTimeFromReminderTime(newTime as JournalReminderTime),
+            label: TIME_OPTIONS.find(t => t.value === newTime)?.label || 'Daily Reminder'
+          }]
+        };
+        
+        const result = await unifiedNotificationService.saveReminderSettings(reminderSettings);
+        if (result.success) {
+          toast.success(`Reminder time updated to ${TIME_OPTIONS.find(t => t.value === newTime)?.label}`);
+          await getDetailedStatus();
+        } else {
+          toast.error('Failed to update reminder time');
+        }
       } catch (error) {
         console.error('Error updating reminder time:', error);
         toast.error('Failed to update reminder time');
@@ -117,17 +155,28 @@ export function UnifiedJournalRemindersSettings() {
     }
   };
 
+  // Helper function to convert reminder time to HH:MM format
+  const getTimeFromReminderTime = (reminderTime: JournalReminderTime): string => {
+    switch (reminderTime) {
+      case 'morning': return '08:00';
+      case 'afternoon': return '14:00';
+      case 'evening': return '19:00';
+      case 'night': return '22:00';
+      default: return '19:00';
+    }
+  };
+
   const testReminder = async () => {
     setIsLoading(true);
     try {
-      const success = await unifiedNotificationService.testNotification();
-      if (success) {
+      const result = await unifiedNotificationService.testNotification();
+      if (result.success) {
         toast.success('🧪 Test reminder sent!', {
           description: 'Check your notifications to confirm they\'re working.'
         });
       } else {
         toast.error('❌ Test reminder failed', {
-          description: 'Please check your notification settings.'
+          description: result.error || 'Please check your notification settings.'
         });
       }
     } catch (error) {

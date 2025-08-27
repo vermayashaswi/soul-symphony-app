@@ -29,6 +29,15 @@ const Journal = () => {
   const [processedEntryIds, setProcessedEntryIds] = useState<number[]>([]);
   const [isCheckingProfile, setIsCheckingProfile] = useState(false);
   const [activeTab, setActiveTab] = useState('record');
+  
+  // Check for tab parameter in URL
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tabParam = urlParams.get('tab');
+    if (tabParam === 'entries') {
+      setActiveTab('entries');
+    }
+  }, []);
   const [profileCheckRetryCount, setProfileCheckRetryCount] = useState(0);
   const [lastProfileErrorTime, setLastProfileErrorTime] = useState(0);
   const [showRetryButton, setShowRetryButton] = useState(false);
