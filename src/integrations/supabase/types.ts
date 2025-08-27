@@ -570,6 +570,54 @@ export type Database = {
         }
         Relationships: []
       }
+      user_app_notifications: {
+        Row: {
+          action_label: string | null
+          action_url: string | null
+          created_at: string
+          data: Json | null
+          dismissed_at: string | null
+          expires_at: string | null
+          id: string
+          message: string
+          read_at: string | null
+          title: string
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          action_label?: string | null
+          action_url?: string | null
+          created_at?: string
+          data?: Json | null
+          dismissed_at?: string | null
+          expires_at?: string | null
+          id?: string
+          message: string
+          read_at?: string | null
+          title: string
+          type?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          action_label?: string | null
+          action_url?: string | null
+          created_at?: string
+          data?: Json | null
+          dismissed_at?: string | null
+          expires_at?: string | null
+          id?: string
+          message?: string
+          read_at?: string | null
+          title?: string
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_devices: {
         Row: {
           created_at: string
@@ -794,6 +842,10 @@ export type Database = {
       cleanup_malformed_json_messages: {
         Args: Record<PropertyKey, never>
         Returns: Json
+      }
+      cleanup_old_notifications: {
+        Args: Record<PropertyKey, never>
+        Returns: number
       }
       close_user_session: {
         Args: { p_session_id: string; p_user_id: string }
