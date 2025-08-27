@@ -1,6 +1,7 @@
 import { initializeApp, getApps } from 'firebase/app';
 import { getMessaging, getToken, onMessage, Messaging } from 'firebase/messaging';
 import { Capacitor } from '@capacitor/core';
+import { PushNotifications } from '@capacitor/push-notifications';
 import { supabase } from '@/integrations/supabase/client';
 import { fromZonedTime, format } from 'date-fns-tz';
 
@@ -85,7 +86,6 @@ class FCMNotificationService {
     try {
       if (this.isNative) {
         // For native platforms, use Capacitor Push Notifications
-        const { PushNotifications } = await import('@capacitor/push-notifications');
         
         const permissionResult = await PushNotifications.requestPermissions();
         
@@ -241,7 +241,6 @@ class FCMNotificationService {
     try {
       if (this.isNative) {
         // For native platforms, get token from Capacitor Push Notifications
-        const { PushNotifications } = await import('@capacitor/push-notifications');
         
         // Set up token listener
         PushNotifications.addListener('registration', async (token) => {

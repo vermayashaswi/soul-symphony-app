@@ -77,10 +77,20 @@ serve(async (req) => {
 
     const jwtData = `${jwtHeader}.${jwtPayload}`;
     
-    // Import private key for signing
+    // Properly parse and import the private key
+    const privateKeyPem = serviceAccount.private_key.replace(/\\n/g, '\n');
+    
+    // Remove PEM headers and decode base64
+    const pemHeader = "-----BEGIN PRIVATE KEY-----";
+    const pemFooter = "-----END PRIVATE KEY-----";
+    const pemContents = privateKeyPem.replace(pemHeader, '').replace(pemFooter, '').replace(/\s/g, '');
+    
+    // Convert base64 to ArrayBuffer
+    const binaryDer = Uint8Array.from(atob(pemContents), c => c.charCodeAt(0));
+    
     const privateKey = await crypto.subtle.importKey(
       "pkcs8",
-      new TextEncoder().encode(serviceAccount.private_key.replace(/\\n/g, '\n')),
+      binaryDer,
       { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
       false,
       ["sign"]
