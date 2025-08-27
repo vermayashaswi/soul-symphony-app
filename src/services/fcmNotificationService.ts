@@ -297,48 +297,35 @@ class FCMNotificationService {
         return { success: false, error: 'User not authenticated' };
       }
 
-      // Get user's timezone from profile
-      const { data: profile } = await supabase
+      // Convert reminders to the format expected by the database function
+      const reminderSettings = settings.reminders.reduce((acc, reminder) => ({
+        ...acc,
+        [reminder.id]: {
+          time: reminder.time,
+          label: reminder.label || 'Journal Reminder',
+          enabled: reminder.enabled
+        }
+      }), {});
+
+      // Update user's reminder settings in the database
+      const { error: profileError } = await supabase
         .from('profiles')
-        .select('timezone')
-        .eq('id', user.id)
-        .single();
+        .update({ reminder_settings: reminderSettings })
+        .eq('id', user.id);
 
-      const userTimezone = profile?.timezone || 'UTC';
-      console.log('[FCMNotificationService] User timezone:', userTimezone);
+      if (profileError) {
+        console.error('[FCMNotificationService] Error saving reminder settings:', profileError);
+        return { success: false, error: profileError.message };
+      }
 
-      // First, clear existing reminder notifications
-      await supabase
-        .from('user_notifications')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('type', 'journal_reminder');
-
-      // Convert local time to UTC before saving
-      const notifications = settings.reminders.map(reminder => {
-        const utcTime = this.convertLocalTimeToUTC(reminder.time, userTimezone);
-        console.log('[FCMNotificationService] Converting', reminder.time, 'in', userTimezone, 'to UTC:', utcTime);
-        
-        return {
-          user_id: user.id,
-          type: 'journal_reminder' as const,
-          scheduled_time: utcTime,
-          title: reminder.label || 'Journal Reminder',
-          body: 'Time for your journal reflection',
-          status: reminder.enabled ? 'active' as const : 'inactive' as const,
-          data: { reminder_id: reminder.id }
-        };
+      // Use the database function for proper timezone conversion
+      const { error: syncError } = await supabase.rpc('sync_reminder_settings_to_notifications', {
+        p_user_id: user.id
       });
 
-      if (notifications.length > 0) {
-        const { error } = await supabase
-          .from('user_notifications')
-          .insert(notifications);
-
-        if (error) {
-          console.error('[FCMNotificationService] Error saving notifications:', error);
-          return { success: false, error: error.message };
-        }
+      if (syncError) {
+        console.error('[FCMNotificationService] Error syncing reminder notifications:', syncError);
+        return { success: false, error: syncError.message };
       }
 
       console.log('[FCMNotificationService] Reminder settings saved successfully');
