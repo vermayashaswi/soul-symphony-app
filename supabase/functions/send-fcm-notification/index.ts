@@ -136,10 +136,8 @@ serve(async (req) => {
             } : undefined,
             android: {
               notification: {
-                click_action: actionUrl ? 'OPEN_MAIN_ACTIVITY' : undefined,
-                channel_id: 'default',
-                priority: 'high',
-                notification_priority: 'PRIORITY_HIGH'
+                click_action: 'OPEN_MAIN_ACTIVITY',
+                channel_id: 'default'
               }
             },
             apns: {

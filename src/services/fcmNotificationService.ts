@@ -50,8 +50,11 @@ class FCMNotificationService {
     
     console.log('[FCMNotificationService] Initialized. Native:', this.isNative);
     
-    // Initialize Firebase only on web platform
-    if (!this.isNative && typeof window !== 'undefined') {
+    if (this.isNative) {
+      // Set up native push notification listeners
+      await this.setupNativePushListeners();
+    } else if (typeof window !== 'undefined') {
+      // Initialize Firebase only on web platform
       try {
         if (!getApps().length) {
           initializeApp(firebaseConfig);
@@ -78,6 +81,47 @@ class FCMNotificationService {
         );
       }
     });
+  }
+
+  private async setupNativePushListeners() {
+    try {
+      console.log('[FCMNotificationService] Setting up native push listeners...');
+      
+      // Listen for notification received (when app is in foreground)
+      await PushNotifications.addListener('pushNotificationReceived', notification => {
+        console.log('[FCMNotificationService] Native notification received:', notification);
+        // On native platforms, notifications in foreground need to be handled by the app
+        // The system will show the status bar notification automatically when app is in background
+      });
+
+      // Listen for notification action performed (when user taps notification)
+      await PushNotifications.addListener('pushNotificationActionPerformed', notification => {
+        console.log('[FCMNotificationService] Native notification action performed:', notification);
+        
+        // Handle notification tap - navigate to action URL if available
+        const actionUrl = notification.notification.data?.actionUrl;
+        if (actionUrl && window.location) {
+          console.log('[FCMNotificationService] Navigating to action URL:', actionUrl);
+          window.location.href = actionUrl;
+        }
+      });
+
+      // Listen for registration token
+      await PushNotifications.addListener('registration', async (token) => {
+        console.log('[FCMNotificationService] Native push registration token received:', token.value);
+        const platform = Capacitor.getPlatform() === 'ios' ? 'ios' : 'android';
+        await this.saveDeviceToken(token.value, platform);
+      });
+
+      // Listen for registration errors
+      await PushNotifications.addListener('registrationError', (error) => {
+        console.error('[FCMNotificationService] Native push registration error:', error);
+      });
+
+      console.log('[FCMNotificationService] Native push listeners set up successfully');
+    } catch (error) {
+      console.error('[FCMNotificationService] Failed to set up native push listeners:', error);
+    }
   }
 
   async requestPermissions(): Promise<{ success: boolean; error?: string; granted: boolean; state: NotificationPermissionState }> {
