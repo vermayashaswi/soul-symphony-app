@@ -55,16 +55,130 @@ serve(async (req) => {
 
     console.log('[FCM] Found devices:', devices.length);
 
-    // For now, we'll simulate successful FCM sending
-    // In production, you'd implement the actual Firebase Admin SDK integration
-    const fcmResults = devices.map(device => ({
-      success: true,
-      device_token: device.device_token,
-      platform: device.platform,
-      message_id: `fcm_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    // Initialize Firebase Admin SDK
+    const serviceAccountKey = Deno.env.get('FIREBASE_SERVICE_ACCOUNT_KEY');
+    if (!serviceAccountKey) {
+      throw new Error('Firebase service account key not found');
+    }
+
+    const serviceAccount = JSON.parse(serviceAccountKey);
+    const projectId = serviceAccount.project_id;
+
+    // Get Firebase access token
+    const jwtHeader = btoa(JSON.stringify({ alg: "RS256", typ: "JWT" }));
+    const now = Math.floor(Date.now() / 1000);
+    const jwtPayload = btoa(JSON.stringify({
+      iss: serviceAccount.client_email,
+      scope: "https://www.googleapis.com/auth/firebase.messaging",
+      aud: "https://oauth2.googleapis.com/token",
+      exp: now + 3600,
+      iat: now
     }));
 
-    console.log('[FCM] Simulated FCM Results:', fcmResults);
+    const jwtData = `${jwtHeader}.${jwtPayload}`;
+    
+    // Import private key for signing
+    const privateKey = await crypto.subtle.importKey(
+      "pkcs8",
+      new TextEncoder().encode(serviceAccount.private_key.replace(/\\n/g, '\n')),
+      { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+      false,
+      ["sign"]
+    );
+    
+    const signature = await crypto.subtle.sign(
+      "RSASSA-PKCS1-v1_5",
+      privateKey,
+      new TextEncoder().encode(jwtData)
+    );
+    
+    const jwt = `${jwtData}.${btoa(String.fromCharCode(...new Uint8Array(signature))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')}`;
+
+    // Get access token
+    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`
+    });
+
+    const tokenData = await tokenResponse.json();
+    const accessToken = tokenData.access_token;
+
+    // Send FCM notifications to all devices
+    const fcmResults = [];
+    for (const device of devices) {
+      try {
+        const fcmMessage = {
+          message: {
+            token: device.device_token,
+            notification: {
+              title,
+              body
+            },
+            data: data || {},
+            webpush: actionUrl ? {
+              fcm_options: {
+                link: actionUrl
+              }
+            } : undefined,
+            android: {
+              notification: {
+                click_action: actionUrl || undefined
+              }
+            },
+            apns: {
+              payload: {
+                aps: {
+                  category: actionUrl ? 'OPEN_URL' : undefined
+                }
+              },
+              fcm_options: actionUrl ? {
+                link: actionUrl
+              } : undefined
+            }
+          }
+        };
+
+        const fcmResponse = await fetch(`https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(fcmMessage)
+        });
+
+        const fcmResponseData = await fcmResponse.json();
+        
+        if (fcmResponse.ok) {
+          fcmResults.push({
+            success: true,
+            device_token: device.device_token,
+            platform: device.platform,
+            message_id: fcmResponseData.name
+          });
+          console.log('[FCM] Successfully sent to:', device.device_token.substring(0, 20) + '...');
+        } else {
+          fcmResults.push({
+            success: false,
+            device_token: device.device_token,
+            platform: device.platform,
+            error: fcmResponseData.error?.message || 'Unknown error'
+          });
+          console.error('[FCM] Failed to send to:', device.device_token.substring(0, 20) + '...', fcmResponseData.error);
+        }
+      } catch (error) {
+        fcmResults.push({
+          success: false,
+          device_token: device.device_token,
+          platform: device.platform,
+          error: error.message
+        });
+        console.error('[FCM] Error sending to device:', error);
+      }
+    }
+
+    console.log('[FCM] Real FCM Results:', fcmResults);
 
     // Create in-app notifications for all users
     const inAppNotifications = userIds.map(userId => ({

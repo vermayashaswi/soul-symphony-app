@@ -33,7 +33,7 @@ serve(async (req) => {
       .from('user_notifications')
       .select(`
         *,
-        profiles!inner(id, full_name, display_name, timezone)
+        profiles!fk_user_notifications_profiles(id, full_name, display_name, timezone)
       `)
       .eq('status', 'active')
       .eq('type', 'journal_reminder')
