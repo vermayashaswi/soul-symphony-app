@@ -460,6 +460,30 @@ const location = useLocation();
           hasUser: !!currentSession?.user,
           userId: currentSession?.user?.id
         });
+
+        // NATIVE APP FIX: Force immediate state refresh for native apps
+        if (nativeIntegrationService.isRunningNatively() && currentSession?.user) {
+          console.log('[AuthContext] Native app detected - forcing immediate state refresh');
+          
+          // Immediate state update for native apps
+          setSession(currentSession);
+          setUser(currentSession.user);
+          setIsLoading(false);
+          
+          // Quick session validation for native apps
+          setTimeout(async () => {
+            try {
+              const { data: { session: latestSession } } = await supabase.auth.getSession();
+              if (latestSession?.user) {
+                console.log('[AuthContext] Native session validated, updating state');
+                setSession(latestSession);
+                setUser(latestSession.user);
+              }
+            } catch (error) {
+              console.warn('[AuthContext] Native session validation failed:', error);
+            }
+          }, 100);
+        }
         
         // Prevent loops by checking if this is the same session
         if (currentSession?.access_token === session?.access_token && event !== 'SIGNED_OUT') {

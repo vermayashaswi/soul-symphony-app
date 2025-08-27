@@ -253,6 +253,10 @@ class NativeAuthService {
       console.log('[NativeAuth] Successfully signed in user:', data.user.email);
       toast.success(`Welcome back!`);
 
+      // NATIVE APP FIX: Wait for session to be established and force immediate navigation
+      console.log('[NativeAuth] Waiting for session establishment...');
+      await this.waitForSessionAndNavigate();
+
     } catch (error: any) {
       console.error('[NativeAuth] Google sign-in failed:', {
         message: error.message,
@@ -358,6 +362,77 @@ class NativeAuthService {
 
   hasValidConfiguration(): boolean {
     return this.hasValidClientId;
+  }
+
+  /**
+   * Wait for session to be established and trigger navigation
+   * CRITICAL: This fixes the native app post-auth navigation issue
+   */
+  private async waitForSessionAndNavigate(): Promise<void> {
+    console.log('[NativeAuth] Starting session validation and navigation process');
+    
+    const maxWaitTime = 10000; // 10 seconds max wait
+    const checkInterval = 500; // Check every 500ms
+    const startTime = Date.now();
+    
+    return new Promise((resolve, reject) => {
+      const checkSession = async () => {
+        try {
+          const { data: { session }, error } = await supabase.auth.getSession();
+          
+          if (error) {
+            console.error('[NativeAuth] Session check error:', error);
+            return false;
+          }
+          
+          if (session?.user && session?.access_token) {
+            console.log('[NativeAuth] Valid session confirmed, triggering navigation');
+            
+            // Force immediate navigation for native apps
+            setTimeout(() => {
+              nativeNavigationService.handleAuthSuccess();
+            }, 100);
+            
+            resolve();
+            return true;
+          }
+          
+          return false;
+        } catch (error) {
+          console.error('[NativeAuth] Error checking session:', error);
+          return false;
+        }
+      };
+      
+      const intervalId = setInterval(async () => {
+        const sessionReady = await checkSession();
+        
+        if (sessionReady) {
+          clearInterval(intervalId);
+          return;
+        }
+        
+        // Timeout check
+        if (Date.now() - startTime > maxWaitTime) {
+          clearInterval(intervalId);
+          console.warn('[NativeAuth] Session wait timeout, forcing navigation anyway');
+          
+          // Force navigation even if session check failed
+          setTimeout(() => {
+            nativeNavigationService.handleAuthSuccess();
+          }, 100);
+          
+          resolve();
+        }
+      }, checkInterval);
+      
+      // Initial check
+      checkSession().then(sessionReady => {
+        if (sessionReady) {
+          clearInterval(intervalId);
+        }
+      });
+    });
   }
 
   private async getGoogleAuthPlugin(): Promise<GoogleAuthPlugin | null> {

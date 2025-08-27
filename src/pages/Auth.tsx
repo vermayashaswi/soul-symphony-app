@@ -153,6 +153,18 @@ export default function Auth() {
     );
   }
 
+  // NATIVE APP FIX: For native apps, show fallback immediately if auth is taking too long
+  if (navigationProcessing && nativeIntegrationService.isRunningNatively()) {
+    return (
+      <AuthRedirectFallback 
+        onManualRedirect={() => {
+          console.log('[Auth] Manual redirect triggered for native app');
+          nativeNavigationService.handleAuthSuccess();
+        }}
+      />
+    );
+  }
+
   // Handle authenticated users - let the useEffect handle navigation
   if (user && !navigationProcessing) {
     const finalRedirectPath = getFinalRedirectPath();
