@@ -36,6 +36,7 @@ import { useChatMessageClassification, QueryCategory } from "@/hooks/use-chat-me
 import { useStreamingChat } from "@/hooks/useStreamingChat";
 import { threadSafetyManager } from "@/utils/threadSafetyManager";
 import { useAutoScroll } from "@/hooks/use-auto-scroll";
+import { useSessionSync } from "@/hooks/useSessionSync";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -80,6 +81,20 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
   const { translate } = useTranslation();
   const loadedThreadRef = useRef<string | null>(null);
   const debugLog = useDebugLog();
+  
+  // Session synchronization for reliable authentication
+  useSessionSync({
+    onSessionLost: () => {
+      toast({
+        title: "Session expired",
+        description: "Please sign in again to continue",
+        variant: "destructive"
+      });
+    },
+    onSessionRestored: () => {
+      console.log('[SmartChatInterface] Session restored, continuing...');
+    }
+  });
   
   // Local thread state and current id
   const [localThreadId, setLocalThreadId] = useState<string | null>(null);

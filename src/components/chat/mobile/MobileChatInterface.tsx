@@ -20,6 +20,7 @@ import { MentalHealthInsights } from "@/hooks/use-mental-health-insights";
 import { useChatRealtime } from "@/hooks/use-chat-realtime";
 import { updateThreadProcessingStatus, generateThreadTitle } from "@/utils/chat/threadUtils";
 import { useUnifiedKeyboard } from "@/hooks/use-unified-keyboard";
+import { useSessionSync } from "@/hooks/useSessionSync";
 import { useEnhancedSwipeGestures } from "@/hooks/use-enhanced-swipe-gestures";
 import { useStreamingChat } from "@/hooks/useStreamingChat";
 import { threadSafetyManager } from "@/utils/threadSafetyManager";
@@ -272,6 +273,20 @@ export default function MobileChatInterface({
   const { translate } = useTranslation();
   const loadedThreadRef = useRef<string | null>(null);
   const userVerificationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Session synchronization for reliable authentication
+  useSessionSync({
+    onSessionLost: () => {
+      toast({
+        title: "Session expired",
+        description: "Please sign in again to continue",
+        variant: "destructive"
+      });
+    },
+    onSessionRestored: () => {
+      console.log('[MobileChatInterface] Session restored, continuing...');
+    }
+  });
   
   // Detect iOS device for specific handling
   useEffect(() => {
@@ -648,21 +663,19 @@ export default function MobileChatInterface({
           user.id
         );
         
-        if (!savedUserMessage) {
-          debugLog.addEvent("Message Sending", "[Mobile] Failed to save user message", "error");
-          toast({
-            title: "Error", 
-            description: "Failed to save your message",
-            variant: "destructive"
-          });
-          return null;
-        }
-
         debugLog.addEvent("Message Sending", `[Mobile] User message saved successfully: ${savedUserMessage.id}`, "success");
         return savedUserMessage;
       } catch (error) {
         console.error("[Mobile] Error saving user message:", error);
         debugLog.addEvent("Message Sending", `[Mobile] Exception saving user message: ${error}`, "error");
+        
+        // Show user-friendly error toast
+        toast({
+          title: "Failed to save message",
+          description: error instanceof Error ? error.message : "Please try again",
+          variant: "destructive"
+        });
+        
         return null;
       }
     };
