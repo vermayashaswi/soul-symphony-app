@@ -1201,8 +1201,6 @@ Examine the conversation context to understand the actual user intent:
 5. Preserve entity names, emotion names, time periods from previous responses
 
 ANALYSIS STATUS:
-- Personal pronouns: ${hasPersonalPronouns}
-- Time reference: ${hasExplicitTimeReference}  
 - Follow-up query: ${isFollowUpContext}
 - User timezone: ${userTimezone}
 
@@ -1304,12 +1302,8 @@ Every query plan MUST include a final vector search step that:
   "confidence": 0.8,
   "reasoning": "Strategy explanation with context awareness",
   "useAllEntries": boolean,
-  "hasPersonalPronouns": ${hasPersonalPronouns},
-  "hasExplicitTimeReference": ${hasExplicitTimeReference},
-  "inferredTimeContext": null or timeframe_object_with_timezone,
   "userTimezone": "${userTimezone}",
-  "sqlValidationEnabled": true,
-  "progressiveTimeExpansion": ${hasExplicitTimeReference}
+  "sqlValidationEnabled": true
 }
 
 **MANDATORY QUALITY CHECKS:**
@@ -1430,12 +1424,8 @@ Every query plan MUST include a final vector search step that:
       confidence: 0.6,
       reasoning: "Using enhanced fallback plan with improved PostgreSQL patterns",
       useAllEntries: false,
-      hasPersonalPronouns: /\b(i|me|my|mine|myself)\b/i.test(message.toLowerCase()),
-      hasExplicitTimeReference: /\b(last week|yesterday|this week|last month|today|recently|lately|this morning|last night|august|january|february|march|april|may|june|july|september|october|november|december)\b/i.test(message.toLowerCase()),
-      inferredTimeContext: null,
       userTimezone,
-      sqlValidationEnabled: true,
-      progressiveTimeExpansion: false
+      sqlValidationEnabled: true
     };
   }
 }
