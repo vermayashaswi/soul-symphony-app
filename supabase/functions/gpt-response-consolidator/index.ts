@@ -148,10 +148,17 @@ serve(async (req) => {
       const hasProcessedSummaries = researchResults.some((r: any) => r?.executionSummary);
       const hasRawResults = researchResults.some((r: any) => 
         r?.executionResults?.sqlResults || r?.executionResults?.vectorResults);
+      
+      // PHASE 4 FIX: Check specifically for journal entries from mandatory vector search
+      const hasJournalEntries = researchResults.some((r: any) => 
+        (r?.executionResults?.vectorResults && r.executionResults.vectorResults.length > 0) ||
+        (r?.executionSummary?.resultType === 'journal_content_retrieval' && r.executionSummary?.count > 0)
+      );
         
       console.log(`[DATA SUMMARY] ${consolidationId}:`, {
         hasProcessedSummaries,
         hasRawResults,
+        hasJournalEntries, // PHASE 4 FIX: Log journal entries availability
         userQuestion: userMessage,
         dataStructureType: hasProcessedSummaries ? 'processed_summaries' : 'raw_results'
       });
@@ -171,6 +178,11 @@ serve(async (req) => {
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
+      }
+      
+      // PHASE 4 FIX: Warning if no journal entries found from mandatory vector search
+      if (!hasJournalEntries) {
+        console.warn(`[${consolidationId}] No journal entries found from mandatory vector search - responses may lack specific examples`);
       }
       
       // Check for empty analysis objects that indicate processing failures

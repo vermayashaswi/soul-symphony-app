@@ -243,7 +243,7 @@ serve(async (req) => {
     if (classification.category === 'JOURNAL_SPECIFIC') {
       console.log("[chat-with-rag] EXECUTING: JOURNAL_SPECIFIC pipeline - full RAG processing");
       
-      // Step 2: Enhanced Query Planning with timezone support
+      // Step 2: Enhanced Query Planning with timezone support and explicit time range
       const queryPlanResponse = await supabaseClient.functions.invoke('smart-query-planner', {
         body: { 
           message, 
@@ -251,7 +251,13 @@ serve(async (req) => {
           conversationContext,
           threadId,
           messageId,
-          userTimezone // Pass user timezone to planner
+          userTimezone, // Pass user timezone to planner
+          timeRange, // PHASE 1 FIX: Pass extracted time range explicitly
+          temporalContext: {
+            detectedTimeframe: finalTimeframe,
+            source: detectedTimeframe ? 'explicit' : 'conversation',
+            conversationHistory: conversationContext?.slice(-3) // Last 3 messages for context
+          }
         }
       });
 
@@ -268,14 +274,31 @@ serve(async (req) => {
         hasResults: !!executionResult && executionResult.length > 0
       });
 
-      // Enhanced timeframe detection with timezone support
+      // Enhanced timeframe detection with timezone support + conversation history analysis
       let timeRange = null;
       const detectedTimeframe = detectTimeframeInQuery(message, normalizedTimezone);
       
-      if (detectedTimeframe) {
-        console.log(`[chat-with-rag] Detected timeframe with timezone ${normalizedTimezone}:`, JSON.stringify(detectedTimeframe, null, 2));
+      // PHASE 1 FIX: Analyze conversation history for temporal context
+      let conversationTimeContext = null;
+      if (conversationContext && conversationContext.length > 0) {
+        const recentMessages = conversationContext.slice(-5); // Last 5 messages
+        for (const msg of recentMessages) {
+          const msgTimeframe = detectTimeframeInQuery(msg.content, normalizedTimezone);
+          if (msgTimeframe) {
+            conversationTimeContext = msgTimeframe;
+            console.log(`[chat-with-rag] Found time context in conversation history: ${msg.content.substring(0, 50)}...`);
+            break;
+          }
+        }
+      }
+      
+      // Prioritize explicit time references, fallback to conversation context
+      const finalTimeframe = detectedTimeframe || conversationTimeContext;
+      
+      if (finalTimeframe) {
+        console.log(`[chat-with-rag] Using timeframe (${detectedTimeframe ? 'explicit' : 'from-conversation'}) with timezone ${normalizedTimezone}:`, JSON.stringify(finalTimeframe, null, 2));
         // Process timeframe with user's timezone for proper UTC conversion
-        timeRange = processTimeRange(detectedTimeframe, normalizedTimezone);
+        timeRange = processTimeRange(finalTimeframe, normalizedTimezone);
         console.log(`[chat-with-rag] Processed time range (converted to UTC):`, JSON.stringify(timeRange, null, 2));
       }
 
