@@ -128,6 +128,23 @@ serve(async (req) => {
 
     console.log(`[chat-with-rag] Processing query: "${message}" for user: ${userId} (threadId: ${threadId}, messageId: ${messageId})`);
     
+    // Generate correlation ID for this request
+    const requestCorrelationId = crypto.randomUUID();
+    console.log(`[chat-with-rag] Generated correlation ID: ${requestCorrelationId}`);
+    
+    // Update user message with correlation ID to track RAG pipeline execution
+    if (messageId) {
+      try {
+        await supabaseClient
+          .from('chat_messages')
+          .update({ request_correlation_id: requestCorrelationId })
+          .eq('id', messageId);
+        console.log(`[chat-with-rag] Updated user message ${messageId} with correlation ID: ${requestCorrelationId}`);
+      } catch (updateError) {
+        console.error('[chat-with-rag] Error updating user message with correlation ID:', updateError);
+      }
+    }
+    
     // No processing message creation - handled by frontend streaming
     let assistantMessageId = null;
     
