@@ -131,9 +131,9 @@ export async function executeBasicSQLQuery(userId: string, supabaseClient: any, 
 }
 
 
-// NEW INTELLIGENT VECTOR SEARCH FALLBACK FUNCTION
+// ENHANCED VECTOR SEARCH FALLBACK WITH TIME CONSTRAINT PRESERVATION
 async function executeVectorSearchFallback(step: any, userId: string, supabaseClient: any, requestId: string) {
-  console.log(`[${requestId}] Executing vector search fallback`);
+  console.log(`[${requestId}] Executing vector search fallback with preserved time constraints`);
   
   try {
     // Extract query context from the original step
@@ -148,75 +148,104 @@ async function executeVectorSearchFallback(step: any, userId: string, supabaseCl
     }
 
     console.log(`[${requestId}] Vector fallback search query: ${searchQuery}`);
+    
+    // CRITICAL: Preserve original time constraints from step
+    const preservedTimeRange = step.timeRange;
+    if (preservedTimeRange) {
+      console.log(`[${requestId}] Preserving original time constraints: ${JSON.stringify(preservedTimeRange)}`);
+    }
 
     // Generate embedding for the search query
     const embedding = await generateEmbedding(searchQuery);
     
-    // Primary vector search with relaxed threshold
+    // Enhanced threshold strategy
     const primaryThreshold = 0.2;
     const fallbackThreshold = 0.15;
     
-    let vectorResults;
+    let vectorResults = null;
     
-    // First try with time range if available
-    if (step.timeRange && (step.timeRange.start || step.timeRange.end)) {
-      console.log(`[${requestId}] Vector fallback with time range: ${step.timeRange.start} to ${step.timeRange.end}`);
-      const { data, error } = await supabaseClient.rpc('match_journal_entries_with_date', {
-        query_embedding: embedding,
-        match_threshold: primaryThreshold,
-        match_count: 15,
-        user_id_filter: userId,
-        start_date: step.timeRange.start || null,
-        end_date: step.timeRange.end || null
-      });
+    // PRIORITY 1: Try with preserved time range if available
+    if (preservedTimeRange && (preservedTimeRange.start || preservedTimeRange.end)) {
+      console.log(`[${requestId}] Vector fallback with preserved time range: ${preservedTimeRange.start} to ${preservedTimeRange.end}`);
+      
+      try {
+        const { data, error } = await supabaseClient.rpc('match_journal_entries_with_date', {
+          query_embedding: embedding,
+          match_threshold: primaryThreshold,
+          match_count: 15,
+          user_id_filter: userId,
+          start_date: preservedTimeRange.start || null,
+          end_date: preservedTimeRange.end || null
+        });
 
-      if (error) {
-        console.error(`[${requestId}] Time-filtered vector fallback error:`, error);
-        vectorResults = null;
-      } else {
-        vectorResults = data;
+        if (error) {
+          console.error(`[${requestId}] Time-filtered vector fallback error:`, error);
+          // Don't null the results yet, try with lower threshold first
+        } else if (data && data.length > 0) {
+          console.log(`[${requestId}] Time-filtered vector fallback successful: ${data.length} results`);
+          vectorResults = data;
+        } else {
+          console.log(`[${requestId}] Time-filtered vector fallback returned 0 results, trying lower threshold`);
+          
+          // Try again with lower threshold but KEEP time constraints
+          const { data: lowThresholdData, error: lowThresholdError } = await supabaseClient.rpc('match_journal_entries_with_date', {
+            query_embedding: embedding,
+            match_threshold: fallbackThreshold,
+            match_count: 15,
+            user_id_filter: userId,
+            start_date: preservedTimeRange.start || null,
+            end_date: preservedTimeRange.end || null
+          });
+
+          if (!lowThresholdError && lowThresholdData && lowThresholdData.length > 0) {
+            console.log(`[${requestId}] Time-filtered vector fallback with lower threshold successful: ${lowThresholdData.length} results`);
+            vectorResults = lowThresholdData;
+          }
+        }
+      } catch (timeFilterError) {
+        console.error(`[${requestId}] Error in time-filtered vector search:`, timeFilterError);
       }
     }
     
-    // If no time range results or no time range specified, try basic vector search
+    // PRIORITY 2: Only if time-filtered search completely fails, try without time constraints
     if (!vectorResults || vectorResults.length === 0) {
-      console.log(`[${requestId}] Vector fallback without time constraints`);
-      const { data, error } = await supabaseClient.rpc('match_journal_entries', {
-        query_embedding: embedding,
-        match_threshold: primaryThreshold,
-        match_count: 15,
-        user_id_filter: userId
-      });
+      console.log(`[${requestId}] Time-filtered search yielded no results, trying without time constraints as last resort`);
+      
+      try {
+        const { data, error } = await supabaseClient.rpc('match_journal_entries', {
+          query_embedding: embedding,
+          match_threshold: primaryThreshold,
+          match_count: 15,
+          user_id_filter: userId
+        });
 
-      if (error) {
-        console.error(`[${requestId}] Basic vector fallback error:`, error);
-        vectorResults = null;
-      } else {
-        vectorResults = data;
-      }
-    }
-    
-    // If still no results, try with lower threshold
-    if (!vectorResults || vectorResults.length === 0) {
-      console.log(`[${requestId}] Vector fallback with lower threshold: ${fallbackThreshold}`);
-      const { data, error } = await supabaseClient.rpc('match_journal_entries', {
-        query_embedding: embedding,
-        match_threshold: fallbackThreshold,
-        match_count: 15,
-        user_id_filter: userId
-      });
+        if (error) {
+          console.error(`[${requestId}] Basic vector fallback error:`, error);
+        } else if (data && data.length > 0) {
+          console.log(`[${requestId}] Basic vector fallback successful: ${data.length} results`);
+          vectorResults = data;
+        } else {
+          // Try with even lower threshold
+          const { data: veryLowData, error: veryLowError } = await supabaseClient.rpc('match_journal_entries', {
+            query_embedding: embedding,
+            match_threshold: fallbackThreshold,
+            match_count: 15,
+            user_id_filter: userId
+          });
 
-      if (error) {
-        console.error(`[${requestId}] Low threshold vector fallback error:`, error);
-        vectorResults = null;
-      } else {
-        vectorResults = data;
+          if (!veryLowError && veryLowData) {
+            console.log(`[${requestId}] Very low threshold vector fallback: ${veryLowData.length} results`);
+            vectorResults = veryLowData;
+          }
+        }
+      } catch (basicVectorError) {
+        console.error(`[${requestId}] Error in basic vector search:`, basicVectorError);
       }
     }
     
     // Final fallback to basic SQL if vector search completely fails
     if (!vectorResults || vectorResults.length === 0) {
-      console.log(`[${requestId}] Vector fallback failed, using basic SQL as last resort`);
+      console.log(`[${requestId}] All vector search attempts failed, using basic SQL as last resort`);
       return await executeBasicSQLQuery(userId, supabaseClient, requestId);
     }
 

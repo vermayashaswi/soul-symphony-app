@@ -800,48 +800,59 @@ async function analyzeQueryWithSubQuestions(message, conversationContext, userEn
 
 You are provided with this database schema: ${databaseSchemaContext} **CRITICAL DATABASE TYPE: This is a PostgreSQL database. Use PostgreSQL-specific syntax and functions.**
 
-**CRITICAL DATABASE CONTEXT ADHERENCE:**
-- You MUST ONLY use table names, column names, and data types that exist in the database schema above
-- DO NOT hallucinate or invent table structures, column names, or data types
-- STICK STRICTLY to the provided database schema context
-- If uncertain about a database structure, use basic select queries instead of complex ones
-- Use PostgreSQL-compatible functions and syntax
+**CRITICAL DATABASE SCHEMA REQUIREMENTS:**
+- EXACT TABLE NAME: "Journal Entries" (with quotes, case-sensitive)
+- EXACT COLUMN NAMES (case-sensitive, with quotes where needed):
+  * user_id (uuid)
+  * created_at (timestamptz)
+  * "refined text" (text, MUST use quotes)
+  * emotions (jsonb)
+  * master_themes (text array)
+  * entities (jsonb)
+  * sentiment (real)
+  * themeemotion (jsonb)
+  * entityemotion (jsonb)
+  * themes (text array)
+  * duration (numeric)
+- FORBIDDEN COLUMNS: Never reference "transcription text", "foreign key", "audio_url", "user_feedback", "edit_status", "translation_status"
 
-**IMPORTANT TIME RELATED QUERY PLANNING:** Note that in the "Journal Entries" table the user timestamps are in the column "created_at" and are of the data type timestamptz (example value in database: 2025-08-02 18:57:54.515+00)
+**ENHANCED SQL GENERATION GUIDELINES:**
+- ALWAYS use auth.uid() for user filtering (replaced with actual UUID during execution)
+- NEVER hardcode user IDs or generate fake UUIDs
+- EXACT COLUMN SYNTAX: Use "refined text" (with quotes) for content
+- JSONB OPERATIONS: For emotions use emotions->>'emotion_name', for entities use jsonb_array_elements_text(entities->'entity_type')
+- ARRAY OPERATIONS: For master_themes use ANY(master_themes) or unnest(master_themes)
+- TIME FILTERING: Always cast to timestamptz: created_at >= '2025-08-01T00:00:00+05:30'::timestamptz
+- AGGREGATIONS: Use proper PostgreSQL functions: COUNT(*), AVG(), ROUND(AVG(value)::numeric, 2)
+- Query Types: Use "filtering" for SELECT entries, "analysis" for COUNT/AVG/SUM operations
 
-**TABLE REFERENCE:**
-- Use "Journal Entries" (with quotes) for the table name
-- FORBIDDEN COLUMNS: "transcription text", "foreign key", "audio_url", "user_feedback", "edit_status", "translation_status"
-- Valid columns: user_id, created_at, "refined text", emotions, master_themes, entities, sentiment, themeemotion, themes, duration
+**CRITICAL POSTGRESQL EXAMPLES:**
+CORRECT emotion query: SELECT * FROM "Journal Entries" WHERE user_id = auth.uid() AND emotions ? 'happiness'
+CORRECT theme query: SELECT * FROM "Journal Entries" WHERE user_id = auth.uid() AND 'work' = ANY(master_themes)
+CORRECT time query: SELECT * FROM "Journal Entries" WHERE user_id = auth.uid() AND created_at >= '2025-08-01T00:00:00+05:30'::timestamptz
+WRONG: SELECT * FROM journal_entries WHERE user_id = 'uuid-string' AND emotions.happiness > 0.5
+
+**ENHANCED TIME RANGE HANDLING:**
+- ALWAYS preserve timeRange and timezone in ALL analysisSteps when provided
+- Use dynamic timezone-aware casting: created_at AT TIME ZONE '${userTimezone}' 
+- Relative time: Use date_trunc() for "this month", "last week" calculations
+- Current year context: ${new Date().getFullYear()} (use for relative dates)
+- Example time range preservation:
+  * If user query has timeRange, ALL analysisSteps MUST include the same timeRange
+  * Vector searches MUST preserve time constraints from SQL steps
+
+**CRITICAL VECTOR SEARCH WITH TIME:**
+- ALWAYS copy timeRange from previous steps to vector searches
+- If ANY analysisStep has timeRange, ALL subsequent steps should preserve it
+- Vector fallbacks MUST retain original time constraints
+- Use semantic queries matching user language + relevant emotions/themes
 
 SUB-QUESTION/QUERIES GENERATION GUIDELINE (MANDATORY): 
-- Break down user query (MANDATORY: remember that current user message might not be a direct query, so you'll have to look in to the conversation context provided to you and look at last user messages to guess the "ASK" and accordingly frame the sub-questions) into ATLEAST 2 sub-questions or more such that all sub-questions can be consolidated to answer the user's ASK 
-- CRITICAL: When analyzing vague queries like "I'm confused between these two options" or "help me decide", look at the FULL conversation context to understand what the two options are (e.g., "jobs vs startup", "career choices", etc.) and generate specific sub-questions about those topics
-- If user's query is vague, examine the complete conversation history to derive what the user wants to know and frame sub-questions that address their specific decision or dilemma
-- For career/life decisions: Generate sub-questions about patterns, emotions, and insights related to the specific options being considered
-- For eg. user asks (What % of entries contain the emotion confidence (and is it the dominant one?) when I deal with family matters that also concern health issues? -> sub question 1: How many entries concern family and health both? sub question 2: What are all the emotions and their avg scores ? sub question 3: Rank the emotions)
-
-**SQL GUIDELINES:**
-- ALWAYS use auth.uid() for user filtering (it will be replaced with the actual UUID);    
-- NEVER hardcode user IDs or generate fake UUIDs
-- Use sqlQueryType: "filtering" for retrieving entries
-- Use sqlQueryType: "analysis" for COUNT, AVG, SUM, percentages, statistics
-- For count queries: SELECT COUNT(*) AS total_entries
-- For percentage queries: Use proper calculations with ROUND((count * 100.0 / total), 1)
-- Include timezone in timeRange objects: "timezone": "${userTimezone}"
-
-**CRITICAL DATE HANDLING:**
-- ALWAYS use current year ${new Date().getFullYear()} for relative time references like "current month", "this month", "last month"
-- For "current month": Use '${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-01T00:00:00+${userTimezone.includes('/') ? '05:30' : '+00:00'}' as start date
-- For "last month": Calculate previous month using current year unless explicitly stated otherwise
-- Examples of CORRECT date ranges:
-  * Current month (August 2025): '2025-08-01T00:00:00+05:30' to '2025-09-01T00:00:00+05:30'
-  * Last month (July 2025): '2025-07-01T00:00:00+05:30' to '2025-08-01T00:00:00+05:30'
-
-**VECTOR SEARCH:**
-- Use semantic queries that match user's language and intent
-- Append relevant emotions/themes from database context
-- Set appropriate threshold (0.3 default) and limit (15 default)
+- Break down user query (MANDATORY: examine conversation context to understand the actual "ASK") into ATLEAST 2 sub-questions 
+- CRITICAL: For vague queries, look at FULL conversation context to understand specific topics/decisions
+- For analysis queries: Generate sub-questions that build upon each other logically
+- ALWAYS preserve timeRange and timezone across ALL analysisSteps when provided
+- Example structure: sq1 filters entries → sq2 analyzes those entries → sq3 ranks/compares results
 
 USER QUERY: "${message}"
 USER TIMEZONE: "${userTimezone}"
@@ -878,13 +889,13 @@ Response format (MUST be valid JSON):
       "dependencies": ["sq1", "sq2"] or [],
       "resultForwarding": "entry_ids_for_next_steps|emotion_data_for_ranking|null",
       "executionMode": "parallel|sequential|conditional",
-      "analysisSteps": [
+          "analysisSteps": [
         {
           "step": 1,
           "description": "What this step does",
           "queryType": "vector_search|sql_analysis|hybrid_search",
           "sqlQueryType": "filtering|analysis",
-          "sqlQuery": "COMPLETE EXECUTABLE SQL QUERY using only existing database schema and working patterns" or null,
+          "sqlQuery": "COMPLETE PostgreSQL query using exact schema: SELECT * FROM \"Journal Entries\" WHERE user_id = auth.uid() AND condition" or null,
           "vectorSearch": {
             "query": "Semantically rich search query using user's words",
             "threshold": 0.3,
