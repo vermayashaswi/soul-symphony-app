@@ -952,59 +952,50 @@ MANDATORY COLUMNS & DATA TYPES (PostgreSQL):
 
 ===== MANDATORY SQL PATTERNS =====
 
-**EMOTION ANALYSIS (COPY EXACTLY):**
-```sql
+EMOTION ANALYSIS (COPY EXACTLY):
 SELECT e.key as emotion, ROUND(AVG((e.value::text)::numeric), 3) as avg_score 
 FROM "Journal Entries" entries, jsonb_each(entries.emotions) e 
 WHERE entries.user_id = auth.uid() 
 GROUP BY e.key 
 ORDER BY avg_score DESC LIMIT 5
-```
 
-**SENTIMENT ANALYSIS (COPY EXACTLY):**
-```sql  
+SENTIMENT ANALYSIS (COPY EXACTLY):
 SELECT ROUND(AVG(entries.sentiment::numeric), 3) as avg_sentiment 
 FROM "Journal Entries" entries 
 WHERE entries.user_id = auth.uid()
-```
 
-**THEME ANALYSIS (COPY EXACTLY):**
-```sql
+THEME ANALYSIS (COPY EXACTLY):
 SELECT theme, COUNT(*) as count 
 FROM "Journal Entries" entries, unnest(entries.master_themes) as theme 
 WHERE entries.user_id = auth.uid() 
 GROUP BY theme 
 ORDER BY count DESC LIMIT 5
-```
 
-**TIME-FILTERED CONTENT (COPY EXACTLY):**
-```sql
+TIME-FILTERED CONTENT (COPY EXACTLY):
 SELECT entries.id, entries."refined text", entries.created_at
 FROM "Journal Entries" entries
 WHERE entries.user_id = auth.uid() 
 AND entries.created_at >= (NOW() AT TIME ZONE '${userTimezone}' - INTERVAL '7 days')
 ORDER BY entries.created_at DESC
-```
 
 ===== CRITICAL: VECTOR SEARCH FUNCTION SPECIFICATION =====
 
-**ONLY FUNCTION FOR TIME-CONSTRAINED VECTOR SEARCH:**
-Function: `match_journal_entries_with_date`
+ONLY FUNCTION FOR TIME-CONSTRAINED VECTOR SEARCH:
+Function: match_journal_entries_with_date
 Parameters: (query_embedding, match_threshold, match_count, user_id_filter, start_date, end_date)
 
-**WHEN TO USE VECTOR SEARCH WITH TIME:**
+WHEN TO USE VECTOR SEARCH WITH TIME:
 - User mentions specific time periods (this week, last month, recently, etc.)
 - Emotional/semantic queries with time context
 - Theme analysis over time periods
 - Any question combining content search + time filter
 
-**VECTOR SEARCH PARAMETERS:**
+VECTOR SEARCH PARAMETERS:
 - threshold: 0.15-0.25 for time-constrained (lower to compensate for filtering)
 - limit: 15-25 for time-constrained (higher to compensate for filtering)  
 - query: Use user's semantic terms + context (emotions, themes, time words)
 
-**EXAMPLE VECTOR SEARCH STEP:**
-```json
+EXAMPLE VECTOR SEARCH STEP:
 {
   "step": 1,
   "description": "Vector search for emotional content from this week",
@@ -1020,7 +1011,6 @@ Parameters: (query_embedding, match_threshold, match_count, user_id_filter, star
     "timezone": "${userTimezone}"
   }
 }
-```
 
 ===== HOLISTIC QUERY SCENARIOS =====
 
