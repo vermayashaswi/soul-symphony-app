@@ -28,6 +28,7 @@ export const useNotifications = () => {
   useEffect(() => {
     // Clear notifications when user logs out
     if (!user) {
+      console.log('[useNotifications] User logged out, clearing state');
       setNotifications([]);
       setUnreadCount(0);
       setIsLoading(false);
@@ -35,22 +36,29 @@ export const useNotifications = () => {
       return;
     }
 
-    loadNotifications();
-    loadUnreadCount();
+    console.log('[useNotifications] User authenticated, loading notifications');
+    
+    // Small delay to ensure user state is fully loaded
+    const timeoutId = setTimeout(() => {
+      loadNotifications();
+      loadUnreadCount();
+    }, 100);
     
     // Set up real-time subscription for new notifications
     const channel = supabase
-      .channel('notification-updates')
+      .channel(`notification-updates-${user.id}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
-          table: 'user_app_notifications'
+          table: 'user_app_notifications',
+          filter: `user_id=eq.${user.id}`
         },
         (payload) => {
-          console.log('Notification update:', payload);
+          console.log('[useNotifications] Real-time notification update:', payload);
           if (user) {
+            // Reload notifications and count
             loadNotifications();
             loadUnreadCount();
             
@@ -69,37 +77,52 @@ export const useNotifications = () => {
       .subscribe();
 
     return () => {
+      clearTimeout(timeoutId);
       supabase.removeChannel(channel);
     };
   }, [toast, user]);
 
-  const loadNotifications = async () => {
+  const loadNotifications = async (retryCount = 0) => {
     if (!user) {
+      console.log('[useNotifications] No user, clearing notifications');
       setNotifications([]);
       setIsLoading(false);
+      setError(null);
       return;
     }
 
+    console.log('[useNotifications] Loading notifications for user:', user.id);
     setIsLoading(true);
     setError(null);
+    
     try {
       const { data, error } = await supabase
         .from('user_app_notifications')
         .select('*')
+        .eq('user_id', user.id)
         .is('dismissed_at', null)
         .order('created_at', { ascending: false })
         .limit(20);
 
       if (error) {
-        console.error('Error loading notifications:', error);
-        setError('Failed to load notifications');
-        return;
+        console.error('[useNotifications] Supabase error loading notifications:', error);
+        throw error;
       }
 
+      console.log('[useNotifications] Loaded notifications:', data?.length || 0);
       setNotifications((data || []) as AppNotification[]);
-    } catch (error) {
-      console.error('Error loading notifications:', error);
-      setError('Failed to load notifications');
+      setError(null);
+    } catch (error: any) {
+      console.error('[useNotifications] Error loading notifications:', error);
+      const errorMessage = error?.message || 'Failed to load notifications';
+      setError(errorMessage);
+      
+      // Retry logic for network errors
+      if (retryCount < 2 && (errorMessage.includes('network') || errorMessage.includes('timeout'))) {
+        console.log('[useNotifications] Retrying notification load, attempt:', retryCount + 1);
+        setTimeout(() => loadNotifications(retryCount + 1), 1000 * (retryCount + 1));
+        return;
+      }
     } finally {
       setIsLoading(false);
     }
@@ -107,6 +130,7 @@ export const useNotifications = () => {
 
   const loadUnreadCount = async () => {
     if (!user) {
+      console.log('[useNotifications] No user for unread count');
       setUnreadCount(0);
       return;
     }
@@ -115,17 +139,19 @@ export const useNotifications = () => {
       const { count, error } = await supabase
         .from('user_app_notifications')
         .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
         .is('read_at', null)
         .is('dismissed_at', null);
 
       if (error) {
-        console.error('Error loading unread count:', error);
+        console.error('[useNotifications] Error loading unread count:', error);
         return;
       }
 
+      console.log('[useNotifications] Unread count:', count || 0);
       setUnreadCount(count || 0);
     } catch (error) {
-      console.error('Error loading unread count:', error);
+      console.error('[useNotifications] Error loading unread count:', error);
     }
   };
 
@@ -244,6 +270,14 @@ export const useNotifications = () => {
     }
   };
 
+  // Add retry function for manual retry attempts
+  const retryLoadNotifications = () => {
+    console.log('[useNotifications] Manual retry requested');
+    setError(null);
+    loadNotifications();
+    loadUnreadCount();
+  };
+
   return {
     notifications,
     unreadCount,
@@ -255,7 +289,7 @@ export const useNotifications = () => {
     dismissNotification,
     markAllAsRead,
     createNotification,
-    loadNotifications,
+    loadNotifications: retryLoadNotifications,
     loadUnreadCount
   };
 };

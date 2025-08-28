@@ -925,22 +925,6 @@ function SettingsContent() {
                 {/* Replace old notification toggle with new categorized preferences */}
                 <NotificationPreferencesSection className="mb-6" />
                 
-                {/* Permission Status Display */}
-                <div className="pt-3">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">
-                      <TranslatableText text="Permission Status" />
-                    </span>
-                    <div className="flex items-center gap-2">
-                      {getPermissionStatusIcon()}
-                      <span className="text-foreground">
-                        <TranslatableText text={getPermissionStatusText()} />
-                      </span>
-                    </div>
-                  </div>
-                  
-                </div>
-                
                 {notificationsEnabled && notificationReminders.length > 0 && (
                   <div className="pt-2 text-sm text-muted-foreground">
                     <div className="flex items-center gap-2 mb-1">

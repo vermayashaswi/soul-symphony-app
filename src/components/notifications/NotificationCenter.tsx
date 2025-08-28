@@ -136,14 +136,18 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, 
             </div>
           ) : error ? (
             <div className="p-4 text-center text-muted-foreground">
-              <TranslatableText text="Failed to load notifications" />
+              <div className="mb-2">
+                <TranslatableText text="Failed to load notifications" />
+              </div>
+              <div className="text-xs text-muted-foreground mb-3">
+                {error}
+              </div>
               <Button 
                 variant="outline" 
                 size="sm" 
-                className="mt-2"
-                onClick={() => loadNotifications()}
+                onClick={loadNotifications}
               >
-                <TranslatableText text="Retry" />
+                <TranslatableText text="Try Again" />
               </Button>
             </div>
           ) : isLoading ? (
