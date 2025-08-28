@@ -126,8 +126,11 @@ serve(async (req) => {
               body
             },
             data: {
-              ...(data || {}),
-              ...(actionUrl ? { action_url: actionUrl } : {})
+              // Convert all data values to strings for FCM compatibility
+              ...(data ? Object.fromEntries(
+                Object.entries(data).map(([key, value]) => [key, String(value)])
+              ) : {}),
+              ...(actionUrl ? { action_url: String(actionUrl) } : {})
             },
             webpush: actionUrl ? {
               fcm_options: {

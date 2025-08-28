@@ -498,7 +498,9 @@ const messaging = firebase.messaging();
 
 // Handle background messages
 messaging.onBackgroundMessage((payload) => {
-  console.log('[SW] Received background message ', payload);
+  console.log('[SW] Received background message:', payload);
+  console.log('[SW] Background message payload data:', payload.data);
+  console.log('[SW] Background message notification:', payload.notification);
 
   const notificationTitle = payload.notification?.title || 'Soulo Notification';
   const notificationOptions = {

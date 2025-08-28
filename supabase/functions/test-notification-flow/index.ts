@@ -79,7 +79,8 @@ serve(async (req) => {
           data: {
             type: 'test_fcm_push',
             test_id: 'fcm-direct-test',
-            bypass: bypassUserPreferences
+            bypass: String(bypassUserPreferences),
+            timestamp: String(Date.now())
           },
           actionUrl: 'https://571d731e-b54b-453e-9f48-a2c79a572930.lovableproject.com/app/journal'
         }
