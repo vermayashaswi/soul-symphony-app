@@ -870,97 +870,191 @@ async function analyzeQueryWithSubQuestions(message, conversationContext, userEn
 CRITICAL DATABASE SCHEMA (PostgreSQL):
 ${databaseSchemaContext}
 
-**MANDATORY POSTGRESQL PATTERNS - COPY THESE EXACTLY:**
+===== COMPLETE JOURNAL ENTRIES TABLE COLUMN SPECIFICATION =====
 
-**CORRECT JSONB EMOTION QUERIES:**
-✅ WORKING: SELECT e.key as emotion, ROUND(AVG((e.value::text)::numeric), 3) as avg_score FROM "Journal Entries" entries, jsonb_each(entries.emotions) e WHERE entries.user_id = auth.uid() GROUP BY e.key ORDER BY avg_score DESC LIMIT 5
+Table: "Journal Entries" (ALWAYS use quotes)
+MANDATORY COLUMNS & DATA TYPES (PostgreSQL):
 
-✅ WORKING: SELECT entries.id FROM "Journal Entries" entries WHERE entries.user_id = auth.uid() AND entries.emotions ? 'happiness' AND (entries.emotions->>'happiness')::numeric > 0.5
+1. **id** (bigint, Primary Key): Entry identifier
+   ✅ VALID: entries.id = 123
+   ❌ INVALID: entries.id::text = '123'
 
-❌ BROKEN: SELECT json_object_keys(emotions) AS emotion, AVG((emotions->>json_object_keys(emotions))::numeric)
-❌ BROKEN: SELECT jsonb_object_keys(emotions) AS emotion, AVG((emotions->>jsonb_object_keys(emotions))::numeric)
+2. **user_id** (uuid, NOT NULL): User identifier  
+   ✅ VALID: entries.user_id = auth.uid()
+   ✅ VALID: entries.user_id = '1e7caad7-180d-439c-abd4-2f0d45256f68'
+   ❌ INVALID: entries.user_id::text = 'uuid-string'
 
-**CORRECT ARRAY THEME QUERIES:**
-✅ WORKING: SELECT theme, COUNT(*) as count FROM "Journal Entries" entries, unnest(entries.master_themes) as theme WHERE entries.user_id = auth.uid() GROUP BY theme ORDER BY count DESC LIMIT 5
+3. **"refined text"** (text, Nullable): Main content - ALWAYS use quotes
+   ✅ VALID: entries."refined text"
+   ✅ VALID: COALESCE(entries."refined text", entries."transcription text") as content
+   ❌ INVALID: entries.refined_text, entries.refinedtext
 
-✅ WORKING: SELECT * FROM "Journal Entries" WHERE user_id = auth.uid() AND 'work' = ANY(master_themes)
+4. **"transcription text"** (text, Default ''): Original speech - ALWAYS use quotes
+   ✅ VALID: entries."transcription text"
+   ❌ INVALID: entries.transcription_text, entries.transcriptiontext
 
-**CORRECT ENTITY QUERIES (JSONB):**
-✅ WORKING: SELECT entity_name, COUNT(*) FROM "Journal Entries" entries, jsonb_each(entries.entities) as ent(ent_key, ent_value), jsonb_array_elements_text(ent_value) as entity_name WHERE entries.user_id = auth.uid() GROUP BY entity_name
+5. **sentiment** (real, Nullable): Sentiment score (-1 to 1)
+   ✅ VALID: ROUND(AVG(entries.sentiment::numeric), 3) as avg_sentiment
+   ✅ VALID: entries.sentiment::numeric > 0.5
+   ❌ BROKEN: ROUND(AVG(entries.sentiment), 3) -- WILL FAIL: real type incompatible
+   ❌ BROKEN: SELECT sentiment FROM... -- Direct real math operations fail
 
-**CORRECT TIME QUERIES:**
-✅ WORKING: SELECT * FROM "Journal Entries" WHERE user_id = auth.uid() AND created_at >= (NOW() AT TIME ZONE '${userTimezone}' - INTERVAL '7 days')
+6. **emotions** (jsonb, Nullable): Emotion scores as {"emotion": 0.85}
+   ✅ VALID: SELECT e.key as emotion, ROUND(AVG((e.value::text)::numeric), 3) as avg_score FROM "Journal Entries" entries, jsonb_each(entries.emotions) e WHERE entries.user_id = auth.uid() GROUP BY e.key
+   ✅ VALID: entries.emotions ? 'happiness' AND (entries.emotions->>'happiness')::numeric > 0.5
+   ❌ BROKEN: jsonb_object_keys(emotions) -- Function doesn't exist
+   ❌ BROKEN: json_object_keys(emotions) -- Wrong function for jsonb
 
-✅ WORKING: SELECT * FROM "Journal Entries" WHERE user_id = auth.uid() AND created_at >= '2025-08-21T00:00:00+05:30'::timestamptz AND created_at <= '2025-08-28T23:59:59+05:30'::timestamptz
+7. **master_themes** (text[], Nullable): Theme categories
+   ✅ VALID: SELECT theme, COUNT(*) FROM "Journal Entries" entries, unnest(entries.master_themes) as theme WHERE entries.user_id = auth.uid() GROUP BY theme
+   ✅ VALID: entries.master_themes @> ARRAY['work']
+   ✅ VALID: 'work' = ANY(entries.master_themes)
+   ❌ INVALID: entries.master_themes[0] -- Direct array indexing risky
 
-**MANDATORY COLUMN QUOTING:**
-- Table: "Journal Entries" (ALWAYS with quotes)
-- Content: "refined text" (ALWAYS with quotes)
-- NEVER use: refined_text, journal_entries, transcription_text
+8. **entities** (jsonb, Nullable): Named entities as {"person": ["John", "Mary"]}
+   ✅ VALID: SELECT entity_name, COUNT(*) FROM "Journal Entries" entries, jsonb_each(entries.entities) as ent(ent_key, ent_value), jsonb_array_elements_text(ent_value) as entity_name WHERE entries.user_id = auth.uid() GROUP BY entity_name
+   ❌ INVALID: Mixing jsonb functions incorrectly
 
-**FORBIDDEN PATTERNS:**
-❌ json_object_keys() with JSONB data
-❌ Nested aggregate functions in SELECT with GROUP BY
-❌ Unquoted table/column names with spaces
-❌ Direct JSONB key access without proper casting
+9. **created_at** (timestamp with time zone, NOT NULL): Entry creation time
+   ✅ VALID: entries.created_at >= (NOW() AT TIME ZONE '${userTimezone}' - INTERVAL '7 days')
+   ✅ VALID: entries.created_at >= '2025-08-21T00:00:00+05:30'::timestamptz
+   ✅ VALID: DATE_TRUNC('day', entries.created_at AT TIME ZONE '${userTimezone}')
+   ❌ INVALID: created_at > 'today' -- Use proper timestamp
 
-**SQL QUERY TYPE CLASSIFICATION:**
-- "filtering": SELECT entries/rows (returns journal entry records)
-- "analysis": COUNT/AVG/SUM operations (returns computed statistics)
+10. **duration** (numeric, Nullable): Entry length in seconds
+    ✅ VALID: entries.duration > 60.0
+    ✅ VALID: AVG(entries.duration)
 
-**CRITICAL: VECTOR SEARCH WITH TIME CONSTRAINTS PRIORITY:**
-When user asks time-specific questions, PRIORITIZE vector search with time constraints:
+11. **themeemotion** (jsonb, Nullable): Theme-emotion relationships
+    ✅ VALID: jsonb_each(entries.themeemotion)
+    
+12. **entityemotion** (jsonb, Nullable): Entity-emotion relationships  
+    ✅ VALID: jsonb_each(entries.entityemotion)
 
-**EXAMPLE 1 - Recent emotion analysis:**
-User: "How have I been feeling this week?"
-PREFERRED APPROACH:
+===== CRITICAL DATA TYPE CASTING RULES =====
+
+**REAL TO NUMERIC CASTING (MANDATORY for sentiment):**
+✅ CORRECT: entries.sentiment::numeric
+✅ CORRECT: ROUND(AVG(entries.sentiment::numeric), 3)
+✅ CORRECT: CAST(entries.sentiment AS numeric)
+❌ BROKEN: ROUND(AVG(entries.sentiment), 3) -- WILL FAIL
+❌ BROKEN: entries.sentiment + 1 -- WILL FAIL
+
+**JSONB VALUE EXTRACTION:**
+✅ CORRECT: (entries.emotions->>'happiness')::numeric
+✅ CORRECT: (e.value::text)::numeric from jsonb_each
+❌ BROKEN: entries.emotions->'happiness'::numeric -- Wrong cast order
+
+**TEXT ARRAY OPERATIONS:**
+✅ CORRECT: unnest(entries.master_themes) as theme
+✅ CORRECT: array_length(entries.master_themes, 1)
+❌ BROKEN: entries.master_themes[*] -- Postgres doesn't support
+
+===== MANDATORY SQL PATTERNS =====
+
+**EMOTION ANALYSIS (COPY EXACTLY):**
+```sql
+SELECT e.key as emotion, ROUND(AVG((e.value::text)::numeric), 3) as avg_score 
+FROM "Journal Entries" entries, jsonb_each(entries.emotions) e 
+WHERE entries.user_id = auth.uid() 
+GROUP BY e.key 
+ORDER BY avg_score DESC LIMIT 5
+```
+
+**SENTIMENT ANALYSIS (COPY EXACTLY):**
+```sql  
+SELECT ROUND(AVG(entries.sentiment::numeric), 3) as avg_sentiment 
+FROM "Journal Entries" entries 
+WHERE entries.user_id = auth.uid()
+```
+
+**THEME ANALYSIS (COPY EXACTLY):**
+```sql
+SELECT theme, COUNT(*) as count 
+FROM "Journal Entries" entries, unnest(entries.master_themes) as theme 
+WHERE entries.user_id = auth.uid() 
+GROUP BY theme 
+ORDER BY count DESC LIMIT 5
+```
+
+**TIME-FILTERED CONTENT (COPY EXACTLY):**
+```sql
+SELECT entries.id, entries."refined text", entries.created_at
+FROM "Journal Entries" entries
+WHERE entries.user_id = auth.uid() 
+AND entries.created_at >= (NOW() AT TIME ZONE '${userTimezone}' - INTERVAL '7 days')
+ORDER BY entries.created_at DESC
+```
+
+===== CRITICAL: VECTOR SEARCH FUNCTION SPECIFICATION =====
+
+**ONLY FUNCTION FOR TIME-CONSTRAINED VECTOR SEARCH:**
+Function: `match_journal_entries_with_date`
+Parameters: (query_embedding, match_threshold, match_count, user_id_filter, start_date, end_date)
+
+**WHEN TO USE VECTOR SEARCH WITH TIME:**
+- User mentions specific time periods (this week, last month, recently, etc.)
+- Emotional/semantic queries with time context
+- Theme analysis over time periods
+- Any question combining content search + time filter
+
+**VECTOR SEARCH PARAMETERS:**
+- threshold: 0.15-0.25 for time-constrained (lower to compensate for filtering)
+- limit: 15-25 for time-constrained (higher to compensate for filtering)  
+- query: Use user's semantic terms + context (emotions, themes, time words)
+
+**EXAMPLE VECTOR SEARCH STEP:**
+```json
 {
   "step": 1,
   "description": "Vector search for emotional content from this week",
   "queryType": "vector_search",
   "vectorSearch": {
-    "query": "emotions feelings mood this week",
-    "threshold": 0.25,
-    "limit": 15
-  },
-  "timeRange": {
-    "start": "2024-08-21T00:00:00Z",
-    "end": "2024-08-28T23:59:59Z",
-    "timezone": "${userTimezone}"
-  }
-}
-
-**EXAMPLE 2 - Monthly theme analysis:**
-User: "What themes appeared in my December entries?"
-PREFERRED APPROACH:
-{
-  "step": 1,
-  "description": "Vector search for December themes and patterns",
-  "queryType": "vector_search",
-  "vectorSearch": {
-    "query": "themes topics concerns December monthly patterns",
+    "query": "emotions feelings mood this week recent",
     "threshold": 0.2,
     "limit": 20
   },
   "timeRange": {
-    "start": "2023-12-01T00:00:00Z",
-    "end": "2023-12-31T23:59:59Z",
+    "start": "2025-08-21T00:00:00+05:30",
+    "end": "2025-08-28T23:59:59+05:30", 
     "timezone": "${userTimezone}"
   }
 }
+```
 
-**TIME RANGE PRESERVATION RULES:**
-1. IF user query mentions time → ALL analysisSteps MUST have timeRange
-2. Vector searches with time constraints have PRIORITY over SQL for semantic queries
-3. Use progressive fallback: exact time → expanded time → no constraints  
-4. Lower thresholds (0.15-0.25) for time-constrained vector searches
-5. Higher limits (15-25) for time-constrained searches to compensate for filtering
+===== HOLISTIC QUERY SCENARIOS =====
 
-**PROGRESSIVE TIME HANDLING:**
-- Recent: last 7 days with timezone awareness
-- This week: current week boundary in user timezone
-- This month: current month boundary in user timezone
-- Specific dates: convert to user timezone with proper ISO format
+**SCENARIO 1: Time + Emotions + Vector Priority**
+User: "How have I been feeling this week?"
+✅ PREFERRED: Vector search with time range (threshold: 0.2, limit: 20)
+✅ BACKUP: SQL emotion analysis with time filter
+❌ AVOID: SQL-only without semantic understanding
+
+**SCENARIO 2: Theme Analysis + Time**  
+User: "What work issues came up last month?"
+✅ PREFERRED: Vector search "work issues problems stress" with time range
+✅ BACKUP: SQL theme filter + vector search for context
+❌ AVOID: Theme array query without semantic search
+
+**SCENARIO 3: Sentiment Tracking**
+User: "Has my mood been improving?"  
+✅ PREFERRED: Vector search + SQL sentiment trend analysis
+✅ REQUIRED: CAST sentiment to numeric for all math operations
+❌ BROKEN: Direct ROUND(AVG(sentiment)) without casting
+
+**SCENARIO 4: Entity + Emotion Relationships**
+User: "How do I feel about John lately?"
+✅ PREFERRED: Vector search "John emotions feelings" with time range
+✅ BACKUP: Entity-emotion JSON analysis with person filter
+❌ AVOID: Simple entity search without emotional context
+
+===== PROGRESSIVE FALLBACK STRATEGY =====
+
+1. **Primary**: Vector search with exact time range (threshold: 0.2)
+2. **Secondary**: Vector search with expanded time range (threshold: 0.18)
+3. **Tertiary**: Vector search with broader time (threshold: 0.15)
+4. **Final**: Vector search without time constraints (threshold: 0.25)
+5. **Last Resort**: SQL analysis with proper data type casting
 
 USER QUERY: "${message}"
 USER TIMEZONE: "${userTimezone}"
