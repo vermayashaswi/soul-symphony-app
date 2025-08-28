@@ -95,6 +95,8 @@ Deno.serve(async (req) => {
               category: 'Reward',
               sendInApp: false, // Only push notifications for status bar
               sendPush: true,
+              actionUrl: '/app/insights',
+              actionLabel: 'View Progress',
               data: {
                 streak_days: currentStreak,
                 action: 'open_journal'

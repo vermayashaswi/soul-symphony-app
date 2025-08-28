@@ -164,6 +164,8 @@ Create a personalized, engaging notification that references their themes and en
             category: 'Engagement',
             sendInApp: false, // Only push notifications for status bar
             sendPush: true,
+            actionUrl: '/app/journal?tab=record',
+            actionLabel: 'Record Entry',
             data: {
               entry_count: user.entry_count,
               themes_analyzed: uniqueThemes,

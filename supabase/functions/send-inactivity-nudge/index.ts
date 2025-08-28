@@ -129,6 +129,8 @@ Deno.serve(async (req) => {
             category: 'Activation',
             sendInApp: false, // Only push notifications for status bar
             sendPush: true,
+            actionUrl: '/app/journal?tab=record',
+            actionLabel: 'Start Journaling',
             data: {
               days: targetDays,
               action: 'open_journal'

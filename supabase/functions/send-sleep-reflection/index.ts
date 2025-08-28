@@ -103,6 +103,8 @@ Deno.serve(async (req) => {
             category: 'Activation',
             sendInApp: false, // Only push notifications for status bar
             sendPush: true,
+            actionUrl: '/app/journal?tab=record',
+            actionLabel: 'Reflect Now',
             data: {
               local_hour: userLocalHour,
               timezone: userTimezone,
