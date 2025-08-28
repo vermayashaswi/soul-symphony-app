@@ -18,6 +18,13 @@ interface NotificationPreferences {
   journaling_reminders: boolean;
 }
 
+interface Reminder {
+  id: string;
+  enabled: boolean;
+  time: string;
+  label: string;
+}
+
 interface NotificationPreferencesSectionProps {
   className?: string;
 }
@@ -33,6 +40,7 @@ export function NotificationPreferencesSection({ className }: NotificationPrefer
   const [isLoading, setIsLoading] = useState(true);
   const [showCustomTimeModal, setShowCustomTimeModal] = useState(false);
   const [permissionState, setPermissionState] = useState<'checking' | 'granted' | 'denied' | 'error'>('checking');
+  const [existingReminders, setExistingReminders] = useState<Reminder[]>([]);
 
   // Enhanced tooltip state management
   const [openTooltips, setOpenTooltips] = useState<Record<string, boolean>>({});
@@ -41,6 +49,7 @@ export function NotificationPreferencesSection({ className }: NotificationPrefer
   // Load preferences from database
   useEffect(() => {
     loadPreferences();
+    loadReminderSettings();
     checkPermissionStatus();
   }, [user]);
 
@@ -68,6 +77,54 @@ export function NotificationPreferencesSection({ className }: NotificationPrefer
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const loadReminderSettings = async () => {
+    if (!user?.id) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('reminder_settings')
+        .eq('id', user.id)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error loading reminder settings:', error);
+        return;
+      }
+
+      if (data?.reminder_settings) {
+        const reminders = convertDbRemindersToModalFormat(data.reminder_settings);
+        setExistingReminders(reminders);
+      }
+    } catch (error) {
+      console.error('Error loading reminder settings:', error);
+    }
+  };
+
+  const convertDbRemindersToModalFormat = (dbReminders: any): Reminder[] => {
+    if (!dbReminders || typeof dbReminders !== 'object') {
+      return [];
+    }
+
+    return Object.entries(dbReminders).map(([id, reminderData]: [string, any]) => ({
+      id,
+      enabled: reminderData.enabled || false,
+      time: reminderData.time || '08:00',
+      label: reminderData.label || 'Journal Reminder'
+    }));
+  };
+
+  const convertModalRemindersToDbFormat = (reminders: Reminder[]): any => {
+    return reminders.reduce((acc, reminder) => ({
+      ...acc,
+      [reminder.id]: {
+        time: reminder.time,
+        label: reminder.label,
+        enabled: reminder.enabled
+      }
+    }), {});
   };
 
   const checkPermissionStatus = async () => {
@@ -156,11 +213,23 @@ export function NotificationPreferencesSection({ className }: NotificationPrefer
     }
   };
 
-  const handleJournalingRemindersSave = async (reminders: any[]) => {
+  const handleJournalingRemindersSave = async (reminders: Reminder[]) => {
     try {
-      await fcmNotificationService.saveReminderSettings({ reminders });
-      toast.success(<TranslatableText text="Reminder settings saved successfully" forceTranslate={true} />);
-      setShowCustomTimeModal(false);
+      // Update the existingReminders state
+      setExistingReminders(reminders);
+      
+      // Save to FCM service (which handles database updates and scheduling)
+      const result = await fcmNotificationService.saveReminderSettings({ reminders });
+      
+      if (result.success) {
+        toast.success(<TranslatableText text="Reminder settings saved successfully" forceTranslate={true} />);
+        setShowCustomTimeModal(false);
+        
+        // Reload reminder settings to get the latest data
+        await loadReminderSettings();
+      } else {
+        throw new Error(result.error || 'Failed to save reminders');
+      }
     } catch (error) {
       console.error('Error saving reminders:', error);
       toast.error(<TranslatableText text="Failed to save reminder settings" forceTranslate={true} />);
@@ -386,6 +455,7 @@ export function NotificationPreferencesSection({ className }: NotificationPrefer
         isOpen={showCustomTimeModal}
         onClose={() => setShowCustomTimeModal(false)}
         onSave={handleJournalingRemindersSave}
+        initialReminders={existingReminders}
       />
     </TooltipProvider>
   );
