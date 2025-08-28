@@ -264,6 +264,7 @@ export type Database = {
           created_at: string
           display_name: string | null
           email: string | null
+          entry_count: number | null
           full_name: string | null
           id: string
           is_premium: boolean | null
@@ -285,6 +286,7 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           email?: string | null
+          entry_count?: number | null
           full_name?: string | null
           id: string
           is_premium?: boolean | null
@@ -306,6 +308,7 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           email?: string | null
+          entry_count?: number | null
           full_name?: string | null
           id?: string
           is_premium?: boolean | null
@@ -808,6 +811,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calculate_user_streak: {
+        Args: { user_id_param: string }
+        Returns: number
+      }
       check_database_health: {
         Args: Record<PropertyKey, never>
         Returns: Json
