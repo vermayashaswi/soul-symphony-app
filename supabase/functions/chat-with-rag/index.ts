@@ -211,6 +211,35 @@ serve(async (req) => {
       classification.category = hintCategory;
     }
 
+    // Create assistant message record after successful classification
+    if (threadId) {
+      try {
+        console.log(`[chat-with-rag] Creating assistant message record for thread: ${threadId}`);
+        
+        const { data: newMessage, error: messageError } = await supabaseClient
+          .from('chat_messages')
+          .insert({
+            thread_id: threadId,
+            content: "Processing your request...",
+            sender: 'assistant',
+            role: 'assistant',
+            is_processing: true,
+            request_correlation_id: requestCorrelationId
+          })
+          .select('id')
+          .single();
+
+        if (messageError) {
+          console.error('[chat-with-rag] Error creating assistant message:', messageError);
+        } else {
+          assistantMessageId = newMessage.id;
+          console.log(`[chat-with-rag] Created assistant message with ID: ${assistantMessageId}`);
+        }
+      } catch (createError) {
+        console.error('[chat-with-rag] Exception creating assistant message:', createError);
+      }
+    }
+
     if (classification.category === 'JOURNAL_SPECIFIC') {
       console.log("[chat-with-rag] EXECUTING: JOURNAL_SPECIFIC pipeline - full RAG processing");
       
@@ -324,16 +353,31 @@ serve(async (req) => {
         hasStatusMessage: !!userStatusMessage
       });
 
-      // Update the assistant message with the final response
+      // Update the assistant message with the final response and analysis data
       if (assistantMessageId && finalResponse) {
         try {
+          const updateData = {
+            content: finalResponse,
+            is_processing: false,
+            // Store analysis data from consolidator if available
+            analysis_data: consolidationResponse.data?.analysisMetadata || null,
+            // Store sub-query responses if available in execution results
+            sub_query_responses: executionResult || null,
+            // Store reference entries if available
+            reference_entries: consolidationResponse.data?.referenceEntries || null
+          };
+
           await supabaseClient
             .from('chat_messages')
-            .update({
-              content: finalResponse
-            })
+            .update(updateData)
             .eq('id', assistantMessageId);
-          console.log(`[chat-with-rag] Updated assistant message ${assistantMessageId} with response`);
+          
+          console.log(`[chat-with-rag] Updated assistant message ${assistantMessageId} with response and analysis data:`, {
+            hasAnalysisData: !!updateData.analysis_data,
+            hasSubQueryResponses: !!updateData.sub_query_responses,
+            hasReferenceEntries: !!updateData.reference_entries,
+            responseLength: finalResponse?.length || 0
+          });
         } catch (updateError) {
           console.error('[chat-with-rag] Error updating assistant message:', updateError);
         }
