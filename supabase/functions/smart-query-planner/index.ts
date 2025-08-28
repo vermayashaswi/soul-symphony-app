@@ -211,6 +211,75 @@ async function processExecutionResults(allResults: any[], userId: string, totalE
 }
 
 /**
+ * Enhanced SQL query validation to catch common PostgreSQL errors before execution
+ */
+function validateSQLQuery(sqlQuery: string): { isValid: boolean; errors: string[]; suggestions: string[] } {
+  const errors: string[] = [];
+  const suggestions: string[] = [];
+  
+  // Check for common JSONB mistakes
+  if (sqlQuery.includes('json_object_keys(emotions)') && sqlQuery.includes('jsonb')) {
+    errors.push('Mixing json_object_keys() with JSONB data type');
+    suggestions.push('Use jsonb_object_keys(emotions) for JSONB columns or jsonb_each(emotions) for key-value iteration');
+  }
+  
+  // Check for incorrect emotion querying patterns
+  if (sqlQuery.includes('emotions->') && !sqlQuery.includes('::numeric')) {
+    suggestions.push('Remember to cast JSONB values to numeric: (emotions->>\'emotion_name\')::numeric');
+  }
+  
+  // Check for table name quoting
+  if (sqlQuery.includes('Journal Entries') && !sqlQuery.includes('"Journal Entries"')) {
+    errors.push('Table name with spaces must be quoted');
+    suggestions.push('Use "Journal Entries" (with quotes) for table name');
+  }
+  
+  // Check for column name issues
+  if (sqlQuery.includes('refined text') && !sqlQuery.includes('"refined text"')) {
+    errors.push('Column name with spaces must be quoted');
+    suggestions.push('Use "refined text" (with quotes) for column name');
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors,
+    suggestions
+  };
+}
+
+/**
+ * Rewrite problematic SQL patterns to working ones
+ */
+function rewriteProblematicSQL(sqlQuery: string): string {
+  let rewritten = sqlQuery;
+  
+  // Fix json_object_keys for JSONB
+  rewritten = rewritten.replace(/json_object_keys\(emotions\)/g, 'jsonb_object_keys(emotions)');
+  
+  // Fix JSONB iteration patterns - replace problematic nested aggregation
+  if (rewritten.includes('jsonb_object_keys(emotions)') && rewritten.includes('AVG((emotions->>jsonb_object_keys(emotions))::numeric)')) {
+    // Replace with proper JSONB iteration using jsonb_each
+    rewritten = rewritten.replace(
+      /SELECT jsonb_object_keys\(emotions\) AS emotion, ROUND\(AVG\(\(emotions->>jsonb_object_keys\(emotions\)\)::numeric\), 3\) AS avg_score FROM "Journal Entries" WHERE user_id = auth\.uid\(\)(.*?)GROUP BY emotion/gs,
+      `WITH emotion_scores AS (
+        SELECT e.key as emotion_name, (e.value::text)::numeric as emotion_score
+        FROM "Journal Entries" entries, jsonb_each(entries.emotions) e
+        WHERE entries.user_id = auth.uid()$1
+      )
+      SELECT emotion_name as emotion, ROUND(AVG(emotion_score), 3) as avg_score 
+      FROM emotion_scores 
+      GROUP BY emotion_name`
+    );
+  }
+  
+  // Add proper table and column quoting
+  rewritten = rewritten.replace(/Journal Entries(?!")/g, '"Journal Entries"');
+  rewritten = rewritten.replace(/refined text(?!")/g, '"refined text"');
+  
+  return rewritten;
+}
+
+/**
  * Process SQL analysis results (COUNT, AVG, SUM, etc.)
  */
 async function processAnalysisResults(sqlResults: any[], totalEntries: number, requestId: string) {
@@ -784,7 +853,7 @@ async function analyzeQueryWithSubQuestions(message, conversationContext, userEn
   try {
     const last = Array.isArray(conversationContext) ? conversationContext.slice(-6) : [];
     
-    console.log(`[Query Planner] Processing query with user timezone: ${userTimezone}`);
+    console.log(`[Query Planner] Processing query with enhanced validation and user timezone: ${userTimezone}`);
     
     // Get live database schema with real themes and emotions using the authenticated client
     const databaseSchemaContext = await generateDatabaseSchemaContext(supabaseClient);
@@ -794,65 +863,62 @@ async function analyzeQueryWithSubQuestions(message, conversationContext, userEn
     const hasExplicitTimeReference = /\b(last week|yesterday|this week|last month|today|recently|lately|this morning|last night|august|january|february|march|april|may|june|july|september|october|november|december)\b/i.test(message.toLowerCase());
     const isFollowUpContext = isFollowUp || /\b(that|those|it|this|these|above|mentioned|said|talked about)\b/i.test(message.toLowerCase());
     
-    console.log(`[Query Planner] Basic analysis - Personal: ${hasPersonalPronouns}, Time ref: ${hasExplicitTimeReference}, Follow-up: ${isFollowUpContext}`);
+    console.log(`[Query Planner] Enhanced analysis - Personal: ${hasPersonalPronouns}, Time ref: ${hasExplicitTimeReference}, Follow-up: ${isFollowUpContext}`);
 
-    const prompt = `You are Ruh's Intelligent Query Planner - a pure execution engine for a voice journaling app called SOuLO. Your ONLY job is to analyze user queries and return structured JSON plans for execution.
+    const prompt = `You are Ruh's Enhanced Intelligent Query Planner - a precise execution engine for a voice journaling app called SOuLO. Your job is to analyze user queries and return structured JSON plans with BULLETPROOF PostgreSQL queries.
 
-You are provided with this database schema: ${databaseSchemaContext} **CRITICAL DATABASE TYPE: This is a PostgreSQL database. Use PostgreSQL-specific syntax and functions.**
+CRITICAL DATABASE SCHEMA (PostgreSQL):
+${databaseSchemaContext}
 
-**CRITICAL DATABASE SCHEMA REQUIREMENTS:**
-- EXACT TABLE NAME: "Journal Entries" (with quotes, case-sensitive)
-- EXACT COLUMN NAMES (case-sensitive, with quotes where needed):
-  * user_id (uuid)
-  * created_at (timestamptz)
-  * "refined text" (text, MUST use quotes)
-  * emotions (jsonb)
-  * master_themes (text array)
-  * entities (jsonb)
-  * sentiment (real)
-  * themeemotion (jsonb)
-  * entityemotion (jsonb)
-  * themes (text array)
-  * duration (numeric)
-- FORBIDDEN COLUMNS: Never reference "transcription text", "foreign key", "audio_url", "user_feedback", "edit_status", "translation_status"
+**MANDATORY POSTGRESQL PATTERNS - COPY THESE EXACTLY:**
 
-**ENHANCED SQL GENERATION GUIDELINES:**
-- ALWAYS use auth.uid() for user filtering (replaced with actual UUID during execution)
-- NEVER hardcode user IDs or generate fake UUIDs
-- EXACT COLUMN SYNTAX: Use "refined text" (with quotes) for content
-- JSONB OPERATIONS: For emotions use emotions->>'emotion_name', for entities use jsonb_array_elements_text(entities->'entity_type')
-- ARRAY OPERATIONS: For master_themes use ANY(master_themes) or unnest(master_themes)
-- TIME FILTERING: Always cast to timestamptz: created_at >= '2025-08-01T00:00:00+05:30'::timestamptz
-- AGGREGATIONS: Use proper PostgreSQL functions: COUNT(*), AVG(), ROUND(AVG(value)::numeric, 2)
-- Query Types: Use "filtering" for SELECT entries, "analysis" for COUNT/AVG/SUM operations
+**CORRECT JSONB EMOTION QUERIES:**
+✅ WORKING: SELECT e.key as emotion, ROUND(AVG((e.value::text)::numeric), 3) as avg_score FROM "Journal Entries" entries, jsonb_each(entries.emotions) e WHERE entries.user_id = auth.uid() GROUP BY e.key ORDER BY avg_score DESC LIMIT 5
 
-**CRITICAL POSTGRESQL EXAMPLES:**
-CORRECT emotion query: SELECT * FROM "Journal Entries" WHERE user_id = auth.uid() AND emotions ? 'happiness'
-CORRECT theme query: SELECT * FROM "Journal Entries" WHERE user_id = auth.uid() AND 'work' = ANY(master_themes)
-CORRECT time query: SELECT * FROM "Journal Entries" WHERE user_id = auth.uid() AND created_at >= '2025-08-01T00:00:00+05:30'::timestamptz
-WRONG: SELECT * FROM journal_entries WHERE user_id = 'uuid-string' AND emotions.happiness > 0.5
+✅ WORKING: SELECT entries.id FROM "Journal Entries" entries WHERE entries.user_id = auth.uid() AND entries.emotions ? 'happiness' AND (entries.emotions->>'happiness')::numeric > 0.5
 
-**ENHANCED TIME RANGE HANDLING:**
-- ALWAYS preserve timeRange and timezone in ALL analysisSteps when provided
-- Use dynamic timezone-aware casting: created_at AT TIME ZONE '${userTimezone}' 
-- Relative time: Use date_trunc() for "this month", "last week" calculations
-- Current year context: ${new Date().getFullYear()} (use for relative dates)
-- Example time range preservation:
-  * If user query has timeRange, ALL analysisSteps MUST include the same timeRange
-  * Vector searches MUST preserve time constraints from SQL steps
+❌ BROKEN: SELECT json_object_keys(emotions) AS emotion, AVG((emotions->>json_object_keys(emotions))::numeric)
+❌ BROKEN: SELECT jsonb_object_keys(emotions) AS emotion, AVG((emotions->>jsonb_object_keys(emotions))::numeric)
 
-**CRITICAL VECTOR SEARCH WITH TIME:**
-- ALWAYS copy timeRange from previous steps to vector searches
-- If ANY analysisStep has timeRange, ALL subsequent steps should preserve it
-- Vector fallbacks MUST retain original time constraints
-- Use semantic queries matching user language + relevant emotions/themes
+**CORRECT ARRAY THEME QUERIES:**
+✅ WORKING: SELECT theme, COUNT(*) as count FROM "Journal Entries" entries, unnest(entries.master_themes) as theme WHERE entries.user_id = auth.uid() GROUP BY theme ORDER BY count DESC LIMIT 5
 
-SUB-QUESTION/QUERIES GENERATION GUIDELINE (MANDATORY): 
-- Break down user query (MANDATORY: examine conversation context to understand the actual "ASK") into ATLEAST 2 sub-questions 
-- CRITICAL: For vague queries, look at FULL conversation context to understand specific topics/decisions
-- For analysis queries: Generate sub-questions that build upon each other logically
-- ALWAYS preserve timeRange and timezone across ALL analysisSteps when provided
-- Example structure: sq1 filters entries → sq2 analyzes those entries → sq3 ranks/compares results
+✅ WORKING: SELECT * FROM "Journal Entries" WHERE user_id = auth.uid() AND 'work' = ANY(master_themes)
+
+**CORRECT ENTITY QUERIES (JSONB):**
+✅ WORKING: SELECT entity_name, COUNT(*) FROM "Journal Entries" entries, jsonb_each(entries.entities) as ent(ent_key, ent_value), jsonb_array_elements_text(ent_value) as entity_name WHERE entries.user_id = auth.uid() GROUP BY entity_name
+
+**CORRECT TIME QUERIES:**
+✅ WORKING: SELECT * FROM "Journal Entries" WHERE user_id = auth.uid() AND created_at >= (NOW() AT TIME ZONE '${userTimezone}' - INTERVAL '7 days')
+
+✅ WORKING: SELECT * FROM "Journal Entries" WHERE user_id = auth.uid() AND created_at >= '2025-08-21T00:00:00+05:30'::timestamptz AND created_at <= '2025-08-28T23:59:59+05:30'::timestamptz
+
+**MANDATORY COLUMN QUOTING:**
+- Table: "Journal Entries" (ALWAYS with quotes)
+- Content: "refined text" (ALWAYS with quotes)
+- NEVER use: refined_text, journal_entries, transcription_text
+
+**FORBIDDEN PATTERNS:**
+❌ json_object_keys() with JSONB data
+❌ Nested aggregate functions in SELECT with GROUP BY
+❌ Unquoted table/column names with spaces
+❌ Direct JSONB key access without proper casting
+
+**SQL QUERY TYPE CLASSIFICATION:**
+- "filtering": SELECT entries/rows (returns journal entry records)
+- "analysis": COUNT/AVG/SUM operations (returns computed statistics)
+
+**ENHANCED TIME RANGE PRESERVATION RULES:**
+1. IF user query mentions time → ALL analysisSteps MUST have timeRange
+2. IF sq1 has timeRange → ALL subsequent steps (sq2, sq3) MUST copy the same timeRange
+3. Vector searches MUST preserve timeRange from SQL steps
+4. Use timezone-aware casting: created_at AT TIME ZONE '${userTimezone}'
+
+**PROGRESSIVE TIME HANDLING:**
+- Recent: last 7 days
+- This week: current week boundary  
+- This month: current month boundary
+- Specific dates: convert to user timezone
 
 USER QUERY: "${message}"
 USER TIMEZONE: "${userTimezone}"
@@ -860,21 +926,21 @@ CURRENT DATE: ${new Date().toISOString().split('T')[0]} (YYYY-MM-DD format)
 CURRENT YEAR: ${new Date().getFullYear()}
 CONVERSATION CONTEXT: ${last.length > 0 ? last.map((m)=>`${m.role || m.sender}: ${m.content || 'N/A'}`).join('\n  ') : 'None'}
 
-**CRITICAL CONVERSATION CONTEXT INSTRUCTIONS:**
-MANDATORY: Look at the conversation context provided to you with roles. Logically figure out what the "ASK" is by:
-1. Identifying what the ASSISTANT previously provided (e.g., sentiment analysis, emotion data)
-2. Understanding how the current USER message relates to or builds upon that previous response
-3. When user asks follow-up questions like "how has it been moving", connect it to the TOPIC of the previous assistant response
-4. Generate sub-questions that CONTINUE the analysis thread from previous conversation, not start a new unrelated analysis
-5. When user says "these emotions" or similar references like event, time, themes, (can be anything), check the conversation context for specific emotion names mentioned in previous ASSISTANT responses
+**CRITICAL CONTEXT ANALYSIS:**
+Examine the conversation context to understand the actual user intent:
+1. Look at previous ASSISTANT responses for topics discussed (emotions, themes, time periods)
+2. Connect current USER message to those topics
+3. When user asks "how has it been moving" or similar, link to the SPECIFIC topic from previous analysis
+4. Generate sub-questions that CONTINUE the analysis thread, not start new unrelated analysis
+5. Preserve entity names, emotion names, time periods from previous responses
 
 ANALYSIS STATUS:
 - Personal pronouns: ${hasPersonalPronouns}
-- Time reference: ${hasExplicitTimeReference}
+- Time reference: ${hasExplicitTimeReference}  
 - Follow-up query: ${isFollowUpContext}
 - User timezone: ${userTimezone}
 
-Response format (MUST be valid JSON):
+**RESPONSE FORMAT (MUST be valid JSON):**
 {
   "queryType": "journal_specific|general_inquiry|mental_health",
   "strategy": "intelligent_sub_query|comprehensive_hybrid|vector_mandatory",
@@ -886,38 +952,47 @@ Response format (MUST be valid JSON):
       "purpose": "Why this question is needed",
       "searchStrategy": "vector_mandatory|sql_primary|hybrid_parallel",
       "executionStage": 1,
-      "dependencies": ["sq1", "sq2"] or [],
+      "dependencies": [],
       "resultForwarding": "entry_ids_for_next_steps|emotion_data_for_ranking|null",
       "executionMode": "parallel|sequential|conditional",
-          "analysisSteps": [
+      "analysisSteps": [
         {
           "step": 1,
           "description": "What this step does",
           "queryType": "vector_search|sql_analysis|hybrid_search",
           "sqlQueryType": "filtering|analysis",
-          "sqlQuery": "COMPLETE PostgreSQL query using exact schema: SELECT * FROM \"Journal Entries\" WHERE user_id = auth.uid() AND condition" or null,
+          "sqlQuery": "COMPLETE PostgreSQL query using EXACT patterns above" or null,
           "vectorSearch": {
-            "query": "Semantically rich search query using user's words",
+            "query": "Semantic search query using user's words + relevant emotions/themes",
             "threshold": 0.3,
             "limit": 15
           } or null,
           "timeRange": {"start": "ISO_DATE", "end": "ISO_DATE", "timezone": "${userTimezone}"} or null,
           "resultContext": "use_entry_ids_from_sq1|use_emotion_data_from_sq2|null",
-          "dependencies": ["sq1"] or []
+          "dependencies": [] or ["sq1"]
         }
       ]
     }
   ],
   "confidence": 0.8,
-  "reasoning": "Explanation of strategy with emphasis on dependency management and execution orchestration",
+  "reasoning": "Strategy explanation with context awareness",
   "useAllEntries": boolean,
   "hasPersonalPronouns": ${hasPersonalPronouns},
   "hasExplicitTimeReference": ${hasExplicitTimeReference},
   "inferredTimeContext": null or timeframe_object_with_timezone,
-  "userTimezone": "${userTimezone}"
-}`;
+  "userTimezone": "${userTimezone}",
+  "sqlValidationEnabled": true,
+  "progressiveTimeExpansion": ${hasExplicitTimeReference}
+}
 
-    console.log(`[Query Planner] Calling OpenAI API for intelligent plan generation`);
+**MANDATORY QUALITY CHECKS:**
+✓ All SQL queries use exact patterns from examples above
+✓ timeRange preserved across ALL analysisSteps when applicable
+✓ JSONB queries use jsonb_each() not json_object_keys()
+✓ Proper column/table quoting with spaces
+✓ Timezone-aware date operations`;
+
+    console.log(`[Query Planner] Calling OpenAI API with enhanced PostgreSQL patterns`);
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -926,12 +1001,12 @@ Response format (MUST be valid JSON):
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4.1-mini-2025-04-14',
+        model: 'gpt-4.1-2025-04-14',
         messages: [
           { role: 'system', content: prompt },
           { role: 'user', content: message }
         ],
-        max_completion_tokens: 2000,
+        max_completion_tokens: 2500,
         response_format: { type: "json_object" }
       }),
     });
@@ -947,27 +1022,54 @@ Response format (MUST be valid JSON):
     let queryPlan;
     try {
       queryPlan = JSON.parse(data.choices[0].message.content);
-      console.log(`[Query Planner] Query plan generated successfully with ${queryPlan.subQuestions?.length || 0} sub-questions`);
+      
+      // Enhanced validation and rewriting of SQL queries
+      if (queryPlan.subQuestions) {
+        for (const subQ of queryPlan.subQuestions) {
+          if (subQ.analysisSteps) {
+            for (const step of subQ.analysisSteps) {
+              if (step.sqlQuery) {
+                const validation = validateSQLQuery(step.sqlQuery);
+                if (!validation.isValid) {
+                  console.warn(`[Query Planner] SQL validation failed for ${subQ.id}: ${validation.errors.join(', ')}`);
+                  console.log(`[Query Planner] Suggestions: ${validation.suggestions.join(', ')}`);
+                  
+                  // Attempt to rewrite the query
+                  const rewritten = rewriteProblematicSQL(step.sqlQuery);
+                  if (rewritten !== step.sqlQuery) {
+                    console.log(`[Query Planner] Rewrote SQL query for ${subQ.id}`);
+                    step.sqlQuery = rewritten;
+                    step.originalQuery = step.sqlQuery; // Keep track of original
+                    step.wasRewritten = true;
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+      
+      console.log(`[Query Planner] Enhanced query plan generated with ${queryPlan.subQuestions?.length || 0} sub-questions`);
     } catch (parseError) {
       console.error(`[Query Planner] JSON parsing error:`, parseError);
       console.error(`[Query Planner] Raw response:`, data.choices[0].message.content);
-      throw new Error('Failed to parse query plan from OpenAI response');
+      throw new Error('Failed to parse enhanced query plan from OpenAI response');
     }
 
     return queryPlan;
 
   } catch (error) {
-    console.error(`[Query Planner] Error in analyzeQueryWithSubQuestions:`, error);
+    console.error(`[Query Planner] Error in enhanced query analysis:`, error);
     
-    // Simple fallback - basic query plan
+    // Enhanced fallback with better SQL patterns
     return {
       queryType: "journal_specific",
-      strategy: "comprehensive_hybrid",
-      userStatusMessage: "Analyzing your journal entries...",
+      strategy: "comprehensive_hybrid", 
+      userStatusMessage: "Analyzing your journal entries with enhanced patterns...",
       subQuestions: [{
         id: "sq1",
-        question: "Find relevant journal entries",
-        purpose: "Retrieve entries that match the user's query",
+        question: "Find relevant journal entries using enhanced search",
+        purpose: "Retrieve entries with improved PostgreSQL patterns",
         searchStrategy: "hybrid_parallel",
         executionStage: 1,
         dependencies: [],
@@ -975,7 +1077,7 @@ Response format (MUST be valid JSON):
         executionMode: "parallel",
         analysisSteps: [{
           step: 1,
-          description: "Search for relevant entries",
+          description: "Enhanced search with proper SQL patterns",
           queryType: "hybrid_search",
           sqlQueryType: "filtering",
           sqlQuery: 'SELECT * FROM "Journal Entries" WHERE user_id = auth.uid() ORDER BY created_at DESC LIMIT 25',
@@ -990,12 +1092,14 @@ Response format (MUST be valid JSON):
         }]
       }],
       confidence: 0.6,
-      reasoning: "Using fallback plan due to OpenAI processing error",
+      reasoning: "Using enhanced fallback plan with improved PostgreSQL patterns",
       useAllEntries: false,
       hasPersonalPronouns: /\b(i|me|my|mine|myself)\b/i.test(message.toLowerCase()),
       hasExplicitTimeReference: /\b(last week|yesterday|this week|last month|today|recently|lately|this morning|last night|august|january|february|march|april|may|june|july|september|october|november|december)\b/i.test(message.toLowerCase()),
       inferredTimeContext: null,
-      userTimezone
+      userTimezone,
+      sqlValidationEnabled: true,
+      progressiveTimeExpansion: false
     };
   }
 }
