@@ -100,7 +100,7 @@ class FCMNotificationService {
         console.log('[FCMNotificationService] Native notification action performed:', notification);
         
         // Handle notification tap - navigate to action URL if available
-        const actionUrl = notification.notification.data?.actionUrl;
+        const actionUrl = notification.notification.data?.action_url || notification.notification.data?.actionUrl;
         if (actionUrl) {
           console.log('[FCMNotificationService] Navigating to action URL:', actionUrl);
           // Use native navigation service for proper app navigation

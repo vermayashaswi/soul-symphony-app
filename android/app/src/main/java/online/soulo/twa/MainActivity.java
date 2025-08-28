@@ -1,5 +1,7 @@
 package online.soulo.twa;
 
+import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.view.View;
 import android.view.WindowManager;
@@ -11,11 +13,47 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         
+        // Handle notification click intent data
+        handleIntentData(getIntent());
+        
         // Configure immersive mode for status bar auto-hide
         setupImmersiveMode();
         
         // Listen for system UI visibility changes to maintain immersive mode
         setupSystemUIVisibilityListener();
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        // Handle new intents (e.g., from notification clicks when app is already running)
+        handleIntentData(intent);
+    }
+
+    private void handleIntentData(Intent intent) {
+        if (intent != null && intent.getExtras() != null) {
+            Bundle extras = intent.getExtras();
+            
+            // Check for FCM notification data
+            String actionUrl = extras.getString("action_url");
+            if (actionUrl != null && !actionUrl.isEmpty()) {
+                // Navigate to the specified URL in the webview
+                getBridge().getWebView().post(() -> {
+                    getBridge().getWebView().evaluateJavascript(
+                        "window.location.href = '" + actionUrl + "';", null);
+                });
+            }
+            
+            // Handle deep link URIs
+            Uri data = intent.getData();
+            if (data != null) {
+                String deepLink = data.toString();
+                getBridge().getWebView().post(() -> {
+                    getBridge().getWebView().evaluateJavascript(
+                        "window.location.href = '" + deepLink + "';", null);
+                });
+            }
+        }
     }
     
     private void setupImmersiveMode() {

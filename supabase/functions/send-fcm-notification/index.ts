@@ -139,8 +139,11 @@ serve(async (req) => {
             } : undefined,
             android: {
               notification: {
-                click_action: 'OPEN_MAIN_ACTIVITY',
                 channel_id: 'default'
+              },
+              data: {
+                // Ensure action_url is available in data for native handling
+                ...(actionUrl ? { action_url: String(actionUrl) } : {})
               }
             },
             apns: {
