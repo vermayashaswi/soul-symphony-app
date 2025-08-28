@@ -55,7 +55,7 @@ const Navbar = () => {
           <Button
             size="sm"
             onClick={openAppStore}
-            className="text-sm"
+            className="text-sm bg-black text-white hover:bg-gray-800"
           >
             <Apple className="mr-2 h-4 w-4" />
             <TranslatableText text="App Store" />
@@ -103,7 +103,7 @@ const Navbar = () => {
             </Link>
             <Button
               size="sm"
-              className="w-full mb-2"
+              className="w-full mb-2 bg-black text-white hover:bg-gray-800"
               onClick={openAppStore}
             >
               <Apple className="mr-2 h-4 w-4" />
