@@ -5,10 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { TranslatableText } from '@/components/translation/TranslatableText';
-import { CustomTimeRemindersModal } from './CustomTimeRemindersModal';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { fcmNotificationService } from '@/services/fcmNotificationService';
 import { toast } from 'sonner';
 
 interface NotificationPreferences {
@@ -16,13 +14,6 @@ interface NotificationPreferences {
   in_app_notifications: boolean;
   insightful_reminders: boolean;
   journaling_reminders: boolean;
-}
-
-interface Reminder {
-  id: string;
-  enabled: boolean;
-  time: string;
-  label: string;
 }
 
 interface NotificationPreferencesSectionProps {
@@ -38,9 +29,6 @@ export function NotificationPreferencesSection({ className }: NotificationPrefer
     journaling_reminders: true
   });
   const [isLoading, setIsLoading] = useState(true);
-  const [showCustomTimeModal, setShowCustomTimeModal] = useState(false);
-  const [permissionState, setPermissionState] = useState<'checking' | 'granted' | 'denied' | 'error'>('checking');
-  const [existingReminders, setExistingReminders] = useState<Reminder[]>([]);
 
   // Enhanced tooltip state management
   const [openTooltips, setOpenTooltips] = useState<Record<string, boolean>>({});
@@ -49,8 +37,6 @@ export function NotificationPreferencesSection({ className }: NotificationPrefer
   // Load preferences from database
   useEffect(() => {
     loadPreferences();
-    loadReminderSettings();
-    checkPermissionStatus();
   }, [user]);
 
   const loadPreferences = async () => {
@@ -76,64 +62,6 @@ export function NotificationPreferencesSection({ className }: NotificationPrefer
       console.error('Error loading preferences:', error);
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const loadReminderSettings = async () => {
-    if (!user?.id) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('reminder_settings')
-        .eq('id', user.id)
-        .single();
-
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error loading reminder settings:', error);
-        return;
-      }
-
-      if (data?.reminder_settings) {
-        const reminders = convertDbRemindersToModalFormat(data.reminder_settings);
-        setExistingReminders(reminders);
-      }
-    } catch (error) {
-      console.error('Error loading reminder settings:', error);
-    }
-  };
-
-  const convertDbRemindersToModalFormat = (dbReminders: any): Reminder[] => {
-    if (!dbReminders || typeof dbReminders !== 'object') {
-      return [];
-    }
-
-    return Object.entries(dbReminders).map(([id, reminderData]: [string, any]) => ({
-      id,
-      enabled: reminderData.enabled || false,
-      time: reminderData.time || '08:00',
-      label: reminderData.label || 'Journal Reminder'
-    }));
-  };
-
-  const convertModalRemindersToDbFormat = (reminders: Reminder[]): any => {
-    return reminders.reduce((acc, reminder) => ({
-      ...acc,
-      [reminder.id]: {
-        time: reminder.time,
-        label: reminder.label,
-        enabled: reminder.enabled
-      }
-    }), {});
-  };
-
-  const checkPermissionStatus = async () => {
-    try {
-      const status = fcmNotificationService.checkPermissionStatus();
-      setPermissionState(status === 'granted' ? 'granted' : 'denied');
-    } catch (error) {
-      console.error('Error checking permission:', error);
-      setPermissionState('error');
     }
   };
 
@@ -166,24 +94,10 @@ export function NotificationPreferencesSection({ className }: NotificationPrefer
 
   const handleMasterToggle = async (enabled: boolean) => {
     if (enabled) {
-      // Request permissions when enabling master notifications
-      try {
-        const result = await fcmNotificationService.requestPermissions();
-        if (result.success) {
-          setPermissionState('granted');
-          const newPreferences = { ...preferences, master_notifications: true };
-          const saved = await savePreferences(newPreferences);
-          if (saved) {
-            toast.success(<TranslatableText text="Notifications enabled successfully" forceTranslate={true} />);
-          }
-        } else {
-          setPermissionState('denied');
-          toast.error(<TranslatableText text="Notification permission denied" forceTranslate={true} />);
-        }
-      } catch (error) {
-        console.error('Error requesting permissions:', error);
-        setPermissionState('error');
-        toast.error(<TranslatableText text="Failed to request notification permission" forceTranslate={true} />);
+      const newPreferences = { ...preferences, master_notifications: true };
+      const saved = await savePreferences(newPreferences);
+      if (saved) {
+        toast.success(<TranslatableText text="Notifications enabled successfully" forceTranslate={true} />);
       }
     } else {
       // Disable all notifications when master is turned off
@@ -210,29 +124,6 @@ export function NotificationPreferencesSection({ className }: NotificationPrefer
     const saved = await savePreferences(newPreferences);
     if (saved) {
       toast.success(<TranslatableText text="Preference updated successfully" forceTranslate={true} />);
-    }
-  };
-
-  const handleJournalingRemindersSave = async (reminders: Reminder[]) => {
-    try {
-      // Update the existingReminders state
-      setExistingReminders(reminders);
-      
-      // Save to FCM service (which handles database updates and scheduling)
-      const result = await fcmNotificationService.saveReminderSettings({ reminders });
-      
-      if (result.success) {
-        toast.success(<TranslatableText text="Reminder settings saved successfully" forceTranslate={true} />);
-        setShowCustomTimeModal(false);
-        
-        // Reload reminder settings to get the latest data
-        await loadReminderSettings();
-      } else {
-        throw new Error(result.error || 'Failed to save reminders');
-      }
-    } catch (error) {
-      console.error('Error saving reminders:', error);
-      toast.error(<TranslatableText text="Failed to save reminder settings" forceTranslate={true} />);
     }
   };
 
@@ -428,16 +319,6 @@ export function NotificationPreferencesSection({ className }: NotificationPrefer
                       </p>
                     </TooltipContent>
                   </Tooltip>
-                  {preferences.journaling_reminders && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setShowCustomTimeModal(true)}
-                      className="p-0 h-4 w-4 ml-1"
-                    >
-                      <Edit3 className="h-3 w-3 text-muted-foreground hover:text-foreground" />
-                    </Button>
-                  )}
                 </div>
                 <Switch
                   checked={preferences.journaling_reminders}
@@ -449,14 +330,6 @@ export function NotificationPreferencesSection({ className }: NotificationPrefer
           )}
         </CardContent>
       </Card>
-
-      {/* Custom Time Reminders Modal */}
-      <CustomTimeRemindersModal
-        isOpen={showCustomTimeModal}
-        onClose={() => setShowCustomTimeModal(false)}
-        onSave={handleJournalingRemindersSave}
-        initialReminders={existingReminders}
-      />
     </TooltipProvider>
   );
 }
