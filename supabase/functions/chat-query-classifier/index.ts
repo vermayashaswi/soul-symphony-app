@@ -100,7 +100,11 @@ async function gptClassifyMessage(
 
 **CONTEXT OVERRIDE RULES (CHECK AFTER TENTATIVE LANGUAGE):**
 - If the user is providing definitive answers to clarifying questions with specific details, classify as "JOURNAL_SPECIFIC"
-- If user says "check", "look at", "analyze", "what does my", "in my entries", "from my data" - classify as "JOURNAL_SPECIFIC" 
+- CRITICAL: If user says phrases like "check it", "look at it", "analyze it", "check that", "what does my", "in my entries", "from my data" - ALWAYS classify as "JOURNAL_SPECIFIC" when conversation context shows they're referring to journal analysis
+- CRITICAL CONTEXT DEPENDENCY: For pronouns/contextual references like "check it", "look at that", "analyze it" - use conversation context to determine what "it" refers to:
+  * If previous messages mentioned journal analysis, emotions, patterns, or personal data → JOURNAL_SPECIFIC
+  * If conversation shows user asking for journal insights → JOURNAL_SPECIFIC
+  * If user previously expressed feelings/problems and now wants analysis → JOURNAL_SPECIFIC
 - Only upgrade to JOURNAL_SPECIFIC if the user is confident and specific, not tentative
 
 **CLARIFICATION LOOP PREVENTION:**
