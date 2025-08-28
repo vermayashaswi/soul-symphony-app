@@ -114,7 +114,7 @@ const JournalHeader: React.FC = () => {
         style={{ left: 'calc(100% - 120px)' }}
       >
         <div
-          className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-black'}`}
+          className={`text-sm font-medium text-left ${theme === 'dark' ? 'text-white' : 'text-black'}`}
           style={{
             fontWeight: 500,
             letterSpacing: '0.01em',
