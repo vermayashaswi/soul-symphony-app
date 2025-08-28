@@ -935,14 +935,7 @@ async function analyzeQueryWithSubQuestions(message, conversationContext, userEn
 CRITICAL DATABASE SCHEMA (PostgreSQL):
 ${databaseSchemaContext}
 
-## CRITICAL TIME CONTEXT PROCESSING:
-${timeRange ? `
-**EXPLICIT TIME CONSTRAINT DETECTED**: ${JSON.stringify(timeRange)}
-- APPLY THIS TIME RANGE TO ALL SQL QUERIES: WHERE entries.created_at >= '${timeRange.startDate}' AND entries.created_at < '${timeRange.endDate}'
-- USE match_journal_entries_with_date for vector searches with start_date='${timeRange.startDate}', end_date='${timeRange.endDate}'
-- GENERATE TIME-SPECIFIC SUB-QUESTIONS focusing on this exact time period
-- Example: "What were the user's emotions from ${timeRange.startDate} to ${timeRange.endDate}?" instead of all-time analysis
-` : ''}
+## CONVERSATION CONTEXT ANALYSIS:
 
 ${temporalContext?.detectedTimeframe ? `
 **TEMPORAL CONTEXT FROM ${temporalContext.source?.toUpperCase()}**: 
@@ -1388,7 +1381,7 @@ serve(async (req) => {
       }
     );
 
-    const { message, userId, execute = true, conversationContext = [], timeRange = null, threadId, messageId, isFollowUp = false, userTimezone = 'UTC', temporalContext } = await req.json();
+    const { message, userId, execute = true, conversationContext = [], threadId, messageId, isFollowUp = false, userTimezone = 'UTC', temporalContext } = await req.json();
 
     const requestId = `planner_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
     
@@ -1398,7 +1391,6 @@ serve(async (req) => {
   execute: ${execute},
   timestamp: "${new Date().toISOString()}",
   contextLength: ${conversationContext?.length || 0},
-  timeRange: ${JSON.stringify(timeRange)},
   threadId: "${threadId}",
   messageId: ${messageId},
   isFollowUp: ${isFollowUp},
