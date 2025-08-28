@@ -936,13 +936,7 @@ CRITICAL DATABASE SCHEMA (PostgreSQL):
 ${databaseSchemaContext}
 
 ## CONVERSATION CONTEXT ANALYSIS:
-
-${temporalContext?.detectedTimeframe ? `
-**TEMPORAL CONTEXT FROM ${temporalContext.source?.toUpperCase()}**: 
-${JSON.stringify(temporalContext.detectedTimeframe)}
-Conversation History: ${temporalContext.conversationHistory?.map(m => m.content.substring(0, 50)).join('; ')}
-**PRIORITIZE TIME-SPECIFIC ANALYSIS** - User is asking about a specific time period, not all-time statistics.
-` : ''}
+The conversation context will help you understand temporal references naturally.
 
 ===== COMPLETE JOURNAL ENTRIES TABLE COLUMN SPECIFICATION =====
 
@@ -1381,7 +1375,7 @@ serve(async (req) => {
       }
     );
 
-    const { message, userId, execute = true, conversationContext = [], threadId, messageId, isFollowUp = false, userTimezone = 'UTC', temporalContext } = await req.json();
+    const { message, userId, execute = true, conversationContext = [], threadId, messageId, isFollowUp = false, userTimezone = 'UTC' } = await req.json();
 
     const requestId = `planner_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
     
@@ -1394,7 +1388,7 @@ serve(async (req) => {
   threadId: "${threadId}",
   messageId: ${messageId},
   isFollowUp: ${isFollowUp},
-  temporalContext: ${JSON.stringify(temporalContext)},
+  
   userTimezone: "${userTimezone}"
 }`);
 
