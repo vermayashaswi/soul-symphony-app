@@ -909,7 +909,7 @@ GROUP BY e.key ORDER BY avg_score DESC LIMIT 10
 \`\`\`
 
 **VECTOR SEARCH EMOTION ENHANCEMENT:**
-```json
+Example vectorSearch object:
 {
   "vectorSearch": {
     "query": "sadness depression hurt disappointment loneliness regret melancholy feelings emotions mood why feeling this way recent",
@@ -917,7 +917,6 @@ GROUP BY e.key ORDER BY avg_score DESC LIMIT 10
     "limit": 20
   }
 }
-```
 
 ## CONVERSATION CONTEXT ANALYSIS:
 The conversation context will help you understand temporal references naturally.
