@@ -107,11 +107,13 @@ export async function fetchLiveMasterData(supabaseClient) {
       emotions: [
         {
           name: "amusement",
-          description: "The state or experience of finding something funny"
+          description: "The state or experience of finding something funny",
+          family: "joy"
         },
         {
           name: "anger",
-          description: "A strong feeling of annoyance, displeasure, or hostility"
+          description: "A strong feeling of annoyance, displeasure, or hostility",
+          family: "anger"
         },
         {
           name: "anticipation",
@@ -453,6 +455,15 @@ ${themes.map((theme)=>`• "${theme.name}": ${theme.description}`).join('\n')}
 **MASTER EMOTIONS (COMPLETE LIST FOR SQL QUERIES):**
 ${emotions.map((emotion)=>`• "${emotion.name}": ${emotion.description}`).join('\n')}
 
+**EMOTION FAMILIES FOR INTELLIGENT CORRELATION:**
+When user mentions any emotion, ALWAYS search for related emotions in the same family:
+
+• SADNESS FAMILY: sadness, depression, disappointment, hurt, loneliness, regret, grief, melancholy, sorrow, remorse
+• HAPPINESS FAMILY: joy, happiness, contentment, gratitude, excitement, satisfaction, amusement, pride, celebration, bliss
+• ANXIETY FAMILY: anxiety, worry, fear, concern, stress, overwhelm, nervousness, apprehension, tension
+• ANGER FAMILY: anger, frustration, irritation, rage, hate, resentment, annoyance, hostility, disgust
+• SURPRISE FAMILY: surprise, awe, confusion, curiosity, interest, enthusiasm, anticipation
+
 **CRITICAL DATABASE INSIGHTS:**
 - emotions column: Contains ONLY emotion names from the master emotions list above with scores 0.0-1.0
 - master_themes column: Contains ONLY theme names from the master themes list above as text array
@@ -462,6 +473,12 @@ ${emotions.map((emotion)=>`• "${emotion.name}": ${emotion.description}`).join(
 - For general emotion queries, use: emotions column with jsonb operators
 - Always include WHERE user_id = $user_id for security
 - Use "refined text" as the primary content source for all queries
+
+**MANDATORY EMOTION CORRELATION RULES:**
+- When user mentions "sadness" → SQL MUST query: sadness, depression, disappointment, hurt, loneliness, regret
+- When user mentions "happy" → SQL MUST query: happiness, joy, contentment, gratitude, excitement, satisfaction
+- When user mentions "anxious" → SQL MUST query: anxiety, worry, fear, concern, stress, overwhelm
+- When user mentions "angry" → SQL MUST query: anger, frustration, irritation, hate, resentment
 
 **SQL QUERY PATTERNS FOR THEME-EMOTION ANALYSIS:**
 1. Top emotions for a specific theme:

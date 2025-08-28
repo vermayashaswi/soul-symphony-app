@@ -747,6 +747,21 @@ async function executeVectorSearch(
     // Enhanced query building using SQL context for mandatory final search
     let enhancedQuery = vectorSearch.query;
     
+    if (sqlContext) {
+      // Enhanced query building with emotion families and SQL context
+      if (vectorSearch.query.includes('sadness') || enhancedQuery.includes('feeling this way')) {
+        enhancedQuery = `sadness depression hurt disappointment loneliness regret melancholy feelings emotions mood ${enhancedQuery}`;
+      }
+      
+      // Add emotions from SQL context
+      if (sqlContext.emotions && sqlContext.emotions.length > 0) {
+        const topEmotions = sqlContext.emotions.slice(0, 3).map(e => e.emotion).join(' ');
+        enhancedQuery = `${topEmotions} ${enhancedQuery}`;
+      }
+      
+      console.log(`[${requestId}] Enhanced vector query with emotion families: "${enhancedQuery}"`);
+    }
+    
     if (sqlContext && vectorSearch.query.includes('[Combine user\'s original')) {
       // This is the mandatory final search - enhance query with SQL context
       const contextTerms = [];
@@ -778,8 +793,8 @@ async function executeVectorSearch(
       console.log(`[${requestId}] Vector search with time range: ${timeRange.start} to ${timeRange.end}`);
       const { data, error } = await supabaseClient.rpc('match_journal_entries_with_date', {
         query_embedding: embedding,
-        match_threshold: vectorSearch.threshold || 0.2,
-        match_count: vectorSearch.limit || 12,
+        match_threshold: Math.max(0.12, (vectorSearch.threshold || 0.2) - 0.05),
+        match_count: Math.min(30, (vectorSearch.limit || 12) + 10),
         user_id_filter: userId,
         start_date: timeRange.start || null,
         end_date: timeRange.end || null
@@ -861,6 +876,48 @@ async function analyzeQueryWithSubQuestions(message, conversationContext, userEn
 
 CRITICAL DATABASE SCHEMA (PostgreSQL):
 ${databaseSchemaContext}
+
+===== EMOTION CORRELATION INTELLIGENCE =====
+
+**EMOTION FAMILY MAPPING (CRITICAL FOR SADNESS QUERIES):**
+When user mentions ANY emotion, you MUST search for related emotions in the same family:
+
+SADNESS FAMILY: sadness, depression, melancholy, despair, hurt, disappointment, loneliness, grief, sorrow, regret, hopelessness
+HAPPINESS FAMILY: happiness, joy, contentment, gratitude, celebration, excitement, bliss, euphoria, satisfaction, pride
+ANXIETY FAMILY: anxiety, worry, stress, overwhelm, nervousness, fear, concern, apprehension, tension, unease
+ANGER FAMILY: anger, frustration, irritation, rage, annoyance, resentment, fury, outrage, hostility, aggravation
+
+**MANDATORY EMOTION CORRELATION RULES:**
+1. If user says "sadness" → SQL MUST query: sadness, depression, hurt, disappointment, loneliness, regret
+2. If user says "happy" → SQL MUST query: happiness, joy, contentment, gratitude, celebration
+3. If user says "anxious" → SQL MUST query: anxiety, worry, stress, overwhelm, concern, fear
+4. If user says "frustrated" → SQL MUST query: frustration, anger, irritation, resentment
+
+**ENHANCED EMOTION QUERY PATTERNS:**
+```sql
+-- WRONG: Only searching mentioned emotion
+SELECT e.key as emotion, ROUND(AVG((e.value::text)::numeric), 3) as avg_score 
+FROM "Journal Entries" entries, jsonb_each(entries.emotions) e 
+WHERE entries.user_id = auth.uid() AND e.key = 'sadness'
+
+-- CORRECT: Search emotion family for comprehensive analysis
+SELECT e.key as emotion, ROUND(AVG((e.value::text)::numeric), 3) as avg_score 
+FROM "Journal Entries" entries, jsonb_each(entries.emotions) e 
+WHERE entries.user_id = auth.uid() 
+AND e.key IN ('sadness', 'depression', 'hurt', 'disappointment', 'loneliness', 'regret', 'melancholy', 'grief')
+GROUP BY e.key ORDER BY avg_score DESC LIMIT 10
+```
+
+**VECTOR SEARCH EMOTION ENHANCEMENT:**
+```json
+{
+  "vectorSearch": {
+    "query": "sadness depression hurt disappointment loneliness regret melancholy feelings emotions mood why feeling this way recent",
+    "threshold": 0.15,
+    "limit": 20
+  }
+}
+```
 
 ## CONVERSATION CONTEXT ANALYSIS:
 The conversation context will help you understand temporal references naturally.
@@ -986,9 +1043,15 @@ WHEN TO USE VECTOR SEARCH WITH TIME:
 - Any question combining content search + time filter
 
 VECTOR SEARCH PARAMETERS:
-- threshold: 0.15-0.25 for time-constrained (lower to compensate for filtering)
-- limit: 15-25 for time-constrained (higher to compensate for filtering)  
-- query: Use user's semantic terms + context (emotions, themes, time words)
+- threshold: 0.12-0.18 for time-constrained (LOWERED to compensate for filtering)
+- limit: 20-30 for time-constrained (INCREASED to compensate for filtering)  
+- query: Use user's semantic terms + EMOTION FAMILIES + context (emotions, themes, time words)
+
+**CRITICAL: EMOTION-ENHANCED VECTOR QUERIES:**
+- If user mentions sadness → "sadness depression hurt disappointment loneliness feelings emotions mood recent"
+- If user mentions happiness → "happiness joy contentment gratitude celebration feelings emotions mood recent"  
+- If user mentions anxiety → "anxiety worry stress overwhelm concern fear feelings emotions mood recent"
+- If user mentions any emotion → ALWAYS include related emotions from the same family
 
 EXAMPLE VECTOR SEARCH STEP WITH DYNAMIC TIME CALCULATION:
 {
@@ -996,9 +1059,9 @@ EXAMPLE VECTOR SEARCH STEP WITH DYNAMIC TIME CALCULATION:
   "description": "Vector search for emotional content from this week",
   "queryType": "vector_search",
   "vectorSearch": {
-    "query": "emotions feelings mood this week recent",
-    "threshold": 0.2,
-    "limit": 20
+    "query": "emotions feelings mood sadness depression hurt disappointment this week recent",
+    "threshold": 0.15,
+    "limit": 25
   },
   "timeRange": {
     "start": "[CALCULATE Monday of current week in user timezone]T00:00:00+[user timezone offset]",
@@ -1025,9 +1088,15 @@ EXAMPLE SQL WITH DYNAMIC TIME CALCULATION:
 
 **SCENARIO 1: Time + Emotions + Vector Priority**
 User: "How have I been feeling this week?"
-✅ PREFERRED: Vector search with time range (threshold: 0.2, limit: 20)
-✅ BACKUP: SQL emotion analysis with time filter
+✅ PREFERRED: Vector search with emotion families + time range (threshold: 0.15, limit: 25)
+✅ BACKUP: SQL emotion family analysis with time filter  
 ❌ AVOID: SQL-only without semantic understanding
+
+**SCENARIO 1b: Sadness Analysis (MANDATORY EMOTION FAMILIES)**
+User: "Why might I be feeling this way" (when context shows sadness)
+✅ REQUIRED: SQL with sadness family: ['sadness', 'depression', 'hurt', 'disappointment', 'loneliness', 'regret']
+✅ REQUIRED: Vector search "sadness depression hurt disappointment feelings emotions mood recent"
+❌ BROKEN: Only searching for explicitly mentioned emotions
 
 **SCENARIO 2: Theme Analysis + Time**  
 User: "What work issues came up last month?"
@@ -1049,11 +1118,11 @@ User: "How do I feel about John lately?"
 
 ===== PROGRESSIVE FALLBACK STRATEGY =====
 
-1. **Primary**: Vector search with exact time range (threshold: 0.2)
-2. **Secondary**: Vector search with expanded time range (threshold: 0.18)
-3. **Tertiary**: Vector search with broader time (threshold: 0.15)
-4. **Final**: Vector search without time constraints (threshold: 0.25)
-5. **Last Resort**: SQL analysis with proper data type casting
+1. **Primary**: Vector search with emotion families + exact time range (threshold: 0.15)
+2. **Secondary**: Vector search with emotion families + expanded time range (threshold: 0.12)  
+3. **Tertiary**: Vector search with emotion families + broader time (threshold: 0.10)
+4. **Final**: Vector search with emotion families without time constraints (threshold: 0.18)
+5. **Last Resort**: SQL emotion family analysis with proper data type casting
 
 USER QUERY: "${message}"
 USER TIMEZONE: "${userTimezone}"
