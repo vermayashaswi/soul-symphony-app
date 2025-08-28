@@ -8,6 +8,8 @@ import { TranslatableText } from '@/components/translation/TranslatableText';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { fcmNotificationService } from '@/services/fcmNotificationService';
+import { CustomTimeRemindersModal } from './CustomTimeRemindersModal';
 
 interface NotificationPreferences {
   master_notifications: boolean;
@@ -29,6 +31,8 @@ export function NotificationPreferencesSection({ className }: NotificationPrefer
     journaling_reminders: true
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [showCustomTimeModal, setShowCustomTimeModal] = useState(false);
+  const [initialReminders, setInitialReminders] = useState<any[]>([]);
 
   // Enhanced tooltip state management
   const [openTooltips, setOpenTooltips] = useState<Record<string, boolean>>({});
@@ -45,7 +49,7 @@ export function NotificationPreferencesSection({ className }: NotificationPrefer
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('notification_preferences')
+        .select('notification_preferences, reminder_settings')
         .eq('id', user.id)
         .single();
 
@@ -57,11 +61,70 @@ export function NotificationPreferencesSection({ className }: NotificationPrefer
       if (data?.notification_preferences) {
         const prefs = data.notification_preferences as unknown as NotificationPreferences;
         setPreferences(prefs);
+        
+        // Auto-check permissions if master notifications are enabled
+        if (prefs.master_notifications) {
+          console.log('[NotificationPreferencesSection] Master notifications enabled, checking permissions...');
+          try {
+            const permissionState = await fcmNotificationService.checkPermissionStatus();
+            console.log('[NotificationPreferencesSection] Current permission state:', permissionState);
+            
+            if (permissionState === 'default') {
+              console.log('[NotificationPreferencesSection] Requesting permissions for enabled master notifications...');
+              const permissionResult = await fcmNotificationService.requestPermissions();
+              if (permissionResult.granted) {
+                console.log('[NotificationPreferencesSection] Permissions granted, registering device token...');
+                await fcmNotificationService.registerDeviceToken();
+              }
+            }
+          } catch (error) {
+            console.error('[NotificationPreferencesSection] Error checking/requesting permissions:', error);
+          }
+        }
+      }
+      
+      // Load reminder settings for custom time modal
+      if (data?.reminder_settings) {
+        const reminderSettings = data.reminder_settings as any;
+        const reminders = Object.entries(reminderSettings).map(([key, value]: [string, any]) => ({
+          id: key,
+          enabled: value.enabled || false,
+          time: value.time || '08:00',
+          label: value.label || 'Reminder'
+        }));
+        setInitialReminders(reminders);
       }
     } catch (error) {
       console.error('Error loading preferences:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadReminderSettings = async () => {
+    if (!user?.id) return [];
+    
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('reminder_settings')
+        .eq('id', user.id)
+        .single();
+
+      if (error || !data?.reminder_settings) {
+        return [];
+      }
+
+      const reminderSettings = data.reminder_settings as any;
+      return Object.entries(reminderSettings).map(([key, value]: [string, any]) => ({
+        id: key,
+        enabled: value.enabled || false,
+        time: value.time || '08:00',
+        label: value.label || 'Reminder'
+      }));
+    } catch (error) {
+      console.error('Error loading reminder settings:', error);
+      return [];
     }
   };
 
@@ -94,10 +157,32 @@ export function NotificationPreferencesSection({ className }: NotificationPrefer
 
   const handleMasterToggle = async (enabled: boolean) => {
     if (enabled) {
-      const newPreferences = { ...preferences, master_notifications: true };
-      const saved = await savePreferences(newPreferences);
-      if (saved) {
-        toast.success(<TranslatableText text="Notifications enabled successfully" forceTranslate={true} />);
+      // Request permissions when master notifications are enabled
+      console.log('[NotificationPreferencesSection] Master toggle ON - requesting permissions');
+      
+      try {
+        const permissionResult = await fcmNotificationService.requestPermissions();
+        console.log('[NotificationPreferencesSection] Permission result:', permissionResult);
+        
+        if (!permissionResult.granted) {
+          toast.error(<TranslatableText text="Please allow notifications to enable this feature" forceTranslate={true} />);
+          return;
+        }
+        
+        // Auto-register device token after permission is granted
+        const tokenResult = await fcmNotificationService.registerDeviceToken();
+        if (!tokenResult.success) {
+          console.warn('[NotificationPreferencesSection] Device token registration failed:', tokenResult.error);
+        }
+        
+        const newPreferences = { ...preferences, master_notifications: true };
+        const saved = await savePreferences(newPreferences);
+        if (saved) {
+          toast.success(<TranslatableText text="Notifications enabled successfully" forceTranslate={true} />);
+        }
+      } catch (error) {
+        console.error('[NotificationPreferencesSection] Error enabling notifications:', error);
+        toast.error(<TranslatableText text="Failed to enable notifications" forceTranslate={true} />);
       }
     } else {
       // Disable all notifications when master is turned off
@@ -319,6 +404,22 @@ export function NotificationPreferencesSection({ className }: NotificationPrefer
                       </p>
                     </TooltipContent>
                   </Tooltip>
+                  
+                  {/* Edit button for custom time settings */}
+                  {preferences.journaling_reminders && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="p-0 h-4 w-4 ml-1"
+                      onClick={async () => {
+                        const reminders = await loadReminderSettings();
+                        setInitialReminders(reminders);
+                        setShowCustomTimeModal(true);
+                      }}
+                    >
+                      <Edit3 className="h-3 w-3 text-muted-foreground" />
+                    </Button>
+                  )}
                 </div>
                 <Switch
                   checked={preferences.journaling_reminders}
@@ -330,6 +431,17 @@ export function NotificationPreferencesSection({ className }: NotificationPrefer
           )}
         </CardContent>
       </Card>
+      
+      {/* Custom Time Reminders Modal */}
+      <CustomTimeRemindersModal
+        isOpen={showCustomTimeModal}
+        onClose={() => setShowCustomTimeModal(false)}
+        onSave={(reminders) => {
+          console.log('Custom reminders saved:', reminders);
+          loadPreferences(); // Reload to reflect changes
+        }}
+        initialReminders={initialReminders}
+      />
     </TooltipProvider>
   );
 }

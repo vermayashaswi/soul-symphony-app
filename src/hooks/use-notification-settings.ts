@@ -21,8 +21,8 @@ export const useNotificationSettings = () => {
     try {
       console.log('[useNotificationSettings] Loading notification settings');
       
-      // Check permission status
-      const permissionState = fcmNotificationService.checkPermissionStatus();
+      // Check permission status using async method
+      const permissionState = await fcmNotificationService.checkPermissionStatus();
       
       // Get journal reminder settings (default to empty for now)
       const reminderSettings = { enabled: false, times: [] };

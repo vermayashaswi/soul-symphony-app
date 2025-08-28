@@ -134,19 +134,23 @@ class FCMNotificationService {
     try {
       if (this.isNative) {
         // For native platforms, use Capacitor Push Notifications
+        console.log('[FCMNotificationService] Requesting native permissions...');
         
         const permissionResult = await PushNotifications.requestPermissions();
+        console.log('[FCMNotificationService] Native permission result:', permissionResult);
         
         if (permissionResult.receive !== 'granted') {
-        return { 
-          success: false, 
-          error: 'Push notification permissions not granted',
-          granted: false,
-          state: 'denied'
-        };
+          console.log('[FCMNotificationService] Native permissions denied');
+          return { 
+            success: false, 
+            error: 'Push notification permissions not granted',
+            granted: false,
+            state: 'denied'
+          };
         }
         
         // Register for push notifications and automatically register device token
+        console.log('[FCMNotificationService] Registering for push notifications...');
         await PushNotifications.register();
         
         // Auto-register device token for native platforms
@@ -155,7 +159,7 @@ class FCMNotificationService {
           console.warn('[FCMNotificationService] Auto device token registration failed:', tokenResult.error);
         }
         
-        console.log('[FCMNotificationService] Native push permissions granted');
+        console.log('[FCMNotificationService] Native push permissions granted successfully');
         return { success: true, granted: true, state: 'granted' };
       } else {
         // Web platform FCM permissions
@@ -542,15 +546,60 @@ class FCMNotificationService {
     }
   }
 
-  checkPermissionStatus(): NotificationPermissionState {
-    if (!('Notification' in window)) {
+  // Enhanced permission status check for both platforms
+  async checkPermissionStatus(): Promise<NotificationPermissionState> {
+    await this.initialize();
+    
+    try {
+      if (this.isNative) {
+        console.log('[FCMNotificationService] Checking native permission status...');
+        const status = await PushNotifications.checkPermissions();
+        console.log('[FCMNotificationService] Native permission status:', status);
+        
+        switch (status.receive) {
+          case 'granted':
+            return 'granted';
+          case 'denied':
+            return 'denied';
+          case 'prompt':
+          case 'prompt-with-rationale':
+            return 'default';
+          default:
+            return 'default';
+        }
+      } else {
+        if (!('Notification' in window)) {
+          return 'unsupported';
+        }
+        return Notification.permission as NotificationPermissionState;
+      }
+    } catch (error) {
+      console.error('[FCMNotificationService] Error checking permission status:', error);
       return 'unsupported';
     }
-    return Notification.permission as NotificationPermissionState;
   }
 
-  getPermissionInfo(): NotificationPermissionState {
-    return this.checkPermissionStatus();
+  // Legacy sync method for backwards compatibility
+  checkPermissionStatusSync(): NotificationPermissionState {
+    try {
+      if (this.isNative) {
+        // For native, we can't check synchronously, return default
+        console.warn('[FCMNotificationService] checkPermissionStatusSync called on native - use async checkPermissionStatus instead');
+        return 'default';
+      } else {
+        if (!('Notification' in window)) {
+          return 'unsupported';
+        }
+        return Notification.permission as NotificationPermissionState;
+      }
+    } catch (error) {
+      console.error('[FCMNotificationService] Error checking permission status:', error);
+      return 'unsupported';
+    }
+  }
+
+  async getPermissionInfo(): Promise<NotificationPermissionState> {
+    return await this.checkPermissionStatus();
   }
 
   // Legacy compatibility methods that do nothing but maintain interface
