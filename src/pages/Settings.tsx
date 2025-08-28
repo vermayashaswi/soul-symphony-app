@@ -918,7 +918,7 @@ function SettingsContent() {
               className="bg-background rounded-xl p-6 shadow-sm border"
             >
               <h2 className="text-xl font-semibold mb-4 text-theme-color">
-                <TranslatableText text="Preferences" />
+                <TranslatableText text="Notification Preferences" />
               </h2>
               
               <div className="space-y-3 divide-y">

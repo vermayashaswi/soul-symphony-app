@@ -223,177 +223,160 @@ export function NotificationPreferencesSection({ className }: NotificationPrefer
   return (
     <TooltipProvider>
       <Card className={className}>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Bell className="h-4 w-4" />
-            <TranslatableText text="Notification Preferences" />
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-4">
-          <div className="border rounded-lg p-2 space-y-2">
-            {/* Master Notifications Toggle */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Bell className="h-4 w-4 text-primary" />
-                <span className="text-sm font-medium">
-                  <TranslatableText text="Master Notifications" />
-                </span>
-                <Tooltip 
-                  open={openTooltips['master'] || false}
-                  onOpenChange={(open) => open ? handleTooltipOpen('master') : handleTooltipClose('master')}
-                >
-                  <TooltipTrigger asChild>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="p-0 h-4 w-4"
-                      onClick={() => handleTooltipOpen('master')}
-                    >
-                      <HelpCircle className="h-3 w-3 text-muted-foreground" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent onPointerDownOutside={() => handleTooltipClose('master')}>
-                    <p className="max-w-xs text-xs">
-                      <TranslatableText text="Controls all notification types. When disabled, no notifications will be sent." />
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-              <Switch
-                checked={preferences.master_notifications}
-                onCheckedChange={handleMasterToggle}
-                disabled={isLoading}
-              />
+        <CardContent className="p-4 space-y-2">
+          {/* Master Notifications Toggle */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Bell className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium">
+                <TranslatableText text="Master Notifications" />
+              </span>
+              <Tooltip 
+                open={openTooltips['master'] || false}
+                onOpenChange={(open) => open ? handleTooltipOpen('master') : handleTooltipClose('master')}
+              >
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="p-0 h-4 w-4"
+                    onClick={() => handleTooltipOpen('master')}
+                  >
+                    <HelpCircle className="h-3 w-3 text-muted-foreground" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent onPointerDownOutside={() => handleTooltipClose('master')}>
+                  <p className="max-w-xs text-xs">
+                    <TranslatableText text="Controls all notification types. When disabled, no notifications will be sent." />
+                  </p>
+                </TooltipContent>
+              </Tooltip>
             </div>
-
-            {/* Sub-category toggles - only show when master is enabled */}
-            {preferences.master_notifications && (
-              <>
-                {/* In-App Notifications */}
-                <div className="flex items-center justify-between pl-6">
-                  <div className="flex items-center gap-2">
-                    <Bell className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                    <span className="text-sm">
-                      <TranslatableText text="In-App Notifications" />
-                    </span>
-                    <Tooltip 
-                      open={openTooltips['inapp'] || false}
-                      onOpenChange={(open) => open ? handleTooltipOpen('inapp') : handleTooltipClose('inapp')}
-                    >
-                      <TooltipTrigger asChild>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="p-0 h-4 w-4"
-                          onClick={() => handleTooltipOpen('inapp')}
-                        >
-                          <HelpCircle className="h-3 w-3 text-muted-foreground" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent onPointerDownOutside={() => handleTooltipClose('inapp')}>
-                        <p className="max-w-xs text-xs">
-                          <TranslatableText text="Notifications that appear within the app's notification center" />
-                        </p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-                  <Switch
-                    checked={preferences.in_app_notifications}
-                    onCheckedChange={(enabled) => handleCategoryToggle('in_app_notifications', enabled)}
-                    disabled={isLoading}
-                  />
-                </div>
-
-                {/* Insightful Reminders */}
-                <div className="flex items-center justify-between pl-6">
-                  <div className="flex items-center gap-2">
-                    <Brain className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                    <span className="text-sm">
-                      <TranslatableText text="Insightful Reminders" />
-                    </span>
-                    <Tooltip 
-                      open={openTooltips['insights'] || false}
-                      onOpenChange={(open) => open ? handleTooltipOpen('insights') : handleTooltipClose('insights')}
-                    >
-                      <TooltipTrigger asChild>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="p-0 h-4 w-4"
-                          onClick={() => handleTooltipOpen('insights')}
-                        >
-                          <HelpCircle className="h-3 w-3 text-muted-foreground" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent onPointerDownOutside={() => handleTooltipClose('insights')}>
-                        <p className="max-w-xs text-xs">
-                          <TranslatableText text="Smart notifications about your progress, insights, and wellness reminders" />
-                        </p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-                  <Switch
-                    checked={preferences.insightful_reminders}
-                    onCheckedChange={(enabled) => handleCategoryToggle('insightful_reminders', enabled)}
-                    disabled={isLoading}
-                  />
-                </div>
-
-                {/* Journaling Reminders */}
-                <div className="flex items-center justify-between pl-6">
-                  <div className="flex items-center gap-2">
-                    <Edit3 className="h-4 w-4 text-green-600 dark:text-green-400" />
-                    <span className="text-sm">
-                      <TranslatableText text="Journaling Reminders" />
-                    </span>
-                    <Tooltip 
-                      open={openTooltips['journaling'] || false}
-                      onOpenChange={(open) => open ? handleTooltipOpen('journaling') : handleTooltipClose('journaling')}
-                    >
-                      <TooltipTrigger asChild>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="p-0 h-4 w-4"
-                          onClick={() => handleTooltipOpen('journaling')}
-                        >
-                          <HelpCircle className="h-3 w-3 text-muted-foreground" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent onPointerDownOutside={() => handleTooltipClose('journaling')}>
-                        <p className="max-w-xs text-xs">
-                          <TranslatableText text="Daily reminders to write in your journal at times you choose" />
-                        </p>
-                      </TooltipContent>
-                    </Tooltip>
-                    {preferences.journaling_reminders && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setShowCustomTimeModal(true)}
-                        className="p-0 h-4 w-4 ml-1"
-                      >
-                        <Edit3 className="h-3 w-3 text-muted-foreground hover:text-foreground" />
-                      </Button>
-                    )}
-                  </div>
-                  <Switch
-                    checked={preferences.journaling_reminders}
-                    onCheckedChange={(enabled) => handleCategoryToggle('journaling_reminders', enabled)}
-                    disabled={isLoading}
-                  />
-                </div>
-              </>
-            )}
+            <Switch
+              checked={preferences.master_notifications}
+              onCheckedChange={handleMasterToggle}
+              disabled={isLoading}
+            />
           </div>
 
-          {/* Permission status indicator */}
-          {permissionState !== 'checking' && (
-            <div className="text-xs text-muted-foreground mt-2">
-              <TranslatableText 
-                text={`Permission Status: ${permissionState === 'granted' ? 'Granted' : 'Denied'}`} 
-              />
-            </div>
+          {/* Sub-category toggles - only show when master is enabled */}
+          {preferences.master_notifications && (
+            <>
+              {/* In-App Notifications */}
+              <div className="flex items-center justify-between pl-6">
+                <div className="flex items-center gap-2">
+                  <Bell className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  <span className="text-sm">
+                    <TranslatableText text="In-App Notifications" />
+                  </span>
+                  <Tooltip 
+                    open={openTooltips['inapp'] || false}
+                    onOpenChange={(open) => open ? handleTooltipOpen('inapp') : handleTooltipClose('inapp')}
+                  >
+                    <TooltipTrigger asChild>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="p-0 h-4 w-4"
+                        onClick={() => handleTooltipOpen('inapp')}
+                      >
+                        <HelpCircle className="h-3 w-3 text-muted-foreground" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent onPointerDownOutside={() => handleTooltipClose('inapp')}>
+                      <p className="max-w-xs text-xs">
+                        <TranslatableText text="Notifications that appear within the app's notification center" />
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <Switch
+                  checked={preferences.in_app_notifications}
+                  onCheckedChange={(enabled) => handleCategoryToggle('in_app_notifications', enabled)}
+                  disabled={isLoading}
+                />
+              </div>
+
+              {/* Insightful Reminders */}
+              <div className="flex items-center justify-between pl-6">
+                <div className="flex items-center gap-2">
+                  <Brain className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                  <span className="text-sm">
+                    <TranslatableText text="Insightful Reminders" />
+                  </span>
+                  <Tooltip 
+                    open={openTooltips['insights'] || false}
+                    onOpenChange={(open) => open ? handleTooltipOpen('insights') : handleTooltipClose('insights')}
+                  >
+                    <TooltipTrigger asChild>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="p-0 h-4 w-4"
+                        onClick={() => handleTooltipOpen('insights')}
+                      >
+                        <HelpCircle className="h-3 w-3 text-muted-foreground" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent onPointerDownOutside={() => handleTooltipClose('insights')}>
+                      <p className="max-w-xs text-xs">
+                        <TranslatableText text="Smart notifications about your progress, insights, and wellness reminders" />
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <Switch
+                  checked={preferences.insightful_reminders}
+                  onCheckedChange={(enabled) => handleCategoryToggle('insightful_reminders', enabled)}
+                  disabled={isLoading}
+                />
+              </div>
+
+              {/* Journaling Reminders */}
+              <div className="flex items-center justify-between pl-6">
+                <div className="flex items-center gap-2">
+                  <Edit3 className="h-4 w-4 text-green-600 dark:text-green-400" />
+                  <span className="text-sm">
+                    <TranslatableText text="Journaling Reminders" />
+                  </span>
+                  <Tooltip 
+                    open={openTooltips['journaling'] || false}
+                    onOpenChange={(open) => open ? handleTooltipOpen('journaling') : handleTooltipClose('journaling')}
+                  >
+                    <TooltipTrigger asChild>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="p-0 h-4 w-4"
+                        onClick={() => handleTooltipOpen('journaling')}
+                      >
+                        <HelpCircle className="h-3 w-3 text-muted-foreground" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent onPointerDownOutside={() => handleTooltipClose('journaling')}>
+                      <p className="max-w-xs text-xs">
+                        <TranslatableText text="Daily reminders to write in your journal at times you choose" />
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                  {preferences.journaling_reminders && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowCustomTimeModal(true)}
+                      className="p-0 h-4 w-4 ml-1"
+                    >
+                      <Edit3 className="h-3 w-3 text-muted-foreground hover:text-foreground" />
+                    </Button>
+                  )}
+                </div>
+                <Switch
+                  checked={preferences.journaling_reminders}
+                  onCheckedChange={(enabled) => handleCategoryToggle('journaling_reminders', enabled)}
+                  disabled={isLoading}
+                />
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
