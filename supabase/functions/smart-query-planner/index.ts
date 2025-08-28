@@ -923,9 +923,9 @@ async function analyzeQueryWithSubQuestions(message, conversationContext, userEn
     // Get live database schema with real themes and emotions using the authenticated client
     const databaseSchemaContext = await generateDatabaseSchemaContext(supabaseClient);
 
-    // Simple detection for personalized queries and time references
+    // Enhanced detection for personalized queries and comprehensive time references
     const hasPersonalPronouns = /\b(i|me|my|mine|myself)\b/i.test(message.toLowerCase());
-    const hasExplicitTimeReference = /\b(last week|yesterday|this week|last month|today|recently|lately|this morning|last night|august|january|february|march|april|may|june|july|september|october|november|december)\b/i.test(message.toLowerCase());
+    const hasExplicitTimeReference = /\b(last\s+(?:\d+[-\s]?\d*\s+)?(?:days?|weeks?|months?|years?)|yesterday|today|this\s+(?:week|month|year|morning|evening)|past\s+(?:few\s+)?(?:days?|weeks?|months?)|recently|lately|earlier|before|after|since|until|during|when|(?:last|this)\s+(?:week|month|year|night|morning|evening|afternoon)|(?:august|january|february|march|april|may|june|july|september|october|november|december)|(?:\d{1,2}[-/]\d{1,2}[-/]\d{2,4})|(?:\d{1,2}\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec))|(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday))\b/i.test(message.toLowerCase());
     const isFollowUpContext = isFollowUp || /\b(that|those|it|this|these|above|mentioned|said|talked about)\b/i.test(message.toLowerCase());
     
     console.log(`[Query Planner] Enhanced analysis - Personal: ${hasPersonalPronouns}, Time ref: ${hasExplicitTimeReference}, Follow-up: ${isFollowUpContext}`);
@@ -1063,7 +1063,7 @@ VECTOR SEARCH PARAMETERS:
 - limit: 15-25 for time-constrained (higher to compensate for filtering)  
 - query: Use user's semantic terms + context (emotions, themes, time words)
 
-EXAMPLE VECTOR SEARCH STEP:
+EXAMPLE VECTOR SEARCH STEP WITH DYNAMIC TIME CALCULATION:
 {
   "step": 1,
   "description": "Vector search for emotional content from this week",
@@ -1074,8 +1074,22 @@ EXAMPLE VECTOR SEARCH STEP:
     "limit": 20
   },
   "timeRange": {
-    "start": "2025-08-21T00:00:00+05:30",
-    "end": "2025-08-28T23:59:59+05:30", 
+    "start": "[CALCULATE Monday of current week in user timezone]T00:00:00+[user timezone offset]",
+    "end": "[CALCULATE Sunday of current week in user timezone]T23:59:59+[user timezone offset]", 
+    "timezone": "${userTimezone}"
+  }
+}
+
+EXAMPLE SQL WITH DYNAMIC TIME CALCULATION:
+{
+  "step": 1,
+  "description": "Analyze emotions from last 7 days",
+  "queryType": "sql_analysis",
+  "sqlQueryType": "analysis",
+  "sqlQuery": "SELECT e.key as emotion, ROUND(AVG((e.value::text)::numeric), 3) as avg_score FROM \"Journal Entries\" entries, jsonb_each(entries.emotions) e WHERE entries.user_id = auth.uid() AND entries.created_at >= '[CALCULATE 7 days ago]T00:00:00+[timezone offset]'::timestamptz GROUP BY e.key ORDER BY avg_score DESC LIMIT 5",
+  "timeRange": {
+    "start": "[CALCULATE 7 days ago]T00:00:00+[timezone offset]",
+    "end": "[CALCULATE current time]T23:59:59+[timezone offset]",
     "timezone": "${userTimezone}"
   }
 }
@@ -1118,7 +1132,65 @@ USER QUERY: "${message}"
 USER TIMEZONE: "${userTimezone}"
 CURRENT DATE: ${new Date().toISOString().split('T')[0]} (YYYY-MM-DD format)
 CURRENT YEAR: ${new Date().getFullYear()}
+CURRENT TIME: ${new Date().toLocaleString('en-US', { timeZone: userTimezone })} (in user timezone)
 CONVERSATION CONTEXT: ${last.length > 0 ? last.map((m)=>`${m.role || m.sender}: ${m.content || 'N/A'}`).join('\n  ') : 'None'}
+
+===== CRITICAL: TIME RANGE CALCULATION INSTRUCTIONS =====
+
+**MANDATORY TIME CALCULATIONS FOR COMMON PHRASES:**
+
+When user mentions time phrases, you MUST calculate exact ISO timestamps:
+
+1. **"today"** = Start: ${new Date().toLocaleDateString('sv-SE', { timeZone: userTimezone })}T00:00:00+XX:XX, End: ${new Date().toLocaleDateString('sv-SE', { timeZone: userTimezone })}T23:59:59+XX:XX
+
+2. **"yesterday"** = Calculate previous day in user timezone
+
+3. **"this week"** = Calculate Monday to Sunday of current week in user timezone
+
+4. **"last week"** = Calculate Monday to Sunday of previous week in user timezone  
+
+5. **"this month"** = Calculate first day to last day of current month in user timezone
+
+6. **"last month"** = Calculate first day to last day of previous month in user timezone
+
+7. **"last 2-3 days"** = Calculate 3 days ago to now in user timezone
+
+8. **"past few days"** = Calculate 3-4 days ago to now in user timezone
+
+9. **"recently/lately"** = Calculate 7 days ago to now in user timezone
+
+10. **"last N days/weeks/months"** = Calculate N periods ago to now in user timezone
+
+**TIMEZONE OFFSET CALCULATION:**
+- For timezone "${userTimezone}": Use appropriate offset (e.g., +05:30 for Asia/Kolkata, -08:00 for US/Pacific)
+- ALWAYS include timezone offset in ISO timestamps
+- Convert "NOW()" references to actual calculated timestamps
+
+**EXAMPLE TIME RANGE CALCULATIONS:**
+
+For "last 7 days" in Asia/Kolkata timezone:
+{
+  "timeRange": {
+    "start": "${new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}T00:00:00+05:30",
+    "end": "${new Date().toISOString().split('T')[0]}T23:59:59+05:30",
+    "timezone": "${userTimezone}"
+  }
+}
+
+For "this week" in user timezone:
+{
+  "timeRange": {
+    "start": "[Calculate Monday of current week]T00:00:00+[offset]",
+    "end": "[Calculate Sunday of current week]T23:59:59+[offset]", 
+    "timezone": "${userTimezone}"
+  }
+}
+
+**CRITICAL: EVERY TIME REFERENCE MUST HAVE CALCULATED timeRange**
+- NO null timeRange values when user mentions time
+- NO "recent" without specific date calculations  
+- NO relative terms without absolute timestamps
+- ALWAYS provide both start and end ISO timestamps with timezone offset
 
 **CRITICAL CONTEXT ANALYSIS:**
 Examine the conversation context to understand the actual user intent:
@@ -1198,7 +1270,7 @@ Every query plan MUST include a final vector search step that:
           "sqlQueryType": "analysis",
           "sqlQuery": "COMPLETE PostgreSQL query using EXACT patterns above",
           "vectorSearch": null,
-          "timeRange": {"start": "ISO_DATE", "end": "ISO_DATE", "timezone": "${userTimezone}"} or null,
+          "timeRange": {"start": "[CALCULATED ISO TIMESTAMP WITH TIMEZONE]", "end": "[CALCULATED ISO TIMESTAMP WITH TIMEZONE]", "timezone": "${userTimezone}"} or null,
           "resultContext": null,
           "dependencies": []
         }
@@ -1245,7 +1317,16 @@ Every query plan MUST include a final vector search step that:
 ✓ timeRange preserved across ALL analysisSteps when applicable
 ✓ JSONB queries use jsonb_each() not json_object_keys()
 ✓ Proper column/table quoting with spaces
-✓ Timezone-aware date operations`;
+✓ Timezone-aware date operations
+✓ EVERY time reference in user query MUST have calculated timeRange with actual ISO timestamps
+✓ NO null timeRange when user mentions any temporal phrases
+✓ ALL timestamps MUST include proper timezone offset for "${userTimezone}"
+
+**FINAL VALIDATION - TIME RANGE REQUIREMENTS:**
+- If user mentions "today", "yesterday", "this week", "last week", "recently", "lately", "past few days", "last N days/weeks/months" → timeRange is MANDATORY
+- Calculate actual start/end timestamps, don't use placeholders
+- Use proper timezone offset for "${userTimezone}"
+- Both SQL and vector search steps MUST include the same timeRange when time is mentioned`;
 
     console.log(`[Query Planner] Calling OpenAI API with enhanced PostgreSQL patterns`);
 
