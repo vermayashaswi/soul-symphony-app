@@ -3,100 +3,12 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 
-// Import date-fns functions directly since we can't import from other edge function files
-import { format, parseISO, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfDay, endOfDay } from 'https://esm.sh/date-fns@4.1.0';
-import { toZonedTime } from 'https://esm.sh/date-fns-tz@3.2.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Copy the essential functions from dateProcessor.ts directly into this file
-function detectTimeframeInQuery(message: string, userTimezone: string = 'UTC'): any {
-  const lowerMessage = message.toLowerCase();
-  
-  // Simple timeframe detection logic
-  if (lowerMessage.includes('this week') || lowerMessage.includes('current week')) {
-    return { type: 'week' };
-  } else if (lowerMessage.includes('last week') || lowerMessage.includes('previous week')) {
-    return { type: 'lastWeek' };
-  } else if (lowerMessage.includes('this month') || lowerMessage.includes('current month')) {
-    return { type: 'month' };
-  } else if (lowerMessage.includes('last month') || lowerMessage.includes('previous month')) {
-    return { type: 'lastMonth' };
-  }
-  
-  // Check for specific month names
-  const months = ['january', 'february', 'march', 'april', 'may', 'june', 
-                  'july', 'august', 'september', 'october', 'november', 'december'];
-  
-  for (const month of months) {
-    if (lowerMessage.includes(month)) {
-      return { type: 'specificMonth', monthName: month };
-    }
-  }
-  
-  return null;
-}
-
-function processTimeRange(timeRange: any, userTimezone: string = 'UTC'): { startDate?: string; endDate?: string } {
-  if (!timeRange) return {};
-  
-  console.log("Processing time range:", timeRange);
-  console.log(`Using user timezone: ${userTimezone}`);
-  
-  const result: { startDate?: string; endDate?: string } = {};
-  
-  try {
-    // Calculate current date in user's timezone
-    const now = userTimezone ? toZonedTime(new Date(), userTimezone) : new Date();
-    console.log(`Current date in timezone ${userTimezone}: ${now.toISOString()}`);
-    
-    // Handle special time range cases
-    if (timeRange.type === 'week') {
-      const weekStart = startOfWeek(now, { weekStartsOn: 1 });
-      const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
-      
-      result.startDate = weekStart.toISOString();
-      result.endDate = weekEnd.toISOString();
-      
-      console.log(`Generated 'this week' date range: ${result.startDate} to ${result.endDate}`);
-    } else if (timeRange.type === 'lastWeek') {
-      const thisWeekMonday = startOfWeek(now, { weekStartsOn: 1 });
-      const lastWeekMonday = subDays(thisWeekMonday, 7);
-      const lastWeekSunday = subDays(thisWeekMonday, 1);
-      
-      result.startDate = lastWeekMonday.toISOString();
-      result.endDate = lastWeekSunday.toISOString();
-      
-      console.log(`Generated 'last week' date range: ${result.startDate} to ${result.endDate}`);
-    } else if (timeRange.type === 'month') {
-      const monthStart = startOfMonth(now);
-      const monthEnd = endOfMonth(now);
-      
-      result.startDate = monthStart.toISOString();
-      result.endDate = monthEnd.toISOString();
-      
-      console.log(`Generated 'this month' date range: ${result.startDate} to ${result.endDate}`);
-    } else if (timeRange.type === 'lastMonth') {
-      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const lastMonthStart = startOfMonth(lastMonth);
-      const lastMonthEnd = endOfMonth(lastMonth);
-      
-      result.startDate = lastMonthStart.toISOString();
-      result.endDate = lastMonthEnd.toISOString();
-      
-      console.log(`Generated 'last month' date range: ${result.startDate} to ${result.endDate}`);
-    }
-    
-    console.log("Final processed time range:", result);
-    return result;
-  } catch (error) {
-    console.error("Error processing time range:", error);
-    return {};
-  }
-}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -243,7 +155,7 @@ serve(async (req) => {
     if (classification.category === 'JOURNAL_SPECIFIC') {
       console.log("[chat-with-rag] EXECUTING: JOURNAL_SPECIFIC pipeline - full RAG processing");
       
-      // Step 2: Enhanced Query Planning with timezone support and explicit time range
+      // Step 2: Enhanced Query Planning with timezone support
       const queryPlanResponse = await supabaseClient.functions.invoke('smart-query-planner', {
         body: { 
           message, 
@@ -251,13 +163,7 @@ serve(async (req) => {
           conversationContext,
           threadId,
           messageId,
-          userTimezone, // Pass user timezone to planner
-          timeRange, // PHASE 1 FIX: Pass extracted time range explicitly
-          temporalContext: {
-            detectedTimeframe: finalTimeframe,
-            source: detectedTimeframe ? 'explicit' : 'conversation',
-            conversationHistory: conversationContext?.slice(-3) // Last 3 messages for context
-          }
+          userTimezone // Pass user timezone to planner
         }
       });
 
@@ -274,33 +180,6 @@ serve(async (req) => {
         hasResults: !!executionResult && executionResult.length > 0
       });
 
-      // Enhanced timeframe detection with timezone support + conversation history analysis
-      let timeRange = null;
-      const detectedTimeframe = detectTimeframeInQuery(message, normalizedTimezone);
-      
-      // PHASE 1 FIX: Analyze conversation history for temporal context
-      let conversationTimeContext = null;
-      if (conversationContext && conversationContext.length > 0) {
-        const recentMessages = conversationContext.slice(-5); // Last 5 messages
-        for (const msg of recentMessages) {
-          const msgTimeframe = detectTimeframeInQuery(msg.content, normalizedTimezone);
-          if (msgTimeframe) {
-            conversationTimeContext = msgTimeframe;
-            console.log(`[chat-with-rag] Found time context in conversation history: ${msg.content.substring(0, 50)}...`);
-            break;
-          }
-        }
-      }
-      
-      // Prioritize explicit time references, fallback to conversation context
-      const finalTimeframe = detectedTimeframe || conversationTimeContext;
-      
-      if (finalTimeframe) {
-        console.log(`[chat-with-rag] Using timeframe (${detectedTimeframe ? 'explicit' : 'from-conversation'}) with timezone ${normalizedTimezone}:`, JSON.stringify(finalTimeframe, null, 2));
-        // Process timeframe with user's timezone for proper UTC conversion
-        timeRange = processTimeRange(finalTimeframe, normalizedTimezone);
-        console.log(`[chat-with-rag] Processed time range (converted to UTC):`, JSON.stringify(timeRange, null, 2));
-      }
 
       // Step 3: Generate consolidated response using gpt-response-consolidator
       console.log("[chat-with-rag] Step 3: Calling gpt-response-consolidator");
@@ -414,7 +293,6 @@ serve(async (req) => {
           classification: classification,
           queryPlan: queryPlan,
           searchResults: executionResult,
-          timeRange: timeRange,
           userTimezone: userTimezone,
           strategy: queryPlan.strategy,
           confidence: queryPlan.confidence,
