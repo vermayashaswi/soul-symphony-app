@@ -58,23 +58,47 @@ serve(async (req) => {
 
     console.log('[TestFlow] Active reminders found:', reminders?.length || 0);
 
-    // 3. Send a test notification regardless of settings
-    console.log('[TestFlow] Sending test notification...');
+    // 3. Send both FCM push notification and in-app notification
+    console.log('[TestFlow] Sending FCM push notification...');
     
     const fcmResponse = await supabase.functions.invoke('send-fcm-notification', {
       body: {
         userIds: [userId],
-        title: '🧪 Test Journal Reminder',
-        body: 'This is a test notification to verify your notification system is working!',
+        title: '🧪 Test Push Notification',
+        body: 'This is a test PUSH notification to verify status bar notifications work!',
         data: {
-          type: 'test_notification',
-          test_id: 'manual-test',
+          type: 'test_push_notification',
+          test_id: 'manual-push-test',
         },
         actionUrl: 'https://571d731e-b54b-453e-9f48-a2c79a572930.lovableproject.com/app/journal'
       }
     });
 
-    // 4. Get profile info
+    console.log('[TestFlow] FCM Response:', fcmResponse);
+
+    // 4. Also create an in-app notification for comparison
+    console.log('[TestFlow] Creating in-app notification...');
+    
+    const { error: appNotificationError } = await supabase
+      .from('user_app_notifications')
+      .insert({
+        user_id: userId,
+        title: '📱 Test In-App Notification',
+        message: 'This is a test IN-APP notification to verify notification center works!',
+        type: 'test_in_app_notification',
+        data: {
+          test_id: 'manual-in-app-test',
+        },
+        action_url: 'https://571d731e-b54b-453e-9f48-a2c79a572930.lovableproject.com/app/journal'
+      });
+
+    if (appNotificationError) {
+      console.error('[TestFlow] Error creating in-app notification:', appNotificationError);
+    } else {
+      console.log('[TestFlow] In-app notification created successfully');
+    }
+
+    // 5. Get profile info
     const { data: profile } = await supabase
       .from('profiles')
       .select('*')
@@ -97,10 +121,16 @@ serve(async (req) => {
         count: reminders?.length || 0,
         settings: reminders?.map(r => ({ time: r.scheduled_time, title: r.title, status: r.status })) || []
       },
-      testNotification: {
-        sent: !fcmResponse.error,
-        error: fcmResponse.error?.message,
-        response: fcmResponse.data
+      testNotifications: {
+        fcmPush: {
+          sent: !fcmResponse.error,
+          error: fcmResponse.error?.message,
+          response: fcmResponse.data
+        },
+        inApp: {
+          sent: !appNotificationError,
+          error: appNotificationError?.message
+        }
       }
     }), {
       headers: { 'Content-Type': 'application/json', ...corsHeaders },

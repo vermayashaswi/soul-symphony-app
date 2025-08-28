@@ -125,8 +125,8 @@ const Home = () => {
         <JournalHeader />
       </div>
 
-      {/* Debug: Test notification button */}
-      <div className="fixed bottom-4 left-4 z-40">
+      {/* Debug: Test notification button - positioned above bottom nav */}
+      <div className="fixed bottom-20 left-4 z-40">
         <NotificationTestButton />
       </div>
     </div>
