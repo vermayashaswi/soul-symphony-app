@@ -20,7 +20,7 @@ export const useNotificationPermission = () => {
         setDebugInfo(info);
         console.log('[useNotificationPermission] Permission debug info:', info);
         
-        // Check current permission status
+        // Check current permission status using async method
         const currentPermission = await enhancedNotificationService.checkPermissionStatus();
         console.log('[useNotificationPermission] Current permission status:', currentPermission);
         
@@ -54,7 +54,7 @@ export const useNotificationPermission = () => {
       // Update state based on result
       setPermission(result.state);
       
-      // Update debug info
+      // Update debug info after permission request
       const newDebugInfo = await enhancedNotificationService.getPermissionInfo();
       setDebugInfo(newDebugInfo);
       
