@@ -1,38 +1,16 @@
 export async function executeSQLAnalysis(step: any, userId: string, supabaseClient: any, requestId: string, executionDetails: any, userTimezone: string = 'UTC') {
   try {
-    console.log(`[${requestId}] Enhanced SQL execution (${step.sqlQueryType || 'unknown'}):`, step.sqlQuery);
+    console.log(`[${requestId}] Direct SQL execution (${step.sqlQueryType || 'unknown'}):`, step.sqlQuery);
     executionDetails.queryType = step.sqlQueryType;
-    executionDetails.enhancedValidation = true;
     
     if (!step.sqlQuery || !step.sqlQuery.trim()) {
-      console.log(`[${requestId}] No SQL query provided, using enhanced vector search fallback`);
+      console.log(`[${requestId}] No SQL query provided, using vector search fallback`);
       executionDetails.fallbackUsed = true;
       return await executeEnhancedVectorSearchFallback(step, userId, supabaseClient, requestId);
     }
 
     const originalQuery = step.sqlQuery.trim().replace(/;+$/, '');
     executionDetails.originalQuery = originalQuery;
-    
-    // Enhanced query validation before execution
-    const validation = validateSQLQuery(originalQuery);
-    executionDetails.validationResult = validation;
-    
-    if (!validation.isValid) {
-      console.error(`[${requestId}] SQL validation failed:`, validation.errors);
-      console.log(`[${requestId}] Suggestions:`, validation.suggestions);
-      
-      // Try to rewrite the query
-      const rewritten = rewriteProblematicSQL(originalQuery);
-      if (rewritten !== originalQuery) {
-        console.log(`[${requestId}] Attempting to use rewritten query`);
-        executionDetails.rewrittenQuery = rewritten;
-        return await executeSQLAnalysis({...step, sqlQuery: rewritten}, userId, supabaseClient, requestId, executionDetails, userTimezone);
-      } else {
-        console.warn(`[${requestId}] Could not rewrite problematic SQL, falling back to vector search`);
-        executionDetails.fallbackUsed = true;
-        return await executeEnhancedVectorSearchFallback(step, userId, supabaseClient, requestId);
-      }
-    }
     
     // Sanitize user ID in the query
     let sanitizedQuery;
@@ -46,8 +24,8 @@ export async function executeSQLAnalysis(step: any, userId: string, supabaseClie
       return await executeEnhancedVectorSearchFallback(step, userId, supabaseClient, requestId);
     }
     
-    // Use the execute_dynamic_query function to safely run GPT-generated SQL
-    console.log(`[${requestId}] Executing enhanced validated query via RPC:`, sanitizedQuery.substring(0, 200) + '...');
+    // Execute GPT-generated SQL directly via RPC
+    console.log(`[${requestId}] Executing query via RPC:`, sanitizedQuery.substring(0, 200) + '...');
     
     const { data, error } = await supabaseClient.rpc('execute_dynamic_query', {
       query_text: sanitizedQuery,
@@ -58,31 +36,17 @@ export async function executeSQLAnalysis(step: any, userId: string, supabaseClie
       console.error(`[${requestId}] SQL execution error:`, error);
       console.error(`[${requestId}] Failed query:`, sanitizedQuery);
       executionDetails.executionError = error.message;
-      executionDetails.fallbackUsed = true;
       
-      // Enhanced error logging for debugging
-      if (error.code) {
-        console.error(`[${requestId}] PostgreSQL error code: ${error.code}`);
-        
-        // Specific error handling for common issues
-        if (error.code === '42883') {
-          console.error(`[${requestId}] Function does not exist - likely JSONB query issue`);
-        } else if (error.code === '42601') {
-          console.error(`[${requestId}] Syntax error - check query structure`);
-        } else if (error.code === '42703') {
-          console.error(`[${requestId}] Column not found - check column names and quoting`);
-        }
-      }
-      if (error.details) {
-        console.error(`[${requestId}] PostgreSQL error details: ${error.details}`);
-      }
-      if (error.hint) {
-        console.error(`[${requestId}] PostgreSQL error hint: ${error.hint}`);
+      // Only fallback to vector search on actual connectivity issues, not query issues
+      if (error.message?.includes('connection') || error.message?.includes('timeout')) {
+        console.log(`[${requestId}] Database connectivity issue, falling back to vector search`);
+        executionDetails.fallbackUsed = true;
+        return await executeEnhancedVectorSearchFallback(step, userId, supabaseClient, requestId);
       }
       
-      // ENHANCED FALLBACK: Use vector search with preserved time constraints
-      console.log(`[${requestId}] SQL execution failed, falling back to enhanced vector search with time preservation`);
-      return await executeEnhancedVectorSearchFallback(step, userId, supabaseClient, requestId);
+      // For query errors, trust the RPC error handling and return empty results
+      console.log(`[${requestId}] Query error - returning empty results, letting RPC handle error details`);
+      return [];
     }
 
     if (data && data.success && data.data) {
@@ -142,93 +106,7 @@ export async function executeSQLAnalysis(step: any, userId: string, supabaseClie
   }
 }
 
-/**
- * Enhanced vector search validation to catch common patterns before execution
- */
-function validateSQLQuery(sqlQuery: string): { isValid: boolean; errors: string[]; suggestions: string[] } {
-  const errors: string[] = [];
-  const suggestions: string[] = [];
-  
-  // Check for common JSONB mistakes
-  if (sqlQuery.includes('json_object_keys(emotions)')) {
-    errors.push('Using json_object_keys() with JSONB data type');
-    suggestions.push('Use jsonb_object_keys(emotions) for JSONB columns or jsonb_each(emotions) for key-value iteration');
-  }
-  
-  // Check for problematic nested aggregation patterns
-  if (sqlQuery.includes('AVG((emotions->>jsonb_object_keys(emotions))::numeric)')) {
-    errors.push('Nested aggregation with jsonb_object_keys in AVG function');
-    suggestions.push('Use jsonb_each(emotions) in FROM clause with proper grouping');
-  }
-  
-  // Check for incorrect emotion querying patterns
-  if (sqlQuery.includes('emotions->') && !sqlQuery.includes('::numeric') && !sqlQuery.includes('::text')) {
-    suggestions.push('Remember to cast JSONB values: (emotions->>\'emotion_name\')::numeric');
-  }
-  
-  // Check for table name quoting
-  if (sqlQuery.includes('Journal Entries') && !sqlQuery.includes('"Journal Entries"')) {
-    errors.push('Table name with spaces must be quoted');
-    suggestions.push('Use "Journal Entries" (with quotes) for table name');
-  }
-  
-  // Check for column name issues
-  if (sqlQuery.includes('refined text') && !sqlQuery.includes('"refined text"')) {
-    errors.push('Column name with spaces must be quoted');
-    suggestions.push('Use "refined text" (with quotes) for column name');
-  }
-  
-  // Check for forbidden column references
-  const forbiddenColumns = ['transcription_text', 'refined_text', 'journal_entries'];
-  for (const forbidden of forbiddenColumns) {
-    if (sqlQuery.toLowerCase().includes(forbidden)) {
-      errors.push(`Forbidden column reference: ${forbidden}`);
-      suggestions.push('Use correct column names: "refined text", "Journal Entries"');
-    }
-  }
-  
-  return {
-    isValid: errors.length === 0,
-    errors,
-    suggestions
-  };
-}
-
-/**
- * Rewrite problematic SQL patterns to working ones
- */
-function rewriteProblematicSQL(sqlQuery: string): string {
-  let rewritten = sqlQuery;
-  
-  // Fix json_object_keys for JSONB
-  rewritten = rewritten.replace(/json_object_keys\(emotions\)/g, 'jsonb_object_keys(emotions)');
-  
-  // Fix problematic nested aggregation - replace with proper JSONB iteration
-  if (rewritten.includes('jsonb_object_keys(emotions)') && rewritten.includes('AVG((emotions->>jsonb_object_keys(emotions))::numeric)')) {
-    console.log('Rewriting problematic nested JSONB aggregation');
-    
-    // Extract time constraint if present
-    const timeConstraintMatch = rewritten.match(/AND created_at[^)]+\)/);
-    const timeConstraint = timeConstraintMatch ? timeConstraintMatch[0] : '';
-    
-    // Replace with proper JSONB iteration using jsonb_each
-    rewritten = `WITH emotion_scores AS (
-      SELECT e.key as emotion_name, (e.value::text)::numeric as emotion_score
-      FROM "Journal Entries" entries, jsonb_each(entries.emotions) e
-      WHERE entries.user_id = auth.uid() ${timeConstraint}
-    )
-    SELECT emotion_name as emotion, ROUND(AVG(emotion_score), 3) as avg_score 
-    FROM emotion_scores 
-    GROUP BY emotion_name
-    ORDER BY avg_score DESC LIMIT 5`;
-  }
-  
-  // Add proper table and column quoting
-  rewritten = rewritten.replace(/Journal Entries(?!")/g, '"Journal Entries"');
-  rewritten = rewritten.replace(/refined text(?!")/g, '"refined text"');
-  
-  return rewritten;
-}
+// Validation functions removed - trusting GPT and dynamic RPC execution
 
 // ENHANCED VECTOR SEARCH FALLBACK WITH PROGRESSIVE TIME CONSTRAINT HANDLING
 async function executeEnhancedVectorSearchFallback(step: any, userId: string, supabaseClient: any, requestId: string) {

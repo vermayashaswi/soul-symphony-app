@@ -221,74 +221,7 @@ async function processExecutionResults(allResults: any[], userId: string, totalE
   return processedResults;
 }
 
-/**
- * Enhanced SQL query validation to catch common PostgreSQL errors before execution
- */
-function validateSQLQuery(sqlQuery: string): { isValid: boolean; errors: string[]; suggestions: string[] } {
-  const errors: string[] = [];
-  const suggestions: string[] = [];
-  
-  // Check for common JSONB mistakes
-  if (sqlQuery.includes('json_object_keys(emotions)') && sqlQuery.includes('jsonb')) {
-    errors.push('Mixing json_object_keys() with JSONB data type');
-    suggestions.push('Use jsonb_object_keys(emotions) for JSONB columns or jsonb_each(emotions) for key-value iteration');
-  }
-  
-  // Check for incorrect emotion querying patterns
-  if (sqlQuery.includes('emotions->') && !sqlQuery.includes('::numeric')) {
-    suggestions.push('Remember to cast JSONB values to numeric: (emotions->>\'emotion_name\')::numeric');
-  }
-  
-  // Check for table name quoting
-  if (sqlQuery.includes('Journal Entries') && !sqlQuery.includes('"Journal Entries"')) {
-    errors.push('Table name with spaces must be quoted');
-    suggestions.push('Use "Journal Entries" (with quotes) for table name');
-  }
-  
-  // Check for column name issues
-  if (sqlQuery.includes('refined text') && !sqlQuery.includes('"refined text"')) {
-    errors.push('Column name with spaces must be quoted');
-    suggestions.push('Use "refined text" (with quotes) for column name');
-  }
-  
-  return {
-    isValid: errors.length === 0,
-    errors,
-    suggestions
-  };
-}
-
-/**
- * Rewrite problematic SQL patterns to working ones
- */
-function rewriteProblematicSQL(sqlQuery: string): string {
-  let rewritten = sqlQuery;
-  
-  // Fix json_object_keys for JSONB
-  rewritten = rewritten.replace(/json_object_keys\(emotions\)/g, 'jsonb_object_keys(emotions)');
-  
-  // Fix JSONB iteration patterns - replace problematic nested aggregation
-  if (rewritten.includes('jsonb_object_keys(emotions)') && rewritten.includes('AVG((emotions->>jsonb_object_keys(emotions))::numeric)')) {
-    // Replace with proper JSONB iteration using jsonb_each
-    rewritten = rewritten.replace(
-      /SELECT jsonb_object_keys\(emotions\) AS emotion, ROUND\(AVG\(\(emotions->>jsonb_object_keys\(emotions\)\)::numeric\), 3\) AS avg_score FROM "Journal Entries" WHERE user_id = auth\.uid\(\)(.*?)GROUP BY emotion/gs,
-      `WITH emotion_scores AS (
-        SELECT e.key as emotion_name, (e.value::text)::numeric as emotion_score
-        FROM "Journal Entries" entries, jsonb_each(entries.emotions) e
-        WHERE entries.user_id = auth.uid()$1
-      )
-      SELECT emotion_name as emotion, ROUND(AVG(emotion_score), 3) as avg_score 
-      FROM emotion_scores 
-      GROUP BY emotion_name`
-    );
-  }
-  
-  // Add proper table and column quoting
-  rewritten = rewritten.replace(/Journal Entries(?!")/g, '"Journal Entries"');
-  rewritten = rewritten.replace(/refined text(?!")/g, '"refined text"');
-  
-  return rewritten;
-}
+// SQL validation functions removed - trusting GPT query generation and dynamic RPC execution
 
 /**
  * Process SQL analysis results (COUNT, AVG, SUM, etc.)
@@ -1346,31 +1279,7 @@ Every query plan MUST include a final vector search step that:
     try {
       queryPlan = JSON.parse(data.choices[0].message.content);
       
-      // Enhanced validation and rewriting of SQL queries
-      if (queryPlan.subQuestions) {
-        for (const subQ of queryPlan.subQuestions) {
-          if (subQ.analysisSteps) {
-            for (const step of subQ.analysisSteps) {
-              if (step.sqlQuery) {
-                const validation = validateSQLQuery(step.sqlQuery);
-                if (!validation.isValid) {
-                  console.warn(`[Query Planner] SQL validation failed for ${subQ.id}: ${validation.errors.join(', ')}`);
-                  console.log(`[Query Planner] Suggestions: ${validation.suggestions.join(', ')}`);
-                  
-                  // Attempt to rewrite the query
-                  const rewritten = rewriteProblematicSQL(step.sqlQuery);
-                  if (rewritten !== step.sqlQuery) {
-                    console.log(`[Query Planner] Rewrote SQL query for ${subQ.id}`);
-                    step.sqlQuery = rewritten;
-                    step.originalQuery = step.sqlQuery; // Keep track of original
-                    step.wasRewritten = true;
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
+      // Trusting GPT-generated queries - no pre-execution validation
       
       console.log(`[Query Planner] Enhanced query plan generated with ${queryPlan.subQuestions?.length || 0} sub-questions`);
     } catch (parseError) {
