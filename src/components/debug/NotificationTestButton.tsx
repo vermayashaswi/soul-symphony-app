@@ -13,7 +13,7 @@ export const NotificationTestButton: React.FC = () => {
     if (!user) {
       toast({
         title: "Error",
-        description: "You must be logged in to create test notifications",
+        description: "You must be logged in to test notifications",
         variant: "destructive",
       });
       return;
@@ -21,10 +21,14 @@ export const NotificationTestButton: React.FC = () => {
 
     setIsLoading(true);
     try {
-      console.log('[NotificationTestButton] Creating test notifications for user:', user.id);
+      console.log('[NotificationTestButton] Starting comprehensive notification test for user:', user.id);
       
-      const { data, error } = await supabase.functions.invoke('create-test-notification', {
-        body: { userId: user.id }
+      const { data, error } = await supabase.functions.invoke('test-notification-flow', {
+        body: { 
+          userId: user.id,
+          bypassUserPreferences: true,
+          testAllFunctions: true
+        }
       });
 
       if (error) {
@@ -32,21 +36,26 @@ export const NotificationTestButton: React.FC = () => {
         throw error;
       }
 
-      console.log('[NotificationTestButton] Response:', data);
+      console.log('[NotificationTestButton] Comprehensive test response:', data);
 
       if (data.success) {
+        const fcmSuccess = data.testNotifications?.fcmPush?.sent ? '✅' : '❌';
+        const inAppSuccess = data.testNotifications?.inApp?.sent ? '✅' : '❌';
+        const customSuccess = data.testNotifications?.custom?.sent ? '✅' : '❌';
+        const categorizedSuccess = data.testNotifications?.categorized?.sent ? '✅' : '❌';
+        
         toast({
-          title: "Test Notifications Created",
-          description: `Successfully created ${data.notifications_created} test notifications. Total: ${data.total_notifications}`,
+          title: "Comprehensive Notification Test Complete",
+          description: `FCM Push: ${fcmSuccess} | In-App: ${inAppSuccess} | Custom: ${customSuccess} | Categorized: ${categorizedSuccess}`,
         });
       } else {
         throw new Error(data.error || 'Unknown error');
       }
     } catch (error: any) {
-      console.error('[NotificationTestButton] Error creating test notifications:', error);
+      console.error('[NotificationTestButton] Error in comprehensive test:', error);
       toast({
         title: "Error",
-        description: `Failed to create test notifications: ${error.message}`,
+        description: `Comprehensive test failed: ${error.message}`,
         variant: "destructive",
       });
     } finally {
@@ -63,7 +72,7 @@ export const NotificationTestButton: React.FC = () => {
       variant="outline"
       size="sm"
     >
-      {isLoading ? 'Creating...' : 'Create Test Notifications'}
+      {isLoading ? 'Testing All...' : 'Test All Notifications'}
     </Button>
   );
 };
