@@ -7,6 +7,8 @@ import {
   getThemeAnalysisGuidelines 
 } from '../_shared/databaseSchemaContext.ts';
 import { executeSQLAnalysis, executeBasicSQLQuery } from './sqlExecution.ts';
+import { validateAndSanitizeSQL } from './sqlValidation.ts';
+import { getEnhancedSQLConstraints } from './promptConstraints.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -800,9 +802,11 @@ async function analyzeQueryWithSubQuestions(message, conversationContext, userEn
     const isContentSeekingQuery = /\b(what did i|show me|entries about|content|wrote|said|find|tell me about|examples|specific|mentioned|talking about|discussed|focused on)\b/i.test(message.toLowerCase());
     const requiresMandatoryVector = isContentSeekingQuery || hasPersonalPronouns;
 
-    const prompt = `You are SOULo's Enhanced Analyst Agent - an intelligent query planning specialist for journal data analysis TIMEZONE-AWARE date processing.
+    const prompt = `You are SOULo's Enhanced Analyst Agent - an intelligent query planning specialist for journal data analysis with SIMPLIFIED and SAFE SQL generation.
 
 **CRITICAL DATABASE TYPE: This is a PostgreSQL database. Use PostgreSQL-specific syntax and functions.**
+
+${getEnhancedSQLConstraints(userTimezone)}
 
 ${databaseSchemaContext}
 
@@ -843,21 +847,32 @@ SUB-QUESTION/QUERIES GENERATION GUIDELINE (MANDATORY):
    - Use proper timestamp with time zone format: '2024-08-01T00:00:00Z'::timestamp with time zone
    - ALWAYS include both start and end date filters when timeRange exists
 
-5. **Simplified Query Guidelines:**
-   - Generate basic SELECT queries focusing on simple columns: user_id, created_at, master_themes, sentiment
-   - Always include user_id = auth.uid() in WHERE clause
+5. **MANDATORY SQL SAFETY RULES:**
+   - Generate ONLY basic SELECT queries focusing on: user_id, created_at, master_themes, sentiment, emotions
+   - ALWAYS include user_id = auth.uid() in WHERE clause
    - Use proper PostgreSQL syntax with double quotes for table/column names with spaces
-   - Avoid complex nested queries - keep it simple and working
+   - NEVER use complex timezone expressions - use only simple INTERVAL arithmetic
+   - VALIDATE: All SQL must be executable PostgreSQL without syntax errors
+   - When in doubt, use basic filtering and let vector search handle complexity
    - Use standard aggregation functions: COUNT, AVG, MAX, MIN, SUM
 
-**CRITICAL TIMEZONE HANDLING RULES:**
+**CRITICAL TIMEZONE HANDLING RULES (SIMPLIFIED):**
 
 1. **USER TIMEZONE CONTEXT**: User timezone is "${userTimezone}"
 2. **DATABASE STORAGE**: All journal entries are stored in UTC in the database
-3. **TIMEZONE CONVERSION REQUIRED**: When generating date ranges, you MUST account for timezone conversion
-   - User asks about "August 6" in India timezone
-   - Database query needs UTC range that captures all entries made on August 6 India time
-   - Example: August 6 India time = August 5 18:30 UTC to August 6 18:29 UTC
+3. **CRITICAL: NEVER GENERATE COMPLEX TIMEZONE SQL**:
+   - DO NOT use complex AT TIME ZONE expressions in SQL
+   - DO NOT use expressions like "(NOW() AT TIME ZONE 'timezone' - INTERVAL 'X days')"
+   - DO NOT use invalid syntax like "'7 days ago (Asia/Kolkata)'"
+   - ONLY use simple INTERVAL subtraction: "NOW() - INTERVAL 'X days'"
+   - Let the date processing service handle timezone conversion
+4. **SAFE TIME EXPRESSIONS ONLY**:
+   - ✅ CORRECT: "NOW() - INTERVAL '7 days'"
+   - ✅ CORRECT: "NOW() - INTERVAL '1 week'"
+   - ✅ CORRECT: "NOW() - INTERVAL '30 days'"
+   - ❌ WRONG: "(NOW() AT TIME ZONE 'Asia/Kolkata' - INTERVAL '7 days')"
+   - ❌ WRONG: "'7 days ago (Asia/Kolkata)'"
+   - ❌ WRONG: "'last week in Asia/Kolkata timezone'"
 
 **CRITICAL VECTOR SEARCH RULES - MUST FOLLOW:**
 
@@ -889,21 +904,18 @@ SUB-QUESTION/QUERIES GENERATION GUIDELINE (MANDATORY):
    - For emotional queries → Vector query: "emotions feelings mood emotional state [specific emotions mentioned] [append relevant emotions from database context]"
    - Preserve user's original language patterns for better semantic matching
 
-4. **CRITICAL TIME-OF-DAY QUERY RULES**:
-    - When user asks about "first half vs second half" or "morning vs evening", NEVER generate UTC-based queries
-    - ALWAYS use user's timezone ("${userTimezone}") for time-of-day calculations
-    - Use SQL with AT TIME ZONE to convert stored UTC times to user's local time for hour-based analysis
-    - Example for "first half vs second half": 
-      \`\`\`sql
-      SELECT 
-        CASE WHEN EXTRACT(HOUR FROM created_at AT TIME ZONE 'USER_TIMEZONE_HERE') < 12 THEN 'first_half' ELSE 'second_half' END as day_period,
-        COUNT(*) as entry_count
-      FROM "Journal Entries" 
-      WHERE user_id = auth.uid()
-      GROUP BY day_period;
-      \`\`\`
-    - All timeRange objects MUST include "timezone": "${userTimezone}"
-    - Date processing will handle conversion from user's local time to UTC for database queries
+4. **SIMPLIFIED DATE FILTERING RULES**:
+     - For recent queries (last week, past 30 days): Use simple INTERVAL subtraction
+     - NEVER generate complex timezone expressions in SQL
+     - Example for "last week": 
+       \`\`\`sql
+       SELECT COUNT(*) as entry_count
+       FROM "Journal Entries" 
+       WHERE user_id = auth.uid() AND created_at >= NOW() - INTERVAL '7 days'
+       ORDER BY created_at DESC;
+       \`\`\`
+     - All timeRange objects MUST include "timezone": "${userTimezone}"
+     - Keep SQL simple and let edge function handle timezone conversion
 
 USER QUERY: "${message}"
 USER TIMEZONE: "${userTimezone}"
