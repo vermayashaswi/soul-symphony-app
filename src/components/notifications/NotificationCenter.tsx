@@ -8,6 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
 import { useNotifications } from '@/hooks/use-notifications';
 import { nativeNavigationService } from '@/services/nativeNavigationService';
+import { TranslatableText } from '@/components/translation/TranslatableText';
 
 interface AppNotification {
   id: string;
@@ -94,10 +95,12 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, 
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Bell className="h-5 w-5" />
-              <h2 className="font-semibold">Notifications</h2>
+              <h2 className="font-semibold">
+                <TranslatableText text="Notifications" />
+              </h2>
               {displayUnreadCount > 0 && (
                 <Badge variant="secondary" className="text-xs">
-                  {displayUnreadCount} new
+                  {displayUnreadCount} <TranslatableText text="new" />
                 </Badge>
               )}
             </div>
@@ -112,14 +115,14 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, 
               size="sm"
               onClick={() => setFilter('all')}
             >
-              All
+              <TranslatableText text="All" />
             </Button>
             <Button
               variant={filter === 'unread' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setFilter('unread')}
             >
-              Unread ({displayUnreadCount})
+              <TranslatableText text="Unread" /> ({displayUnreadCount})
             </Button>
           </div>
         </div>
@@ -127,11 +130,13 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, 
         <ScrollArea className="h-96">
           {isLoading ? (
             <div className="p-4 text-center text-muted-foreground">
-              Loading notifications...
+              <TranslatableText text="Loading notifications..." />
             </div>
           ) : filteredNotifications.length === 0 ? (
             <div className="p-4 text-center text-muted-foreground">
-              {filter === 'unread' ? 'No unread notifications' : 'No notifications yet'}
+              <TranslatableText 
+                text={filter === 'unread' ? 'No unread notifications' : 'No notifications yet'} 
+              />
             </div>
           ) : (
             <div className="p-2">
@@ -155,7 +160,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <h4 className={`font-medium text-sm ${getNotificationColor(notification.type)}`}>
-                          {notification.title}
+                          <TranslatableText text={notification.title} />
                         </h4>
                         
                         <div className="flex gap-1 flex-shrink-0">
@@ -184,7 +189,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, 
                       </div>
                       
                       <p className="text-sm text-muted-foreground mt-1">
-                        {notification.message}
+                        <TranslatableText text={notification.message} />
                       </p>
                       
                       <div className="flex items-center justify-between mt-2">

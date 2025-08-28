@@ -977,8 +977,8 @@ function SettingsContent() {
                       {notificationReminders.filter(r => r.enabled).map(reminder => (
                         <div key={reminder.id} className="flex items-center gap-2">
                           <span>{reminder.time}</span>
-                          <span>-</span>
-                          <span>{reminder.label}</span>
+                         <span>-</span>
+                          <span><TranslatableText text={reminder.label} /></span>
                         </div>
                       ))}
                     </div>

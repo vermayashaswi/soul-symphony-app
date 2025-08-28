@@ -7,6 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import { Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { TranslatableText } from '@/components/translation/TranslatableText';
 
 interface Reminder {
   id: string;
@@ -59,7 +60,7 @@ export function CustomTimeRemindersModal({
 
   const removeReminder = (id: string) => {
     if (reminders.length <= 1) {
-      toast.error('You must have at least one reminder');
+      toast.error(<TranslatableText text="You must have at least one reminder" />);
       return;
     }
     setReminders(reminders.filter(r => r.id !== id));
@@ -80,14 +81,14 @@ export function CustomTimeRemindersModal({
     // Validate all times
     const invalidTimes = reminders.filter(r => !validateTime(r.time));
     if (invalidTimes.length > 0) {
-      toast.error('Please enter valid times in HH:MM format');
+      toast.error(<TranslatableText text="Please enter valid times in HH:MM format" />);
       return;
     }
 
     // Check for at least one enabled reminder
     const enabledReminders = reminders.filter(r => r.enabled);
     if (enabledReminders.length === 0) {
-      toast.error('Please enable at least one reminder');
+      toast.error(<TranslatableText text="Please enable at least one reminder" />);
       return;
     }
 
@@ -98,7 +99,7 @@ export function CustomTimeRemindersModal({
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
-        toast.error('User not authenticated');
+        toast.error(<TranslatableText text="User not authenticated" />);
         return;
       }
 
@@ -119,7 +120,7 @@ export function CustomTimeRemindersModal({
 
       if (error) {
         console.error('Error saving reminder settings:', error);
-        toast.error('Failed to save reminder settings');
+        toast.error(<TranslatableText text="Failed to save reminder settings" />);
         return;
       }
 
@@ -130,16 +131,16 @@ export function CustomTimeRemindersModal({
 
       if (syncError) {
         console.error('Error syncing reminder notifications:', syncError);
-        toast.error('Reminders saved but scheduling failed. Please try again.');
+        toast.error(<TranslatableText text="Reminders saved but scheduling failed. Please try again." />);
         return;
       }
 
-      toast.success('Reminder settings saved and scheduled successfully');
+      toast.success(<TranslatableText text="Reminder settings saved and scheduled successfully" />);
       onSave(reminders);
       onClose();
     } catch (error) {
       console.error('Error saving reminders:', error);
-      toast.error('An error occurred while saving');
+      toast.error(<TranslatableText text="An error occurred while saving" />);
     } finally {
       setIsLoading(false);
     }
@@ -149,9 +150,11 @@ export function CustomTimeRemindersModal({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Set your daily reminder timings here</DialogTitle>
+          <DialogTitle>
+            <TranslatableText text="Set your daily reminder timings here" />
+          </DialogTitle>
           <DialogDescription>
-            Customize when you'd like to receive your journal reminders. You can add multiple times throughout the day.
+            <TranslatableText text="Customize when you'd like to receive your journal reminders. You can add multiple times throughout the day." />
           </DialogDescription>
         </DialogHeader>
 
@@ -161,7 +164,7 @@ export function CustomTimeRemindersModal({
               <div className="flex-1 space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor={`reminder-${reminder.id}`} className="text-sm font-medium">
-                    Reminder {index + 1}
+                    <TranslatableText text={`Reminder ${index + 1}`} />
                   </Label>
                   <Switch
                     id={`reminder-${reminder.id}`}
@@ -173,7 +176,7 @@ export function CustomTimeRemindersModal({
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <Label htmlFor={`time-${reminder.id}`} className="text-xs text-muted-foreground">
-                      Time
+                      <TranslatableText text="Time" />
                     </Label>
                     <Input
                       id={`time-${reminder.id}`}
@@ -186,7 +189,7 @@ export function CustomTimeRemindersModal({
                   </div>
                   <div>
                     <Label htmlFor={`label-${reminder.id}`} className="text-xs text-muted-foreground">
-                      Label
+                      <TranslatableText text="Label" />
                     </Label>
                     <Input
                       id={`label-${reminder.id}`}
@@ -219,16 +222,16 @@ export function CustomTimeRemindersModal({
             disabled={reminders.length >= 6}
           >
             <Plus className="h-4 w-4 mr-2" />
-            Add Another Reminder
+            <TranslatableText text="Add Another Reminder" />
           </Button>
         </div>
 
         <div className="flex justify-end gap-3">
           <Button variant="outline" onClick={onClose} disabled={isLoading}>
-            Cancel
+            <TranslatableText text="Cancel" />
           </Button>
           <Button onClick={handleSave} disabled={isLoading}>
-            {isLoading ? 'Saving...' : 'Save Settings'}
+            <TranslatableText text={isLoading ? 'Saving...' : 'Save Settings'} />
           </Button>
         </div>
       </DialogContent>

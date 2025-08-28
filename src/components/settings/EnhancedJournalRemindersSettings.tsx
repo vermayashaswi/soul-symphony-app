@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { fcmNotificationService as enhancedJournalReminderService } from '@/services/fcmNotificationService';
+import { TranslatableText } from '@/components/translation/TranslatableText';
 
 type JournalReminderTime = 'morning' | 'afternoon' | 'evening' | 'night';
 import { enhancedPlatformService } from '@/services/enhancedPlatformService';
@@ -163,16 +164,16 @@ export function EnhancedJournalRemindersSettings() {
     <Card className="w-full">
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
-          Enhanced Journal Reminders
+          <TranslatableText text="Enhanced Journal Reminders" />
           {notificationStatus && (
             <Badge variant="outline" className="text-xs">
-              {notificationStatus.strategy} • {notificationStatus.activeReminders} active
+              {notificationStatus.strategy} • {notificationStatus.activeReminders} <TranslatableText text="active" />
             </Badge>
           )}
         </CardTitle>
         <CardDescription>
-          Improved daily reminders with enhanced reliability for Android devices.
-          {isNative && " Running in native mode with advanced features."}
+          <TranslatableText text="Improved daily reminders with enhanced reliability for Android devices." />
+          {isNative && <TranslatableText text=" Running in native mode with advanced features." />}
         </CardDescription>
       </CardHeader>
 

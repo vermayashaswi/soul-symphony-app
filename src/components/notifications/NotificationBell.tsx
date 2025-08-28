@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { NotificationCenter } from './NotificationCenter';
 import { supabase } from '@/integrations/supabase/client';
+import { TranslatableText } from '@/components/translation/TranslatableText';
 
 export const NotificationBell: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -63,7 +64,7 @@ export const NotificationBell: React.FC = () => {
             <Badge 
               className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs bg-red-500 hover:bg-red-600"
             >
-              {unreadCount > 9 ? '9+' : unreadCount}
+              <TranslatableText text={unreadCount > 9 ? '9+' : unreadCount.toString()} />
             </Badge>
           )}
         </Button>
