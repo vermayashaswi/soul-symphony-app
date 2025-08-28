@@ -800,18 +800,30 @@ async function analyzeQueryWithSubQuestions(message, conversationContext, userEn
 
 You are provided with this database schema: ${databaseSchemaContext} **CRITICAL DATABASE TYPE: This is a PostgreSQL database. Use PostgreSQL-specific syntax and functions.**
 
-**CORE RULES:**
+**CRITICAL DATABASE CONTEXT ADHERENCE:**
 - You MUST ONLY use table names, column names, and data types that exist in the database schema above
+- DO NOT hallucinate or invent table structures, column names, or data types
 - STICK STRICTLY to the provided database schema context
+- If uncertain about a database structure, use basic select queries instead of complex ones
 - Use PostgreSQL-compatible functions and syntax
+
+**IMPORTANT TIME RELATED QUERY PLANNING:** Note that in the "Journal Entries" table the user timestamps are in the column "created_at" and are of the data type timestamptz (example value in database: 2025-08-02 18:57:54.515+00)
 
 **TABLE REFERENCE:**
 - Use "Journal Entries" (with quotes) for the table name
 - FORBIDDEN COLUMNS: "transcription text", "foreign key", "audio_url", "user_feedback", "edit_status", "translation_status"
 - Valid columns: user_id, created_at, "refined text", emotions, master_themes, entities, sentiment, themeemotion, themes, duration
 
+SUB-QUESTION/QUERIES GENERATION GUIDELINE (MANDATORY): 
+- Break down user query (MANDATORY: remember that current user message might not be a direct query, so you'll have to look in to the conversation context provided to you and look at last user messages to guess the "ASK" and accordingly frame the sub-questions) into ATLEAST 2 sub-questions or more such that all sub-questions can be consolidated to answer the user's ASK 
+- CRITICAL: When analyzing vague queries like "I'm confused between these two options" or "help me decide", look at the FULL conversation context to understand what the two options are (e.g., "jobs vs startup", "career choices", etc.) and generate specific sub-questions about those topics
+- If user's query is vague, examine the complete conversation history to derive what the user wants to know and frame sub-questions that address their specific decision or dilemma
+- For career/life decisions: Generate sub-questions about patterns, emotions, and insights related to the specific options being considered
+- For eg. user asks (What % of entries contain the emotion confidence (and is it the dominant one?) when I deal with family matters that also concern health issues? -> sub question 1: How many entries concern family and health both? sub question 2: What are all the emotions and their avg scores ? sub question 3: Rank the emotions)
+
 **SQL GUIDELINES:**
-- ALWAYS use auth.uid() for user filtering (it will be replaced with the actual UUID)
+- ALWAYS use auth.uid() for user filtering (it will be replaced with the actual UUID);    
+- NEVER hardcode user IDs or generate fake UUIDs
 - Use sqlQueryType: "filtering" for retrieving entries
 - Use sqlQueryType: "analysis" for COUNT, AVG, SUM, percentages, statistics
 - For count queries: SELECT COUNT(*) AS total_entries
@@ -835,33 +847,21 @@ USER QUERY: "${message}"
 USER TIMEZONE: "${userTimezone}"
 CURRENT DATE: ${new Date().toISOString().split('T')[0]} (YYYY-MM-DD format)
 CURRENT YEAR: ${new Date().getFullYear()}
-CONVERSATION CONTEXT: ${last.length > 0 ? last.map(m => `${m.role || m.sender}: ${m.content || 'N/A'}`).join('\n  ') : 'None'}
+CONVERSATION CONTEXT: ${last.length > 0 ? last.map((m)=>`${m.role || m.sender}: ${m.content || 'N/A'}`).join('\n  ') : 'None'}
 
 **CRITICAL CONVERSATION CONTEXT INSTRUCTIONS:**
-- When user says "these emotions" or similar references, check the conversation context for specific emotion names mentioned in previous ASSISTANT responses
-- If previous assistant messages contain specific emotions (like "contentment, hope, sadness, disappointment"), focus your analysis on THOSE SPECIFIC emotions
-- Generate sub-questions that target the exact emotions/entities mentioned in recent conversation rather than generic "top emotions"
-
-
 MANDATORY: Look at the conversation context provided to you with roles. Logically figure out what the "ASK" is by:
 1. Identifying what the ASSISTANT previously provided (e.g., sentiment analysis, emotion data)
 2. Understanding how the current USER message relates to or builds upon that previous response
 3. When user asks follow-up questions like "how has it been moving", connect it to the TOPIC of the previous assistant response
 4. Generate sub-questions that CONTINUE the analysis thread from previous conversation, not start a new unrelated analysis
-
-**SUB-QUESTION GENERATION STRATEGY:**
-- For follow-up queries, first sub-question should ALWAYS relate to the previous conversation topic
-- If previous response was about sentiment, continue with sentiment analysis
-- If user asks "how has X been moving/changing", focus on temporal trends of X
-- Avoid generating unrelated sub-questions when clear conversation continuity exists
-- ALways generate atleast 2 sub-questions or more (Even if the query/ASK os the user is straightforward try framing more sub-questions to deep dive like a true researcher)
+5. When user says "these emotions" or similar references like event, time, themes, (can be anything), check the conversation context for specific emotion names mentioned in previous ASSISTANT responses
 
 ANALYSIS STATUS:
 - Personal pronouns: ${hasPersonalPronouns}
 - Time reference: ${hasExplicitTimeReference}
 - Follow-up query: ${isFollowUpContext}
 - User timezone: ${userTimezone}
-
 
 Response format (MUST be valid JSON):
 {
