@@ -35,6 +35,8 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, 
     notifications, 
     unreadCount, 
     isLoading, 
+    error,
+    isAuthenticated,
     markAsRead, 
     markAsUnread, 
     dismissNotification,
@@ -43,10 +45,10 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, 
   const { toast } = useToast();
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && isAuthenticated) {
       loadNotifications();
     }
-  }, [isOpen, filter, loadNotifications]);
+  }, [isOpen, filter, loadNotifications, isAuthenticated]);
 
   const handleNotificationClick = (notification: AppNotification) => {
     // Only handle clicks for reminder type notifications
@@ -128,7 +130,23 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, 
         </div>
 
         <ScrollArea className="h-96">
-          {isLoading ? (
+          {!isAuthenticated ? (
+            <div className="p-4 text-center text-muted-foreground">
+              <TranslatableText text="Please log in to view notifications" />
+            </div>
+          ) : error ? (
+            <div className="p-4 text-center text-muted-foreground">
+              <TranslatableText text="Failed to load notifications" />
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="mt-2"
+                onClick={() => loadNotifications()}
+              >
+                <TranslatableText text="Retry" />
+              </Button>
+            </div>
+          ) : isLoading ? (
             <div className="p-4 text-center text-muted-foreground">
               <TranslatableText text="Loading notifications..." />
             </div>

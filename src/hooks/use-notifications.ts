@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface AppNotification {
   id: string;
@@ -20,9 +21,20 @@ export const useNotifications = () => {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   useEffect(() => {
+    // Clear notifications when user logs out
+    if (!user) {
+      setNotifications([]);
+      setUnreadCount(0);
+      setIsLoading(false);
+      setError(null);
+      return;
+    }
+
     loadNotifications();
     loadUnreadCount();
     
@@ -38,17 +50,19 @@ export const useNotifications = () => {
         },
         (payload) => {
           console.log('Notification update:', payload);
-          loadNotifications();
-          loadUnreadCount();
-          
-          // Show toast for new notifications
-          if (payload.eventType === 'INSERT' && payload.new) {
-            const newNotification = payload.new as AppNotification;
-            toast({
-              title: newNotification.title,
-              description: newNotification.message,
-              duration: 5000,
-            });
+          if (user) {
+            loadNotifications();
+            loadUnreadCount();
+            
+            // Show toast for new notifications
+            if (payload.eventType === 'INSERT' && payload.new) {
+              const newNotification = payload.new as AppNotification;
+              toast({
+                title: newNotification.title,
+                description: newNotification.message,
+                duration: 5000,
+              });
+            }
           }
         }
       )
@@ -57,10 +71,17 @@ export const useNotifications = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [toast]);
+  }, [toast, user]);
 
   const loadNotifications = async () => {
+    if (!user) {
+      setNotifications([]);
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
+    setError(null);
     try {
       const { data, error } = await supabase
         .from('user_app_notifications')
@@ -69,17 +90,27 @@ export const useNotifications = () => {
         .order('created_at', { ascending: false })
         .limit(20);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error loading notifications:', error);
+        setError('Failed to load notifications');
+        return;
+      }
 
       setNotifications((data || []) as AppNotification[]);
     } catch (error) {
       console.error('Error loading notifications:', error);
+      setError('Failed to load notifications');
     } finally {
       setIsLoading(false);
     }
   };
 
   const loadUnreadCount = async () => {
+    if (!user) {
+      setUnreadCount(0);
+      return;
+    }
+
     try {
       const { count, error } = await supabase
         .from('user_app_notifications')
@@ -87,7 +118,10 @@ export const useNotifications = () => {
         .is('read_at', null)
         .is('dismissed_at', null);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error loading unread count:', error);
+        return;
+      }
 
       setUnreadCount(count || 0);
     } catch (error) {
@@ -96,6 +130,8 @@ export const useNotifications = () => {
   };
 
   const markAsRead = async (notificationId: string) => {
+    if (!user) return;
+
     try {
       const { error } = await supabase
         .from('user_app_notifications')
@@ -118,6 +154,8 @@ export const useNotifications = () => {
   };
 
   const markAsUnread = async (notificationId: string) => {
+    if (!user) return;
+
     try {
       const { error } = await supabase
         .from('user_app_notifications')
@@ -140,6 +178,8 @@ export const useNotifications = () => {
   };
 
   const dismissNotification = async (notificationId: string) => {
+    if (!user) return;
+
     try {
       const { error } = await supabase
         .from('user_app_notifications')
@@ -156,6 +196,8 @@ export const useNotifications = () => {
   };
 
   const markAllAsRead = async () => {
+    if (!user) return;
+
     try {
       const { error } = await supabase
         .from('user_app_notifications')
@@ -206,6 +248,8 @@ export const useNotifications = () => {
     notifications,
     unreadCount,
     isLoading,
+    error,
+    isAuthenticated: !!user,
     markAsRead,
     markAsUnread,
     dismissNotification,

@@ -14,7 +14,7 @@ interface HomeNotificationBellProps {
 
 const HomeNotificationBell: React.FC<HomeNotificationBellProps> = ({ className = "" }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const { unreadCount } = useNotifications();
+  const { unreadCount, isAuthenticated } = useNotifications();
   const { isActive } = useTutorial();
   const buttonRef = useRef<HTMLButtonElement>(null);
 
@@ -37,12 +37,18 @@ const HomeNotificationBell: React.FC<HomeNotificationBellProps> = ({ className =
   }, [isOpen]);
 
   const handleToggle = () => {
+    if (!isAuthenticated) return;
     setIsOpen(!isOpen);
   };
 
   const handleClose = () => {
     setIsOpen(false);
   };
+
+  // Don't render the bell if user is not authenticated
+  if (!isAuthenticated) {
+    return null;
+  }
 
   return (
     <div className={`relative ${className}`}>
