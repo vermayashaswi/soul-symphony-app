@@ -46,6 +46,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, 
 
   useEffect(() => {
     if (isOpen && isAuthenticated) {
+      console.log('[NotificationCenter] Loading notifications on open, authenticated:', isAuthenticated);
       loadNotifications();
     }
   }, [isOpen, filter, loadNotifications, isAuthenticated]);

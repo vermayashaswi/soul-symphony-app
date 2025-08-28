@@ -5,6 +5,7 @@ import JournalHeader from '@/components/home/JournalHeader';
 import JournalNavigationButton from '@/components/home/JournalNavigationButton';
 import JournalContent from '@/components/home/JournalContent';
 import BackgroundElements from '@/components/home/BackgroundElements';
+import { NotificationTestButton } from '@/components/debug/NotificationTestButton';
 
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -122,7 +123,11 @@ const Home = () => {
       {/* Header with journal name and date - lower z-index to avoid stacking context conflicts */}
       <div className={`relative ${isInWelcomeTutorialStep ? 'z-[1000]' : 'z-20'} flex flex-col`}>
         <JournalHeader />
-        
+      </div>
+
+      {/* Debug: Test notification button */}
+      <div className="fixed bottom-4 left-4 z-40">
+        <NotificationTestButton />
       </div>
     </div>
   );

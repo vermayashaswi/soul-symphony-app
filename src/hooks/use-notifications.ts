@@ -36,13 +36,11 @@ export const useNotifications = () => {
       return;
     }
 
-    console.log('[useNotifications] User authenticated, loading notifications');
+    console.log('[useNotifications] User authenticated, loading notifications for user ID:', user.id);
     
-    // Small delay to ensure user state is fully loaded
-    const timeoutId = setTimeout(() => {
-      loadNotifications();
-      loadUnreadCount();
-    }, 100);
+    // Immediate load without delay to reduce stuck loading states
+    loadNotifications();
+    loadUnreadCount();
     
     // Set up real-time subscription for new notifications
     const channel = supabase
@@ -77,14 +75,13 @@ export const useNotifications = () => {
       .subscribe();
 
     return () => {
-      clearTimeout(timeoutId);
       supabase.removeChannel(channel);
     };
   }, [toast, user]);
 
   const loadNotifications = async (retryCount = 0) => {
-    if (!user) {
-      console.log('[useNotifications] No user, clearing notifications');
+    if (!user?.id) {
+      console.log('[useNotifications] No user ID, clearing notifications');
       setNotifications([]);
       setIsLoading(false);
       setError(null);
@@ -92,24 +89,37 @@ export const useNotifications = () => {
     }
 
     console.log('[useNotifications] Loading notifications for user:', user.id);
+    console.log('[useNotifications] Auth user object:', { id: user.id, email: user.email });
     setIsLoading(true);
     setError(null);
     
     try {
-      const { data, error } = await supabase
+      // Log the exact query being made
+      console.log('[useNotifications] Querying user_app_notifications table...');
+      
+      const { data, error, count } = await supabase
         .from('user_app_notifications')
-        .select('*')
+        .select('*', { count: 'exact' })
         .eq('user_id', user.id)
         .is('dismissed_at', null)
         .order('created_at', { ascending: false })
         .limit(20);
+
+      console.log('[useNotifications] Query result:', { 
+        data: data, 
+        error: error, 
+        count: count,
+        dataLength: data?.length || 0 
+      });
 
       if (error) {
         console.error('[useNotifications] Supabase error loading notifications:', error);
         throw error;
       }
 
-      console.log('[useNotifications] Loaded notifications:', data?.length || 0);
+      console.log('[useNotifications] Successfully loaded notifications:', data?.length || 0);
+      console.log('[useNotifications] Raw notification data:', data);
+      
       setNotifications((data || []) as AppNotification[]);
       setError(null);
     } catch (error: any) {
@@ -129,19 +139,23 @@ export const useNotifications = () => {
   };
 
   const loadUnreadCount = async () => {
-    if (!user) {
-      console.log('[useNotifications] No user for unread count');
+    if (!user?.id) {
+      console.log('[useNotifications] No user ID for unread count');
       setUnreadCount(0);
       return;
     }
 
     try {
+      console.log('[useNotifications] Loading unread count for user:', user.id);
+      
       const { count, error } = await supabase
         .from('user_app_notifications')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id)
         .is('read_at', null)
         .is('dismissed_at', null);
+
+      console.log('[useNotifications] Unread count query result:', { count, error });
 
       if (error) {
         console.error('[useNotifications] Error loading unread count:', error);
