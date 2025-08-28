@@ -894,19 +894,19 @@ ANGER FAMILY: anger, frustration, irritation, rage, annoyance, resentment, fury,
 4. If user says "frustrated" → SQL MUST query: frustration, anger, irritation, resentment
 
 **ENHANCED EMOTION QUERY PATTERNS:**
-```sql
--- WRONG: Only searching mentioned emotion
+\`\`\`sql
+/* WRONG: Only searching mentioned emotion */
 SELECT e.key as emotion, ROUND(AVG((e.value::text)::numeric), 3) as avg_score 
 FROM "Journal Entries" entries, jsonb_each(entries.emotions) e 
 WHERE entries.user_id = auth.uid() AND e.key = 'sadness'
 
--- CORRECT: Search emotion family for comprehensive analysis
+/* CORRECT: Search emotion family for comprehensive analysis */
 SELECT e.key as emotion, ROUND(AVG((e.value::text)::numeric), 3) as avg_score 
 FROM "Journal Entries" entries, jsonb_each(entries.emotions) e 
 WHERE entries.user_id = auth.uid() 
 AND e.key IN ('sadness', 'depression', 'hurt', 'disappointment', 'loneliness', 'regret', 'melancholy', 'grief')
 GROUP BY e.key ORDER BY avg_score DESC LIMIT 10
-```
+\`\`\`
 
 **VECTOR SEARCH EMOTION ENHANCEMENT:**
 ```json
