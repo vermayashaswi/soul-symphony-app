@@ -269,6 +269,7 @@ export type Database = {
           id: string
           is_premium: boolean | null
           journal_focus_areas: string[] | null
+          notification_preferences: Json | null
           onboarding_completed: boolean | null
           reminder_settings: Json | null
           revenuecat_entitlements: Json | null
@@ -291,6 +292,7 @@ export type Database = {
           id: string
           is_premium?: boolean | null
           journal_focus_areas?: string[] | null
+          notification_preferences?: Json | null
           onboarding_completed?: boolean | null
           reminder_settings?: Json | null
           revenuecat_entitlements?: Json | null
@@ -313,6 +315,7 @@ export type Database = {
           id?: string
           is_premium?: boolean | null
           journal_focus_areas?: string[] | null
+          notification_preferences?: Json | null
           onboarding_completed?: boolean | null
           reminder_settings?: Json | null
           revenuecat_entitlements?: Json | null

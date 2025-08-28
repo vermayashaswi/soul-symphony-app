@@ -4,6 +4,7 @@ import { Capacitor } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { supabase } from '@/integrations/supabase/client';
 import { fromZonedTime, format } from 'date-fns-tz';
+import { NotificationPreferencesService, NotificationCategory, getNotificationCategory } from './notificationPreferencesService';
 
 export interface NotificationReminder {
   id: string;
@@ -478,6 +479,40 @@ class FCMNotificationService {
           window.location.href = '/app/journal';
         }
       };
+    }
+  }
+
+  async sendCategorizedNotification(
+    userId: string,
+    notificationType: string,
+    title: string,
+    body: string,
+    data?: Record<string, any>,
+    targetUrl?: string,
+    icon?: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const response = await supabase.functions.invoke('send-categorized-notification', {
+        body: {
+          userId,
+          notificationType,
+          title,
+          body,
+          data,
+          targetUrl,
+          icon
+        }
+      });
+
+      if (response.error) {
+        console.error('[FCMNotificationService] Error from categorized notification edge function:', response.error);
+        return { success: false, error: response.error.message };
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('[FCMNotificationService] Error sending categorized notification:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   }
 

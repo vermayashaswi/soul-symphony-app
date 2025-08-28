@@ -37,6 +37,7 @@ import { useTutorial } from '@/contexts/TutorialContext';
 import { DeleteAllEntriesSection } from '@/components/settings/DeleteAllEntriesSection';
 import { EnhancedAvatarImage } from '@/components/ui/EnhancedAvatarImage';
 import { avatarSyncService } from '@/services/avatarSyncService';
+import { NotificationPreferencesSection } from '@/components/settings/NotificationPreferencesSection';
 
 
 interface SettingItemProps {
@@ -921,31 +922,8 @@ function SettingsContent() {
               </h2>
               
               <div className="space-y-3 divide-y">
-                <SettingItem
-                  icon={Bell}
-                  title="Notifications"
-                  description={
-                    notificationsEnabled 
-                      ? ""
-                      : "Get reminders to journal and stay on track"
-                  }
-                >
-                  <div className="flex items-center gap-2">
-                    <Switch 
-                      checked={notificationsEnabled}
-                      onCheckedChange={handleToggleNotifications}
-                    />
-                    {notificationsEnabled && (
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => setShowCustomTimeModal(true)}
-                      >
-                        <TranslatableText text="Customize" />
-                      </Button>
-                    )}
-                  </div>
-                </SettingItem>
+                {/* Replace old notification toggle with new categorized preferences */}
+                <NotificationPreferencesSection className="mb-6" />
                 
                 {/* Permission Status Display */}
                 <div className="pt-3">
