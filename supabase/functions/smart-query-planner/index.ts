@@ -908,17 +908,59 @@ ${databaseSchemaContext}
 - "filtering": SELECT entries/rows (returns journal entry records)
 - "analysis": COUNT/AVG/SUM operations (returns computed statistics)
 
-**ENHANCED TIME RANGE PRESERVATION RULES:**
+**CRITICAL: VECTOR SEARCH WITH TIME CONSTRAINTS PRIORITY:**
+When user asks time-specific questions, PRIORITIZE vector search with time constraints:
+
+**EXAMPLE 1 - Recent emotion analysis:**
+User: "How have I been feeling this week?"
+PREFERRED APPROACH:
+{
+  "step": 1,
+  "description": "Vector search for emotional content from this week",
+  "queryType": "vector_search",
+  "vectorSearch": {
+    "query": "emotions feelings mood this week",
+    "threshold": 0.25,
+    "limit": 15
+  },
+  "timeRange": {
+    "start": "2024-08-21T00:00:00Z",
+    "end": "2024-08-28T23:59:59Z",
+    "timezone": "${userTimezone}"
+  }
+}
+
+**EXAMPLE 2 - Monthly theme analysis:**
+User: "What themes appeared in my December entries?"
+PREFERRED APPROACH:
+{
+  "step": 1,
+  "description": "Vector search for December themes and patterns",
+  "queryType": "vector_search",
+  "vectorSearch": {
+    "query": "themes topics concerns December monthly patterns",
+    "threshold": 0.2,
+    "limit": 20
+  },
+  "timeRange": {
+    "start": "2023-12-01T00:00:00Z",
+    "end": "2023-12-31T23:59:59Z",
+    "timezone": "${userTimezone}"
+  }
+}
+
+**TIME RANGE PRESERVATION RULES:**
 1. IF user query mentions time → ALL analysisSteps MUST have timeRange
-2. IF sq1 has timeRange → ALL subsequent steps (sq2, sq3) MUST copy the same timeRange
-3. Vector searches MUST preserve timeRange from SQL steps
-4. Use timezone-aware casting: created_at AT TIME ZONE '${userTimezone}'
+2. Vector searches with time constraints have PRIORITY over SQL for semantic queries
+3. Use progressive fallback: exact time → expanded time → no constraints  
+4. Lower thresholds (0.15-0.25) for time-constrained vector searches
+5. Higher limits (15-25) for time-constrained searches to compensate for filtering
 
 **PROGRESSIVE TIME HANDLING:**
-- Recent: last 7 days
-- This week: current week boundary  
-- This month: current month boundary
-- Specific dates: convert to user timezone
+- Recent: last 7 days with timezone awareness
+- This week: current week boundary in user timezone
+- This month: current month boundary in user timezone
+- Specific dates: convert to user timezone with proper ISO format
 
 USER QUERY: "${message}"
 USER TIMEZONE: "${userTimezone}"

@@ -232,12 +232,15 @@ function rewriteProblematicSQL(sqlQuery: string): string {
 
 // ENHANCED VECTOR SEARCH FALLBACK WITH PROGRESSIVE TIME CONSTRAINT HANDLING
 async function executeEnhancedVectorSearchFallback(step: any, userId: string, supabaseClient: any, requestId: string) {
-  console.log(`[${requestId}] Enhanced vector search fallback with progressive time handling`);
+  console.log(`[${requestId}] Enhanced vector search fallback with intelligent time preservation`);
   
   try {
     // Extract query context from the original step
     let searchQuery = '';
-    if (step.description) {
+    if (step.vectorSearch?.query) {
+      // Use the vector search query if available
+      searchQuery = step.vectorSearch.query;
+    } else if (step.description) {
       searchQuery = step.description;
     } else if (step.sqlQuery) {
       // Extract meaningful terms from the SQL query for vector search
@@ -248,36 +251,49 @@ async function executeEnhancedVectorSearchFallback(step: any, userId: string, su
 
     console.log(`[${requestId}] Enhanced vector fallback search query: ${searchQuery}`);
     
-    // CRITICAL: Preserve original time constraints from step
+    // CRITICAL: Preserve original time constraints from step with priority preservation
     const preservedTimeRange = step.timeRange;
     if (preservedTimeRange) {
       console.log(`[${requestId}] PRESERVING original time constraints: ${JSON.stringify(preservedTimeRange)}`);
     }
+    
+    // Get vector search parameters from step or use smart defaults
+    const baseThreshold = step.vectorSearch?.threshold || 0.25;
+    const baseLimit = step.vectorSearch?.limit || 15;
 
     // Generate embedding for the search query
     const embedding = await generateEmbedding(searchQuery);
     
-    // Enhanced threshold strategy with progressive expansion
-    const primaryThreshold = 0.25;
-    const secondaryThreshold = 0.2;
-    const fallbackThreshold = 0.15;
+    // Enhanced threshold strategy with progressive expansion and vector search optimization
+    const primaryThreshold = baseThreshold;
+    const secondaryThreshold = Math.max(baseThreshold - 0.05, 0.15);
+    const fallbackThreshold = Math.max(baseThreshold - 0.1, 0.1);
     
     let vectorResults = null;
     let timeExpansionUsed = false;
+    let executionLog = {
+      timeConstrainedAttempts: 0,
+      expandedTimeAttempts: 0,
+      unconstrainedAttempts: 0,
+      finalStrategy: 'none'
+    };
     
-    // PRIORITY 1: Try with preserved time range if available
+    // PRIORITY 1: Try with preserved time range if available (ENHANCED)
     if (preservedTimeRange && (preservedTimeRange.start || preservedTimeRange.end)) {
       console.log(`[${requestId}] Enhanced vector fallback with PRESERVED time range: ${preservedTimeRange.start} to ${preservedTimeRange.end}`);
       
-      // Try multiple thresholds with time constraints first
+      // STRATEGY: Start with higher limits for time-constrained searches since filtering reduces results
+      const timeConstrainedLimit = Math.max(baseLimit + 5, 20);
       const thresholds = [primaryThreshold, secondaryThreshold, fallbackThreshold];
       
       for (const threshold of thresholds) {
         try {
+          executionLog.timeConstrainedAttempts++;
+          
           const { data, error } = await supabaseClient.rpc('match_journal_entries_with_date', {
             query_embedding: embedding,
             match_threshold: threshold,
-            match_count: 15,
+            match_count: timeConstrainedLimit,
             user_id_filter: userId,
             start_date: preservedTimeRange.start || null,
             end_date: preservedTimeRange.end || null
@@ -287,42 +303,57 @@ async function executeEnhancedVectorSearchFallback(step: any, userId: string, su
             console.error(`[${requestId}] Time-filtered vector fallback error at threshold ${threshold}:`, error);
             continue;
           } else if (data && data.length > 0) {
-            console.log(`[${requestId}] Time-filtered vector fallback successful at threshold ${threshold}: ${data.length} results`);
+            console.log(`[${requestId}] ✅ Time-filtered vector fallback successful at threshold ${threshold}: ${data.length} results`);
             vectorResults = data;
+            executionLog.finalStrategy = 'time_constrained';
             break;
           } else {
-            console.log(`[${requestId}] Time-filtered vector fallback returned 0 results at threshold ${threshold}`);
+            console.log(`[${requestId}] ⚠️ Time-filtered vector fallback returned 0 results at threshold ${threshold}`);
           }
         } catch (timeFilterError) {
           console.error(`[${requestId}] Error in time-filtered vector search at threshold ${threshold}:`, timeFilterError);
         }
       }
       
-      // PROGRESSIVE TIME EXPANSION: If no results with original time range, try expanding
+      // ENHANCED PROGRESSIVE TIME EXPANSION: If no results with original time range, try expanding intelligently
       if (!vectorResults || vectorResults.length === 0) {
-        console.log(`[${requestId}] No results with original time range, attempting progressive time expansion`);
+        console.log(`[${requestId}] 📈 No results with original time range, attempting SMART progressive time expansion`);
         
-        // Expand time range progressively
-        const timeRanges = generateExpandedTimeRanges(preservedTimeRange);
+        // Generate smarter time ranges with context preservation
+        const expandedRanges = generateExpandedTimeRanges(preservedTimeRange);
         
-        for (const expandedRange of timeRanges) {
-          console.log(`[${requestId}] Trying expanded time range: ${expandedRange.start} to ${expandedRange.end}`);
+        for (const expandedRange of expandedRanges) {
+          executionLog.expandedTimeAttempts++;
+          console.log(`[${requestId}] 🔍 Trying expanded time range: ${expandedRange.description} (${expandedRange.start} to ${expandedRange.end})`);
           
           try {
             const { data, error } = await supabaseClient.rpc('match_journal_entries_with_date', {
               query_embedding: embedding,
               match_threshold: fallbackThreshold,
-              match_count: 15,
+              match_count: Math.max(baseLimit + 10, 25), // Higher limit for expanded searches
               user_id_filter: userId,
               start_date: expandedRange.start,
               end_date: expandedRange.end
             });
 
             if (!error && data && data.length > 0) {
-              console.log(`[${requestId}] Expanded time range successful: ${data.length} results`);
+              console.log(`[${requestId}] ✅ Expanded time range successful: ${data.length} results with ${expandedRange.description}`);
               vectorResults = data;
               timeExpansionUsed = true;
+              executionLog.finalStrategy = 'time_expanded';
+              
+              // Add metadata about time expansion
+              vectorResults = vectorResults.map(result => ({
+                ...result,
+                _timeExpansion: {
+                  originalRange: preservedTimeRange,
+                  expandedRange: expandedRange,
+                  expansionType: expandedRange.description
+                }
+              }));
               break;
+            } else {
+              console.log(`[${requestId}] ⚠️ Expanded range ${expandedRange.description} returned 0 results`);
             }
           } catch (expandedError) {
             console.error(`[${requestId}] Error in expanded time range search:`, expandedError);
@@ -331,26 +362,51 @@ async function executeEnhancedVectorSearchFallback(step: any, userId: string, su
       }
     }
     
-    // PRIORITY 2: Only if ALL time-constrained searches fail, try without time constraints
+    // PRIORITY 2: Only if ALL time-constrained searches fail, try without time constraints (ENHANCED WARNING)
     if (!vectorResults || vectorResults.length === 0) {
-      console.log(`[${requestId}] ALL time-constrained searches failed, trying without time constraints as LAST resort`);
+      console.warn(`[${requestId}] 🚨 ALL TIME-CONSTRAINED SEARCHES FAILED - this indicates potential issues:`);
+      console.warn(`[${requestId}] - Original time range may have no matching content`);
+      console.warn(`[${requestId}] - Vector embeddings may not match user's semantic query`);
+      console.warn(`[${requestId}] - Database may have limited entries in time period`);
+      console.log(`[${requestId}] 🔄 Trying WITHOUT time constraints as LAST resort`);
       
-      try {
-        const { data, error } = await supabaseClient.rpc('match_journal_entries', {
-          query_embedding: embedding,
-          match_threshold: fallbackThreshold,
-          match_count: 15,
-          user_id_filter: userId
-        });
+      // Try multiple thresholds without time constraints
+      const unconstrainedThresholds = [fallbackThreshold, 0.1, 0.05];
+      
+      for (const threshold of unconstrainedThresholds) {
+        try {
+          executionLog.unconstrainedAttempts++;
+          
+          const { data, error } = await supabaseClient.rpc('match_journal_entries', {
+            query_embedding: embedding,
+            match_threshold: threshold,
+            match_count: baseLimit,
+            user_id_filter: userId
+          });
 
-        if (error) {
-          console.error(`[${requestId}] Basic vector fallback error:`, error);
-        } else if (data && data.length > 0) {
-          console.log(`[${requestId}] Basic vector fallback successful: ${data.length} results`);
-          vectorResults = data;
+          if (error) {
+            console.error(`[${requestId}] Basic vector fallback error at threshold ${threshold}:`, error);
+            continue;
+          } else if (data && data.length > 0) {
+            console.log(`[${requestId}] ✅ Basic vector fallback successful at threshold ${threshold}: ${data.length} results`);
+            console.warn(`[${requestId}] ⚠️ TIME CONSTRAINTS WERE DROPPED - results may include irrelevant time periods`);
+            vectorResults = data;
+            executionLog.finalStrategy = 'unconstrained';
+            
+            // Add warning metadata to results
+            vectorResults = vectorResults.map(result => ({
+              ...result,
+              _timeWarning: {
+                originalTimeRange: preservedTimeRange,
+                warning: 'Time constraints were dropped - results may span any time period',
+                executionLog: executionLog
+              }
+            }));
+            break;
+          }
+        } catch (basicVectorError) {
+          console.error(`[${requestId}] Error in basic vector search at threshold ${threshold}:`, basicVectorError);
         }
-      } catch (basicVectorError) {
-        console.error(`[${requestId}] Error in basic vector search:`, basicVectorError);
       }
     }
     
@@ -360,7 +416,15 @@ async function executeEnhancedVectorSearchFallback(step: any, userId: string, su
       return await executeBasicSQLQuery(userId, supabaseClient, requestId);
     }
 
-    console.log(`[${requestId}] Enhanced vector fallback successful, found ${vectorResults.length} results${timeExpansionUsed ? ' (with time expansion)' : ''}`);
+    // Log final execution summary
+    console.log(`[${requestId}] 📊 Enhanced vector fallback completed:`);
+    console.log(`[${requestId}] - Final strategy: ${executionLog.finalStrategy}`);
+    console.log(`[${requestId}] - Time-constrained attempts: ${executionLog.timeConstrainedAttempts}`);
+    console.log(`[${requestId}] - Expanded time attempts: ${executionLog.expandedTimeAttempts}`);
+    console.log(`[${requestId}] - Unconstrained attempts: ${executionLog.unconstrainedAttempts}`);
+    console.log(`[${requestId}] - Results found: ${vectorResults.length}`);
+    console.log(`[${requestId}] - Time expansion used: ${timeExpansionUsed}`);
+    
     return vectorResults;
 
   } catch (error) {
@@ -372,7 +436,7 @@ async function executeEnhancedVectorSearchFallback(step: any, userId: string, su
 }
 
 /**
- * Generate progressively expanded time ranges for better results
+ * Generate intelligently expanded time ranges with contextual descriptions
  */
 function generateExpandedTimeRanges(originalRange: any): any[] {
   if (!originalRange || (!originalRange.start && !originalRange.end)) {
@@ -382,23 +446,56 @@ function generateExpandedTimeRanges(originalRange: any): any[] {
   const ranges = [];
   const start = new Date(originalRange.start || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
   const end = new Date(originalRange.end || new Date());
+  const now = new Date();
   
-  // Expand by doubling the time range
-  const duration = end.getTime() - start.getTime();
-  const expandedStart = new Date(start.getTime() - duration);
-  const expandedEnd = new Date(end.getTime() + duration);
+  // Calculate original duration
+  const originalDuration = end.getTime() - start.getTime();
+  const daysOriginal = Math.floor(originalDuration / (24 * 60 * 60 * 1000));
   
+  // EXPANSION 1: Double the time range (extend both directions)
+  const doubledStart = new Date(start.getTime() - originalDuration);
+  const doubledEnd = new Date(end.getTime() + originalDuration);
   ranges.push({
-    start: expandedStart.toISOString(),
-    end: expandedEnd.toISOString()
+    start: doubledStart.toISOString(),
+    end: doubledEnd.toISOString(),
+    description: `doubled time range (${daysOriginal * 2} days)`
   });
   
-  // Expand to last 30 days if not already larger
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-  if (start > thirtyDaysAgo) {
+  // EXPANSION 2: Extend backwards significantly (for historical context)
+  const extendedBackStart = new Date(start.getTime() - (originalDuration * 2));
+  ranges.push({
+    start: extendedBackStart.toISOString(),
+    end: end.toISOString(),
+    description: `extended backwards (${Math.floor((end.getTime() - extendedBackStart.getTime()) / (24 * 60 * 60 * 1000))} days)`
+  });
+  
+  // EXPANSION 3: Last 30 days if original range is smaller
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  if (originalDuration < 30 * 24 * 60 * 60 * 1000) {
     ranges.push({
       start: thirtyDaysAgo.toISOString(),
-      end: new Date().toISOString()
+      end: now.toISOString(),
+      description: `last 30 days`
+    });
+  }
+  
+  // EXPANSION 4: Last 90 days if original range is much smaller
+  const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+  if (originalDuration < 14 * 24 * 60 * 60 * 1000) {
+    ranges.push({
+      start: ninetyDaysAgo.toISOString(),
+      end: now.toISOString(),
+      description: `last 90 days`
+    });
+  }
+  
+  // EXPANSION 5: Seasonal context (last 6 months)
+  const sixMonthsAgo = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000);
+  if (originalDuration < 7 * 24 * 60 * 60 * 1000) {
+    ranges.push({
+      start: sixMonthsAgo.toISOString(),
+      end: now.toISOString(),
+      description: `seasonal context (6 months)`
     });
   }
   
