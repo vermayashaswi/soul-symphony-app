@@ -149,12 +149,13 @@ const LanguageSelector = () => {
       <DropdownMenuTrigger asChild>
         <Button 
           variant="ghost" 
-          size="icon" 
+          size="sm" 
           aria-label="Select language"
           title="Select language"
           disabled={isTranslating}
+          className="hover:bg-primary/5 transition-colors duration-200"
         >
-          <Globe className={`h-5 w-5 ${isTranslating ? 'animate-pulse' : ''}`} />
+          <Globe className={`h-4 w-4 text-muted-foreground ${isTranslating ? 'animate-pulse' : ''}`} />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent 

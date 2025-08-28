@@ -105,12 +105,13 @@ const JournalHeader: React.FC = () => {
         </h1>
       </div>
 
-      {/* FIXED POSITION: Date strip - top right */}
+      {/* FIXED POSITION: Date strip - emerges from right edge, starts from globe icon */}
       <motion.div
         variants={dateStripVariants}
         initial="hidden"
         animate="visible"
-        className={`absolute top-4 right-4 px-3 py-1 rounded-l-md whitespace-nowrap ${theme === 'dark' ? 'bg-gray-800/80' : 'bg-gray-100/80'} ${isInWelcomeTutorialStep ? 'tutorial-highlight z-[9999]' : 'z-50'}`}
+        className={`absolute top-4 right-0 pl-12 pr-3 py-1 rounded-l-md whitespace-nowrap ${theme === 'dark' ? 'bg-gray-800/80' : 'bg-gray-100/80'} ${isInWelcomeTutorialStep ? 'tutorial-highlight z-[9999]' : 'z-50'}`}
+        style={{ left: 'calc(100% - 120px)' }}
       >
         <div
           className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-black'}`}
