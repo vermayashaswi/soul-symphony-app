@@ -923,12 +923,6 @@ async function analyzeQueryWithSubQuestions(message, conversationContext, userEn
     // Get live database schema with real themes and emotions using the authenticated client
     const databaseSchemaContext = await generateDatabaseSchemaContext(supabaseClient);
 
-    // Enhanced detection for personalized queries and comprehensive time references
-    const hasPersonalPronouns = /\b(i|me|my|mine|myself)\b/i.test(message.toLowerCase());
-    const hasExplicitTimeReference = /\b(last\s+(?:\d+[-\s]?\d*\s+)?(?:days?|weeks?|months?|years?)|yesterday|today|this\s+(?:week|month|year|morning|evening)|past\s+(?:few\s+)?(?:days?|weeks?|months?)|recently|lately|earlier|before|after|since|until|during|when|(?:last|this)\s+(?:week|month|year|night|morning|evening|afternoon)|(?:august|january|february|march|april|may|june|july|september|october|november|december)|(?:\d{1,2}[-/]\d{1,2}[-/]\d{2,4})|(?:\d{1,2}\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec))|(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday))\b/i.test(message.toLowerCase());
-    const isFollowUpContext = isFollowUp || /\b(that|those|it|this|these|above|mentioned|said|talked about)\b/i.test(message.toLowerCase());
-    
-    console.log(`[Query Planner] Enhanced analysis - Personal: ${hasPersonalPronouns}, Time ref: ${hasExplicitTimeReference}, Follow-up: ${isFollowUpContext}`);
 
     const prompt = `You are Ruh's Enhanced Intelligent Query Planner - a precise execution engine for a voice journaling app called SOuLO. Your job is to analyze user queries and return structured JSON plans with BULLETPROOF PostgreSQL queries.
 
@@ -1201,7 +1195,6 @@ Examine the conversation context to understand the actual user intent:
 5. Preserve entity names, emotion names, time periods from previous responses
 
 ANALYSIS STATUS:
-- Follow-up query: ${isFollowUpContext}
 - User timezone: ${userTimezone}
 
 ===== MANDATORY FINAL VECTOR SEARCH REQUIREMENT =====
