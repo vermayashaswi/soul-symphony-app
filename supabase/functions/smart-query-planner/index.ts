@@ -796,136 +796,72 @@ async function analyzeQueryWithSubQuestions(message, conversationContext, userEn
     
     console.log(`[Query Planner] Basic analysis - Personal: ${hasPersonalPronouns}, Time ref: ${hasExplicitTimeReference}, Follow-up: ${isFollowUpContext}`);
 
-    // Enhanced query detection for better routing
-    const isContentSeekingQuery = /\b(what did i|show me|entries about|content|wrote|said|find|tell me about|examples|specific|mentioned|talking about|discussed|focused on)\b/i.test(message.toLowerCase());
-    const requiresMandatoryVector = isContentSeekingQuery || hasPersonalPronouns;
+    const prompt = `You are Ruh's Intelligent Query Planner - a pure execution engine for a voice journaling app called SOuLO. Your ONLY job is to analyze user queries and return structured JSON plans for execution.
 
-    const prompt = `You are SOULo's Enhanced Analyst Agent - an intelligent query planning specialist for journal data analysis TIMEZONE-AWARE date processing.
+You are provided with this database schema: ${databaseSchemaContext} **CRITICAL DATABASE TYPE: This is a PostgreSQL database. Use PostgreSQL-specific syntax and functions.**
 
-**CRITICAL DATABASE TYPE: This is a PostgreSQL database. Use PostgreSQL-specific syntax and functions.**
-
-${databaseSchemaContext}
-
-**CRITICAL DATABASE CONTEXT ADHERENCE:**
+**CORE RULES:**
 - You MUST ONLY use table names, column names, and data types that exist in the database schema above
-- DO NOT hallucinate or invent table structures, column names, or data types
 - STICK STRICTLY to the provided database schema context
-- If uncertain about a database structure, use basic select queries instead of complex ones
 - Use PostgreSQL-compatible functions and syntax
 
-**IMPORTANT TIME RELATED QUERY PLANNING:** Note that in the "Journal Entries" table the user timestamps are in the column "created_at" and are of the data type timestamptz (example value in database: 2025-08-02 18:57:54.515+00)
+**TABLE REFERENCE:**
+- Use "Journal Entries" (with quotes) for the table name
+- FORBIDDEN COLUMNS: "transcription text", "foreign key", "audio_url", "user_feedback", "edit_status", "translation_status"
+- Valid columns: user_id, created_at, "refined text", emotions, master_themes, entities, sentiment, themeemotion, themes, duration
 
-SUB-QUESTION/QUERIES GENERATION GUIDELINE (MANDATORY): 
-- Break down user query (MANDATORY: remember that current user message might not be a direct query, so you'll have to look in to the conversation context provided to you and look at last user messages to guess the "ASK" and accordingly frame the sub-questions) into ATLEAST 2 sub-questions or more such that all sub-questions can be consolidated to answer the user's ASK 
-- CRITICAL: When analyzing vague queries like "I'm confused between these two options" or "help me decide", look at the FULL conversation context to understand what the two options are (e.g., "jobs vs startup", "career choices", etc.) and generate specific sub-questions about those topics
-- If user's query is vague, examine the complete conversation history to derive what the user wants to know and frame sub-questions that address their specific decision or dilemma
-- For career/life decisions: Generate sub-questions about patterns, emotions, and insights related to the specific options being considered
-- For eg. user asks (What % of entries contain the emotion confidence (and is it the dominant one?) when I deal with family matters that also concern health issues? -> sub question 1: How many entries concern family and health both? sub question 2: What are all the emotions and their avg scores ? sub question 3: Rank the emotions)
+**SQL GUIDELINES:**
+- ALWAYS use auth.uid() for user filtering (it will be replaced with the actual UUID)
+- Use sqlQueryType: "filtering" for retrieving entries
+- Use sqlQueryType: "analysis" for COUNT, AVG, SUM, percentages, statistics
+- For count queries: SELECT COUNT(*) AS total_entries
+- For percentage queries: Use proper calculations with ROUND((count * 100.0 / total), 1)
+- Include timezone in timeRange objects: "timezone": "${userTimezone}"
 
+**CRITICAL DATE HANDLING:**
+- ALWAYS use current year ${new Date().getFullYear()} for relative time references like "current month", "this month", "last month"
+- For "current month": Use '${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-01T00:00:00+${userTimezone.includes('/') ? '05:30' : '+00:00'}' as start date
+- For "last month": Calculate previous month using current year unless explicitly stated otherwise
+- Examples of CORRECT date ranges:
+  * Current month (August 2025): '2025-08-01T00:00:00+05:30' to '2025-09-01T00:00:00+05:30'
+  * Last month (July 2025): '2025-07-01T00:00:00+05:30' to '2025-08-01T00:00:00+05:30'
 
-1. **UUID and User ID Requirements:**
-   - ALWAYS use auth.uid() for user filtering (it will be replaced with the actual UUID)
-   - NEVER hardcode user IDs or generate fake UUIDs
-
-2. **Table and Column References:**
-   - Use "Journal Entries" (with quotes) for the table name
-   - FORBIDDEN COLUMNS (NEVER USE): "transcription text", "foreign key", "audio_url", "user_feedback", "edit_status", "translation_status"
-   - Valid columns: user_id, created_at, "refined text", emotions, master_themes, entities, sentiment, themeemotion, themes, duration
-   - Avoid using "refined text" in SQL queries unless absolutely necessary (it's just text content)
-
-3. **Simplified JSONB Operations:**
-   - For emotions: Use emotions->>'emotion_name' for specific emotion values only when needed
-   - Avoid complex JSONB operations unless absolutely necessary for the user's specific request
-   - When possible, use master_themes array instead of complex emotion JSONB queries
-
-4. **MANDATORY TIME RANGE INTEGRATION:**
-   - When timeRange is provided in the step, SQL queries MUST include the date filters
-   - Use proper timestamp with time zone format: '2024-08-01T00:00:00Z'::timestamp with time zone
-   - ALWAYS include both start and end date filters when timeRange exists
-
-5. **Simplified Query Guidelines:**
-   - Generate basic SELECT queries focusing on simple columns: user_id, created_at, master_themes, sentiment
-   - Always include user_id = auth.uid() in WHERE clause
-   - Use proper PostgreSQL syntax with double quotes for table/column names with spaces
-   - Avoid complex nested queries - keep it simple and working
-   - Use standard aggregation functions: COUNT, AVG, MAX, MIN, SUM
-
-**CRITICAL TIMEZONE HANDLING RULES:**
-
-1. **USER TIMEZONE CONTEXT**: User timezone is "${userTimezone}"
-2. **DATABASE STORAGE**: All journal entries are stored in UTC in the database
-3. **TIMEZONE CONVERSION REQUIRED**: When generating date ranges, you MUST account for timezone conversion
-   - User asks about "August 6" in India timezone
-   - Database query needs UTC range that captures all entries made on August 6 India time
-   - Example: August 6 India time = August 5 18:30 UTC to August 6 18:29 UTC
-
-**CRITICAL VECTOR SEARCH RULES - MUST FOLLOW:**
-
-1. **MANDATORY VECTOR SEARCH SCENARIOS** (Always include vector search regardless of time constraints):
-   - ANY query asking for "content", "what I wrote", "what I said", "entries about", "show me", "find"
-   - Questions seeking emotional context, feelings, moods, or mental states
-   - Requests for examples, patterns, insights, or thematic analysis  
-   - Queries about achievements, progress, breakthroughs, or personal growth
-   - Comparative analysis ("similar to", "like when", "reminds me of")
-   - Reflective queries ("how was I feeling", "what was going through my mind")
-   - Follow-up questions referencing previous context
-   - Any query with words: "exactly", "specifically", "precisely", "detailed", "in-depth"
-
-2. **HYBRID SEARCH STRATEGY** (SQL + Vector for optimal results):
-   - Time-based content queries: Use SQL for date filtering AND vector for semantic content
-   - Statistical queries needing examples: SQL for stats AND vector for relevant samples
-   - Thematic queries: SQL theme analysis AND vector semantic search
-   - Achievement/progress tracking: SQL for metrics AND vector for meaningful content
-
-3. **ENHANCED VECTOR QUERY GENERATION**:
-   - MANDATORY: When generating vector search queries, append relevant terms from the master themes and emotions lists provided in the database schema context
-   - For negative emotion queries: append negative emotions like "anxiety anger frustration sadness disappointment fear guilt shame regret loneliness pessimism overwhelm"
-   - For theme-specific queries: append related theme names from the master themes list
-   - For general queries: append contextually relevant emotions and themes from the database context
-   - Example: Original sub-question "What are negative emotions expressed?" → Enhanced vector search: "negative emotions anxiety anger frustration sadness disappointment fear guilt shame overwhelm loneliness pessimism regret personal feelings journal entries"
-   - Use the user's EXACT words and emotional context in vector searches
-   - For "What did I journal in August" → Vector query: "journal entries personal thoughts feelings experiences august"
-   - For achievement queries → Vector query: "achievement success accomplishment progress breakthrough proud confidence joy satisfaction pride"
-   - For emotional queries → Vector query: "emotions feelings mood emotional state [specific emotions mentioned] [append relevant emotions from database context]"
-   - Preserve user's original language patterns for better semantic matching
-
-4. **CRITICAL TIME-OF-DAY QUERY RULES**:
-    - When user asks about "first half vs second half" or "morning vs evening", NEVER generate UTC-based queries
-    - ALWAYS use user's timezone ("${userTimezone}") for time-of-day calculations
-    - Use SQL with AT TIME ZONE to convert stored UTC times to user's local time for hour-based analysis
-    - Example for "first half vs second half": 
-      \`\`\`sql
-      SELECT 
-        CASE WHEN EXTRACT(HOUR FROM created_at AT TIME ZONE 'USER_TIMEZONE_HERE') < 12 THEN 'first_half' ELSE 'second_half' END as day_period,
-        COUNT(*) as entry_count
-      FROM "Journal Entries" 
-      WHERE user_id = auth.uid()
-      GROUP BY day_period;
-      \`\`\`
-    - All timeRange objects MUST include "timezone": "${userTimezone}"
-    - Date processing will handle conversion from user's local time to UTC for database queries
+**VECTOR SEARCH:**
+- Use semantic queries that match user's language and intent
+- Append relevant emotions/themes from database context
+- Set appropriate threshold (0.3 default) and limit (15 default)
 
 USER QUERY: "${message}"
 USER TIMEZONE: "${userTimezone}"
-CONVERSATION CONTEXT (Last 6 messages): ${last.length > 0 ? last.map((m)=>`${m.role || m.sender}: ${m.content || 'N/A'}`).join('\n  ') : 'None'}
+CURRENT DATE: ${new Date().toISOString().split('T')[0]} (YYYY-MM-DD format)
+CURRENT YEAR: ${new Date().getFullYear()}
+CONVERSATION CONTEXT: ${last.length > 0 ? last.map(m => `${m.role || m.sender}: ${m.content || 'N/A'}`).join('\n  ') : 'None'}
 
-ANALYSIS REQUIREMENTS:
-- Content-seeking detected: ${isContentSeekingQuery}
-- Mandatory vector required: ${requiresMandatoryVector}  
-- Has personal pronouns: ${hasPersonalPronouns}
-- Has time reference: ${hasExplicitTimeReference}
-- Is follow-up query: ${isFollowUpContext}
+**CRITICAL CONVERSATION CONTEXT INSTRUCTIONS:**
+- When user says "these emotions" or similar references, check the conversation context for specific emotion names mentioned in previous ASSISTANT responses
+- If previous assistant messages contain specific emotions (like "contentment, hope, sadness, disappointment"), focus your analysis on THOSE SPECIFIC emotions
+- Generate sub-questions that target the exact emotions/entities mentioned in recent conversation rather than generic "top emotions"
+
+
+MANDATORY: Look at the conversation context provided to you with roles. Logically figure out what the "ASK" is by:
+1. Identifying what the ASSISTANT previously provided (e.g., sentiment analysis, emotion data)
+2. Understanding how the current USER message relates to or builds upon that previous response
+3. When user asks follow-up questions like "how has it been moving", connect it to the TOPIC of the previous assistant response
+4. Generate sub-questions that CONTINUE the analysis thread from previous conversation, not start a new unrelated analysis
+
+**SUB-QUESTION GENERATION STRATEGY:**
+- For follow-up queries, first sub-question should ALWAYS relate to the previous conversation topic
+- If previous response was about sentiment, continue with sentiment analysis
+- If user asks "how has X been moving/changing", focus on temporal trends of X
+- Avoid generating unrelated sub-questions when clear conversation continuity exists
+- ALways generate atleast 2 sub-questions or more (Even if the query/ASK os the user is straightforward try framing more sub-questions to deep dive like a true researcher)
+
+ANALYSIS STATUS:
+- Personal pronouns: ${hasPersonalPronouns}
+- Time reference: ${hasExplicitTimeReference}
+- Follow-up query: ${isFollowUpContext}
 - User timezone: ${userTimezone}
 
-Generate a comprehensive analysis plan that:
-1. MANDATES vector search for any content-seeking scenario
-2. Uses hybrid approach (SQL + vector) for time-based content queries
-3. Creates semantically rich vector search queries using user's language
-4. INCLUDES proper timezone information in all timeRange objects
-5. Generates COMPLETE, SAFE, EXECUTABLE SQL queries using ONLY the provided database schema and working patterns above
-6. NEVER references forbidden columns: transcription text, foreign key, audio_url, user_feedback, edit_status, translation_status
-7. Uses "refined text" as the primary content source (NEVER transcription text)
-8. Ensures comprehensive coverage of user's intent
 
 Response format (MUST be valid JSON):
 {
@@ -947,6 +883,7 @@ Response format (MUST be valid JSON):
           "step": 1,
           "description": "What this step does",
           "queryType": "vector_search|sql_analysis|hybrid_search",
+          "sqlQueryType": "filtering|analysis",
           "sqlQuery": "COMPLETE EXECUTABLE SQL QUERY using only existing database schema and working patterns" or null,
           "vectorSearch": {
             "query": "Semantically rich search query using user's words",
