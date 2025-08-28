@@ -923,7 +923,7 @@ function SettingsContent() {
               <div className="space-y-3 divide-y">
                 <SettingItem
                   icon={Bell}
-                  title="Journal Reminders"
+                  title="Notifications"
                   description={
                     notificationsEnabled 
                       ? ""
