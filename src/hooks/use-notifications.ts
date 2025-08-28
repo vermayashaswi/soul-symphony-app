@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -24,10 +24,42 @@ export const useNotifications = () => {
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
+  
+  // Refs to track stable state and prevent race conditions
+  const currentUserIdRef = useRef<string | null>(null);
+  const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isMountedRef = useRef(true);
+
+  // Cleanup function
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
+    // Handle authentication state changes with stability checks
+    const userId = user?.id || null;
+    
+    // If user ID hasn't changed, don't reload
+    if (currentUserIdRef.current === userId) {
+      return;
+    }
+    
+    currentUserIdRef.current = userId;
+    
+    // Clear timeout from previous operations
+    if (loadingTimeoutRef.current) {
+      clearTimeout(loadingTimeoutRef.current);
+      loadingTimeoutRef.current = null;
+    }
+    
     // Clear notifications when user logs out
-    if (!user) {
+    if (!user || !userId) {
       console.log('[useNotifications] User logged out, clearing state');
       setNotifications([]);
       setUnreadCount(0);
@@ -36,29 +68,29 @@ export const useNotifications = () => {
       return;
     }
 
-    console.log('[useNotifications] User authenticated, loading notifications for user ID:', user.id);
+    console.log('[useNotifications] User authenticated, loading notifications for user ID:', userId);
     
-    // Immediate load without delay to reduce stuck loading states
-    loadNotifications();
-    loadUnreadCount();
+    // Load notifications with authentication stability
+    loadNotificationsStable();
+    loadUnreadCountStable();
     
     // Set up real-time subscription for new notifications
     const channel = supabase
-      .channel(`notification-updates-${user.id}`)
+      .channel(`notification-updates-${userId}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'user_app_notifications',
-          filter: `user_id=eq.${user.id}`
+          filter: `user_id=eq.${userId}`
         },
         (payload) => {
           console.log('[useNotifications] Real-time notification update:', payload);
-          if (user) {
-            // Reload notifications and count
-            loadNotifications();
-            loadUnreadCount();
+          // Only process if user is still the same and component is mounted
+          if (currentUserIdRef.current === userId && isMountedRef.current) {
+            loadNotificationsStable();
+            loadUnreadCountStable();
             
             // Show toast for new notifications
             if (payload.eventType === 'INSERT' && payload.new) {
@@ -77,33 +109,48 @@ export const useNotifications = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [toast, user]);
+  }, [user?.id, toast]);
 
-  const loadNotifications = async (retryCount = 0) => {
-    if (!user?.id) {
-      console.log('[useNotifications] No user ID, clearing notifications');
+  const loadNotificationsStable = useCallback(async (retryCount = 0) => {
+    const userId = currentUserIdRef.current;
+    
+    if (!userId || !isMountedRef.current) {
+      console.log('[useNotifications] No user ID or component unmounted, clearing notifications');
       setNotifications([]);
       setIsLoading(false);
       setError(null);
       return;
     }
 
-    console.log('[useNotifications] Loading notifications for user:', user.id);
-    console.log('[useNotifications] Auth user object:', { id: user.id, email: user.email });
+    console.log('[useNotifications] Loading notifications for user:', userId);
     setIsLoading(true);
     setError(null);
     
+    // Set a timeout to prevent stuck loading states
+    loadingTimeoutRef.current = setTimeout(() => {
+      if (isMountedRef.current) {
+        console.log('[useNotifications] Loading timeout reached, clearing loading state');
+        setIsLoading(false);
+        setError('Loading timeout - please try again');
+      }
+    }, 10000);
+    
     try {
-      // Log the exact query being made
       console.log('[useNotifications] Querying user_app_notifications table...');
       
       const { data, error, count } = await supabase
         .from('user_app_notifications')
         .select('*', { count: 'exact' })
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .is('dismissed_at', null)
         .order('created_at', { ascending: false })
         .limit(20);
+
+      // Clear the timeout since we got a response
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+        loadingTimeoutRef.current = null;
+      }
 
       console.log('[useNotifications] Query result:', { 
         data: data, 
@@ -112,50 +159,82 @@ export const useNotifications = () => {
         dataLength: data?.length || 0 
       });
 
+      // Check if component is still mounted and user hasn't changed
+      if (!isMountedRef.current || currentUserIdRef.current !== userId) {
+        console.log('[useNotifications] Component unmounted or user changed during query');
+        return;
+      }
+
       if (error) {
         console.error('[useNotifications] Supabase error loading notifications:', error);
         throw error;
       }
 
       console.log('[useNotifications] Successfully loaded notifications:', data?.length || 0);
-      console.log('[useNotifications] Raw notification data:', data);
       
       setNotifications((data || []) as AppNotification[]);
       setError(null);
     } catch (error: any) {
       console.error('[useNotifications] Error loading notifications:', error);
+      
+      // Clear timeout on error
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+        loadingTimeoutRef.current = null;
+      }
+      
+      // Check if component is still mounted and user hasn't changed
+      if (!isMountedRef.current || currentUserIdRef.current !== userId) {
+        return;
+      }
+      
       const errorMessage = error?.message || 'Failed to load notifications';
       setError(errorMessage);
       
       // Retry logic for network errors
       if (retryCount < 2 && (errorMessage.includes('network') || errorMessage.includes('timeout'))) {
         console.log('[useNotifications] Retrying notification load, attempt:', retryCount + 1);
-        setTimeout(() => loadNotifications(retryCount + 1), 1000 * (retryCount + 1));
+        setTimeout(() => {
+          if (currentUserIdRef.current === userId && isMountedRef.current) {
+            loadNotificationsStable(retryCount + 1);
+          }
+        }, 1000 * (retryCount + 1));
         return;
       }
     } finally {
-      setIsLoading(false);
+      if (isMountedRef.current && currentUserIdRef.current === userId) {
+        setIsLoading(false);
+      }
     }
-  };
+  }, []);
 
-  const loadUnreadCount = async () => {
-    if (!user?.id) {
+  const loadNotifications = loadNotificationsStable;
+
+  const loadUnreadCountStable = useCallback(async () => {
+    const userId = currentUserIdRef.current;
+    
+    if (!userId || !isMountedRef.current) {
       console.log('[useNotifications] No user ID for unread count');
       setUnreadCount(0);
       return;
     }
 
     try {
-      console.log('[useNotifications] Loading unread count for user:', user.id);
+      console.log('[useNotifications] Loading unread count for user:', userId);
       
       const { count, error } = await supabase
         .from('user_app_notifications')
         .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .is('read_at', null)
         .is('dismissed_at', null);
 
       console.log('[useNotifications] Unread count query result:', { count, error });
+
+      // Check if component is still mounted and user hasn't changed
+      if (!isMountedRef.current || currentUserIdRef.current !== userId) {
+        return;
+      }
 
       if (error) {
         console.error('[useNotifications] Error loading unread count:', error);
@@ -167,10 +246,12 @@ export const useNotifications = () => {
     } catch (error) {
       console.error('[useNotifications] Error loading unread count:', error);
     }
-  };
+  }, []);
+
+  const loadUnreadCount = loadUnreadCountStable;
 
   const markAsRead = async (notificationId: string) => {
-    if (!user) return;
+    if (!currentUserIdRef.current || !isMountedRef.current) return;
 
     try {
       const { error } = await supabase
@@ -285,12 +366,20 @@ export const useNotifications = () => {
   };
 
   // Add retry function for manual retry attempts
-  const retryLoadNotifications = () => {
+  const retryLoadNotifications = useCallback(() => {
     console.log('[useNotifications] Manual retry requested');
     setError(null);
-    loadNotifications();
-    loadUnreadCount();
-  };
+    setIsLoading(false); // Reset loading state
+    
+    // Clear any existing timeout
+    if (loadingTimeoutRef.current) {
+      clearTimeout(loadingTimeoutRef.current);
+      loadingTimeoutRef.current = null;
+    }
+    
+    loadNotificationsStable();
+    loadUnreadCountStable();
+  }, [loadNotificationsStable, loadUnreadCountStable]);
 
   return {
     notifications,
