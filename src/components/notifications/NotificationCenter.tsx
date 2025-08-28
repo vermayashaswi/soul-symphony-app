@@ -5,8 +5,9 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
+import { useNotifications } from '@/hooks/use-notifications';
+import { nativeNavigationService } from '@/services/nativeNavigationService';
 
 interface AppNotification {
   id: string;
@@ -28,111 +29,32 @@ interface NotificationCenterProps {
 }
 
 export const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, onClose }) => {
-  const [notifications, setNotifications] = useState<AppNotification[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
+  const { 
+    notifications, 
+    unreadCount, 
+    isLoading, 
+    markAsRead, 
+    markAsUnread, 
+    dismissNotification,
+    loadNotifications 
+  } = useNotifications();
   const { toast } = useToast();
 
   useEffect(() => {
     if (isOpen) {
       loadNotifications();
     }
-  }, [isOpen, filter]);
+  }, [isOpen, filter, loadNotifications]);
 
-  const loadNotifications = async () => {
-    setIsLoading(true);
-    try {
-      let query = supabase
-        .from('user_app_notifications')
-        .select('*')
-        .is('dismissed_at', null)
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      if (filter === 'unread') {
-        query = query.is('read_at', null);
+  const handleNotificationClick = (notification: AppNotification) => {
+    // Only handle clicks for reminder type notifications
+    if (notification.type === 'reminder') {
+      if (!notification.read_at) {
+        markAsRead(notification.id);
       }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-
-      setNotifications((data || []) as AppNotification[]);
-    } catch (error) {
-      console.error('Error loading notifications:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load notifications',
-        variant: 'destructive'
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const markAsRead = async (notificationId: string) => {
-    try {
-      const { error } = await supabase
-        .from('user_app_notifications')
-        .update({ read_at: new Date().toISOString() })
-        .eq('id', notificationId);
-
-      if (error) throw error;
-
-      setNotifications(prev => 
-        prev.map(n => 
-          n.id === notificationId 
-            ? { ...n, read_at: new Date().toISOString() }
-            : n
-        )
-      );
-    } catch (error) {
-      console.error('Error marking notification as read:', error);
-    }
-  };
-
-  const markAsUnread = async (notificationId: string) => {
-    try {
-      const { error } = await supabase
-        .from('user_app_notifications')
-        .update({ read_at: null })
-        .eq('id', notificationId);
-
-      if (error) throw error;
-
-      setNotifications(prev => 
-        prev.map(n => 
-          n.id === notificationId 
-            ? { ...n, read_at: null }
-            : n
-        )
-      );
-    } catch (error) {
-      console.error('Error marking notification as unread:', error);
-    }
-  };
-
-  const dismissNotification = async (notificationId: string) => {
-    try {
-      const { error } = await supabase
-        .from('user_app_notifications')
-        .update({ dismissed_at: new Date().toISOString() })
-        .eq('id', notificationId);
-
-      if (error) throw error;
-
-      setNotifications(prev => prev.filter(n => n.id !== notificationId));
-    } catch (error) {
-      console.error('Error dismissing notification:', error);
-    }
-  };
-
-  const handleNotificationAction = (notification: AppNotification) => {
-    if (notification.action_url) {
-      window.location.href = notification.action_url;
-    }
-    if (!notification.read_at) {
-      markAsRead(notification.id);
+      // Navigate to journal page for reminders
+      nativeNavigationService.navigateToPath('/app/journal');
     }
   };
 
@@ -156,7 +78,12 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, 
     }
   };
 
-  const unreadCount = notifications.filter(n => !n.read_at).length;
+  // Filter out success notifications and apply current filter
+  const filteredNotifications = notifications
+    .filter(n => n.type !== 'success') // Remove success notifications
+    .filter(n => filter === 'all' || !n.read_at); // Apply unread filter if selected
+
+  const displayUnreadCount = filteredNotifications.filter(n => !n.read_at).length;
 
   if (!isOpen) return null;
 
@@ -168,9 +95,9 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, 
             <div className="flex items-center gap-2">
               <Bell className="h-5 w-5" />
               <h2 className="font-semibold">Notifications</h2>
-              {unreadCount > 0 && (
+              {displayUnreadCount > 0 && (
                 <Badge variant="secondary" className="text-xs">
-                  {unreadCount} new
+                  {displayUnreadCount} new
                 </Badge>
               )}
             </div>
@@ -192,7 +119,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, 
               size="sm"
               onClick={() => setFilter('unread')}
             >
-              Unread ({unreadCount})
+              Unread ({displayUnreadCount})
             </Button>
           </div>
         </div>
@@ -202,20 +129,23 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, 
             <div className="p-4 text-center text-muted-foreground">
               Loading notifications...
             </div>
-          ) : notifications.length === 0 ? (
+          ) : filteredNotifications.length === 0 ? (
             <div className="p-4 text-center text-muted-foreground">
               {filter === 'unread' ? 'No unread notifications' : 'No notifications yet'}
             </div>
           ) : (
             <div className="p-2">
-              {notifications.map((notification) => (
+              {filteredNotifications.map((notification) => (
                 <div
                   key={notification.id}
                   className={`p-3 rounded-lg mb-2 border transition-colors ${
                     notification.read_at
                       ? 'bg-muted/50 border-border/50'
                       : 'bg-background border-border hover:bg-muted/30'
+                  } ${
+                    notification.type === 'reminder' ? 'cursor-pointer hover:bg-muted/50' : ''
                   }`}
+                  onClick={() => handleNotificationClick(notification)}
                 >
                   <div className="flex items-start gap-3">
                     <span className="text-lg flex-shrink-0 mt-0.5">
@@ -261,17 +191,6 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, 
                         <span className="text-xs text-muted-foreground">
                           {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
                         </span>
-                        
-                        {notification.action_label && notification.action_url && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-6 text-xs px-2"
-                            onClick={() => handleNotificationAction(notification)}
-                          >
-                            {notification.action_label}
-                          </Button>
-                        )}
                       </div>
                     </div>
                   </div>
