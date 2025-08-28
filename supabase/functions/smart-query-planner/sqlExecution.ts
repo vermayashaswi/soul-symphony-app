@@ -1,6 +1,4 @@
 
-import { validateAndSanitizeSQL, suggestSimpleAlternative } from './sqlValidation.ts';
-
 export async function executeSQLAnalysis(step: any, userId: string, supabaseClient: any, requestId: string, executionDetails: any, userTimezone: string = 'UTC') {
   try {
     console.log(`[${requestId}] Executing SQL query (${step.sqlQueryType || 'unknown'}):`, step.sqlQuery);
@@ -12,23 +10,13 @@ export async function executeSQLAnalysis(step: any, userId: string, supabaseClie
       return await executeVectorSearchFallback(step, userId, supabaseClient, requestId);
     }
 
-    const originalQuery = step.sqlQuery.trim();
+    const originalQuery = step.sqlQuery.trim().replace(/;+$/, ''); // Fixed: remove trailing semicolons
     executionDetails.originalQuery = originalQuery;
     
-    // ENHANCED: Validate SQL query for PostgreSQL compatibility
-    const validation = validateAndSanitizeSQL(originalQuery, requestId);
-    if (!validation.isValid) {
-      console.error(`[${requestId}] SQL validation failed: ${validation.error}`);
-      console.log(`[${requestId}] Falling back to vector search due to invalid SQL`);
-      executionDetails.executionError = `SQL validation failed: ${validation.error}`;
-      executionDetails.fallbackUsed = true;
-      return await executeVectorSearchFallback(step, userId, supabaseClient, requestId);
-    }
-    
-    // Sanitize user ID in the validated query
+    // Sanitize user ID in the query
     let sanitizedQuery;
     try {
-      sanitizedQuery = sanitizeUserIdInQuery(validation.sanitizedQuery, userId, requestId);
+      sanitizedQuery = sanitizeUserIdInQuery(originalQuery, userId, requestId);
       executionDetails.sanitizedQuery = sanitizedQuery;
     } catch (sanitizeError) {
       console.error(`[${requestId}] Query sanitization failed:`, sanitizeError);

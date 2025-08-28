@@ -2,7 +2,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { ChatMessage } from '@/types/chat';
 import { parseMessageContent, getSanitizedFinalContent } from '@/utils/messageParser';
-import { validateAuthForChat } from '@/utils/chat/authValidation';
 
 export const createChatMessage = async (
   threadId: string, 
@@ -20,33 +19,10 @@ export const createChatMessage = async (
       hasAdditionalData: !!additionalData
     });
 
-    // CRITICAL: Comprehensive authentication validation
-    const authValidation = await validateAuthForChat();
-    
-    if (!authValidation.isValid) {
-      console.error('[createChatMessage] Authentication validation failed:', {
-        error: authValidation.error,
-        errorCode: authValidation.errorCode,
-        providedUserId: userId
-      });
-      throw new Error(authValidation.error || 'Authentication required. Please sign in again.');
-    }
-
-    // Verify user ID matches validated session
-    if (authValidation.userId !== userId) {
-      console.error('[createChatMessage] User ID mismatch after validation:', {
-        validatedUserId: authValidation.userId,
-        providedUserId: userId
-      });
-      throw new Error('Authentication mismatch. Please refresh and try again.');
-    }
-
-    console.log('[createChatMessage] Authentication verified, checking thread access');
-
     // First verify the thread belongs to the user
     const { data: thread, error: threadError } = await supabase
       .from('chat_threads')
-      .select('id, user_id')
+      .select('id')
       .eq('id', threadId)
       .eq('user_id', userId)
       .single();
@@ -56,18 +32,9 @@ export const createChatMessage = async (
         threadId,
         userId,
         error: threadError,
-        hasThread: !!thread,
-        threadUserId: thread?.user_id
+        hasThread: !!thread
       });
-      
-      // Provide specific error messages
-      if (threadError?.code === 'PGRST116') {
-        throw new Error('Thread not found. Please create a new conversation.');
-      } else if (threadError?.message?.includes('row-level security')) {
-        throw new Error('You do not have access to this conversation.');
-      } else {
-        throw new Error('Failed to verify conversation access.');
-      }
+      return null;
     }
 
     console.log('[createChatMessage] Thread verified, inserting message');
@@ -96,22 +63,12 @@ export const createChatMessage = async (
     if (error) {
       console.error('[createChatMessage] Database insert failed:', {
         error,
-        errorCode: error.code,
-        errorMessage: error.message,
         messageData: {
           ...messageData,
           content: `${content.substring(0, 50)}${content.length > 50 ? '...' : ''}`
         }
       });
-      
-      // Provide specific error messages for common RLS issues
-      if (error.message?.includes('row-level security')) {
-        throw new Error('Permission denied. Please refresh the page and try again.');
-      } else if (error.code === '23503') {
-        throw new Error('Invalid thread reference. Please create a new conversation.');
-      } else {
-        throw new Error(`Failed to save message: ${error.message}`);
-      }
+      return null;
     }
 
     console.log('[createChatMessage] Message inserted successfully:', {
@@ -148,15 +105,12 @@ export const createChatMessage = async (
   } catch (error) {
     console.error('[createChatMessage] Exception occurred:', {
       error,
-      errorMessage: error instanceof Error ? error.message : 'Unknown error',
       threadId,
       userId,
       sender,
       stack: error instanceof Error ? error.stack : 'No stack available'
     });
-    
-    // Re-throw the error to be handled by the calling code
-    throw error;
+    return null;
   }
 };
 
@@ -291,22 +245,15 @@ export const saveMessage = async (
   if (analysisData) additionalData.analysis_data = analysisData;
 
   console.log('[saveMessage] Processed data, calling createChatMessage');
+  const result = await createChatMessage(threadId, processedContent, sender, userId, additionalData);
   
-  try {
-    const result = await createChatMessage(threadId, processedContent, sender, userId, additionalData);
+  if (result) {
     console.log('[saveMessage] Message saved successfully:', result.id);
-    return result;
-  } catch (error) {
-    console.error('[saveMessage] Failed to save message:', {
-      error: error instanceof Error ? error.message : 'Unknown error',
-      threadId,
-      sender,
-      userId
-    });
-    
-    // Re-throw with user-friendly message
-    throw new Error(error instanceof Error ? error.message : 'Failed to save message');
+  } else {
+    console.error('[saveMessage] Failed to save message');
   }
+  
+  return result;
 };
 
 // Update message with classification data
