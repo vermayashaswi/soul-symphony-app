@@ -40,8 +40,19 @@ const HeroSection: React.FC<HeroSectionProps> = ({ user }) => {
           </span> 
           <SouloLogo size={shouldRenderMobile ? "large" : "large"} className="ml-2" useColorTheme={true} animate={true} />
         </h1>
-        <p className={`${shouldRenderMobile ? 'text-lg' : 'text-xl'} max-w-2xl mx-auto text-primary animate-pulse mt-4 mb-8`}>
-          Your personal AI companion for emotional wellness and self-reflection using VOICE journaling
+        <p className={`${shouldRenderMobile ? 'text-lg' : 'text-xl'} max-w-2xl mx-auto animate-pulse mt-4 mb-8`}>
+          <span className="text-muted-foreground">Designed to help you understand yourself, </span>
+          <span className="text-primary font-bold">IMPROVE</span>
+          <span className="text-muted-foreground"> your </span>
+          <span className="text-primary font-bold">MINDSET</span>
+          <span className="text-muted-foreground">, and </span>
+          <span className="text-primary font-bold">GROW</span>
+          <span className="text-muted-foreground"> with every word you share. Because your </span>
+          <span className="text-primary font-bold">VOICE</span>
+          <span className="text-muted-foreground"> deserves to be </span>
+          <span className="text-primary font-bold">HEARD</span>
+          <span className="text-muted-foreground"> - </span>
+          <span className="text-primary font-bold">BY YOU</span>
         </p>
         
         {!user && (

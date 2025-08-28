@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, Apple, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import SouloLogo from '@/components/SouloLogo';
 import { TranslatableText } from '@/components/translation/TranslatableText';
@@ -15,6 +15,14 @@ const Navbar = () => {
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
+  };
+
+  const openAppStore = () => {
+    window.open('https://apps.apple.com/app/soulo', '_blank');
+  };
+
+  const openPlayStore = () => {
+    window.open('https://play.google.com/store/apps/details?id=online.soulo.twa', '_blank');
   };
   
   // Prefetch translations for navbar items on mount and route change
@@ -44,10 +52,21 @@ const Navbar = () => {
           <Link to="/faq" className="text-gray-600 hover:text-primary text-sm">
             <TranslatableText text="FAQ" />
           </Link>
-          <Button size="sm" asChild>
-            <a href="https://apps.apple.com/app/soulo" target="_blank" rel="noopener noreferrer">
-              <TranslatableText text="Download on App Store" />
-            </a>
+          <Button
+            size="sm"
+            onClick={openAppStore}
+            className="text-sm"
+          >
+            <Apple className="mr-2 h-4 w-4" />
+            <TranslatableText text="App Store" />
+          </Button>
+          <Button
+            size="sm"
+            onClick={openPlayStore}
+            className="text-sm"
+          >
+            <Play className="mr-2 h-4 w-4" />
+            <TranslatableText text="Google Play" />
           </Button>
           <LanguageSelector />
         </div>
@@ -82,10 +101,21 @@ const Navbar = () => {
             <Link to="/faq" className="text-gray-600 hover:text-primary" onClick={toggleMenu}>
               <TranslatableText text="FAQ" />
             </Link>
-            <Button size="sm" className="w-full" asChild>
-              <a href="https://apps.apple.com/app/soulo" target="_blank" rel="noopener noreferrer">
-                <TranslatableText text="Download on App Store" />
-              </a>
+            <Button
+              size="sm"
+              className="w-full mb-2"
+              onClick={openAppStore}
+            >
+              <Apple className="mr-2 h-4 w-4" />
+              <TranslatableText text="App Store" />
+            </Button>
+            <Button
+              size="sm"
+              className="w-full"
+              onClick={openPlayStore}
+            >
+              <Play className="mr-2 h-4 w-4" />
+              <TranslatableText text="Google Play" />
             </Button>
             <LanguageSelector />
           </div>
