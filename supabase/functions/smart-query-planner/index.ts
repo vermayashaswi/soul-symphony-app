@@ -189,7 +189,18 @@ async function processExecutionResults(allResults: any[], userId: string, totalE
       }
     } else if (result.executionResults?.vectorResults?.length > 0) {
       // VECTOR SEARCH: Sample entries with semantic relevance
-      processedResult.executionSummary = await processVectorResults(result.executionResults.vectorResults, totalEntries, requestId);
+      if (result.subQuestion?.id === 'final_content_retrieval') {
+        // This is the mandatory final vector search - mark it specially
+        const vectorSummary = await processVectorResults(result.executionResults.vectorResults, totalEntries, requestId);
+        processedResult.executionSummary = {
+          ...vectorSummary,
+          resultType: 'journal_content_retrieval',
+          dataType: 'journal_entries',
+          isMandatoryFinalStep: true
+        };
+      } else {
+        processedResult.executionSummary = await processVectorResults(result.executionResults.vectorResults, totalEntries, requestId);
+      }
     } else {
       // NO RESULTS
       processedResult.executionSummary = {
@@ -711,7 +722,36 @@ async function executeSubQuestion(
           subResults.executionResults.vectorExecutionDetails.testPassed = vectorTestPassed;
           
           if (vectorTestPassed) {
-            const vectorResult = await executeVectorSearch(step.vectorSearch, userId, supabaseClient, requestId, step.timeRange, userTimezone);
+            // Build SQL context for mandatory final vector search
+            let sqlContext = null;
+            if (step.resultContext === "use_sql_context_for_semantic_search") {
+              sqlContext = {
+                emotions: [],
+                themes: [],
+                sentiments: []
+              };
+              
+              // Collect SQL context from dependencies
+              Object.values(subResults.executionResults.dependencyContext).forEach((depContext: any) => {
+                if (depContext.sqlResults) {
+                  depContext.sqlResults.forEach((row: any) => {
+                    if (row.emotion && row.avg_score !== undefined) {
+                      sqlContext.emotions.push({ emotion: row.emotion, score: row.avg_score });
+                    }
+                    if (row.theme && row.count !== undefined) {
+                      sqlContext.themes.push({ theme: row.theme, count: row.count });
+                    }
+                    if (row.avg_sentiment !== undefined) {
+                      sqlContext.sentiments.push({ sentiment: row.avg_sentiment });
+                    }
+                  });
+                }
+              });
+              
+              console.log(`[${requestId}] Built SQL context for vector search:`, sqlContext);
+            }
+            
+            const vectorResult = await executeVectorSearch(step.vectorSearch, userId, supabaseClient, requestId, step.timeRange, userTimezone, sqlContext);
             if (vectorResult && Array.isArray(vectorResult)) {
               subResults.executionResults.vectorResults.push(...vectorResult);
             }
@@ -765,13 +805,38 @@ async function executeVectorSearch(
   supabaseClient: any, 
   requestId: string,
   timeRange: any = null,
-  userTimezone: string = 'UTC'
+  userTimezone: string = 'UTC',
+  sqlContext: any = null
 ) {
   console.log(`[${requestId}] Executing vector search: "${vectorSearch.query}"`);
   
   try {
+    // Enhanced query building using SQL context for mandatory final search
+    let enhancedQuery = vectorSearch.query;
+    
+    if (sqlContext && vectorSearch.query.includes('[Combine user\'s original')) {
+      // This is the mandatory final search - enhance query with SQL context
+      const contextTerms = [];
+      
+      // Extract top emotions from SQL context
+      if (sqlContext.emotions && Array.isArray(sqlContext.emotions)) {
+        const topEmotions = sqlContext.emotions.slice(0, 3).map(e => e.emotion || e.key);
+        contextTerms.push(...topEmotions);
+      }
+      
+      // Extract top themes from SQL context
+      if (sqlContext.themes && Array.isArray(sqlContext.themes)) {
+        const topThemes = sqlContext.themes.slice(0, 3).map(t => t.theme);
+        contextTerms.push(...topThemes);
+      }
+      
+      // Build enhanced semantic query
+      enhancedQuery = `${vectorSearch.query.replace(/\[.*?\]/g, '')} ${contextTerms.join(' ')}`.trim();
+      console.log(`[${requestId}] Enhanced vector query with SQL context: "${enhancedQuery}"`);
+    }
+    
     // Generate embedding for the search query
-    const embedding = await generateEmbedding(vectorSearch.query);
+    const embedding = await generateEmbedding(enhancedQuery);
     
     let vectorResults;
     
@@ -780,8 +845,8 @@ async function executeVectorSearch(
       console.log(`[${requestId}] Vector search with time range: ${timeRange.start} to ${timeRange.end}`);
       const { data, error } = await supabaseClient.rpc('match_journal_entries_with_date', {
         query_embedding: embedding,
-        match_threshold: vectorSearch.threshold || 0.3,
-        match_count: vectorSearch.limit || 15,
+        match_threshold: vectorSearch.threshold || 0.2,
+        match_count: vectorSearch.limit || 12,
         user_id_filter: userId,
         start_date: timeRange.start || null,
         end_date: timeRange.end || null
@@ -1066,6 +1131,47 @@ ANALYSIS STATUS:
 - Follow-up query: ${isFollowUpContext}
 - User timezone: ${userTimezone}
 
+===== MANDATORY FINAL VECTOR SEARCH REQUIREMENT =====
+
+**CRITICAL: ALL QUERY PLANS MUST END WITH A JOURNAL CONTENT RETRIEVAL STEP**
+
+Every query plan MUST include a final vector search step that:
+1. Retrieves actual journal entry content to support SQL analysis results
+2. Uses semantic terms from the user's original query + analysis context
+3. Applies time range and filters established by previous SQL steps
+4. Provides specific journal excerpts for the consolidator to quote and reference
+5. Ensures responses are both quantified (SQL data) AND evidence-backed (journal content)
+
+**MANDATORY FINAL STEP TEMPLATE (COPY EXACTLY):**
+{
+  "id": "final_content_retrieval",
+  "question": "Retrieve actual journal entries that match the analysis",
+  "purpose": "Provide specific journal content to support and illustrate the statistical findings from previous SQL analysis",
+  "searchStrategy": "vector_mandatory",
+  "executionStage": 2,
+  "dependencies": ["sq1", "sq2", "sq3"],
+  "resultForwarding": "journal_entries_for_consolidator",
+  "executionMode": "sequential",
+  "analysisSteps": [{
+    "step": 1,
+    "description": "Vector search for journal entries matching user's semantic query with context from SQL results",
+    "queryType": "vector_search",
+    "vectorSearch": {
+      "query": "[Combine user's original emotional/thematic terms + top results from SQL analysis]",
+      "threshold": 0.2,
+      "limit": 12
+    },
+    "timeRange": "[Inherit from previous SQL analysis timeRange if any]",
+    "resultContext": "use_sql_context_for_semantic_search",
+    "dependencies": ["sq1", "sq2"]
+  }]
+}
+
+**EXECUTION STRATEGY:**
+- Stage 1: All SQL sub-questions (emotions, themes, sentiment analysis) - PARALLEL execution
+- Stage 2: Final vector search using SQL context - SEQUENTIAL execution after Stage 1
+- Result: Consolidator receives BOTH quantified analysis AND actual journal content
+
 **RESPONSE FORMAT (MUST be valid JSON):**
 {
   "queryType": "journal_specific|general_inquiry|mental_health",
@@ -1076,28 +1182,48 @@ ANALYSIS STATUS:
       "id": "sq1",
       "question": "Specific sub-question",
       "purpose": "Why this question is needed",
-      "searchStrategy": "vector_mandatory|sql_primary|hybrid_parallel",
+      "searchStrategy": "sql_primary|hybrid_parallel",
       "executionStage": 1,
       "dependencies": [],
-      "resultForwarding": "entry_ids_for_next_steps|emotion_data_for_ranking|null",
-      "executionMode": "parallel|sequential|conditional",
+      "resultForwarding": "emotion_data_for_ranking|theme_data_for_context|null",
+      "executionMode": "parallel",
       "analysisSteps": [
         {
           "step": 1,
           "description": "What this step does",
-          "queryType": "vector_search|sql_analysis|hybrid_search",
-          "sqlQueryType": "filtering|analysis",
-          "sqlQuery": "COMPLETE PostgreSQL query using EXACT patterns above" or null,
-          "vectorSearch": {
-            "query": "Semantic search query using user's words + relevant emotions/themes",
-            "threshold": 0.3,
-            "limit": 15
-          } or null,
+          "queryType": "sql_analysis",
+          "sqlQueryType": "analysis",
+          "sqlQuery": "COMPLETE PostgreSQL query using EXACT patterns above",
+          "vectorSearch": null,
           "timeRange": {"start": "ISO_DATE", "end": "ISO_DATE", "timezone": "${userTimezone}"} or null,
-          "resultContext": "use_entry_ids_from_sq1|use_emotion_data_from_sq2|null",
-          "dependencies": [] or ["sq1"]
+          "resultContext": null,
+          "dependencies": []
         }
       ]
+    },
+    {
+      "id": "final_content_retrieval",
+      "question": "Retrieve actual journal entries that match the analysis",
+      "purpose": "Provide specific journal content to support and illustrate the statistical findings",
+      "searchStrategy": "vector_mandatory",
+      "executionStage": 2,
+      "dependencies": ["sq1"],
+      "resultForwarding": "journal_entries_for_consolidator",
+      "executionMode": "sequential",
+      "analysisSteps": [{
+        "step": 1,
+        "description": "Vector search for journal entries matching user's semantic query",
+        "queryType": "vector_search",
+        "vectorSearch": {
+          "query": "User's original terms + context from SQL results",
+          "threshold": 0.2,
+          "limit": 12
+        },
+        "timeRange": null,
+        "resultContext": "use_sql_context_for_semantic_search",
+        "dependencies": ["sq1"]
+      }]
+    }
     }
   ],
   "confidence": 0.8,
