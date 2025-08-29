@@ -663,20 +663,39 @@ async function executeSubQuestion(
               Object.values(subResults.executionResults.dependencyContext).forEach((depContext: any) => {
                 if (depContext.sqlResults) {
                   depContext.sqlResults.forEach((row: any) => {
-                    if (row.emotion && row.avg_score !== undefined) {
-                      sqlContext.emotions.push({ emotion: row.emotion, score: row.avg_score });
+                    // Enhanced emotion detection
+                    if (row.emotion && (row.avg_score !== undefined || row.score !== undefined)) {
+                      const emotionScore = row.avg_score || row.score;
+                      sqlContext.emotions.push({ emotion: row.emotion, score: emotionScore });
                     }
-                    if (row.theme && row.count !== undefined) {
-                      sqlContext.themes.push({ theme: row.theme, count: row.count });
+                    // Enhanced theme detection  
+                    if (row.theme && (row.count !== undefined || row.entry_count !== undefined)) {
+                      const themeCount = row.count || row.entry_count;
+                      sqlContext.themes.push({ theme: row.theme, count: themeCount });
                     }
+                    // Enhanced sentiment detection
                     if (row.avg_sentiment !== undefined) {
                       sqlContext.sentiments.push({ sentiment: row.avg_sentiment });
+                    }
+                    // Additional patterns for various SQL result structures
+                    if (row.master_theme) {
+                      sqlContext.themes.push({ theme: row.master_theme, count: row.entry_count || 1 });
                     }
                   });
                 }
               });
               
-              console.log(`[${requestId}] Built SQL context for vector search:`, sqlContext);
+              // Sort emotions by score (highest first) and themes by count (highest first)
+              sqlContext.emotions.sort((a, b) => (b.score || 0) - (a.score || 0));
+              sqlContext.themes.sort((a, b) => (b.count || 0) - (a.count || 0));
+              
+              console.log(`[${requestId}] Built SQL context for vector search: {
+  emotions: [
+    ${sqlContext.emotions.slice(0, 5).map(e => `{ emotion: "${e.emotion}", score: ${e.score} }`).join(',\n    ')}
+  ],
+  themes: [${sqlContext.themes.slice(0, 3).map(t => `"${t.theme}"`).join(', ')}],
+  sentiments: [${sqlContext.sentiments.map(s => `{ sentiment: ${s.sentiment} }`).join(', ')}]
+}`);
             }
             
             const vectorResult = await executeVectorSearch(step.vectorSearch, userId, supabaseClient, requestId, step.timeRange, userTimezone, sqlContext);
@@ -739,43 +758,21 @@ async function executeVectorSearch(
   console.log(`[${requestId}] Executing vector search: "${vectorSearch.query}"`);
   
   try {
-    // Enhanced query building using SQL context for mandatory final search
     let enhancedQuery = vectorSearch.query;
     
-    if (sqlContext) {
-      // Enhanced query building with emotion families and SQL context
-      if (vectorSearch.query.includes('sadness') || enhancedQuery.includes('feeling this way')) {
-        enhancedQuery = `sadness depression hurt disappointment loneliness regret melancholy feelings emotions mood ${enhancedQuery}`;
-      }
-      
-      // Add emotions from SQL context
-      if (sqlContext.emotions && sqlContext.emotions.length > 0) {
-        const topEmotions = sqlContext.emotions.slice(0, 3).map(e => e.emotion).join(' ');
-        enhancedQuery = `${topEmotions} ${enhancedQuery}`;
-      }
-      
-      console.log(`[${requestId}] Enhanced vector query with emotion families: "${enhancedQuery}"`);
+    // CRITICAL FIX: Replace [DYNAMIC_CONTEXT_QUERY] with actual SQL results
+    if (vectorSearch.query === '[DYNAMIC_CONTEXT_QUERY]' || vectorSearch.query.includes('[DYNAMIC_CONTEXT_QUERY]')) {
+      enhancedQuery = buildDynamicVectorQuery(sqlContext, requestId);
+      console.log(`[${requestId}] Built dynamic vector query from SQL context: "${enhancedQuery}"`);
     }
-    
-    if (sqlContext && vectorSearch.query.includes('[Combine user\'s original')) {
-      // This is the mandatory final search - enhance query with SQL context
-      const contextTerms = [];
-      
-      // Extract top emotions from SQL context
-      if (sqlContext.emotions && Array.isArray(sqlContext.emotions)) {
-        const topEmotions = sqlContext.emotions.slice(0, 3).map(e => e.emotion || e.key);
-        contextTerms.push(...topEmotions);
-      }
-      
-      // Extract top themes from SQL context
-      if (sqlContext.themes && Array.isArray(sqlContext.themes)) {
-        const topThemes = sqlContext.themes.slice(0, 3).map(t => t.theme);
-        contextTerms.push(...topThemes);
-      }
-      
-      // Build enhanced semantic query
-      enhancedQuery = `${vectorSearch.query.replace(/\[.*?\]/g, '')} ${contextTerms.join(' ')}`.trim();
-      console.log(`[${requestId}] Enhanced vector query with SQL context: "${enhancedQuery}"`);
+    // Handle legacy placeholder queries
+    else if (sqlContext && (vectorSearch.query.includes('[Combine user\'s original') || vectorSearch.query.includes('sadness depression hurt'))) {
+      enhancedQuery = buildDynamicVectorQuery(sqlContext, requestId);
+      console.log(`[${requestId}] Replaced legacy placeholder with dynamic query: "${enhancedQuery}"`);
+    }
+    // If sqlContext exists but query is static, enhance it
+    else if (sqlContext) {
+      enhancedQuery = enhanceStaticQuery(vectorSearch.query, sqlContext, requestId);
     }
     
     // Generate embedding for the search query
@@ -826,6 +823,126 @@ async function executeVectorSearch(
     console.error(`[${requestId}] Error in vector search:`, error);
     throw error;
   }
+}
+
+/**
+ * CRITICAL FIX: Build dynamic vector query from SQL context
+ */
+function buildDynamicVectorQuery(sqlContext: any, requestId: string): string {
+  const contextTerms: string[] = [];
+  
+  console.log(`[${requestId}] Building dynamic vector query from SQL context:`, JSON.stringify(sqlContext, null, 2));
+  
+  // Extract emotions from SQL context
+  if (sqlContext?.emotions && Array.isArray(sqlContext.emotions)) {
+    const topEmotions = sqlContext.emotions.slice(0, 3).map((e: any) => e.emotion || e.key || e);
+    contextTerms.push(...topEmotions);
+    
+    // Add emotion families
+    topEmotions.forEach((emotion: string) => {
+      const emotionFamily = getEmotionFamily(emotion);
+      contextTerms.push(...emotionFamily);
+    });
+  }
+  
+  // Extract themes from SQL context
+  if (sqlContext?.themes && Array.isArray(sqlContext.themes)) {
+    const topThemes = sqlContext.themes.slice(0, 2).map((t: any) => t.theme || t);
+    contextTerms.push(...topThemes);
+  }
+  
+  // Add sentiment-based terms
+  if (sqlContext?.sentiments && Array.isArray(sqlContext.sentiments)) {
+    const avgSentiment = sqlContext.sentiments[0]?.sentiment || sqlContext.sentiments[0]?.avg_sentiment;
+    if (avgSentiment !== undefined) {
+      if (avgSentiment > 0.2) {
+        contextTerms.push('positive', 'good', 'happy');
+      } else if (avgSentiment < -0.2) {
+        contextTerms.push('negative', 'difficult', 'challenging');
+      } else {
+        contextTerms.push('neutral', 'balanced', 'calm');
+      }
+    }
+  }
+  
+  // Add general emotional context terms
+  contextTerms.push('feelings', 'emotions', 'mood', 'recent');
+  
+  // Remove duplicates and join
+  const uniqueTerms = [...new Set(contextTerms)];
+  const dynamicQuery = uniqueTerms.slice(0, 15).join(' '); // Limit to prevent token overflow
+  
+  // Fallback if no context terms found
+  if (dynamicQuery.trim() === 'feelings emotions mood recent' || uniqueTerms.length <= 4) {
+    const fallbackQuery = 'personal thoughts feelings emotions experiences recent journal entries';
+    console.log(`[${requestId}] Insufficient context terms, using fallback query: "${fallbackQuery}"`);
+    return fallbackQuery;
+  }
+  
+  console.log(`[${requestId}] Built dynamic query with ${uniqueTerms.length} terms: "${dynamicQuery}"`);
+  return dynamicQuery;
+}
+
+/**
+ * Enhance static query with SQL context
+ */
+function enhanceStaticQuery(originalQuery: string, sqlContext: any, requestId: string): string {
+  const contextTerms: string[] = [];
+  
+  // Add top emotions from SQL context
+  if (sqlContext?.emotions && Array.isArray(sqlContext.emotions)) {
+    const topEmotions = sqlContext.emotions.slice(0, 2).map((e: any) => e.emotion || e.key);
+    contextTerms.push(...topEmotions);
+  }
+  
+  const enhancedQuery = `${contextTerms.join(' ')} ${originalQuery}`.trim();
+  console.log(`[${requestId}] Enhanced static query: "${originalQuery}" → "${enhancedQuery}"`);
+  return enhancedQuery;
+}
+
+/**
+ * Get emotion family for expanding vector search
+ */
+function getEmotionFamily(emotion: string): string[] {
+  const emotionFamilies: { [key: string]: string[] } = {
+    // Joy family
+    'joy': ['happiness', 'contentment', 'satisfaction', 'celebration'],
+    'happiness': ['joy', 'contentment', 'satisfaction', 'celebration'],
+    'contentment': ['joy', 'happiness', 'satisfaction', 'peace'],
+    'satisfaction': ['contentment', 'happiness', 'fulfillment'],
+    'celebration': ['joy', 'happiness', 'excitement'],
+    'gratitude': ['appreciation', 'thankfulness', 'joy'],
+    'love': ['affection', 'joy', 'contentment'],
+    
+    // Sadness family
+    'sadness': ['depression', 'hurt', 'disappointment', 'loneliness', 'melancholy'],
+    'depression': ['sadness', 'hurt', 'loneliness', 'melancholy'],
+    'hurt': ['sadness', 'disappointment', 'loneliness'],
+    'disappointment': ['sadness', 'hurt', 'regret'],
+    'loneliness': ['sadness', 'hurt', 'isolation'],
+    'regret': ['disappointment', 'sadness', 'remorse'],
+    'melancholy': ['sadness', 'depression', 'nostalgia'],
+    
+    // Anxiety family
+    'anxiety': ['worry', 'stress', 'overwhelm', 'concern', 'fear'],
+    'worry': ['anxiety', 'stress', 'concern'],
+    'stress': ['anxiety', 'overwhelm', 'pressure'],
+    'overwhelm': ['anxiety', 'stress', 'pressure'],
+    'concern': ['worry', 'anxiety'],
+    'fear': ['anxiety', 'worry', 'nervousness'],
+    
+    // Anger family
+    'anger': ['frustration', 'irritation', 'resentment'],
+    'frustration': ['anger', 'irritation', 'annoyance'],
+    'irritation': ['anger', 'frustration', 'annoyance'],
+    
+    // Content family
+    'peace': ['contentment', 'calm', 'serenity'],
+    'calm': ['peace', 'contentment', 'serenity'],
+    'serenity': ['peace', 'calm', 'contentment']
+  };
+  
+  return emotionFamilies[emotion.toLowerCase()] || [];
 }
 
 async function generateEmbedding(text: string): Promise<number[]> {
@@ -1253,15 +1370,40 @@ Every query plan MUST include a final vector search step that:
     "description": "Vector search for journal entries matching user's semantic query with context from SQL results",
     "queryType": "vector_search",
     "vectorSearch": {
-      "query": "[Combine user's original emotional/thematic terms + top results from SQL analysis]",
-      "threshold": 0.2,
-      "limit": 12
+      "query": "[DYNAMIC_CONTEXT_QUERY]",
+      "threshold": 0.15,
+      "limit": 25
     },
     "timeRange": "[Inherit from previous SQL analysis timeRange if any]",
     "resultContext": "use_sql_context_for_semantic_search",
     "dependencies": ["sq1", "sq2"]
   }]
 }
+
+**CRITICAL: DYNAMIC VECTOR QUERY GENERATION RULES:**
+The [DYNAMIC_CONTEXT_QUERY] MUST be replaced with a query that:
+1. **USES TOP EMOTIONS from SQL analysis results** (e.g., if SQL finds "contentment, joy, celebration" → use these in vector query)
+2. **EXPANDS with emotion families** (e.g., if "contentment" found → add "happiness, satisfaction, peace, calm")
+3. **INCLUDES user's original semantic terms** from their query
+4. **ADDS time context terms** if applicable ("recent", "lately", "this week", etc.)
+
+**EXAMPLES OF DYNAMIC QUERY GENERATION:**
+
+If SQL analysis finds emotions: ["contentment", "joy", "celebration"]
+→ Vector query: "contentment joy celebration happiness satisfaction peace feelings emotions mood recent"
+
+If SQL analysis finds emotions: ["sadness", "regret", "disappointment"] 
+→ Vector query: "sadness regret disappointment hurt loneliness depression feelings emotions mood recent"
+
+If SQL analysis finds emotions: ["anxiety", "concern", "worry"]
+→ Vector query: "anxiety concern worry stress overwhelm fear feelings emotions mood recent"
+
+**EMOTION FAMILY MAPPINGS:**
+- Joy family: joy, happiness, contentment, satisfaction, celebration, gratitude, love
+- Sadness family: sadness, depression, hurt, disappointment, loneliness, regret, melancholy
+- Anxiety family: anxiety, worry, stress, overwhelm, concern, fear, nervousness
+- Anger family: anger, frustration, irritation, resentment, rage, annoyance
+- Content family: contentment, peace, calm, serenity, satisfaction, fulfillment
 
 **EXECUTION STRATEGY:**
 - Stage 1: All SQL sub-questions (emotions, themes, sentiment analysis) - PARALLEL execution
@@ -1308,12 +1450,12 @@ Every query plan MUST include a final vector search step that:
       "executionMode": "sequential",
       "analysisSteps": [{
         "step": 1,
-        "description": "Vector search for journal entries matching user's semantic query",
+        "description": "Vector search for journal entries matching user's semantic query with context from SQL results",
         "queryType": "vector_search",
         "vectorSearch": {
-          "query": "User's original terms + context from SQL results",
-          "threshold": 0.2,
-          "limit": 12
+          "query": "[DYNAMIC_CONTEXT_QUERY]",
+          "threshold": 0.15,
+          "limit": 25
         },
         "timeRange": null,
         "resultContext": "use_sql_context_for_semantic_search",
