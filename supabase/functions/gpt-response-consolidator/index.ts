@@ -529,7 +529,7 @@ Similarity: ${entry.similarity || 'N/A'}`;
     Your response should be a JSON object with this structure:
     {
       "userStatusMessage": "exactly 5 words describing your synthesis approach (e.g., 'Revealing your hidden emotional patterns' or 'Connecting insights to personal growth')",
-      "response": "your complete natural response based on the analysis and conversation context with mandatory formatting and follow-up questions"
+      "response": "your complete natural response based on the analysis (keep it as BRIEF [for eg. 30, 50, 75, 150 words as the case maybe] as possible with mandatory data and patterns and journal anecdotes and conversation context with mandatory formatting and follow-up questions"
     }
     
     STRICT OUTPUT RULES:
