@@ -133,9 +133,7 @@ BEFORE analyzing the current message standalone, you MUST:
 - Only upgrade to JOURNAL_SPECIFIC if the user is confident and specific, not tentative
 
 **CLARIFICATION LOOP PREVENTION (CRITICAL):**
-- NEVER classify follow-up messages in ongoing journal analysis as NEEDS_CLARIFICATION
 - If conversation shows user trying to proceed with analysis, classify as JOURNAL_SPECIFIC
-- If user is responding to previous analysis or clarification → JOURNAL_SPECIFIC
 - Only use NEEDS_CLARIFICATION for genuinely vague INITIAL messages without context
 - If conversation has 3+ messages and analysis is being discussed → JOURNAL_SPECIFIC
 - If the user acknowledged the chatbot's response, classify as "GENERAL_MENTAL_HEALTH"
