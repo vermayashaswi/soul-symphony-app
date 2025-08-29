@@ -3,11 +3,6 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
-import { 
-  generateDatabaseSchemaContext, 
-  getEmotionAnalysisGuidelines, 
-  getThemeAnalysisGuidelines 
-} from '../_shared/databaseSchemaContext.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -63,20 +58,12 @@ serve(async (req) => {
     // Analyze user's journaling patterns including entity-emotion relationships
     const userPatterns = await analyzeUserPatterns(recentEntries || [], supabaseClient, userId);
 
-    // Generate database schema context
-    const databaseContext = generateDatabaseSchemaContext();
-    const emotionGuidelines = getEmotionAnalysisGuidelines();
-    const themeGuidelines = getThemeAnalysisGuidelines();
-
     // Generate intelligent query plan using GPT with enhanced entity-emotion awareness
     const queryPlan = await generateIntelligentQueryPlan(
       message,
       conversationContext,
       userPatterns,
       userProfile,
-      databaseContext,
-      emotionGuidelines,
-      themeGuidelines,
       openaiApiKey
     );
 
@@ -85,7 +72,6 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       queryPlan,
       userPatterns,
-      databaseContext,
       enhancedThemeFiltering: true,
       enhancedEntityFiltering: true,
       entityEmotionRelationshipAnalysis: true,
@@ -111,18 +97,9 @@ async function generateIntelligentQueryPlan(
   conversationContext: any[],
   userPatterns: any,
   userProfile: any,
-  databaseContext: string,
-  emotionGuidelines: string,
-  themeGuidelines: string,
   openaiApiKey: string
 ): Promise<QueryPlan> {
   const systemPrompt = `You are an intelligent query planning system for a personal journal analysis AI with ADVANCED ENTITY-EMOTION RELATIONSHIP ANALYSIS CAPABILITIES.
-
-${databaseContext}
-
-${emotionGuidelines}
-
-${themeGuidelines}
 
 ENHANCED THEME FILTERING CAPABILITIES:
 - PostgreSQL array-based theme filtering with GIN index optimization
