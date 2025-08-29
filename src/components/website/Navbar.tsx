@@ -5,7 +5,7 @@ import { Menu, X, Apple, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import SouloLogo from '@/components/SouloLogo';
 import { TranslatableText } from '@/components/translation/TranslatableText';
-import { LanguageSelector } from '@/components/translation/LanguageSelector';
+
 import { useTranslation } from '@/contexts/TranslationContext';
 
 const Navbar = () => {
@@ -68,7 +68,6 @@ const Navbar = () => {
             <Play className="mr-2 h-4 w-4" />
             <TranslatableText text="Google Play" />
           </Button>
-          <LanguageSelector />
         </div>
 
         {/* Mobile Navigation Toggle */}
@@ -117,7 +116,7 @@ const Navbar = () => {
               <Play className="mr-2 h-4 w-4" />
               <TranslatableText text="Google Play" />
             </Button>
-            <LanguageSelector />
+            
           </div>
         </div>
       )}
