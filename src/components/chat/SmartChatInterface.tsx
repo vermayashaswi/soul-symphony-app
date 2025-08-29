@@ -26,6 +26,7 @@ import DebugPanel from "@/components/debug/DebugPanel";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "@/contexts/TranslationContext";
 import { useChatRealtime } from "@/hooks/use-chat-realtime";
+import { useChatStateSync } from "@/hooks/useChatStateSync";
 import { updateThreadProcessingStatus, createProcessingMessage, updateProcessingMessage, generateThreadTitle } from "@/utils/chat/threadUtils";
 import { MentalHealthInsights } from "@/hooks/use-mental-health-insights";
 
@@ -192,6 +193,16 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     // Only used for message subscription management
   } = useChatRealtime(currentThreadId);
   
+  // Enhanced state synchronization for reliable message loading
+  const { triggerSync } = useChatStateSync({
+    threadId: currentThreadId,
+    onStateSync: (reason: string) => {
+      console.log(`[ChatStateSync] Triggering sync for reason: ${reason}`);
+      loadThreadMessages(currentThreadId!, true);
+    },
+    enabled: !!currentThreadId
+  });
+  
   // Use unified auto-scroll hook - ONLY useStreamingChat dependencies
   const { scrollElementRef, scrollToBottom } = useAutoScroll({
     dependencies: [chatHistory, isStreaming, streamingMessages],
@@ -328,21 +339,62 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
   // Listen for completed responses and reload messages
   useEffect(() => {
     const onResponseReady = (event: CustomEvent) => {
-      const { threadId, completed, restored, correlationId } = event.detail;
+      const { threadId, completed, restored, correlationId, reason, forceReload, messageId } = event.detail;
       
       if (threadId === currentThreadId) {
         console.log(`[SmartChatInterface] Response ready for thread ${currentThreadId}`, {
           completed,
           restored,
-          correlationId
+          correlationId,
+          reason,
+          forceReload,
+          messageId
         });
         
-        // Force reload messages to show latest state, especially for completed/restored responses
-        loadThreadMessages(currentThreadId, restored || completed);
+        // Always force reload for realtime events to ensure UI synchronization
+        const shouldForceReload = forceReload || restored || completed || reason?.includes('message_received');
         
-        // If this was a restoration event, also dispatch to any listening components
+        // Immediate state synchronization for critical events
+        if (reason === 'assistant_message_received' || reason === 'assistant_message_updated') {
+          debugLog.addEvent("Realtime Sync", `Assistant message ${reason} - forcing immediate reload`, "info");
+          
+          // Double-check that we actually need to reload by comparing message counts
+          setTimeout(async () => {
+            try {
+              const { data: latestMessages } = await supabase
+                .from('chat_messages')
+                .select('id, sender, created_at')
+                .eq('thread_id', currentThreadId)
+                .order('created_at', { ascending: true });
+              
+              const currentMessageIds = chatHistory.map(m => m.id);
+              const latestMessageIds = (latestMessages || []).map(m => m.id);
+              
+              // Check if we're missing any messages
+              const missingMessages = latestMessageIds.filter(id => !currentMessageIds.includes(id));
+              
+              if (missingMessages.length > 0) {
+                console.log(`[SmartChatInterface] Found ${missingMessages.length} missing messages, reloading thread`);
+                loadThreadMessages(currentThreadId, true);
+              } else {
+                console.log(`[SmartChatInterface] No missing messages detected`);
+              }
+            } catch (error) {
+              console.warn(`[SmartChatInterface] Failed to verify message sync:`, error);
+              // Fallback to reload anyway
+              loadThreadMessages(currentThreadId, true);
+            }
+          }, 200);
+        } else {
+          // Standard reload for other events
+          loadThreadMessages(currentThreadId, shouldForceReload);
+        }
+        
+        // Enhanced logging for different event types
         if (restored || completed) {
           debugLog.addEvent("Response Ready", `${restored ? 'Restored' : 'Completed'} response for thread: ${threadId}`, "success");
+        } else if (reason) {
+          debugLog.addEvent("Response Ready", `${reason} triggered reload for thread: ${threadId}`, "info");
         }
       }
     };
@@ -351,7 +403,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     return () => {
       window.removeEventListener('chatResponseReady' as any, onResponseReady);
     };
-  }, [currentThreadId, debugLog]);
+  }, [currentThreadId, debugLog, chatHistory]);
 
   // Auto-scroll is now handled by the useAutoScroll hook
 
@@ -361,13 +413,14 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       return;
     }
     
+    // Enhanced loading guard with state validation
     if (loadedThreadRef.current === threadId && !forceReload) {
       debugLog.addEvent("Thread Loading", `Thread ${threadId} already loaded, skipping`, "info");
       return;
     }
     
     if (forceReload) {
-      debugLog.addEvent("Thread Loading", `Force reloading thread ${threadId}`, "info");
+      debugLog.addEvent("Thread Loading", `Force reloading thread ${threadId} (activeThread: ${currentThreadIdRef.current})`, "info");
       loadedThreadRef.current = null; // Reset to ensure proper reload
     }
     
@@ -405,14 +458,27 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
           role: msg.role as 'user' | 'assistant' | 'error'
         }));
         
-        setChatHistory(typedMessages);
-        setShowSuggestions(false);
-        loadedThreadRef.current = threadId;
+        // Enhanced state validation: only update if we're still on the same thread
+        if (currentThreadIdRef.current === threadId) {
+          setChatHistory(typedMessages);
+          setShowSuggestions(false);
+          loadedThreadRef.current = threadId;
+          
+          // Post-load verification: ensure we have the latest assistant responses
+          const assistantMessages = typedMessages.filter(m => m.sender === 'assistant');
+          if (assistantMessages.length > 0) {
+            debugLog.addEvent("Thread Loading", `Verified ${assistantMessages.length} assistant messages loaded`, "success");
+          }
+        } else {
+          debugLog.addEvent("Thread Loading", `Thread changed during load (${threadId} -> ${currentThreadIdRef.current}), skipping update`, "warning");
+        }
       } else {
         debugLog.addEvent("Thread Loading", `No messages found for thread ${threadId}`, "info");
         console.log(`No messages found for thread ${threadId}`);
-        setChatHistory([]);
-        setShowSuggestions(true);
+        if (currentThreadIdRef.current === threadId) {
+          setChatHistory([]);
+          setShowSuggestions(true);
+        }
       }
     } catch (error) {
       console.error("Error loading messages:", error);

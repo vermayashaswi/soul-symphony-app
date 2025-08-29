@@ -54,6 +54,25 @@ export function useChatRealtime(threadId: string | null) {
     
     // Only create subscription if it doesn't exist
     if (!threadState.subscription) {
+      // Check for missed messages immediately when subscription starts
+      const checkForMissedMessages = async () => {
+        try {
+          console.log(`[useChatRealtime] Checking for missed messages in thread ${threadId}`);
+          
+          // Get the latest message timestamp from current chat history
+          const chatResponseReadyEvent = new CustomEvent('chatResponseReady', {
+            detail: { 
+              threadId, 
+              reason: 'realtime_subscription_start',
+              forceReload: true 
+            }
+          });
+          window.dispatchEvent(chatResponseReadyEvent);
+        } catch (error) {
+          console.warn(`[useChatRealtime] Failed to check for missed messages:`, error);
+        }
+      };
+
       const messageChannel = supabase
         .channel(`thread-messages-${threadId}`)
         .on('postgres_changes',
@@ -68,6 +87,20 @@ export function useChatRealtime(threadId: string | null) {
             console.log(`[useChatRealtime] New message in thread ${threadId}:`, messageData.sender);
             
             // Real-time message subscription - processing handled by useStreamingChat
+            // Trigger immediate state refresh for assistant messages
+            if (messageData.sender === 'assistant') {
+              setTimeout(() => {
+                const event = new CustomEvent('chatResponseReady', {
+                  detail: { 
+                    threadId, 
+                    messageId: messageData.id,
+                    reason: 'assistant_message_received',
+                    forceReload: true 
+                  }
+                });
+                window.dispatchEvent(event);
+              }, 100);
+            }
           }
         )
         .on('postgres_changes',
@@ -82,6 +115,20 @@ export function useChatRealtime(threadId: string | null) {
             console.log(`[useChatRealtime] Updated message in thread ${threadId}:`, messageData.sender);
             
             // Real-time message update subscription - processing handled by useStreamingChat
+            // Trigger immediate state refresh for assistant messages
+            if (messageData.sender === 'assistant') {
+              setTimeout(() => {
+                const event = new CustomEvent('chatResponseReady', {
+                  detail: { 
+                    threadId, 
+                    messageId: messageData.id,
+                    reason: 'assistant_message_updated',
+                    forceReload: true 
+                  }
+                });
+                window.dispatchEvent(event);
+              }, 100);
+            }
           }
         )
         .on('postgres_changes',
@@ -102,7 +149,14 @@ export function useChatRealtime(threadId: string | null) {
             window.dispatchEvent(deleteEvent);
           }
         )
-        .subscribe();
+        .subscribe((status) => {
+          console.log(`[useChatRealtime] Subscription status for ${threadId}:`, status);
+          
+          // When subscription is ready, check for missed messages
+          if (status === 'SUBSCRIBED') {
+            checkForMissedMessages();
+          }
+        });
 
       // Store subscription in thread state
       updateThreadRealtimeState(threadId, { subscription: messageChannel });
