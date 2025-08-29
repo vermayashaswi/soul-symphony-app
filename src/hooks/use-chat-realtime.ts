@@ -57,19 +57,47 @@ export function useChatRealtime(threadId: string | null) {
       // Check for missed messages immediately when subscription starts
       const checkForMissedMessages = async () => {
         try {
-          console.log(`[useChatRealtime] Checking for missed messages in thread ${threadId}`);
+          console.log(`[useChatRealtime] Checking for completed messages in thread ${threadId}`);
           
-          // Get the latest message timestamp from current chat history
+          // Check for any assistant messages that completed while we were away
+          const { data: recentAssistantMessages } = await supabase
+            .from('chat_messages')
+            .select('id, sender, created_at, is_processing')
+            .eq('thread_id', threadId)
+            .eq('sender', 'assistant')
+            .order('created_at', { ascending: false })
+            .limit(5);
+
+          if (recentAssistantMessages && recentAssistantMessages.length > 0) {
+            // Check if there are any completed assistant messages (not processing)
+            const completedMessages = recentAssistantMessages.filter(msg => !msg.is_processing);
+            
+            if (completedMessages.length > 0) {
+              console.log(`[useChatRealtime] Found ${completedMessages.length} completed assistant messages, triggering reload`);
+              
+              // Force immediate reload for completed messages
+              const chatResponseReadyEvent = new CustomEvent('chatResponseReady', {
+                detail: { 
+                  threadId, 
+                  reason: 'subscription_start_completed_found',
+                  forceReload: true,
+                  messageId: completedMessages[0].id
+                }
+              });
+              window.dispatchEvent(chatResponseReadyEvent);
+            }
+          }
+        } catch (error) {
+          console.warn(`[useChatRealtime] Failed to check for missed messages:`, error);
+          // Still dispatch event to ensure basic reload
           const chatResponseReadyEvent = new CustomEvent('chatResponseReady', {
             detail: { 
               threadId, 
-              reason: 'realtime_subscription_start',
+              reason: 'subscription_start_fallback',
               forceReload: true 
             }
           });
           window.dispatchEvent(chatResponseReadyEvent);
-        } catch (error) {
-          console.warn(`[useChatRealtime] Failed to check for missed messages:`, error);
         }
       };
 

@@ -351,44 +351,17 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
           messageId
         });
         
-        // Always force reload for realtime events to ensure UI synchronization
-        const shouldForceReload = forceReload || restored || completed || reason?.includes('message_received');
+        // SIMPLIFIED: Always force reload for realtime and completion events
+        const shouldForceReload = forceReload || restored || completed || 
+          reason?.includes('message_received') || 
+          reason?.includes('message_updated') ||
+          reason?.includes('subscription_start') ||
+          reason?.includes('completed_found');
         
-        // Immediate state synchronization for critical events
-        if (reason === 'assistant_message_received' || reason === 'assistant_message_updated') {
-          debugLog.addEvent("Realtime Sync", `Assistant message ${reason} - forcing immediate reload`, "info");
-          
-          // Double-check that we actually need to reload by comparing message counts
-          setTimeout(async () => {
-            try {
-              const { data: latestMessages } = await supabase
-                .from('chat_messages')
-                .select('id, sender, created_at')
-                .eq('thread_id', currentThreadId)
-                .order('created_at', { ascending: true });
-              
-              const currentMessageIds = chatHistory.map(m => m.id);
-              const latestMessageIds = (latestMessages || []).map(m => m.id);
-              
-              // Check if we're missing any messages
-              const missingMessages = latestMessageIds.filter(id => !currentMessageIds.includes(id));
-              
-              if (missingMessages.length > 0) {
-                console.log(`[SmartChatInterface] Found ${missingMessages.length} missing messages, reloading thread`);
-                loadThreadMessages(currentThreadId, true);
-              } else {
-                console.log(`[SmartChatInterface] No missing messages detected`);
-              }
-            } catch (error) {
-              console.warn(`[SmartChatInterface] Failed to verify message sync:`, error);
-              // Fallback to reload anyway
-              loadThreadMessages(currentThreadId, true);
-            }
-          }, 200);
-        } else {
-          // Standard reload for other events
-          loadThreadMessages(currentThreadId, shouldForceReload);
-        }
+        debugLog.addEvent("Response Ready", `Event: ${reason} - Force reload: ${shouldForceReload}`, "info");
+        
+        // Immediate aggressive reload for all critical events
+        loadThreadMessages(currentThreadId, shouldForceReload);
         
         // Enhanced logging for different event types
         if (restored || completed) {
@@ -413,11 +386,13 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       return;
     }
     
-    // Enhanced loading guard with state validation
+    // SIMPLIFIED: Only skip if explicitly not forcing reload
     if (loadedThreadRef.current === threadId && !forceReload) {
-      debugLog.addEvent("Thread Loading", `Thread ${threadId} already loaded, skipping`, "info");
+      debugLog.addEvent("Thread Loading", `Thread ${threadId} already loaded, skipping (forceReload: false)`, "info");
       return;
     }
+    
+    console.log(`[SmartChatInterface] Loading messages for thread ${threadId} (force: ${forceReload})`);
     
     if (forceReload) {
       debugLog.addEvent("Thread Loading", `Force reloading thread ${threadId} (activeThread: ${currentThreadIdRef.current})`, "info");
