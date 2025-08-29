@@ -33,7 +33,7 @@ import { getThreadMessages, saveMessage } from "@/services/chat";
 import { useDebugLog } from "@/utils/debug/DebugContext";
 import { TranslatableText } from "@/components/translation/TranslatableText";
 import { useChatMessageClassification, QueryCategory } from "@/hooks/use-chat-message-classification";
-import { useStreamingChat } from "@/hooks/useStreamingChat";
+import { useStreamingChatV2 } from "@/hooks/useStreamingChatV2";
 import { threadSafetyManager } from "@/utils/threadSafetyManager";
 import { useAutoScroll } from "@/hooks/use-auto-scroll";
 import {
@@ -106,87 +106,79 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
   // Use streaming chat for enhanced UX
   const {
     isStreaming,
-    // streamingThreadId - removed as part of thread isolation
     streamingMessages,
-    currentUserMessage,
-    showBackendAnimation,
+    lastUserInput: currentUserMessage,
+    showDynamicMessages: showBackendAnimation,
     startStreamingChat,
     queryCategory,
-    restoreStreamingState,
-    stopStreaming,
     dynamicMessages,
     translatedDynamicMessages,
     currentMessageIndex,
-    useThreeDotFallback
-  } = useStreamingChat({
-      threadId: currentThreadId,
-    onFinalResponse: async (response, analysis, originThreadId, requestId) => {
-      // Handle final streaming response scoped to its origin thread
-      if (!response || !originThreadId || !effectiveUserId) {
+    useThreeDotFallback,
+    stopStreaming
+  } = useStreamingChatV2(currentThreadId || '', {
+    onFinalResponse: async (response) => {
+      // Handle final streaming response
+      if (!response || !currentThreadId || !effectiveUserId) {
         debugLog.addEvent("Streaming Response", "Missing required data for final response", "error");
-        console.error("[Streaming] Missing response data:", { response: !!response, originThreadId: !!originThreadId, userId: !!effectiveUserId });
+        console.error("[Streaming] Missing response data:", { response: !!response, threadId: !!currentThreadId, userId: !!effectiveUserId });
         return;
       }
       
-      debugLog.addEvent("Streaming Response", `Final response received for ${originThreadId}: ${response.substring(0, 100)}...`, "success");
+      debugLog.addEvent("Streaming Response", `Final response received for ${currentThreadId}: ${response.substring(0, 100)}...`, "success");
 
       // NO manual loading states - useStreamingChat handles everything
       
       // Backend persists assistant message; UI will append via realtime
-      if (originThreadId === currentThreadId) {
-        // Watchdog: if realtime insert doesn't arrive, persist client-side after a short delay
-        try {
-          setTimeout(async () => {
-            // Double-check still on same thread
-            if (!currentThreadIdRef.current || currentThreadIdRef.current !== originThreadId) return;
+      // Watchdog: if realtime insert doesn't arrive, persist client-side after a short delay
+      try {
+        setTimeout(async () => {
+          // Double-check still on same thread
+          if (!currentThreadIdRef.current || currentThreadIdRef.current !== currentThreadId) return;
 
-            // Has an assistant message with same content arrived?
-            const { data: recent, error: recentErr } = await supabase
-              .from('chat_messages')
-              .select('id, content, sender, created_at')
-              .eq('thread_id', originThreadId)
-              .order('created_at', { ascending: false })
-              .limit(5);
+          // Has an assistant message with same content arrived?
+          const { data: recent, error: recentErr } = await supabase
+            .from('chat_messages')
+            .select('id, content, sender, created_at')
+            .eq('thread_id', currentThreadId)
+            .order('created_at', { ascending: false })
+            .limit(5);
 
-            if (recentErr) {
-              console.warn('[Streaming Watchdog] Failed to fetch recent messages:', recentErr.message);
+          if (recentErr) {
+            console.warn('[Streaming Watchdog] Failed to fetch recent messages:', recentErr.message);
+          }
+
+          const responseText = typeof response === 'string' ? response : response?.content || '';
+          const alreadyExists = (recent || []).some(m => (m as any).sender === 'assistant' && (m as any).content?.trim() === responseText.trim());
+          if (!alreadyExists) {
+            // Persist safely with an idempotency_key derived from threadId + response
+            try {
+              const enc = new TextEncoder();
+              const keySource = `${currentThreadId}:${responseText}`;
+              const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
+              const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+              const idempotencyKey = hex.slice(0, 32);
+
+              await supabase.from('chat_messages').upsert({
+                thread_id: currentThreadId,
+                content: responseText,
+                sender: 'assistant',
+                role: 'assistant',
+                idempotency_key: idempotencyKey
+              }, { onConflict: 'thread_id,idempotency_key' });
+            } catch (e) {
+              console.warn('[Streaming Watchdog] Persist fallback failed:', (e as any)?.message || e);
             }
-
-            const alreadyExists = (recent || []).some(m => (m as any).sender === 'assistant' && (m as any).content?.trim() === response.trim());
-            if (!alreadyExists) {
-              // Persist safely with an idempotency_key derived from threadId + response
-              try {
-                const enc = new TextEncoder();
-                const keySource = requestId || `${originThreadId}:${response}`;
-                const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
-                const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
-                const idempotencyKey = hex.slice(0, 32);
-
-                await supabase.from('chat_messages').upsert({
-                  thread_id: originThreadId,
-                  content: response,
-                  sender: 'assistant',
-                  role: 'assistant',
-                  idempotency_key: idempotencyKey
-                }, { onConflict: 'thread_id,idempotency_key' });
-              } catch (e) {
-                console.warn('[Streaming Watchdog] Persist fallback failed:', (e as any)?.message || e);
-              }
-            }
-
-            // NO manual state clearing - useStreamingChat handles it
-          }, 1200);
-        } catch (e) {
-          console.warn('[Streaming Watchdog] Exception scheduling fallback:', (e as any)?.message || e);
-          // NO manual state clearing - useStreamingChat handles it
-        }
+          }
+        }, 1200);
+      } catch (e) {
+        console.warn('[Streaming Watchdog] Exception scheduling fallback:', (e as any)?.message || e);
       }
     },
     onError: (error) => {
-      // NO manual state clearing - useStreamingChat handles errors
       toast({
         title: "Error",
-        description: error,
+        description: typeof error === 'string' ? error : error?.message || 'Unknown error',
         variant: "destructive"
       });
     }
@@ -288,18 +280,6 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
   useEffect(() => {
     if (propsThreadId && propsThreadId !== currentThreadId) {
       loadThreadMessages(propsThreadId);
-      // Try to restore streaming state for this thread (now async)
-      const tryRestore = async () => {
-        try {
-          const restored = await restoreStreamingState(propsThreadId);
-          if (restored) {
-            debugLog.addEvent("Props Thread Change", `Restored streaming state for props thread: ${propsThreadId}`, "info");
-          }
-        } catch (error) {
-          console.warn('[SmartChatInterface] Error restoring state for props thread:', error);
-        }
-      };
-      tryRestore();
       
       // Update local storage to maintain consistency
       if (propsThreadId) {
@@ -307,7 +287,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       }
       debugLog.addEvent("Props Thread Change", `Thread selected via props: ${propsThreadId}`, "info");
     }
-  }, [propsThreadId, currentThreadId, restoreStreamingState]);
+  }, [propsThreadId, currentThreadId]);
 
   useEffect(() => {
     // Only handle events and local storage if not using props
@@ -331,18 +311,6 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     if (storedThreadId && effectiveUserId) {
       setLocalThreadId(storedThreadId);
       loadThreadMessages(storedThreadId);
-      // Try to restore streaming state for stored thread (now async)
-      const tryRestoreStored = async () => {
-        try {
-          const restored = await restoreStreamingState(storedThreadId);
-          if (restored) {
-            debugLog.addEvent("Initialization", `Restored streaming state for stored thread: ${storedThreadId}`, "info");
-          }
-        } catch (error) {
-          console.warn('[SmartChatInterface] Error restoring state for stored thread:', error);
-        }
-      };
-      tryRestoreStored();
       debugLog.addEvent("Initialization", `Loading stored thread: ${storedThreadId}`, "info");
     } else {
       setInitialLoading(false);
@@ -678,9 +646,9 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       // Start streaming chat for all queries
       await startStreamingChat(
         message,
-        effectiveUserId,
         threadId,
-        conversationContext,
+        effectiveUserId,
+        'JOURNAL_SPECIFIC',
         {
           useAllEntries: queryClassification.useAllEntries || false,
           hasPersonalPronouns: message.toLowerCase().includes('i ') || message.toLowerCase().includes('my '),
