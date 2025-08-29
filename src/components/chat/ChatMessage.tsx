@@ -78,15 +78,15 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
               ) : (
                 <div className="prose prose-sm max-w-none dark:prose-invert 
                   prose-headings:text-theme prose-headings:font-bold
-                  prose-h1:text-lg prose-h1:mb-3 prose-h1:flex prose-h1:items-center prose-h1:gap-2
-                  prose-h2:text-base prose-h2:mb-3 prose-h2:mt-4 prose-h2:flex prose-h2:items-center prose-h2:gap-2
-                  prose-h3:text-sm prose-h3:mb-2 prose-h3:mt-3 prose-h3:flex prose-h3:items-center prose-h3:gap-2
+                  prose-h1:text-lg prose-h1:mb-2 prose-h1:mt-0
+                  prose-h2:text-base prose-h2:mb-2 prose-h2:mt-3
+                  prose-h3:text-sm prose-h3:mb-1 prose-h3:mt-2
                   prose-strong:text-theme prose-strong:font-bold
-                  prose-ul:list-none prose-ul:space-y-2 prose-ul:ml-1 prose-ul:my-2
-                  prose-ol:list-decimal prose-ol:list-inside prose-ol:space-y-2 prose-ol:ml-4 prose-ol:my-2
-                  prose-li:flex prose-li:items-start prose-li:gap-2 prose-li:mb-1
-                  prose-p:mb-2 prose-p:leading-relaxed
-                  prose-blockquote:border-l-4 prose-blockquote:border-theme prose-blockquote:pl-4 prose-blockquote:py-2 prose-blockquote:my-3 prose-blockquote:bg-muted/30 prose-blockquote:rounded-r
+                  prose-ul:list-disc prose-ul:pl-6 prose-ul:my-2 prose-ul:space-y-1
+                  prose-ol:list-decimal prose-ol:pl-6 prose-ol:my-2 prose-ol:space-y-1
+                  prose-li:block prose-li:mb-0
+                  prose-p:mb-2 prose-p:leading-relaxed prose-p:mt-0
+                  prose-blockquote:border-l-4 prose-blockquote:border-theme prose-blockquote:pl-4 prose-blockquote:py-2 prose-blockquote:my-2 prose-blockquote:bg-muted/30 prose-blockquote:rounded-r
                 ">
                   <TranslatableMarkdown 
                     className="text-sm leading-relaxed"
