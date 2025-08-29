@@ -37,23 +37,64 @@ public class MainActivity extends BridgeActivity {
             // Check for FCM notification data
             String actionUrl = extras.getString("action_url");
             if (actionUrl != null && !actionUrl.isEmpty()) {
-                // Navigate to the specified URL in the webview
-                getBridge().getWebView().post(() -> {
-                    getBridge().getWebView().evaluateJavascript(
-                        "window.location.href = '" + actionUrl + "';", null);
-                });
+                // Sanitize URL to ensure it's relative or internal
+                String sanitizedUrl = sanitizeNavigationUrl(actionUrl);
+                if (sanitizedUrl != null) {
+                    // Use safe navigation within the WebView
+                    getBridge().getWebView().post(() -> {
+                        getBridge().getWebView().evaluateJavascript(
+                            "if (window.nativeNavigationService) { " +
+                                "window.nativeNavigationService.navigateToPath('" + sanitizedUrl + "', { replace: true, force: true }); " +
+                            "} else { " +
+                                "window.history.pushState(null, '', '" + sanitizedUrl + "'); " +
+                                "window.dispatchEvent(new PopStateEvent('popstate')); " +
+                            "}", null);
+                    });
+                }
             }
             
             // Handle deep link URIs
             Uri data = intent.getData();
             if (data != null) {
                 String deepLink = data.toString();
-                getBridge().getWebView().post(() -> {
-                    getBridge().getWebView().evaluateJavascript(
-                        "window.location.href = '" + deepLink + "';", null);
-                });
+                String sanitizedDeepLink = sanitizeNavigationUrl(deepLink);
+                if (sanitizedDeepLink != null) {
+                    getBridge().getWebView().post(() -> {
+                        getBridge().getWebView().evaluateJavascript(
+                            "if (window.nativeNavigationService) { " +
+                                "window.nativeNavigationService.navigateToPath('" + sanitizedDeepLink + "', { replace: true, force: true }); " +
+                            "} else { " +
+                                "window.history.pushState(null, '', '" + sanitizedDeepLink + "'); " +
+                                "window.dispatchEvent(new PopStateEvent('popstate')); " +
+                            "}", null);
+                    });
+                }
             }
         }
+    }
+    
+    private String sanitizeNavigationUrl(String url) {
+        if (url == null || url.isEmpty()) {
+            return null;
+        }
+        
+        // Remove full domain if present, keep only path
+        if (url.startsWith("https://571d731e-b54b-453e-9f48-a2c79a572930.lovableproject.com")) {
+            url = url.replace("https://571d731e-b54b-453e-9f48-a2c79a572930.lovableproject.com", "");
+        }
+        
+        // Ensure URL starts with / for relative paths
+        if (!url.startsWith("/")) {
+            url = "/" + url;
+        }
+        
+        // Only allow internal app paths
+        if (url.startsWith("/app/") || url.equals("/")) {
+            return url;
+        }
+        
+        // Default fallback to journal
+        return "/app/journal";
     }
     
     private void setupImmersiveMode() {

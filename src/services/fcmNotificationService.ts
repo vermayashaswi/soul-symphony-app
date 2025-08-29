@@ -103,9 +103,14 @@ class FCMNotificationService {
         const actionUrl = notification.notification.data?.action_url || notification.notification.data?.actionUrl;
         if (actionUrl) {
           console.log('[FCMNotificationService] Navigating to action URL:', actionUrl);
+          
+          // Sanitize URL to ensure it's a relative path
+          const sanitizedUrl = this.sanitizeNotificationUrl(actionUrl);
+          console.log('[FCMNotificationService] Sanitized URL:', sanitizedUrl);
+          
           // Use native navigation service for proper app navigation
           import('../services/nativeNavigationService').then(({ nativeNavigationService }) => {
-            nativeNavigationService.navigateToPath(actionUrl, { replace: true, force: true });
+            nativeNavigationService.navigateToPath(sanitizedUrl, { replace: true, force: true });
           });
         }
       });
@@ -478,9 +483,11 @@ class FCMNotificationService {
       notification.onclick = () => {
         window.focus();
         notification.close();
-        // Navigate to journal if possible
+        // Navigate to journal if possible using proper navigation
         if (window.location.pathname !== '/app/journal') {
-          window.location.href = '/app/journal';
+          // Use history API instead of window.location.href to prevent external browser
+          window.history.pushState(null, '', '/app/journal');
+          window.dispatchEvent(new PopStateEvent('popstate'));
         }
       };
     }
@@ -634,6 +641,30 @@ class FCMNotificationService {
   }
   disableReminders() { return Promise.resolve(); }
   testReminder() { return this.testNotification(); }
+
+  // Utility method to sanitize notification URLs
+  private sanitizeNotificationUrl(url: string): string {
+    if (!url) return '/app/journal';
+    
+    // Remove full domain if present, keep only path
+    if (url.includes('lovableproject.com')) {
+      const urlObj = new URL(url);
+      url = urlObj.pathname + urlObj.search + urlObj.hash;
+    }
+    
+    // Ensure URL starts with / for relative paths
+    if (!url.startsWith('/')) {
+      url = '/' + url;
+    }
+    
+    // Only allow internal app paths
+    if (url.startsWith('/app/') || url === '/') {
+      return url;
+    }
+    
+    // Default fallback to journal
+    return '/app/journal';
+  }
 }
 
 export const fcmNotificationService = FCMNotificationService.getInstance();

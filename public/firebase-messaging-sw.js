@@ -40,24 +40,59 @@ self.addEventListener('notificationclick', function(event) {
   // Open the app or focus existing window
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
-      const actionUrl = event.notification.data?.actionUrl || '/app/journal';
+      // Sanitize action URL to ensure it's relative
+      let actionUrl = event.notification.data?.actionUrl || event.notification.data?.action_url || '/app/journal';
+      actionUrl = sanitizeActionUrl(actionUrl);
       
       // Check if the app is already open
       for (let i = 0; i < clientList.length; i++) {
         const client = clientList[i];
         if (client.url.includes(self.location.origin) && 'focus' in client) {
           client.focus();
-          if (actionUrl && client.navigate) {
-            client.navigate(actionUrl);
+          // Use postMessage to navigate instead of direct navigation
+          if (actionUrl) {
+            client.postMessage({
+              type: 'NAVIGATE_TO',
+              url: actionUrl
+            });
           }
           return;
         }
       }
       
-      // If not open, open new window
+      // If not open, open new window with sanitized URL
       if (clients.openWindow) {
-        return clients.openWindow(actionUrl);
+        return clients.openWindow(self.location.origin + actionUrl);
       }
     })
   );
 });
+
+// Utility function to sanitize action URLs
+function sanitizeActionUrl(url) {
+  if (!url) return '/app/journal';
+  
+  // Remove full domain if present, keep only path
+  if (url.includes('lovableproject.com')) {
+    try {
+      const urlObj = new URL(url);
+      url = urlObj.pathname + urlObj.search + urlObj.hash;
+    } catch (e) {
+      console.warn('[firebase-messaging-sw.js] Invalid URL, using fallback:', url);
+      return '/app/journal';
+    }
+  }
+  
+  // Ensure URL starts with / for relative paths
+  if (!url.startsWith('/')) {
+    url = '/' + url;
+  }
+  
+  // Only allow internal app paths
+  if (url.startsWith('/app/') || url === '/') {
+    return url;
+  }
+  
+  // Default fallback to journal
+  return '/app/journal';
+}

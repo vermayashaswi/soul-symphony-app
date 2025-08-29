@@ -118,6 +118,9 @@ serve(async (req) => {
     const fcmResults = [];
     for (const device of devices) {
       try {
+        // Sanitize action URL to ensure it's a relative path
+        const sanitizedActionUrl = actionUrl ? sanitizeActionUrl(actionUrl) : null;
+        
         const fcmMessage = {
           message: {
             token: device.device_token,
@@ -130,11 +133,11 @@ serve(async (req) => {
               ...(data ? Object.fromEntries(
                 Object.entries(data).map(([key, value]) => [key, String(value)])
               ) : {}),
-              ...(actionUrl ? { action_url: String(actionUrl) } : {})
+              ...(sanitizedActionUrl ? { action_url: String(sanitizedActionUrl) } : {})
             },
-            webpush: actionUrl ? {
+            webpush: sanitizedActionUrl ? {
               fcm_options: {
-                link: actionUrl
+                link: sanitizedActionUrl
               }
             } : undefined,
             android: {
@@ -143,13 +146,13 @@ serve(async (req) => {
               },
               data: {
                 // Ensure action_url is available in data for native handling
-                ...(actionUrl ? { action_url: String(actionUrl) } : {})
+                ...(sanitizedActionUrl ? { action_url: String(sanitizedActionUrl) } : {})
               }
             },
             apns: {
               payload: {
                 aps: {
-                  category: actionUrl ? 'OPEN_URL' : undefined
+                  category: sanitizedActionUrl ? 'OPEN_URL' : undefined
                 }
               }
             }
@@ -197,14 +200,15 @@ serve(async (req) => {
 
     console.log('[FCM] Real FCM Results:', fcmResults);
 
-    // Create in-app notifications for all users
+    // Create in-app notifications for all users with sanitized URLs
+    const sanitizedActionUrl = actionUrl ? sanitizeActionUrl(actionUrl) : null;
     const inAppNotifications = userIds.map(userId => ({
       user_id: userId,
       title,
       message: body,
       type: 'info',
       data: data || {},
-      action_url: actionUrl,
+      action_url: sanitizedActionUrl,
       action_label: 'View',
     }));
 
@@ -243,3 +247,32 @@ serve(async (req) => {
     });
   }
 });
+
+// Utility function to sanitize action URLs
+function sanitizeActionUrl(url: string): string {
+  if (!url) return '/app/journal';
+  
+  // Remove full domain if present, keep only path
+  if (url.includes('lovableproject.com')) {
+    try {
+      const urlObj = new URL(url);
+      url = urlObj.pathname + urlObj.search + urlObj.hash;
+    } catch (e) {
+      console.warn('[send-fcm-notification] Invalid URL, using fallback:', url);
+      return '/app/journal';
+    }
+  }
+  
+  // Ensure URL starts with / for relative paths
+  if (!url.startsWith('/')) {
+    url = '/' + url;
+  }
+  
+  // Only allow internal app paths
+  if (url.startsWith('/app/') || url === '/') {
+    return url;
+  }
+  
+  // Default fallback to journal
+  return '/app/journal';
+}
