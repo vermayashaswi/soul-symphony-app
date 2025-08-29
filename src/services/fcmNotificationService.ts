@@ -81,7 +81,19 @@ class FCMNotificationService {
           payload.notification.body || ''
         );
       }
+
+      // Trigger notification refresh in the app
+      this.triggerNotificationRefresh();
     });
+  }
+
+  private triggerNotificationRefresh() {
+    // Dispatch a custom event to trigger notification refresh
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('fcm-notification-received', {
+        detail: { timestamp: Date.now() }
+      }));
+    }
   }
 
   private async setupNativePushListeners() {
@@ -93,11 +105,17 @@ class FCMNotificationService {
         console.log('[FCMNotificationService] Native notification received:', notification);
         // On native platforms, notifications in foreground need to be handled by the app
         // The system will show the status bar notification automatically when app is in background
+        
+        // Trigger notification refresh in the app
+        this.triggerNotificationRefresh();
       });
 
       // Listen for notification action performed (when user taps notification)
       await PushNotifications.addListener('pushNotificationActionPerformed', notification => {
         console.log('[FCMNotificationService] Native notification action performed:', notification);
+        
+        // Trigger notification refresh when user taps notification
+        this.triggerNotificationRefresh();
         
         // Handle notification tap - navigate to action URL if available
         const actionUrl = notification.notification.data?.action_url || notification.notification.data?.actionUrl;

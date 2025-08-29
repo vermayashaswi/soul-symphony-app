@@ -25,10 +25,21 @@ messaging.onBackgroundMessage(function(payload) {
     icon: '/favicon.ico',
     badge: '/favicon.ico',
     tag: 'soulo-notification',
-    data: payload.data || {}
+    data: payload.data || {},
+    requireInteraction: true // Keep notification visible until user interacts
   };
 
   self.registration.showNotification(notificationTitle, notificationOptions);
+  
+  // Signal app to refresh notifications when it becomes active
+  self.clients.matchAll({ includeUncontrolled: true, type: 'window' }).then(function(clientList) {
+    clientList.forEach(function(client) {
+      client.postMessage({
+        type: 'BACKGROUND_NOTIFICATION_RECEIVED',
+        payload: payload
+      });
+    });
+  });
 });
 
 // Handle notification click
@@ -47,6 +58,11 @@ self.addEventListener('notificationclick', function(event) {
         const client = clientList[i];
         if (client.url.includes(self.location.origin) && 'focus' in client) {
           client.focus();
+          // Signal app to refresh notifications
+          client.postMessage({
+            type: 'NOTIFICATION_CLICKED',
+            actionUrl: actionUrl
+          });
           if (actionUrl && client.navigate) {
             client.navigate(actionUrl);
           }
@@ -60,4 +76,11 @@ self.addEventListener('notificationclick', function(event) {
       }
     })
   );
+});
+
+// Listen for messages from the main app
+self.addEventListener('message', function(event) {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });

@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { Capacitor } from '@capacitor/core';
+import { App } from '@capacitor/app';
 
 interface AppNotification {
   id: string;
@@ -74,40 +76,133 @@ export const useNotifications = () => {
     loadNotificationsStable();
     loadUnreadCountStable();
     
-    // Set up real-time subscription for new notifications
-    const channel = supabase
-      .channel(`notification-updates-${userId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'user_app_notifications',
-          filter: `user_id=eq.${userId}`
-        },
-        (payload) => {
-          console.log('[useNotifications] Real-time notification update:', payload);
-          // Only process if user is still the same and component is mounted
-          if (currentUserIdRef.current === userId && isMountedRef.current) {
-            loadNotificationsStable();
-            loadUnreadCountStable();
-            
-            // Show toast for new notifications
-            if (payload.eventType === 'INSERT' && payload.new) {
-              const newNotification = payload.new as AppNotification;
-              toast({
-                title: newNotification.title,
-                description: newNotification.message,
-                duration: 5000,
-              });
+    let channel: any = null;
+    let appStateListener: any = null;
+    let foregroundListener: any = null;
+    let fcmListener: any = null;
+
+    const setupSubscription = () => {
+      // Set up real-time subscription for new notifications with optimized filters
+      channel = supabase
+        .channel(`notification-updates-${userId}`, {
+          config: {
+            broadcast: { self: false }, // Reduce latency by not echoing our own changes
+            presence: { key: userId }
+          }
+        })
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'user_app_notifications',
+            filter: `user_id=eq.${userId}`
+          },
+          (payload) => {
+            console.log('[useNotifications] Real-time notification update:', payload);
+            // Only process if user is still the same and component is mounted
+            if (currentUserIdRef.current === userId && isMountedRef.current) {
+              // Show toast for new notifications
+              if (payload.eventType === 'INSERT' && payload.new) {
+                const newNotification = payload.new as AppNotification;
+                toast({
+                  title: newNotification.title,
+                  description: newNotification.message,
+                  duration: 5000,
+                });
+              }
+              
+              // Debounced reload to prevent excessive calls
+              setTimeout(() => {
+                if (currentUserIdRef.current === userId && isMountedRef.current) {
+                  loadNotificationsStable();
+                  loadUnreadCountStable();
+                }
+              }, 100);
             }
           }
+        )
+        .subscribe();
+    };
+
+    const setupAppLifecycleListeners = async () => {
+      if (Capacitor.isNativePlatform()) {
+        try {
+          // Listen for app state changes (foreground/background)
+          appStateListener = await App.addListener('appStateChange', ({ isActive }) => {
+            console.log('[useNotifications] App state changed:', isActive ? 'foreground' : 'background');
+            
+            if (isActive && isMountedRef.current && currentUserIdRef.current === userId) {
+              // App became active - refresh notifications to catch any background notifications
+              console.log('[useNotifications] App became active, refreshing notifications...');
+              setTimeout(() => {
+                if (isMountedRef.current && currentUserIdRef.current === userId) {
+                  loadNotificationsStable();
+                  loadUnreadCountStable();
+                }
+              }, 500); // Slight delay to ensure app is fully active
+            }
+          });
+
+          // Listen for URL open events (when app is opened from notification)
+          foregroundListener = await App.addListener('appUrlOpen', (event) => {
+            console.log('[useNotifications] App opened from URL:', event.url);
+            // Refresh notifications when app is opened from external source
+            if (isMountedRef.current && currentUserIdRef.current === userId) {
+              setTimeout(() => {
+                if (isMountedRef.current && currentUserIdRef.current === userId) {
+                  loadNotificationsStable();
+                  loadUnreadCountStable();
+                }
+              }, 1000);
+            }
+          });
+
+          console.log('[useNotifications] App lifecycle listeners set up');
+        } catch (error) {
+          console.warn('[useNotifications] Failed to set up app lifecycle listeners:', error);
         }
-      )
-      .subscribe();
+      }
+    };
+
+    const setupFCMListener = () => {
+      // Listen for FCM notification events
+      const handleFCMNotification = () => {
+        console.log('[useNotifications] FCM notification received, refreshing...');
+        if (isMountedRef.current && currentUserIdRef.current === userId) {
+          setTimeout(() => {
+            if (isMountedRef.current && currentUserIdRef.current === userId) {
+              loadNotificationsStable();
+              loadUnreadCountStable();
+            }
+          }, 1000); // Allow time for backend to process
+        }
+      };
+
+      if (typeof window !== 'undefined') {
+        window.addEventListener('fcm-notification-received', handleFCMNotification);
+        fcmListener = () => window.removeEventListener('fcm-notification-received', handleFCMNotification);
+      }
+    };
+
+    // Set up subscription, lifecycle listeners, and FCM listener
+    setupSubscription();
+    setupAppLifecycleListeners();
+    setupFCMListener();
 
     return () => {
-      supabase.removeChannel(channel);
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+      if (appStateListener) {
+        appStateListener.remove();
+      }
+      if (foregroundListener) {
+        foregroundListener.remove();
+      }
+      if (fcmListener) {
+        fcmListener();
+      }
     };
   }, [user?.id, toast]);
 
@@ -250,53 +345,111 @@ export const useNotifications = () => {
 
   const loadUnreadCount = loadUnreadCountStable;
 
-  const markAsRead = async (notificationId: string) => {
-    if (!currentUserIdRef.current || !isMountedRef.current) return;
+  const markAsRead = useCallback(async (notificationId: string) => {
+    const userId = currentUserIdRef.current;
+    if (!userId || !isMountedRef.current) return;
 
     try {
+      // Optimistic update - immediately update local state
+      setNotifications(prev => 
+        prev.map(notification => 
+          notification.id === notificationId 
+            ? { ...notification, read_at: new Date().toISOString() }
+            : notification
+        )
+      );
+      
+      // Update unread count immediately
+      setUnreadCount(prev => Math.max(0, prev - 1));
+
       const { error } = await supabase
         .from('user_app_notifications')
         .update({ read_at: new Date().toISOString() })
-        .eq('id', notificationId);
+        .eq('id', notificationId)
+        .eq('user_id', userId);
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
 
-      setNotifications(prev => 
-        prev.map(n => 
-          n.id === notificationId 
-            ? { ...n, read_at: new Date().toISOString() }
-            : n
-        )
-      );
-      loadUnreadCount();
-    } catch (error) {
-      console.error('Error marking notification as read:', error);
+      // Debounced consistency check
+      setTimeout(() => {
+        if (isMountedRef.current && currentUserIdRef.current === userId) {
+          loadUnreadCountStable();
+        }
+      }, 500);
+    } catch (error: any) {
+      console.error('[useNotifications] Error marking notification as read:', error);
+      
+      // Retry once on RLS policy error
+      if (error.message?.includes('RLS')) {
+        console.log('[useNotifications] Retrying mark as read due to RLS error...');
+        setTimeout(() => {
+          if (isMountedRef.current && currentUserIdRef.current === userId) {
+            markAsRead(notificationId);
+          }
+        }, 1000);
+        return;
+      }
+      
+      // Revert optimistic update on error
+      loadNotificationsStable();
+      loadUnreadCountStable();
     }
-  };
+  }, [loadNotificationsStable, loadUnreadCountStable]);
 
-  const markAsUnread = async (notificationId: string) => {
-    if (!user) return;
+  const markAsUnread = useCallback(async (notificationId: string) => {
+    const userId = currentUserIdRef.current;
+    if (!userId || !isMountedRef.current) return;
 
     try {
+      // Optimistic update
+      setNotifications(prev => 
+        prev.map(notification => 
+          notification.id === notificationId 
+            ? { ...notification, read_at: null }
+            : notification
+        )
+      );
+      
+      // Update unread count immediately
+      setUnreadCount(prev => prev + 1);
+
       const { error } = await supabase
         .from('user_app_notifications')
         .update({ read_at: null })
-        .eq('id', notificationId);
+        .eq('id', notificationId)
+        .eq('user_id', userId);
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
 
-      setNotifications(prev => 
-        prev.map(n => 
-          n.id === notificationId 
-            ? { ...n, read_at: null }
-            : n
-        )
-      );
-      loadUnreadCount();
-    } catch (error) {
-      console.error('Error marking notification as unread:', error);
+      // Debounced consistency check
+      setTimeout(() => {
+        if (isMountedRef.current && currentUserIdRef.current === userId) {
+          loadUnreadCountStable();
+        }
+      }, 500);
+    } catch (error: any) {
+      console.error('[useNotifications] Error marking notification as unread:', error);
+      
+      // Retry once on RLS policy error
+      if (error.message?.includes('RLS')) {
+        console.log('[useNotifications] Retrying mark as unread due to RLS error...');
+        setTimeout(() => {
+          if (isMountedRef.current && currentUserIdRef.current === userId) {
+            markAsUnread(notificationId);
+          }
+        }, 1000);
+        return;
+      }
+      
+      // Revert optimistic update on error
+      loadNotificationsStable();
+      loadUnreadCountStable();
     }
-  };
+  }, [loadNotificationsStable, loadUnreadCountStable]);
 
   const dismissNotification = async (notificationId: string) => {
     if (!user) return;
@@ -316,24 +469,59 @@ export const useNotifications = () => {
     }
   };
 
-  const markAllAsRead = async () => {
-    if (!user) return;
+  const markAllAsRead = useCallback(async () => {
+    const userId = currentUserIdRef.current;
+    if (!userId || !isMountedRef.current) return;
 
     try {
+      // Optimistic update - mark all as read locally
+      setNotifications(prev => 
+        prev.map(notification => ({
+          ...notification,
+          read_at: notification.read_at || new Date().toISOString()
+        }))
+      );
+      
+      // Update unread count to 0
+      setUnreadCount(0);
+
       const { error } = await supabase
         .from('user_app_notifications')
         .update({ read_at: new Date().toISOString() })
+        .eq('user_id', userId)
         .is('read_at', null)
         .is('dismissed_at', null);
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
 
-      loadNotifications();
-      loadUnreadCount();
-    } catch (error) {
-      console.error('Error marking all as read:', error);
+      // Immediate consistency check
+      setTimeout(() => {
+        if (isMountedRef.current && currentUserIdRef.current === userId) {
+          loadNotificationsStable();
+          loadUnreadCountStable();
+        }
+      }, 100);
+    } catch (error: any) {
+      console.error('[useNotifications] Error marking all notifications as read:', error);
+      
+      // Retry once on RLS policy error
+      if (error.message?.includes('RLS')) {
+        console.log('[useNotifications] Retrying mark all as read due to RLS error...');
+        setTimeout(() => {
+          if (isMountedRef.current && currentUserIdRef.current === userId) {
+            markAllAsRead();
+          }
+        }, 1000);
+        return;
+      }
+      
+      // Revert optimistic update on error
+      loadNotificationsStable();
+      loadUnreadCountStable();
     }
-  };
+  }, [loadNotificationsStable, loadUnreadCountStable]);
 
   const createNotification = async (notification: {
     title: string;
@@ -381,6 +569,13 @@ export const useNotifications = () => {
     loadUnreadCountStable();
   }, [loadNotificationsStable, loadUnreadCountStable]);
 
+  // Force refresh notifications - useful for push notification sync
+  const forceRefresh = useCallback(() => {
+    console.log('[useNotifications] Force refreshing notifications...');
+    loadNotificationsStable();
+    loadUnreadCountStable();
+  }, [loadNotificationsStable, loadUnreadCountStable]);
+
   return {
     notifications,
     unreadCount,
@@ -393,6 +588,7 @@ export const useNotifications = () => {
     markAllAsRead,
     createNotification,
     loadNotifications: retryLoadNotifications,
-    loadUnreadCount
+    loadUnreadCount,
+    forceRefresh
   };
 };
