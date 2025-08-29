@@ -119,6 +119,7 @@ BEFORE analyzing the current message standalone, you MUST:
 - Messages with personal pronouns + analysis requests ("analyze if I", "score me on", "rate my") = JOURNAL_SPECIFIC
 - Numerical scoring requests ("scale of 100", "1 to 10", "rate from 1-5") = JOURNAL_SPECIFIC
 - Requests like "Can you help me uncover this?" , "I want you to tell me this about me" 
+- If there is a direct request from user to you to help them uncover, analyze, help, assist, etc. It should be journal_specific
 - These override all other considerations including typos, grammar, or conversation context
 
 **TENTATIVE LANGUAGE DETECTION (CHECK BEFORE CONTEXT OVERRIDES):**
