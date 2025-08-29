@@ -26,6 +26,14 @@ export interface ChatStreamingState {
   expectedProcessingTime?: number;
   processingStartTime?: number;
   activeRequestId?: string;
+  // Additional state for comprehensive restoration
+  translatedDynamicMessages?: any[];
+  isRetrying?: boolean;
+  retryAttempts?: number;
+  lastFailedMessage?: any;
+  isAppBackgrounded?: boolean;
+  isPageHidden?: boolean;
+  wasBackgroundProcessing?: boolean;
 }
 
 const CHAT_STATE_PREFIX = 'chat_streaming_state_';
