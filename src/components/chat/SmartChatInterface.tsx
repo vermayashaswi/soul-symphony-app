@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import ChatSuggestionButton from "./ChatSuggestionButton";
 import { Separator } from "@/components/ui/separator";
 import EmptyChatState from "@/components/chat/EmptyChatState";
+import { ChatRecoveryButton } from './ChatRecoveryButton';
 import { useDebouncedCallback } from 'use-debounce';
 import {
   Sheet,
@@ -115,7 +116,9 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     translatedDynamicMessages,
     currentMessageIndex,
     useThreeDotFallback,
-    stopStreaming
+    stopStreaming,
+    forceRecovery,
+    isStuck
   } = useStreamingChatV2(currentThreadId || '', {
     onFinalResponse: async (response) => {
       // Handle final streaming response
@@ -947,7 +950,14 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
         </div>
       </div>
       
-      <div className="chat-content flex-1 overflow-hidden">
+      <div className="chat-content flex-1 overflow-hidden flex flex-col">
+        {/* Recovery button for stuck states */}
+        <ChatRecoveryButton 
+          isStuck={isStuck} 
+          onForceRecovery={forceRecovery}
+          className="mx-4 mt-4"
+        />
+        
         {initialLoading ? (
           <div className="flex items-center justify-center h-full">
             <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></div>

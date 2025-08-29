@@ -854,11 +854,92 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
     });
   }, [threadId, updateThreadState]);
 
-  // Setup cleanup timer
+  // Enhanced recovery detection and cleanup
+  const detectStuckState = useCallback((targetThreadId: string): boolean => {
+    const state = getThreadState(targetThreadId);
+    const now = Date.now();
+    const stuckThreshold = 10 * 60 * 1000; // 10 minutes
+    
+    return (
+      (state.isStreaming || state.showDynamicMessages) &&
+      state.requestStartTime > 0 &&
+      (now - state.requestStartTime) > stuckThreshold
+    );
+  }, [getThreadState]);
+
+  const forceRecovery = useCallback((targetThreadId: string, reason: string = 'manual') => {
+    console.warn(`[useStreamingChatV2] Force recovery triggered for thread ${targetThreadId}, reason: ${reason}`);
+    
+    const currentState = getThreadState(targetThreadId);
+    
+    // Abort any active request
+    if (currentState.abortController) {
+      currentState.abortController.abort();
+    }
+    
+    // Clear state completely
+    updateThreadState(targetThreadId, {
+      ...createInitialState(),
+      lastActivity: Date.now()
+    });
+    
+    // Clear localStorage state
+    clearChatStreamingState(targetThreadId);
+    
+    // Emit recovery event
+    window.dispatchEvent(new CustomEvent('chatStateRecovered', {
+      detail: { threadId: targetThreadId, reason }
+    }));
+    
+    console.log(`[useStreamingChatV2] Recovery completed for thread: ${targetThreadId}`);
+  }, [getThreadState, updateThreadState]);
+
+  // Auto-recovery on mount for stuck states
   useEffect(() => {
-    const cleanupTimer = setInterval(cleanupOrphanedStates, 5 * 60 * 1000); // Every 5 minutes
+    if (!threadId) return;
+    
+    const checkAndRecover = async () => {
+      // Check localStorage for stuck state
+      const savedState = getChatStreamingState(threadId);
+      if (savedState) {
+        const now = Date.now();
+        const stateAge = now - (savedState.savedAt || 0);
+        const stuckThreshold = 10 * 60 * 1000; // 10 minutes
+        
+        if (stateAge > stuckThreshold && (savedState.isStreaming || savedState.showDynamicMessages)) {
+          console.warn(`[useStreamingChatV2] Detected stuck state in localStorage for thread ${threadId}, age: ${stateAge}ms`);
+          forceRecovery(threadId, 'stuck_state_on_mount');
+          return;
+        }
+      }
+      
+      // Check current state
+      if (detectStuckState(threadId)) {
+        console.warn(`[useStreamingChatV2] Detected stuck state for thread ${threadId}`);
+        forceRecovery(threadId, 'stuck_state_detected');
+      }
+    };
+    
+    // Run check after a short delay to allow state restoration
+    const timer = setTimeout(checkAndRecover, 2000);
+    return () => clearTimeout(timer);
+  }, [threadId, detectStuckState, forceRecovery]);
+
+  // Setup cleanup timer with enhanced stuck state detection
+  useEffect(() => {
+    const cleanupTimer = setInterval(() => {
+      cleanupOrphanedStates();
+      
+      // Check all thread states for stuck conditions
+      for (const [checkThreadId] of threadStatesRef.current.entries()) {
+        if (detectStuckState(checkThreadId)) {
+          forceRecovery(checkThreadId, 'periodic_stuck_check');
+        }
+      }
+    }, 5 * 60 * 1000); // Every 5 minutes
+    
     return () => clearInterval(cleanupTimer);
-  }, [cleanupOrphanedStates]);
+  }, [cleanupOrphanedStates, detectStuckState, forceRecovery]);
 
   return {
     ...state,
@@ -868,6 +949,8 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
     generateCorrelationId,
     generateIdempotencyKey,
     retryLastMessage,
-    addStreamingMessage: (message: StreamingMessage) => addStreamingMessage(threadId, message)
+    addStreamingMessage: (message: StreamingMessage) => addStreamingMessage(threadId, message),
+    forceRecovery: () => forceRecovery(threadId, 'user_manual'),
+    isStuck: detectStuckState(threadId)
   };
 };
