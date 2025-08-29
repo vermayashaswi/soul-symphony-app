@@ -115,7 +115,6 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     queryCategory,
     dynamicMessages,
     translatedDynamicMessages,
-    currentMessageIndex,
     useThreeDotFallback,
     stopStreaming,
     forceRecovery,
@@ -441,39 +440,18 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     };
   }, [effectiveUserId, propsThreadId]);
 
-  // Listen for completed responses and reload messages
+  // Listen for completed responses and reload messages - SIMPLIFIED
   useEffect(() => {
     const onResponseReady = (event: CustomEvent) => {
-      const { threadId, completed, restored, correlationId, reason, forceReload, messageId } = event.detail;
+      const { threadId } = event.detail;
       
       if (threadId === currentThreadId) {
-        console.log(`[SmartChatInterface] Response ready for thread ${currentThreadId}`, {
-          completed,
-          restored,
-          correlationId,
-          reason,
-          forceReload,
-          messageId
-        });
+        console.log(`[SmartChatInterface] Response ready for thread ${currentThreadId} - force reloading messages`);
         
-        // SIMPLIFIED: Always force reload for realtime and completion events
-        const shouldForceReload = forceReload || restored || completed || 
-          reason?.includes('message_received') || 
-          reason?.includes('message_updated') ||
-          reason?.includes('subscription_start') ||
-          reason?.includes('completed_found');
+        // SIMPLIFIED: Always force reload when event is received
+        loadThreadMessages(currentThreadId, true);
         
-        debugLog.addEvent("Response Ready", `Event: ${reason} - Force reload: ${shouldForceReload}`, "info");
-        
-        // Immediate aggressive reload for all critical events
-        loadThreadMessages(currentThreadId, shouldForceReload);
-        
-        // Enhanced logging for different event types
-        if (restored || completed) {
-          debugLog.addEvent("Response Ready", `${restored ? 'Restored' : 'Completed'} response for thread: ${threadId}`, "success");
-        } else if (reason) {
-          debugLog.addEvent("Response Ready", `${reason} triggered reload for thread: ${threadId}`, "info");
-        }
+        debugLog.addEvent("Response Ready", "Force reload triggered", "info");
       }
     };
     
@@ -481,7 +459,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     return () => {
       window.removeEventListener('chatResponseReady' as any, onResponseReady);
     };
-  }, [currentThreadId, debugLog, chatHistory]);
+  }, [currentThreadId, debugLog]);
 
   // Auto-scroll is now handled by the useAutoScroll hook
 
@@ -1121,7 +1099,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
             streamingMessage={
               useThreeDotFallback || dynamicMessages.length === 0
                 ? undefined
-                : translatedDynamicMessages[currentMessageIndex] || dynamicMessages[currentMessageIndex]
+                : translatedDynamicMessages[0] || dynamicMessages[0]
             }
             useThreeDotFallback={useThreeDotFallback}
             showBackendAnimation={showBackendAnimation}
