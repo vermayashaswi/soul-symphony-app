@@ -854,6 +854,48 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
     });
   }, [threadId, updateThreadState]);
 
+  // Enhanced state validation with message existence check
+  const validateStreamingContext = useCallback(async (threadId: string, messageId?: string): Promise<boolean> => {
+    if (!user?.id || !threadId) return false;
+    
+    // If a specific message ID is provided, check if it still exists
+    if (messageId) {
+      try {
+        const { data, error } = await supabase
+          .from('chat_messages')
+          .select('id')
+          .eq('id', messageId)
+          .eq('thread_id', threadId)
+          .single();
+          
+        if (error || !data) {
+          console.log(`[useStreamingChatV2] Message ${messageId} no longer exists, clearing streaming state`);
+          return false;
+        }
+      } catch (error) {
+        console.warn(`[useStreamingChatV2] Failed to validate message ${messageId}:`, error);
+        return false;
+      }
+    }
+    
+    return true;
+  }, [user?.id]);
+
+  // Enhanced message deletion handler
+  const handleMessageDeletion = useCallback((messageId: string, threadId: string) => {
+    console.log(`[useStreamingChatV2] Handling message deletion: ${messageId} in thread: ${threadId}`);
+    
+    const currentState = getThreadState(threadId);
+    
+    // Check if the deleted message is related to current streaming
+    const isRelatedToStreaming = currentState.isStreaming || currentState.showDynamicMessages;
+    
+    if (isRelatedToStreaming) {
+      console.log(`[useStreamingChatV2] Deleted message was related to streaming, force clearing state`);
+      forceRecovery(threadId, 'message_deleted');
+    }
+  }, [getThreadState]);
+
   // Enhanced recovery detection and cleanup
   const detectStuckState = useCallback((targetThreadId: string): boolean => {
     const state = getThreadState(targetThreadId);
@@ -893,6 +935,20 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
     
     console.log(`[useStreamingChatV2] Recovery completed for thread: ${targetThreadId}`);
   }, [getThreadState, updateThreadState]);
+
+  // Set up message deletion listener
+  useEffect(() => {
+    const onMessageDeleted = (event: CustomEvent) => {
+      const { messageId, threadId } = event.detail;
+      handleMessageDeletion(messageId, threadId);
+    };
+    
+    window.addEventListener('chatMessageDeleted', onMessageDeleted as EventListener);
+    
+    return () => {
+      window.removeEventListener('chatMessageDeleted', onMessageDeleted as EventListener);
+    };
+  }, [handleMessageDeletion]);
 
   // Auto-recovery on mount for stuck states
   useEffect(() => {
@@ -951,6 +1007,7 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
     retryLastMessage,
     addStreamingMessage: (message: StreamingMessage) => addStreamingMessage(threadId, message),
     forceRecovery: () => forceRecovery(threadId, 'user_manual'),
+    validateStreamingContext,
     isStuck: detectStuckState(threadId)
   };
 };

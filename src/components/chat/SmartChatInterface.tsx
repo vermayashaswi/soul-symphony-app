@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import ChatInput from "./ChatInput";
 import ChatArea from "./ChatArea";
 import { v4 as uuidv4 } from 'uuid';
@@ -193,6 +193,97 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     // Only used for message subscription management
   } = useChatRealtime(currentThreadId);
   
+  // 30-second timeout handler for stuck backend processing
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  const clearProcessingTimeout = useCallback(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+  }, []);
+  
+  const handleStuckProcessing = useCallback(async () => {
+    if (!currentThreadId || !effectiveUserId) return;
+    
+    console.log('[SmartChatInterface] Detecting stuck processing, initiating recovery');
+    debugLog.addEvent("Recovery", "30-second timeout triggered - clearing stuck state", "warning");
+    
+    // Force recovery through streaming chat hook
+    forceRecovery();
+    
+    // Clear any processing messages in database
+    try {
+      await supabase
+        .from('chat_messages')
+        .update({ is_processing: false })
+        .eq('thread_id', currentThreadId)
+        .eq('is_processing', true);
+      
+      debugLog.addEvent("Recovery", "Cleared processing flags in database", "success");
+    } catch (error) {
+      console.error('[Recovery] Failed to clear processing flags:', error);
+    }
+    
+    // Force reload messages
+    loadThreadMessages(currentThreadId, true);
+    
+    toast({
+      title: "Chat Recovered",
+      description: "Detected stuck processing and automatically recovered the chat.",
+      variant: "default"
+    });
+  }, [currentThreadId, effectiveUserId, forceRecovery, debugLog, toast]);
+  
+  const startProcessingTimeout = useCallback(() => {
+    clearProcessingTimeout();
+    timeoutRef.current = setTimeout(handleStuckProcessing, 30000); // 30 seconds
+  }, [clearProcessingTimeout, handleStuckProcessing]);
+  
+  // Handle message deletion events
+  const handleMessageDeleted = useCallback((messageId: string, threadId: string) => {
+    if (threadId !== currentThreadId) return;
+    
+    console.log('[SmartChatInterface] Message deleted:', messageId);
+    debugLog.addEvent("Message Deletion", `Message ${messageId} deleted from thread ${threadId}`, "info");
+    
+    // Remove from chat history
+    setChatHistory(prev => prev.filter(msg => msg.id !== messageId));
+    
+    // Check if the deleted message was being processed
+    const wasProcessingMessage = chatHistory.find(msg => 
+      msg.id === messageId && (msg.is_processing || msg.sender === 'assistant' && msg.content.includes('Processing'))
+    );
+    
+    if (wasProcessingMessage) {
+      console.log('[SmartChatInterface] Deleted message was processing - clearing streaming state');
+      debugLog.addEvent("Message Deletion", `Processing message deleted - clearing streaming state`, "warning");
+      
+      // Force recovery to clear any stuck streaming state
+      forceRecovery();
+      clearProcessingTimeout();
+      
+      // Reload messages to ensure consistency
+      setTimeout(() => {
+        loadThreadMessages(currentThreadId, true);
+      }, 100);
+    }
+  }, [currentThreadId, chatHistory, forceRecovery, debugLog, clearProcessingTimeout]);
+  
+  // Set up message deletion listener
+  useEffect(() => {
+    const onMessageDeleted = (event: CustomEvent) => {
+      const { messageId, threadId } = event.detail;
+      handleMessageDeleted(messageId, threadId);
+    };
+    
+    window.addEventListener('chatMessageDeleted', onMessageDeleted as EventListener);
+    
+    return () => {
+      window.removeEventListener('chatMessageDeleted', onMessageDeleted as EventListener);
+    };
+  }, [handleMessageDeleted]);
+  
   // Enhanced state synchronization for reliable message loading
   const { triggerSync } = useChatStateSync({
     threadId: currentThreadId,
@@ -216,7 +307,21 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     if (onProcessingStateChange) {
       onProcessingStateChange(isProcessingActive);
     }
-  }, [isStreaming, onProcessingStateChange]);
+    
+    // Manage processing timeout
+    if (isProcessingActive) {
+      startProcessingTimeout();
+    } else {
+      clearProcessingTimeout();
+    }
+  }, [isStreaming, onProcessingStateChange, startProcessingTimeout, clearProcessingTimeout]);
+  
+  // Clear timeout on component unmount
+  useEffect(() => {
+    return () => {
+      clearProcessingTimeout();
+    };
+  }, [clearProcessingTimeout]);
 
   // Realtime: append assistant messages saved by backend
   useEffect(() => {
