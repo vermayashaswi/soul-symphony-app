@@ -976,7 +976,18 @@ async function generateEmbedding(text: string): Promise<number[]> {
  */
 async function analyzeQueryWithSubQuestions(message, conversationContext, userEntryCount, isFollowUp = false, supabaseClient, userTimezone = 'UTC') {
   try {
-    const last = Array.isArray(conversationContext) ? conversationContext.slice(-6) : [];
+    // Enhanced conversation context processing with proper role mapping and ordering
+    const last = Array.isArray(conversationContext) ? 
+      conversationContext
+        .slice(-10) // Expand to last 10 messages for richer context
+        .sort((a, b) => new Date(a.created_at || a.timestamp || 0) - new Date(b.created_at || b.timestamp || 0)) // Chronological order (oldest to newest)
+        .map((msg, index) => ({
+          role: msg.sender === 'assistant' ? 'assistant' : 'user', // Standardize role mapping using sender field
+          content: msg.content || 'N/A',
+          messageOrder: index + 1,
+          timestamp: msg.created_at || msg.timestamp,
+          id: msg.id
+        })) : [];
     
     console.log(`[Query Planner] Processing query with enhanced validation and user timezone: ${userTimezone}`);
     
@@ -1267,7 +1278,10 @@ USER TIMEZONE: "${userTimezone}"
 CURRENT DATE: ${new Date().toISOString().split('T')[0]} (YYYY-MM-DD format)
 CURRENT YEAR: ${new Date().getFullYear()}
 CURRENT TIME: ${new Date().toLocaleString('en-US', { timeZone: userTimezone })} (in user timezone)
-CONVERSATION CONTEXT: ${last.length > 0 ? last.map((m)=>`${m.role || m.sender}: ${m.content || 'N/A'}`).join('\n  ') : 'None'}
+CONVERSATION CONTEXT: ${last.length > 0 ? 
+  `${last.length} messages in conversation (chronological order, oldest to newest):
+${last.map((m) => `  [Message ${m.messageOrder}] ${m.role}: ${m.content}`).join('\n')}` : 
+  'None - This is the start of the conversation'}
 
 ===== CRITICAL: TIME RANGE CALCULATION INSTRUCTIONS =====
 

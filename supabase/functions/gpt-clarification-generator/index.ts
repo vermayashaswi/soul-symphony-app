@@ -31,7 +31,24 @@ serve(async (req) => {
 USER QUESTION: "${userMessage}"
 
 CONVERSATION CONTEXT:
-${conversationContext ? conversationContext.slice(-6).map((msg) => `${msg.role || msg.sender || 'user'}: ${msg.content}`).join('\n') : 'No prior context'}
+${conversationContext ? 
+  (() => {
+    // Enhanced conversation context processing with proper role mapping and ordering
+    const processedContext = conversationContext
+      .slice(-10) // Expand to last 10 messages for richer context
+      .sort((a, b) => new Date(a.created_at || a.timestamp || 0) - new Date(b.created_at || b.timestamp || 0)) // Chronological order (oldest to newest)
+      .map((msg, index) => ({
+        role: msg.sender === 'assistant' ? 'assistant' : 'user', // Standardize role mapping using sender field
+        content: msg.content || msg.content,
+        messageOrder: index + 1,
+        timestamp: msg.created_at || msg.timestamp,
+        id: msg.id
+      }));
+    
+    return `${processedContext.length} messages in conversation (chronological order, oldest to newest):
+${processedContext.map((m) => `  [Message ${m.messageOrder}] ${m.role}: ${m.content}`).join('\n')}`;
+  })() : 
+  'No prior context - This is the start of the conversation'}
 
 USER PROFILE:
 - Timezone: ${userProfile?.timezone || 'Unknown'}

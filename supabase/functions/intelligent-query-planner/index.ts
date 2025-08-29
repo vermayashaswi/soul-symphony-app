@@ -109,7 +109,24 @@ CURRENT YEAR: ${new Date().getFullYear()}
 CURRENT TIME: ${new Date().toLocaleString('en-US', {
       timeZone: userProfile.timezone || 'UTC'
     })} (in user timezone)
-CONVERSATION CONTEXT: ${conversationContext.length > 0 ? conversationContext.map((m: any) => `${m.role || m.sender}: ${m.content || 'N/A'}`).join('\n  ') : 'None'}
+CONVERSATION CONTEXT: ${conversationContext.length > 0 ? 
+  (() => {
+    // Enhanced conversation context processing with proper role mapping and ordering  
+    const processedContext = conversationContext
+      .slice(-10) // Expand to last 10 messages for richer context
+      .sort((a, b) => new Date(a.created_at || a.timestamp || 0) - new Date(b.created_at || b.timestamp || 0)) // Chronological order (oldest to newest)
+      .map((msg, index) => ({
+        role: msg.sender === 'assistant' ? 'assistant' : 'user', // Standardize role mapping using sender field
+        content: msg.content || 'N/A',
+        messageOrder: index + 1,
+        timestamp: msg.created_at || msg.timestamp,
+        id: msg.id
+      }));
+    
+    return `${processedContext.length} messages in conversation (chronological order, oldest to newest):
+${processedContext.map((m) => `  [Message ${m.messageOrder}] ${m.role}: ${m.content}`).join('\n')}`;
+  })() : 
+  'None - This is the start of the conversation'}
 
 
 ===== COMPLETE JOURNAL ENTRIES TABLE COLUMN SPECIFICATION =====
