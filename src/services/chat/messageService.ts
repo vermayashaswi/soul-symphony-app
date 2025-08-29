@@ -19,41 +19,70 @@ export const createChatMessage = async (
       hasAdditionalData: !!additionalData
     });
 
-    // First verify the thread belongs to the user
+    // First verify the thread belongs to the user with detailed logging
+    console.log('[createChatMessage] Verifying thread ownership...');
     const { data: thread, error: threadError } = await supabase
       .from('chat_threads')
-      .select('id')
+      .select('id, user_id')
       .eq('id', threadId)
       .eq('user_id', userId)
-      .single();
+      .maybeSingle(); // Use maybeSingle to handle non-existent threads gracefully
 
-    if (threadError || !thread) {
-      console.error('[createChatMessage] Thread verification failed:', {
+    if (threadError) {
+      console.error('[createChatMessage] Database error during thread verification:', {
         threadId,
         userId,
         error: threadError,
-        hasThread: !!thread
+        errorCode: threadError.code,
+        errorMessage: threadError.message,
+        errorDetails: threadError.details
       });
       return null;
     }
 
+    if (!thread) {
+      console.error('[createChatMessage] Thread verification failed - thread not found or access denied:', {
+        threadId,
+        userId,
+        message: 'Either thread does not exist or user does not have access to it'
+      });
+      return null;
+    }
+
+    console.log('[createChatMessage] Thread verification successful:', {
+      threadId: thread.id,
+      threadUserId: thread.user_id,
+      requestUserId: userId
+    });
+
     console.log('[createChatMessage] Thread verified, inserting message');
 
-    // Prepare message data with idempotency key support
+    // Prepare message data with comprehensive logging and validation
     const messageData = {
       thread_id: threadId,
-      content,
+      content: content.trim(), // Ensure content is trimmed
       sender,
       role: sender,
       created_at: new Date().toISOString(),
       ...additionalData
     };
 
+    // Validate required fields before insertion
+    if (!messageData.content) {
+      console.error('[createChatMessage] Message content is empty after trimming');
+      return null;
+    }
+
     console.log('[createChatMessage] Message data prepared:', {
-      ...messageData,
-      content: `${content.substring(0, 50)}${content.length > 50 ? '...' : ''}`
+      thread_id: messageData.thread_id,
+      sender: messageData.sender,
+      role: messageData.role,
+      content_preview: `${content.substring(0, 50)}${content.length > 50 ? '...' : ''}`,
+      content_length: content.length,
+      has_additional_data: Object.keys(additionalData || {}).length > 0
     });
 
+    // Insert message with enhanced error handling
     const { data, error } = await supabase
       .from('chat_messages')
       .insert(messageData)
@@ -62,12 +91,26 @@ export const createChatMessage = async (
 
     if (error) {
       console.error('[createChatMessage] Database insert failed:', {
-        error,
-        messageData: {
-          ...messageData,
-          content: `${content.substring(0, 50)}${content.length > 50 ? '...' : ''}`
-        }
+        error_code: error.code,
+        error_message: error.message,
+        error_details: error.details,
+        error_hint: error.hint,
+        thread_id: threadId,
+        user_id: userId,
+        sender: messageData.sender,
+        rls_context: 'Check if RLS policies are blocking this insert'
       });
+      
+      // Check if this is an RLS policy violation
+      if (error.message?.includes('row-level security') || error.code === 'PGRST116') {
+        console.error('[createChatMessage] RLS POLICY VIOLATION DETECTED:', {
+          threadId,
+          userId,
+          error_details: error,
+          suggestion: 'Verify that auth.uid() matches the user_id being passed'
+        });
+      }
+      
       return null;
     }
 

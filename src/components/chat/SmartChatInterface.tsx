@@ -519,64 +519,107 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       // Check if this is the first message in the thread
       const isFirstMessage = chatHistory.length === 1; // Only the temp message we just added
       
-      // Save the user message with idempotency key
+      // Save the user message with comprehensive error handling and retry logic
       let savedUserMessage: ChatMessage | null = null;
-      try {
-        const idempotencyKey = `user-${effectiveUserId}-${threadId}-${Date.now()}-${Math.random().toString(36).substring(2)}`;
-        debugLog.addEvent("Database", `Saving user message to thread ${threadId} with idempotency key: ${idempotencyKey}`, "info");
-        savedUserMessage = await saveMessage(
-          threadId, 
-          message, 
-          'user', 
-          effectiveUserId,
-          null, // references
-          undefined, // hasNumericResult
-          false, // isInteractive
-          undefined, // interactiveOptions
-          idempotencyKey
-        );
-        debugLog.addEvent("Database", `User message saved with ID: ${savedUserMessage?.id}`, "success");
-        
-        if (savedUserMessage) {
-          debugLog.addEvent("UI Update", `Replacing temporary message with saved message: ${savedUserMessage.id}`, "info");
-          setChatHistory(prev => prev.map(msg => 
-            msg.id === tempUserMessage.id ? {
-              ...savedUserMessage!,
-              sender: savedUserMessage!.sender as 'user' | 'assistant' | 'error',
-              role: savedUserMessage!.role as 'user' | 'assistant' | 'error'
-            } : msg
-          ));
+      let saveAttempts = 0;
+      const maxSaveAttempts = 3;
+      
+      while (saveAttempts < maxSaveAttempts && !savedUserMessage) {
+        saveAttempts++;
+        try {
+          const idempotencyKey = `user-${effectiveUserId}-${threadId}-${Date.now()}-${Math.random().toString(36).substring(2)}`;
+          debugLog.addEvent("Database", `Saving user message to thread ${threadId} (attempt ${saveAttempts}/${maxSaveAttempts}) with idempotency key: ${idempotencyKey}`, "info");
           
-          // Generate title for the first message in a thread
-          if (isFirstMessage) {
-            try {
-              debugLog.addEvent("Title Generation", "Generating thread title after first message", "info");
-              const generatedTitle = await generateThreadTitle(threadId, effectiveUserId);
-              if (generatedTitle) {
-                // Dispatch event to update sidebar
-                window.dispatchEvent(
-                  new CustomEvent('threadTitleUpdated', {
-                    detail: { threadId, title: generatedTitle }
-                  })
-                );
-                debugLog.addEvent("Title Generation", `Generated title: ${generatedTitle}`, "success");
-              }
-            } catch (titleError) {
-              debugLog.addEvent("Title Generation", `Failed to generate title: ${titleError instanceof Error ? titleError.message : "Unknown error"}`, "error");
-              console.warn('Failed to generate thread title:', titleError);
-            }
+          // Verify thread still exists before attempting save
+          const { data: threadCheck, error: threadCheckError } = await supabase
+            .from('chat_threads')
+            .select('id')
+            .eq('id', threadId)
+            .eq('user_id', effectiveUserId)
+            .maybeSingle();
+          
+          if (threadCheckError) {
+            debugLog.addEvent("Database", `Thread verification failed: ${threadCheckError.message}`, "error");
+            throw new Error(`Thread verification failed: ${threadCheckError.message}`);
           }
-        } else {
-          debugLog.addEvent("Database", "Failed to save user message - null response", "error");
-          throw new Error("Failed to save message");
+          
+          if (!threadCheck) {
+            debugLog.addEvent("Database", `Thread ${threadId} not found or access denied for user ${effectiveUserId}`, "error");
+            throw new Error(`Thread not found or access denied`);
+          }
+          
+          debugLog.addEvent("Database", `Thread verification successful, saving message...`, "info");
+          
+          savedUserMessage = await saveMessage(
+            threadId, 
+            message, 
+            'user', 
+            effectiveUserId,
+            null, // references
+            undefined, // hasNumericResult
+            false, // isInteractive
+            undefined, // interactiveOptions
+            idempotencyKey
+          );
+          
+          if (savedUserMessage) {
+            debugLog.addEvent("Database", `User message saved successfully with ID: ${savedUserMessage.id}`, "success");
+            break;
+          } else {
+            throw new Error("saveMessage returned null");
+          }
+          
+        } catch (saveError: any) {
+          debugLog.addEvent("Database", `Save attempt ${saveAttempts} failed: ${saveError.message || "Unknown error"}`, "error");
+          
+          if (saveAttempts >= maxSaveAttempts) {
+            // Remove the temporary message from UI on final failure
+            setChatHistory(prev => prev.filter(msg => msg.id !== tempUserMessage.id));
+            
+            toast({
+              title: "Failed to save message",
+              description: `Could not save your message after ${maxSaveAttempts} attempts. Please try again.`,
+              variant: "destructive"
+            });
+            
+            debugLog.addEvent("Database", `All save attempts failed, message not saved`, "error");
+            return; // Exit early on complete failure
+          }
+          
+          // Wait before retry (exponential backoff)
+          await new Promise(resolve => setTimeout(resolve, 1000 * saveAttempts));
         }
-      } catch (saveError: any) {
-        debugLog.addEvent("Database", `Error saving user message: ${saveError.message || "Unknown error"}`, "error");
-        toast({
-          title: "Error saving message",
-          description: saveError.message || "Could not save your message",
-          variant: "destructive"
-        });
+      }
+      
+      if (savedUserMessage) {
+        debugLog.addEvent("UI Update", `Replacing temporary message with saved message: ${savedUserMessage.id}`, "info");
+        setChatHistory(prev => prev.map(msg => 
+          msg.id === tempUserMessage.id ? {
+            ...savedUserMessage!,
+            sender: savedUserMessage!.sender as 'user' | 'assistant' | 'error',
+            role: savedUserMessage!.role as 'user' | 'assistant' | 'error'
+          } : msg
+        ));
+        
+        // Generate title for the first message in a thread
+        if (isFirstMessage) {
+          try {
+            debugLog.addEvent("Title Generation", "Generating thread title after first message", "info");
+            const generatedTitle = await generateThreadTitle(threadId, effectiveUserId);
+            if (generatedTitle) {
+              // Dispatch event to update sidebar
+              window.dispatchEvent(
+                new CustomEvent('threadTitleUpdated', {
+                  detail: { threadId, title: generatedTitle }
+                })
+              );
+              debugLog.addEvent("Title Generation", `Generated title: ${generatedTitle}`, "success");
+            }
+          } catch (titleError) {
+            debugLog.addEvent("Title Generation", `Failed to generate title: ${titleError instanceof Error ? titleError.message : "Unknown error"}`, "error");
+            console.warn('Failed to generate thread title:', titleError);
+          }
+        }
       }
       
       // Initialize processing message placeholder (only created for non-journal queries)

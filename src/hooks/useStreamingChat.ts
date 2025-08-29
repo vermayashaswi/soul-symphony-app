@@ -102,12 +102,15 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
 
   const maxRetryAttempts = 2;
 
-  // Create message fingerprint to prevent duplicates
-  const createMessageFingerprint = useCallback((message: string, threadId: string, timestamp: number) => {
-    return `${message}_${threadId}_${Math.floor(timestamp / 5000)}`; // 5-second window
+  // Create message fingerprint to prevent duplicates - enhanced with user context
+  const createMessageFingerprint = useCallback((message: string, threadId: string, userId: string, timestamp: number) => {
+    // Create a more robust fingerprint that includes user context and a tighter time window
+    const normalizedMessage = message.trim().toLowerCase();
+    const timeWindow = Math.floor(timestamp / 3000); // 3-second window for tighter duplicate detection
+    return `${userId}_${threadId}_${normalizedMessage.substring(0, 50)}_${timeWindow}`;
   }, []);
 
-  // Enhanced completion check with better detection logic
+  // Enhanced completion check with better detection logic and duplicate prevention
   const checkIfRequestCompleted = useCallback(async (threadId: string, savedState: any): Promise<boolean> => {
     try {
       // More flexible completion detection
@@ -149,7 +152,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
         return false;
       }
 
-      // Enhanced detection logic
+      // Enhanced detection logic with duplicate checking
       const hasCompletedResponse = messages && messages.length > 0;
       
       if (hasCompletedResponse) {
@@ -157,6 +160,21 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
         const latestMessage = messages[0];
         const isProcessingMessage = latestMessage.content.includes('...') || 
                                    latestMessage.content.length < 10;
+        
+        // Also check for potential duplicate by content similarity
+        const hasDuplicates = messages.length > 1 && 
+          messages.some((msg, index) => 
+            index > 0 && 
+            msg.content.trim() === messages[0].content.trim() && 
+            msg.content.length > 20
+          );
+        
+        if (hasDuplicates) {
+          console.warn(`[useStreamingChat] Detected duplicate messages for thread ${threadId}`, {
+            messageCount: messages.length,
+            similarContent: messages.map(m => m.content.substring(0, 50)).join(' | ')
+          });
+        }
         
         if (!isProcessingMessage) {
           console.log(`[useStreamingChat] Found completed response for thread ${threadId}, message created at:`, latestMessage.created_at);
@@ -813,7 +831,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     
     // Check for duplicate requests using message fingerprinting
     const currentTime = Date.now();
-    const messageFingerprint = createMessageFingerprint(message, targetThreadId, currentTime);
+    const messageFingerprint = createMessageFingerprint(message, targetThreadId, userId, currentTime);
     
     if (threadState.isStreaming || threadState.activeRequestId) {
       console.warn(`[useStreamingChat] Already streaming for thread ${targetThreadId}, ignoring new request`);
