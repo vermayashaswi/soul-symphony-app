@@ -334,8 +334,8 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
           correlationId
         });
         
-        // Always reload messages to show latest state
-        loadThreadMessages(currentThreadId);
+        // Force reload messages to show latest state, especially for completed/restored responses
+        loadThreadMessages(currentThreadId, restored || completed);
         
         // If this was a restoration event, also dispatch to any listening components
         if (restored || completed) {
@@ -352,15 +352,20 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
 
   // Auto-scroll is now handled by the useAutoScroll hook
 
-  const loadThreadMessages = async (threadId: string) => {
+  const loadThreadMessages = async (threadId: string, forceReload: boolean = false) => {
     if (!threadId || !effectiveUserId) {
       setInitialLoading(false);
       return;
     }
     
-    if (loadedThreadRef.current === threadId) {
+    if (loadedThreadRef.current === threadId && !forceReload) {
       debugLog.addEvent("Thread Loading", `Thread ${threadId} already loaded, skipping`, "info");
       return;
+    }
+    
+    if (forceReload) {
+      debugLog.addEvent("Thread Loading", `Force reloading thread ${threadId}`, "info");
+      loadedThreadRef.current = null; // Reset to ensure proper reload
     }
     
     setInitialLoading(true);
