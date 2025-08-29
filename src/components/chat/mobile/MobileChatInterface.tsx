@@ -663,8 +663,10 @@ export default function MobileChatInterface({
       
       await startStreamingChat(
         message,
-        {},
-        currentThreadId
+        currentThreadId,
+        user.id,
+        'JOURNAL_SPECIFIC',
+        {}
       );
 
       // PHASE 5: Background operations (don't block streaming)
