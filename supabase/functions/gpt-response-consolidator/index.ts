@@ -180,6 +180,41 @@ serve(async (req) => {
         });
       }
       
+      // PHASE 1 FIX: Extract and prominently feature journal entries
+      const journalEntries = researchResults.flatMap((research: any, index: number) => {
+        // Extract journal entries from vector search results
+        const vectorResults = research?.executionResults?.vectorResults || [];
+        const processedEntries = research?.executionSummary?.sampleEntries || [];
+        
+        // Process vector results (actual journal content)
+        const vectorEntries = vectorResults.map((entry: any) => ({
+          id: entry.id,
+          content: entry.content || '',
+          created_at: entry.created_at,
+          similarity: entry.similarity,
+          emotions: entry.emotions || {},
+          themes: entry.themes || entry.master_themes || [],
+          source: 'vector_search',
+          subQuestionIndex: index + 1
+        }));
+        
+        // Process sample entries from execution summaries
+        const sampleEntries = processedEntries.map((entry: any) => ({
+          id: entry.id,
+          content: entry.content || '',
+          created_at: entry.created_at,
+          similarity: entry.similarity || 0,
+          emotions: entry.emotions || {},
+          themes: entry.themes || entry.master_themes || [],
+          source: 'processed_summary',
+          subQuestionIndex: index + 1
+        }));
+        
+        return [...vectorEntries, ...sampleEntries];
+      }).filter(entry => entry.content && entry.content.length > 0);
+
+      console.log(`[${consolidationId}] Extracted ${journalEntries.length} journal entries for GPT integration`);
+      
       // PHASE 4 FIX: Enhanced validation and logging for journal entries
       if (!hasJournalEntries) {
         console.warn(`[${consolidationId}] No journal entries found from mandatory vector search - responses may lack specific examples`);
@@ -206,41 +241,6 @@ serve(async (req) => {
       }
     }
 
-    // PHASE 1 FIX: Extract and prominently feature journal entries
-    const journalEntries = researchResults.flatMap((research: any, index: number) => {
-      // Extract journal entries from vector search results
-      const vectorResults = research?.executionResults?.vectorResults || [];
-      const processedEntries = research?.executionSummary?.sampleEntries || [];
-      
-      // Process vector results (actual journal content)
-      const vectorEntries = vectorResults.map((entry: any) => ({
-        id: entry.id,
-        content: entry.content || '',
-        created_at: entry.created_at,
-        similarity: entry.similarity,
-        emotions: entry.emotions || {},
-        themes: entry.themes || entry.master_themes || [],
-        source: 'vector_search',
-        subQuestionIndex: index + 1
-      }));
-      
-      // Process sample entries from execution summaries
-      const sampleEntries = processedEntries.map((entry: any) => ({
-        id: entry.id,
-        content: entry.content || '',
-        created_at: entry.created_at,
-        similarity: entry.similarity || 0,
-        emotions: entry.emotions || {},
-        themes: entry.themes || entry.master_themes || [],
-        source: 'processed_summary',
-        subQuestionIndex: index + 1
-      }));
-      
-      return [...vectorEntries, ...sampleEntries];
-    }).filter(entry => entry.content && entry.content.length > 0);
-
-    console.log(`[${consolidationId}] Extracted ${journalEntries.length} journal entries for GPT integration`);
-    
     // Permissive pass-through of Researcher results (no restrictive parsing)
     const MAX_SQL_ROWS = 200;
     const MAX_VECTOR_ITEMS = 20;
