@@ -75,13 +75,11 @@ export function useChatRealtime(threadId: string | null) {
             if (completedMessages.length > 0) {
               console.log(`[useChatRealtime] Found ${completedMessages.length} completed assistant messages, triggering reload`);
               
-              // Force immediate reload for completed messages
+              // SIMPLIFIED: Force immediate reload for completed messages
               const chatResponseReadyEvent = new CustomEvent('chatResponseReady', {
                 detail: { 
                   threadId, 
-                  reason: 'subscription_start_completed_found',
-                  forceReload: true,
-                  messageId: completedMessages[0].id
+                  forceReload: true
                 }
               });
               window.dispatchEvent(chatResponseReadyEvent);
@@ -89,11 +87,10 @@ export function useChatRealtime(threadId: string | null) {
           }
         } catch (error) {
           console.warn(`[useChatRealtime] Failed to check for missed messages:`, error);
-          // Still dispatch event to ensure basic reload
+          // SIMPLIFIED: Still dispatch event to ensure basic reload
           const chatResponseReadyEvent = new CustomEvent('chatResponseReady', {
             detail: { 
               threadId, 
-              reason: 'subscription_start_fallback',
               forceReload: true 
             }
           });
@@ -114,15 +111,12 @@ export function useChatRealtime(threadId: string | null) {
             const messageData = payload.new as any;
             console.log(`[useChatRealtime] New message in thread ${threadId}:`, messageData.sender);
             
-            // Real-time message subscription - processing handled by useStreamingChat
-            // Trigger immediate state refresh for assistant messages
+            // SIMPLIFIED: Trigger immediate reload for assistant messages
             if (messageData.sender === 'assistant') {
               setTimeout(() => {
                 const event = new CustomEvent('chatResponseReady', {
                   detail: { 
                     threadId, 
-                    messageId: messageData.id,
-                    reason: 'assistant_message_received',
                     forceReload: true 
                   }
                 });
@@ -142,15 +136,12 @@ export function useChatRealtime(threadId: string | null) {
             const messageData = payload.new as any;
             console.log(`[useChatRealtime] Updated message in thread ${threadId}:`, messageData.sender);
             
-            // Real-time message update subscription - processing handled by useStreamingChat
-            // Trigger immediate state refresh for assistant messages
+            // SIMPLIFIED: Trigger immediate reload for assistant messages
             if (messageData.sender === 'assistant') {
               setTimeout(() => {
                 const event = new CustomEvent('chatResponseReady', {
                   detail: { 
                     threadId, 
-                    messageId: messageData.id,
-                    reason: 'assistant_message_updated',
                     forceReload: true 
                   }
                 });
