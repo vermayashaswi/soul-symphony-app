@@ -62,7 +62,8 @@ const HeroSection: React.FC<HeroSectionProps> = ({ openAppStore, openPlayStore }
             </h1>
             <p className="text-base md:text-lg lg:text-xl text-gray-700 mb-3 md:mb-4 max-w-2xl mx-auto lg:mx-0 leading-relaxed">
               <span className="text-gray-700">Designed to help you understand yourself, improve your mindset, and grow with every word you share. Because your voice deserves to be heard - </span>
-              <span className="text-primary font-bold">by YOU</span>
+              <span className="text-gray-700">by </span>
+              <span className="text-primary font-bold text-glitter">YOU</span>
             </p>
             
             <div className="flex flex-col sm:flex-row gap-2 justify-center lg:justify-start mb-2 md:mb-3">
