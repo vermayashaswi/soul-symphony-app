@@ -509,50 +509,67 @@ body {
   }
 }
 
-/* Glitter effect for special text */
-@keyframes glitter {
-  0%, 100% {
-    text-shadow: 
-      0 0 5px hsl(var(--primary)),
-      0 0 10px hsl(var(--primary)),
-      0 0 15px hsl(var(--primary)),
-      2px -2px 0px #FFD700,
-      -2px 2px 0px #C0C0C0,
-      4px 1px 0px #FFD700,
-      -1px -4px 0px #FFFFFF;
-  }
-  25% {
-    text-shadow: 
-      0 0 8px hsl(var(--primary)),
-      0 0 15px hsl(var(--primary)),
-      0 0 20px hsl(var(--primary)),
-      -3px 1px 0px #FFD700,
-      3px -3px 0px #C0C0C0,
-      -1px 2px 0px #FFFFFF,
-      2px 4px 0px #FFD700;
-  }
-  50% {
-    text-shadow: 
-      0 0 12px hsl(var(--primary)),
-      0 0 20px hsl(var(--primary)),
-      0 0 25px hsl(var(--primary)),
-      1px 3px 0px #C0C0C0,
-      -4px -1px 0px #FFD700,
-      3px -2px 0px #FFFFFF,
-      -2px 3px 0px #FFD700;
-  }
-  75% {
-    text-shadow: 
-      0 0 6px hsl(var(--primary)),
-      0 0 12px hsl(var(--primary)),
-      0 0 18px hsl(var(--primary)),
-      4px -3px 0px #FFFFFF,
-      -1px 4px 0px #C0C0C0,
-      -3px -2px 0px #FFD700,
-      2px 1px 0px #FFD700;
-  }
+/* Star twinkling effect for special text */
+@keyframes twinkle {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
 }
 
-.text-glitter {
-  animation: glitter 2.5s ease-in-out infinite;
+.text-twinkle {
+  position: relative;
+}
+
+.text-twinkle::before,
+.text-twinkle::after {
+  content: '';
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  background: radial-gradient(circle, #FFD700 0%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.text-twinkle::before {
+  top: -5px;
+  right: -8px;
+  animation: twinkle 2s ease-in-out infinite;
+}
+
+.text-twinkle::after {
+  bottom: -3px;
+  left: -6px;
+  animation: twinkle 2.3s ease-in-out infinite 0.7s;
+}
+
+/* Additional sparkles using box-shadow */
+.text-twinkle {
+  animation: sparkle-glow 3s ease-in-out infinite;
+}
+
+@keyframes sparkle-glow {
+  0%, 100% {
+    box-shadow: 
+      15px -10px 0 -1px rgba(255, 215, 0, 0),
+      -10px 15px 0 -1px rgba(192, 192, 192, 0),
+      20px 10px 0 -2px rgba(255, 255, 255, 0);
+  }
+  33% {
+    box-shadow: 
+      15px -10px 0 -1px rgba(255, 215, 0, 0.8),
+      -10px 15px 0 -1px rgba(192, 192, 192, 0),
+      20px 10px 0 -2px rgba(255, 255, 255, 0);
+  }
+  66% {
+    box-shadow: 
+      15px -10px 0 -1px rgba(255, 215, 0, 0),
+      -10px 15px 0 -1px rgba(192, 192, 192, 0.6),
+      20px 10px 0 -2px rgba(255, 255, 255, 0);
+  }
+  83% {
+    box-shadow: 
+      15px -10px 0 -1px rgba(255, 215, 0, 0),
+      -10px 15px 0 -1px rgba(192, 192, 192, 0),
+      20px 10px 0 -2px rgba(255, 255, 255, 0.9);
+  }
 }
