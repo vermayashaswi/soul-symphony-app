@@ -8,7 +8,7 @@
   --safe-area-inset-right: env(safe-area-inset-right, 0px);
   
   /* JavaScript-calculated fallback values */
-  --safe-area-fallback: 24px;
+  --safe-area-fallback: 48px;
   --safe-area-bottom-fallback: 12px;
   --safe-area-left-fallback: 8px;
   --safe-area-right-fallback: 8px;
