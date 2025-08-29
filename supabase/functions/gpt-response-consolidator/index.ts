@@ -180,9 +180,17 @@ serve(async (req) => {
         });
       }
       
-      // PHASE 4 FIX: Warning if no journal entries found from mandatory vector search
+      // PHASE 4 FIX: Enhanced validation and logging for journal entries
       if (!hasJournalEntries) {
         console.warn(`[${consolidationId}] No journal entries found from mandatory vector search - responses may lack specific examples`);
+      } else {
+        const entryCount = journalEntries?.length || 0;
+        console.log(`[${consolidationId}] Successfully extracted ${entryCount} journal entries for GPT integration`);
+        
+        if (entryCount > 0) {
+          const entriesWithContent = journalEntries.filter((e: any) => e.content && e.content.length > 50);
+          console.log(`[${consolidationId}] Journal entries validation: ${entriesWithContent.length}/${entryCount} have substantial content`);
+        }
       }
       
       // Check for empty analysis objects that indicate processing failures
@@ -198,6 +206,41 @@ serve(async (req) => {
       }
     }
 
+    // PHASE 1 FIX: Extract and prominently feature journal entries
+    const journalEntries = researchResults.flatMap((research: any, index: number) => {
+      // Extract journal entries from vector search results
+      const vectorResults = research?.executionResults?.vectorResults || [];
+      const processedEntries = research?.executionSummary?.sampleEntries || [];
+      
+      // Process vector results (actual journal content)
+      const vectorEntries = vectorResults.map((entry: any) => ({
+        id: entry.id,
+        content: entry.content || '',
+        created_at: entry.created_at,
+        similarity: entry.similarity,
+        emotions: entry.emotions || {},
+        themes: entry.themes || entry.master_themes || [],
+        source: 'vector_search',
+        subQuestionIndex: index + 1
+      }));
+      
+      // Process sample entries from execution summaries
+      const sampleEntries = processedEntries.map((entry: any) => ({
+        id: entry.id,
+        content: entry.content || '',
+        created_at: entry.created_at,
+        similarity: entry.similarity || 0,
+        emotions: entry.emotions || {},
+        themes: entry.themes || entry.master_themes || [],
+        source: 'processed_summary',
+        subQuestionIndex: index + 1
+      }));
+      
+      return [...vectorEntries, ...sampleEntries];
+    }).filter(entry => entry.content && entry.content.length > 0);
+
+    console.log(`[${consolidationId}] Extracted ${journalEntries.length} journal entries for GPT integration`);
+    
     // Permissive pass-through of Researcher results (no restrictive parsing)
     const MAX_SQL_ROWS = 200;
     const MAX_VECTOR_ITEMS = 20;
@@ -420,6 +463,29 @@ Your response MUST be structured with:
     
     **USER QUESTION:** "${userMessage}"
     
+    **JOURNAL ENTRIES FOUND (PHASE 2 FIX - Prominently Featured):**
+    ${journalEntries.length > 0 ? journalEntries.map((entry: any, i: number) => {
+      const entryDate = new Date(entry.created_at).toLocaleDateString('en-US', { 
+        timeZone: userTimezone, 
+        month: 'long', 
+        day: 'numeric',
+        year: 'numeric'
+      });
+      const emotions = Object.keys(entry.emotions || {}).length > 0 
+        ? Object.entries(entry.emotions).map(([emotion, score]) => `${emotion}: ${score}`).join(', ')
+        : 'No emotions recorded';
+      const themes = Array.isArray(entry.themes) && entry.themes.length > 0 
+        ? entry.themes.join(', ')
+        : 'No themes recorded';
+      
+      return `
+**Entry ${i + 1}** (${entryDate}):
+Content: "${entry.content.length > 300 ? entry.content.substring(0, 300) + '...' : entry.content}"
+Emotions: ${emotions}
+Themes: ${themes}
+Similarity: ${entry.similarity || 'N/A'}`;
+    }).join('\n') : 'No journal entries found in the analysis results.'}
+    
     **COMPREHENSIVE ANALYSIS RESULTS:**
     ${JSON.stringify(analysisSummary, null, 2)}
   
@@ -438,6 +504,9 @@ Your response MUST be structured with:
   4. Focus on patterns, themes, and insights that are genuinely supported by the data
   5. If insufficient data exists, say so clearly while still being helpful
   6. Always validate your insights against the actual data provided
+  7. **MANDATORY: USE ACTUAL JOURNAL CONTENT** - When journal entries are provided above, reference them directly with quotes and dates
+  8. **CONNECT ANALYSIS TO JOURNAL CONTENT** - Always correlate your analytical insights with specific examples from the user's actual journal entries
+  9. **QUOTE RESPONSIBLY** - Use exact phrases from journal entries when available, always with proper date attribution
 
   MANDATORY: Only assert specific symptom words (e.g., "fatigue," "bloating," "heaviness") if those exact strings appear in the user's source text.If the data is theme-level (e.g., 'Body & Health' count) or inferred, phrase it as "Body & Health–related entries" instead of naming symptoms. Always include 1–3 reference journal snippets with dates (always in this format "7th august" or "9th september last year") when you claim any symptom is present in the entries. DON'T EVER USE TERMS LIKE "VECTOR SEARCH" , "SQL TABLE ANALYSIS"
       
@@ -703,21 +772,18 @@ Your response MUST be structured with:
           }
         }));
 
-        const referenceEntries = researchResults.flatMap((r: any) => [
-          ...(r?.executionResults?.vectorResults || []).map((v: any) => ({
-            id: v.id,
-            snippet: v.content?.substring(0, 200) || 'Vector result',
-            similarity: v.similarity,
-            source: 'vector',
-            date: v.created_at
-          })),
-          ...(r?.executionResults?.sqlResults || []).map((s: any) => ({
-            id: s.id,
-            snippet: s['refined text']?.substring(0, 200) || s.content?.substring(0, 200) || 'SQL result',
-            source: 'sql',
-            date: s.created_at
-          }))
-        ]).slice(0, 10); // Limit reference entries
+        // PHASE 3 FIX: Enhanced reference entries with full context
+        const referenceEntries = journalEntries.map((entry: any) => ({
+          id: entry.id,
+          content_snippet: entry.content.substring(0, 500), // Increased from 200 to 500 chars
+          full_content: entry.content, // Store full content for better context
+          similarity: entry.similarity,
+          emotions: entry.emotions,
+          themes: entry.themes,
+          source: entry.source,
+          date: entry.created_at,
+          sub_question_index: entry.subQuestionIndex
+        })).slice(0, 15); // Increased limit from 10 to 15
 
         console.log(`[${consolidationId}] Storing analysis data:`, {
           analysisDataKeys: Object.keys(analysisData),
