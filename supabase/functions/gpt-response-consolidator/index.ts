@@ -679,6 +679,15 @@ Similarity: ${entry.similarity || 'N/A'}`;
       // Try to parse as JSON since the prompt expects structured output
       const responseObj = JSON.parse(rawResponse);
       consolidatedResponse = responseObj.response || rawResponse;
+      
+      // Normalize the response content to handle escaped characters
+      if (consolidatedResponse && typeof consolidatedResponse === 'string') {
+        consolidatedResponse = consolidatedResponse
+          .replace(/\\n\\n/g, '\n\n')
+          .replace(/\\n/g, '\n')
+          .replace(/\\(\*|_|\[|\]|\(|\)|#)/g, '$1');
+      }
+      
       userStatusMessage = responseObj.userStatusMessage || null;
       
       console.log(`[CONSOLIDATION SUCCESS] ${consolidationId}:`, {
@@ -709,13 +718,21 @@ Similarity: ${entry.similarity || 'N/A'}`;
           const multiLineStatusMatch = rawResponse.match(/"userStatusMessage"\s*:\s*"((?:[^"\\]|\\.)*)"/s);
           
           if (multiLineResponseMatch) {
-            extractedResponse = multiLineResponseMatch[1].replace(/\\"/g, '"').replace(/\\n/g, '\n');
+            extractedResponse = multiLineResponseMatch[1]
+              .replace(/\\"/g, '"')
+              .replace(/\\n\\n/g, '\n\n')
+              .replace(/\\n/g, '\n')
+              .replace(/\\(\*|_|\[|\]|\(|\)|#)/g, '$1');
             extractedStatus = multiLineStatusMatch ? multiLineStatusMatch[1].replace(/\\"/g, '"') : null;
           } else {
             // Strategy 3: Extract everything between response field markers
             const responseContentMatch = rawResponse.match(/"response"\s*:\s*"([^"]*(?:\\.[^"]*)*)"/);
             if (responseContentMatch) {
-              extractedResponse = responseContentMatch[1].replace(/\\"/g, '"').replace(/\\n/g, '\n');
+              extractedResponse = responseContentMatch[1]
+                .replace(/\\"/g, '"')
+                .replace(/\\n\\n/g, '\n\n')
+                .replace(/\\n/g, '\n')
+                .replace(/\\(\*|_|\[|\]|\(|\)|#)/g, '$1');
             }
           }
         }

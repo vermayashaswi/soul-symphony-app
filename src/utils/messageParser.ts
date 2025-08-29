@@ -75,11 +75,11 @@ export const getDisplayContent = (content: string): string => {
   
   // Prefer the response field if it exists and has content
   if (parsed.response && parsed.response.trim()) {
-    return parsed.response;
+    return normalizeContent(parsed.response);
   }
   
-  // Fall back to original content
-  return parsed.originalContent;
+  // Fall back to normalized original content
+  return normalizeContent(parsed.originalContent);
 };
 
 /**
@@ -128,6 +128,27 @@ export const recoverFromMalformedJSON = (content: string): string => {
 };
 
 /**
+ * Normalizes content by handling escaped characters and converting literal newlines
+ */
+export const normalizeContent = (content: string): string => {
+  if (!content) return content;
+  
+  // Convert literal \n\n sequences to actual newlines for proper markdown parsing
+  let normalized = content.replace(/\\n\\n/g, '\n\n');
+  
+  // Convert single literal \n to actual newlines
+  normalized = normalized.replace(/\\n/g, '\n');
+  
+  // Unescape other common markdown characters
+  normalized = normalized.replace(/\\(\*|_|\[|\]|\(|\)|#)/g, '$1');
+  
+  // Remove any leading/trailing whitespace
+  normalized = normalized.trim();
+  
+  return normalized;
+};
+
+/**
  * Remove any "userStatusMessage" artifacts and labels from raw content
  */
 export const stripUserStatusArtifacts = (content: string): string => {
@@ -151,17 +172,20 @@ export const getSanitizedFinalContent = (content: string): string => {
   // If we successfully parsed JSON and have a response field, use only that
   if (parsed.isParsedJSON && parsed.response && parsed.response.trim()) {
     console.log('[MessageParser] Using parsed response field from JSON');
-    return parsed.response.trim();
+    const normalizedResponse = normalizeContent(parsed.response.trim());
+    return normalizedResponse;
   }
   
   // If content is malformed JSON, try to recover
   if (isMalformedJSON(content)) {
     const recovered = recoverFromMalformedJSON(content);
     if (recovered && recovered !== content) {
-      return stripUserStatusArtifacts(recovered);
+      const normalized = normalizeContent(stripUserStatusArtifacts(recovered));
+      return normalized;
     }
   }
   
-  // Fallback: clean the original content
-  return stripUserStatusArtifacts(content);
+  // Fallback: clean and normalize the original content
+  const cleaned = stripUserStatusArtifacts(content);
+  return normalizeContent(cleaned);
 };
