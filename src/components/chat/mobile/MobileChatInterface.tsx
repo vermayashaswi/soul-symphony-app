@@ -122,6 +122,7 @@ export default function MobileChatInterface({
     startStreamingChat,
     dynamicMessages,
     translatedDynamicMessages,
+    currentMessageIndex,
     useThreeDotFallback,
     queryCategory
    } = useStreamingChatV2(threadId || '', {
@@ -1084,9 +1085,9 @@ export default function MobileChatInterface({
                   streamingMessage={
                     useThreeDotFallback || dynamicMessages.length === 0
                       ? undefined // Show only three-dot animation
-                      : translatedDynamicMessages[0] || dynamicMessages[0] // Use first pre-translated message
+                      : translatedDynamicMessages[currentMessageIndex] || dynamicMessages[currentMessageIndex] // Use pre-translated message
                   }
-                  showStreamingDots={useThreeDotFallback || dynamicMessages.length === 0}
+                  showStreamingDots={true}
                 />
               </ChatErrorBoundary>
             ) : (!isStreaming && false) ? ( // NO fallback processing states

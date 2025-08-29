@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import ChatInput from "./ChatInput";
 import ChatArea from "./ChatArea";
 import { v4 as uuidv4 } from 'uuid';
@@ -26,7 +26,6 @@ import DebugPanel from "@/components/debug/DebugPanel";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "@/contexts/TranslationContext";
 import { useChatRealtime } from "@/hooks/use-chat-realtime";
-import { useChatStateSync } from "@/hooks/useChatStateSync";
 import { updateThreadProcessingStatus, createProcessingMessage, updateProcessingMessage, generateThreadTitle } from "@/utils/chat/threadUtils";
 import { MentalHealthInsights } from "@/hooks/use-mental-health-insights";
 
@@ -115,6 +114,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     queryCategory,
     dynamicMessages,
     translatedDynamicMessages,
+    currentMessageIndex,
     useThreeDotFallback,
     stopStreaming,
     forceRecovery,
@@ -192,107 +192,6 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     // Only used for message subscription management
   } = useChatRealtime(currentThreadId);
   
-  // 30-second timeout handler for stuck backend processing
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
-  const clearProcessingTimeout = useCallback(() => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
-  }, []);
-  
-  const handleStuckProcessing = useCallback(async () => {
-    if (!currentThreadId || !effectiveUserId) return;
-    
-    console.log('[SmartChatInterface] Detecting stuck processing, initiating recovery');
-    debugLog.addEvent("Recovery", "30-second timeout triggered - clearing stuck state", "warning");
-    
-    // Force recovery through streaming chat hook
-    forceRecovery();
-    
-    // Clear any processing messages in database
-    try {
-      await supabase
-        .from('chat_messages')
-        .update({ is_processing: false })
-        .eq('thread_id', currentThreadId)
-        .eq('is_processing', true);
-      
-      debugLog.addEvent("Recovery", "Cleared processing flags in database", "success");
-    } catch (error) {
-      console.error('[Recovery] Failed to clear processing flags:', error);
-    }
-    
-    // Force reload messages
-    loadThreadMessages(currentThreadId, true);
-    
-    toast({
-      title: "Chat Recovered",
-      description: "Detected stuck processing and automatically recovered the chat.",
-      variant: "default"
-    });
-  }, [currentThreadId, effectiveUserId, forceRecovery, debugLog, toast]);
-  
-  const startProcessingTimeout = useCallback(() => {
-    clearProcessingTimeout();
-    timeoutRef.current = setTimeout(handleStuckProcessing, 30000); // 30 seconds
-  }, [clearProcessingTimeout, handleStuckProcessing]);
-  
-  // Handle message deletion events
-  const handleMessageDeleted = useCallback((messageId: string, threadId: string) => {
-    if (threadId !== currentThreadId) return;
-    
-    console.log('[SmartChatInterface] Message deleted:', messageId);
-    debugLog.addEvent("Message Deletion", `Message ${messageId} deleted from thread ${threadId}`, "info");
-    
-    // Remove from chat history
-    setChatHistory(prev => prev.filter(msg => msg.id !== messageId));
-    
-    // Check if the deleted message was being processed
-    const wasProcessingMessage = chatHistory.find(msg => 
-      msg.id === messageId && (msg.is_processing || msg.sender === 'assistant' && msg.content.includes('Processing'))
-    );
-    
-    if (wasProcessingMessage) {
-      console.log('[SmartChatInterface] Deleted message was processing - clearing streaming state');
-      debugLog.addEvent("Message Deletion", `Processing message deleted - clearing streaming state`, "warning");
-      
-      // Force recovery to clear any stuck streaming state
-      forceRecovery();
-      clearProcessingTimeout();
-      
-      // Reload messages to ensure consistency
-      setTimeout(() => {
-        loadThreadMessages(currentThreadId, true);
-      }, 100);
-    }
-  }, [currentThreadId, chatHistory, forceRecovery, debugLog, clearProcessingTimeout]);
-  
-  // Set up message deletion listener
-  useEffect(() => {
-    const onMessageDeleted = (event: CustomEvent) => {
-      const { messageId, threadId } = event.detail;
-      handleMessageDeleted(messageId, threadId);
-    };
-    
-    window.addEventListener('chatMessageDeleted', onMessageDeleted as EventListener);
-    
-    return () => {
-      window.removeEventListener('chatMessageDeleted', onMessageDeleted as EventListener);
-    };
-  }, [handleMessageDeleted]);
-  
-  // Enhanced state synchronization for reliable message loading
-  const { triggerSync } = useChatStateSync({
-    threadId: currentThreadId,
-    onStateSync: (reason: string) => {
-      console.log(`[ChatStateSync] Triggering sync for reason: ${reason}`);
-      loadThreadMessages(currentThreadId!, true);
-    },
-    enabled: !!currentThreadId
-  });
-  
   // Use unified auto-scroll hook - ONLY useStreamingChat dependencies
   const { scrollElementRef, scrollToBottom } = useAutoScroll({
     dependencies: [chatHistory, isStreaming, streamingMessages],
@@ -306,21 +205,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     if (onProcessingStateChange) {
       onProcessingStateChange(isProcessingActive);
     }
-    
-    // Manage processing timeout
-    if (isProcessingActive) {
-      startProcessingTimeout();
-    } else {
-      clearProcessingTimeout();
-    }
-  }, [isStreaming, onProcessingStateChange, startProcessingTimeout, clearProcessingTimeout]);
-  
-  // Clear timeout on component unmount
-  useEffect(() => {
-    return () => {
-      clearProcessingTimeout();
-    };
-  }, [clearProcessingTimeout]);
+  }, [isStreaming, onProcessingStateChange]);
 
   // Realtime: append assistant messages saved by backend
   useEffect(() => {
@@ -440,18 +325,25 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     };
   }, [effectiveUserId, propsThreadId]);
 
-  // Listen for completed responses and reload messages - SIMPLIFIED
+  // Listen for completed responses and reload messages
   useEffect(() => {
     const onResponseReady = (event: CustomEvent) => {
-      const { threadId } = event.detail;
+      const { threadId, completed, restored, correlationId } = event.detail;
       
       if (threadId === currentThreadId) {
-        console.log(`[SmartChatInterface] Response ready for thread ${currentThreadId} - force reloading messages`);
+        console.log(`[SmartChatInterface] Response ready for thread ${currentThreadId}`, {
+          completed,
+          restored,
+          correlationId
+        });
         
-        // SIMPLIFIED: Always force reload when event is received
-        loadThreadMessages(currentThreadId, true);
+        // Force reload messages to show latest state, especially for completed/restored responses
+        loadThreadMessages(currentThreadId, restored || completed);
         
-        debugLog.addEvent("Response Ready", "Force reload triggered", "info");
+        // If this was a restoration event, also dispatch to any listening components
+        if (restored || completed) {
+          debugLog.addEvent("Response Ready", `${restored ? 'Restored' : 'Completed'} response for thread: ${threadId}`, "success");
+        }
       }
     };
     
@@ -469,16 +361,13 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       return;
     }
     
-    // SIMPLIFIED: Only skip if explicitly not forcing reload
     if (loadedThreadRef.current === threadId && !forceReload) {
-      debugLog.addEvent("Thread Loading", `Thread ${threadId} already loaded, skipping (forceReload: false)`, "info");
+      debugLog.addEvent("Thread Loading", `Thread ${threadId} already loaded, skipping`, "info");
       return;
     }
     
-    console.log(`[SmartChatInterface] Loading messages for thread ${threadId} (force: ${forceReload})`);
-    
     if (forceReload) {
-      debugLog.addEvent("Thread Loading", `Force reloading thread ${threadId} (activeThread: ${currentThreadIdRef.current})`, "info");
+      debugLog.addEvent("Thread Loading", `Force reloading thread ${threadId}`, "info");
       loadedThreadRef.current = null; // Reset to ensure proper reload
     }
     
@@ -516,27 +405,14 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
           role: msg.role as 'user' | 'assistant' | 'error'
         }));
         
-        // Enhanced state validation: only update if we're still on the same thread
-        if (currentThreadIdRef.current === threadId) {
-          setChatHistory(typedMessages);
-          setShowSuggestions(false);
-          loadedThreadRef.current = threadId;
-          
-          // Post-load verification: ensure we have the latest assistant responses
-          const assistantMessages = typedMessages.filter(m => m.sender === 'assistant');
-          if (assistantMessages.length > 0) {
-            debugLog.addEvent("Thread Loading", `Verified ${assistantMessages.length} assistant messages loaded`, "success");
-          }
-        } else {
-          debugLog.addEvent("Thread Loading", `Thread changed during load (${threadId} -> ${currentThreadIdRef.current}), skipping update`, "warning");
-        }
+        setChatHistory(typedMessages);
+        setShowSuggestions(false);
+        loadedThreadRef.current = threadId;
       } else {
         debugLog.addEvent("Thread Loading", `No messages found for thread ${threadId}`, "info");
         console.log(`No messages found for thread ${threadId}`);
-        if (currentThreadIdRef.current === threadId) {
-          setChatHistory([]);
-          setShowSuggestions(true);
-        }
+        setChatHistory([]);
+        setShowSuggestions(true);
       }
     } catch (error) {
       console.error("Error loading messages:", error);
@@ -1099,7 +975,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
             streamingMessage={
               useThreeDotFallback || dynamicMessages.length === 0
                 ? undefined
-                : translatedDynamicMessages[0] || dynamicMessages[0]
+                : translatedDynamicMessages[currentMessageIndex] || dynamicMessages[currentMessageIndex]
             }
             useThreeDotFallback={useThreeDotFallback}
             showBackendAnimation={showBackendAnimation}
