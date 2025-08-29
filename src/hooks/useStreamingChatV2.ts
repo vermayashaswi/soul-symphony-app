@@ -12,7 +12,7 @@ export interface StreamingMessage {
   timestamp?: number;
 }
 
-// Thread-specific streaming state interface
+// Thread-specific streaming state interface  
 export interface ThreadStreamingState {
   isStreaming: boolean;
   streamingMessages: StreamingMessage[];
@@ -210,6 +210,7 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
             if (!isCompleted) {
               console.log(`[useStreamingChatV2] Restoring active streaming state for thread: ${threadId} with correlation ID: ${savedState.requestCorrelationId}`);
               const restoredState = {
+                ...createInitialState(),
                 ...savedState,
                 abortController: new AbortController() // Create new abort controller
               };
