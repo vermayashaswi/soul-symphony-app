@@ -1086,7 +1086,7 @@ export default function MobileChatInterface({
                       ? undefined // Show only three-dot animation
                       : translatedDynamicMessages[0] || dynamicMessages[0] // Use first pre-translated message
                   }
-                  showStreamingDots={true}
+                  showStreamingDots={useThreeDotFallback || dynamicMessages.length === 0}
                 />
               </ChatErrorBoundary>
             ) : (!isStreaming && false) ? ( // NO fallback processing states
