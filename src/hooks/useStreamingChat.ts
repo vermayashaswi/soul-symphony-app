@@ -467,19 +467,8 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
               supabase.functions.invoke('general-mental-health-chat', { body }),
               timeoutPromise,
             ])) as { data: any; error: any };
-          } else if (category === 'JOURNAL_SPECIFIC_NEEDS_CLARIFICATION') {
-            const timeoutMs = 20000 + i * 5000;
-            const timeoutPromise = new Promise((_, rej) =>
-              setTimeout(() => rej(new Error('Request timed out')), timeoutMs)
-            );
-
-            result = (await Promise.race([
-              supabase.functions.invoke('chat-with-rag', { body }),
-              timeoutPromise,
-            ])) as { data: any; error: any };
           } else {
-            // Fallback for truly unknown categories (should not happen with UNRELATED being handled earlier)
-            console.error(`[useStreamingChat] Unknown category: ${category}, falling back to general mental health`);
+            // Fallback for unknown categories
             const timeoutMs = 20000 + i * 5000;
             const timeoutPromise = new Promise((_, rej) =>
               setTimeout(() => rej(new Error('Request timed out')), timeoutMs)
@@ -915,33 +904,6 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     }
 
     updateThreadState(targetThreadId, { queryCategory: messageCategory });
-
-    // Handle UNRELATED queries immediately with hardcoded responses
-    if (messageCategory === 'UNRELATED') {
-      const unrelatedResponses = [
-        "Oops! 🤖 I think my emotional intelligence wires got crossed with my general knowledge circuits there! I'm like a really enthusiastic therapist who only knows about feelings, journals, and the beautiful chaos of human emotions. Try asking me about your mood, your day, or that thing that's been bouncing around in your head! 🧠✨",
-        "Ah, you've stumbled upon my one weakness! 😅 I'm basically a feelings expert who failed at everything else in AI school. I can help you decode your emotions, dive into your journal patterns, and figure out what your heart is trying to tell you... but ask me about the weather and I'll probably suggest you journal about how clouds make you feel! 🌤️💭",
-        "Whoops! Looks like you've found the edge of my brain! 🤯 I'm like that friend who's AMAZING at deep 2am conversations about life but terrible at trivia night. I live for your thoughts, feelings, journal entries, and all things emotional wellbeing - that's where I absolutely shine! ✨ What's your heart been up to lately? 💛",
-        "Haha, you caught me! I'm basically a one-trick pony, but it's a really GOOD trick! 🐴✨ Think of me as your personal feelings detective, journal whisperer, and emotional GPS all rolled into one. I can't help with that question, but I'd love to hear what's been stirring in your world today! 🌍💫"
-      ];
-      
-      const randomResponse = unrelatedResponses[Math.floor(Math.random() * unrelatedResponses.length)];
-      
-      addStreamingMessage({
-        type: 'final_response',
-        response: randomResponse,
-        timestamp: Date.now(),
-        requestId
-      }, targetThreadId);
-      
-      updateThreadState(targetThreadId, {
-        isStreaming: false,
-        activeRequestId: null
-      });
-      
-      clearChatStreamingState(targetThreadId);
-      return;
-    }
 
     await generateStreamingMessages(message, messageCategory, conversationContext, userProfile, targetThreadId);
     
