@@ -37,7 +37,7 @@ export interface ChatStreamingState {
 }
 
 const CHAT_STATE_PREFIX = 'chat_streaming_state_';
-const STATE_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes (increased for stuck state detection)
+const STATE_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
 
 export const saveChatStreamingState = (threadId: string, state: ChatStreamingState): void => {
   try {
@@ -85,45 +85,6 @@ export const clearAllChatStreamingStates = (): void => {
     keys.forEach(key => localStorage.removeItem(key));
   } catch (error) {
     console.warn('Failed to clear all chat streaming states:', error);
-  }
-};
-
-// Force clear stuck states for a specific user
-export const forceClearStuckStates = (userId?: string): number => {
-  try {
-    const keys = Object.keys(localStorage).filter(key => key.startsWith(CHAT_STATE_PREFIX));
-    let clearedCount = 0;
-    
-    keys.forEach(key => {
-      try {
-        const stored = localStorage.getItem(key);
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          const now = Date.now();
-          const stateAge = now - (parsed.savedAt || 0);
-          const processingAge = parsed.requestStartTime ? now - parsed.requestStartTime : 0;
-          
-          // Clear if state is stuck (processing for >10 minutes or aged >10 minutes)
-          if (
-            (parsed.isStreaming || parsed.showDynamicMessages) && 
-            (stateAge > 10 * 60 * 1000 || processingAge > 10 * 60 * 1000)
-          ) {
-            localStorage.removeItem(key);
-            clearedCount++;
-            console.log(`Cleared stuck state: ${key}, age: ${stateAge}ms, processing: ${processingAge}ms`);
-          }
-        }
-      } catch (parseError) {
-        // Invalid JSON, remove it
-        localStorage.removeItem(key);
-        clearedCount++;
-      }
-    });
-    
-    return clearedCount;
-  } catch (error) {
-    console.warn('Failed to force clear stuck states:', error);
-    return 0;
   }
 };
 

@@ -11,7 +11,6 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { v4 as uuidv4 } from 'uuid';
 import { PremiumFeatureGuard } from '@/components/subscription/PremiumFeatureGuard';
 import { setupGlobalMessageDeletionListener } from '@/hooks/use-message-deletion';
-import { forceClearStuckStates } from '@/utils/chatStateStorage';
 
 const SmartChat = () => {
   const { user } = useAuth();
@@ -32,12 +31,6 @@ const SmartChat = () => {
   useEffect(() => {
     const loadLastThread = async () => {
       if (!user?.id) return;
-      
-      // Force clear any stuck states on app load
-      const clearedCount = forceClearStuckStates(user.id);
-      if (clearedCount > 0) {
-        console.log(`[SmartChat] Cleared ${clearedCount} stuck chat states on mount`);
-      }
       
       const storedThreadId = localStorage.getItem("lastActiveChatThreadId");
       if (storedThreadId) {

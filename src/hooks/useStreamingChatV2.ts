@@ -2,25 +2,14 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { saveChatStreamingState, getChatStreamingState, clearChatStreamingState } from '@/utils/chatStateStorage';
 import { useAuth } from '@/contexts/AuthContext';
-import { showEdgeFunctionRetryToast } from '@/utils/toast-messages';
-import { useTranslation } from '@/contexts/TranslationContext';
 
-// Enhanced streaming message interface with original features
+// Streaming message interface
 export interface StreamingMessage {
-  id?: string;
+  id: string;
   type: 'user_message' | 'backend_task' | 'progress' | 'final_response' | 'error';
-  message?: string;
-  task?: string;
-  description?: string;
-  stage?: string;
-  progress?: number;
-  response?: string;
-  analysis?: any;
-  error?: string;
-  content?: string;
-  isVisible?: boolean;
-  timestamp: number;
-  requestId?: string; // correlate to activeRequestId to avoid bleed
+  content: string;
+  isVisible: boolean;
+  timestamp?: number;
 }
 
   // Thread-specific streaming state interface  
@@ -67,11 +56,7 @@ export interface UseStreamingChatProps {
 
 export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProps = {}) => {
   const { user } = useAuth();
-  const { translate, currentLanguage } = useTranslation();
   const { onFinalResponse, onError } = props;
-  
-  // Enhanced configuration
-  const maxRetryAttempts = 2;
   
   // Thread states map for managing multiple concurrent streams
   const threadStatesRef = useRef<Map<string, ThreadStreamingState>>(new Map());
@@ -148,71 +133,6 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
     return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }, []);
 
-  // Enhanced message fingerprint to prevent duplicates
-  const createMessageFingerprint = useCallback((message: string, threadId: string, userId: string, timestamp: number) => {
-    const normalizedMessage = message.trim().toLowerCase();
-    const timeWindow = Math.floor(timestamp / 3000); // 3-second window for tighter duplicate detection
-    return `${userId}_${threadId}_${normalizedMessage.substring(0, 50)}_${timeWindow}`;
-  }, []);
-
-  // Smart edge function routing based on query category
-  const getEdgeFunctionName = useCallback((category: string) => {
-    switch (category) {
-      case 'JOURNAL_SPECIFIC':
-        return 'chat-with-rag';
-      case 'GENERAL':
-        return 'general-chat';
-      default:
-        return 'chat-with-rag';
-    }
-  }, []);
-
-  // Enhanced error detection
-  const isEdgeFunctionError = useCallback((error: any) => {
-    return error?.message?.includes('Failed to invoke function') ||
-           error?.message?.includes('Edge Function') ||
-           error?.statusText?.includes('502') ||
-           error?.statusText?.includes('503');
-  }, []);
-
-  const isNetworkError = useCallback((error: any) => {
-    return error?.message?.includes('network') ||
-           error?.message?.includes('fetch') ||
-           error?.code === 'NETWORK_ERROR';
-  }, []);
-
-  // Retry logic with exponential backoff
-  const invokeWithBackoff = useCallback(async (
-    functionName: string, 
-    payload: any, 
-    attempt: number = 1
-  ): Promise<any> => {
-    try {
-      const { data, error } = await supabase.functions.invoke(functionName, {
-        body: payload,
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
-      
-      if (error) throw error;
-      return data;
-    } catch (error) {
-      console.warn(`[useStreamingChatV2] Function invoke attempt ${attempt} failed:`, error);
-      
-      if (attempt >= maxRetryAttempts) {
-        throw error;
-      }
-      
-      // Exponential backoff: 1s, 2s, 4s...
-      const backoffDelay = Math.pow(2, attempt - 1) * 1000;
-      console.log(`[useStreamingChatV2] Retrying in ${backoffDelay}ms...`);
-      
-      await new Promise(resolve => setTimeout(resolve, backoffDelay));
-      return invokeWithBackoff(functionName, payload, attempt + 1);
-    }
-  }, [maxRetryAttempts]);
-
   // Generate idempotency key for message deduplication
   const generateIdempotencyKey = useCallback((content: string, sender: 'user' | 'assistant', threadId: string, userId?: string) => {
     const timestamp = Date.now();
@@ -282,10 +202,9 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
     }
   }, [supabase]);
 
-  // Enhanced streaming messages with external generation and translation
-  const generateStreamingMessages = useCallback(async (threadId: string, userMessage: string, userProfile?: any) => {
-    const currentState = getThreadState(threadId);
-    let fallbackMessages = [
+  // Generate streaming messages for journal-specific queries
+  const generateStreamingMessages = useCallback((threadId: string) => {
+    const journalMessages = [
       "Analyzing your journal entries...",
       "Looking for patterns and insights...",
       "Examining emotional themes...",
@@ -293,69 +212,23 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
       "Generating personalized insights..."
     ];
 
-    // Try to get dynamic messages from edge function
-    let dynamicMessages = fallbackMessages;
-    let translatedMessages = fallbackMessages;
-    let useThreeDotFallback = false;
-
-    try {
-      const { data } = await supabase.functions.invoke('generate-streaming-messages', {
-        body: {
-          userMessage,
-          category: currentState.queryCategory,
-          conversationContext: '', // Add if available
-          userProfile
-        }
-      });
-
-      if (data?.success && data?.messages && Array.isArray(data.messages)) {
-        dynamicMessages = data.messages;
-        useThreeDotFallback = !!data.shouldUseFallback;
-        
-        // Translate messages if needed
-        if (currentLanguage !== 'en') {
-          translatedMessages = await Promise.all(
-            dynamicMessages.map(async msg => await translate(msg))
-          );
-        } else {
-          translatedMessages = dynamicMessages;
-        }
-      } else {
-        useThreeDotFallback = true;
-      }
-    } catch (error) {
-      console.warn('[useStreamingChatV2] Failed to generate dynamic messages:', error);
-      useThreeDotFallback = true;
-    }
-
-    // Update state with generated messages
-    updateThreadState(threadId, {
-      dynamicMessages,
-      translatedDynamicMessages: translatedMessages,
-      useThreeDotFallback
-    });
-
+    const currentState = getThreadState(threadId);
     let messageIndex = currentState.dynamicMessageIndex;
     
     const showNextMessage = () => {
-      const state = getThreadState(threadId);
-      if (!state.showDynamicMessages) return;
+      if (!getThreadState(threadId).showDynamicMessages) return;
       
       // Clear previous message
+      const state = getThreadState(threadId);
       const clearedMessages = state.streamingMessages.map(msg => 
-        msg.id?.startsWith('dynamic-') ? { ...msg, isVisible: false } : msg
+        msg.id.startsWith('dynamic-') ? { ...msg, isVisible: false } : msg
       );
-      
-      // Determine message to show
-      const messages = state.useThreeDotFallback ? fallbackMessages : (state.translatedDynamicMessages || dynamicMessages);
-      const messageContent = messages[messageIndex % messages.length];
       
       // Add new message
       const newMessage: StreamingMessage = {
         id: `dynamic-${messageIndex}`,
         type: 'progress',
-        content: messageContent,
-        message: messageContent,
+        content: journalMessages[messageIndex % journalMessages.length],
         isVisible: true,
         timestamp: Date.now()
       };
@@ -374,7 +247,7 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
     
     // Start the first message immediately
     showNextMessage();
-  }, [getThreadState, updateThreadState, currentLanguage, translate]);
+  }, [getThreadState, updateThreadState]);
 
   // Save streaming state to localStorage with better structure
   const saveStreamingState = useCallback((threadId: string, state: ThreadStreamingState) => {
@@ -490,7 +363,7 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
               
               // Continue dynamic messages if it's a journal-specific query
               if (savedState.queryCategory === 'JOURNAL_SPECIFIC' && savedState.showDynamicMessages) {
-                generateStreamingMessages(threadId, savedState.currentUserMessage || '', null);
+                generateStreamingMessages(threadId);
               }
               
               // Emit event so UI knows response might be ready
@@ -577,100 +450,12 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
     }
   }, [getThreadState, updateThreadState, onFinalResponse, onError]);
 
-  // Enhanced retry functionality  
-  const retryLastMessage = useCallback(async (targetThreadId: string) => {
-    const threadState = getThreadState(targetThreadId);
-    
-    if (!threadState.lastFailedMessage) {
-      console.warn('[useStreamingChatV2] No failed message to retry');
-      return false;
-    }
-
-    if (threadState.retryAttempts >= maxRetryAttempts) {
-      console.warn('[useStreamingChatV2] Max retry attempts reached');
-      showEdgeFunctionRetryToast();
-      return false;
-    }
-
-    console.log(`[useStreamingChatV2] Retrying message (attempt ${threadState.retryAttempts + 1}/${maxRetryAttempts})`);
-    
-    updateThreadState(targetThreadId, {
-      isRetrying: true,
-      retryAttempts: threadState.retryAttempts + 1
-    });
-
-    try {
-      const { messageContent, userId, messageCategory, userProfile } = threadState.lastFailedMessage;
-      return await startStreamingChat(messageContent, targetThreadId, userId, messageCategory, userProfile);
-    } catch (error) {
-      updateThreadState(targetThreadId, { isRetrying: false });
-      throw error;
-    }
-  }, [getThreadState, updateThreadState, maxRetryAttempts]);
-
-  // Safety completion guard to prevent infinite processing
-  const safetyCompletionGuard = useCallback((targetThreadId: string, timeoutMs: number = 120000) => {
-    const timer = setTimeout(async () => {
-      const state = getThreadState(targetThreadId);
-      if (state.isStreaming || state.showDynamicMessages) {
-        console.warn(`[useStreamingChatV2] Safety timeout reached for thread: ${targetThreadId}`);
-        
-        // Check one more time if completion happened
-        const isCompleted = await checkIfRequestCompleted(targetThreadId, user?.id || '', state.requestCorrelationId);
-        
-        if (isCompleted) {
-          console.log(`[useStreamingChatV2] Request completed during safety check: ${targetThreadId}`);
-          clearChatStreamingState(targetThreadId);
-          window.dispatchEvent(new CustomEvent('chatResponseReady', {
-            detail: { threadId: targetThreadId, completed: true, correlationId: state.requestCorrelationId }
-          }));
-        } else {
-          // Force completion with timeout message
-          updateThreadState(targetThreadId, {
-            isStreaming: false,
-            showDynamicMessages: false,
-            streamingMessages: [...state.streamingMessages, {
-              id: `timeout-${Date.now()}`,
-              type: 'error',
-              content: 'Request timed out. Please try again.',
-              error: 'Timeout',
-              timestamp: Date.now()
-            }]
-          });
-          clearChatStreamingState(targetThreadId);
-        }
-      }
-    }, timeoutMs);
-
-    return () => clearTimeout(timer);
-  }, [getThreadState, updateThreadState, checkIfRequestCompleted, user?.id]);
-
-  // Cleanup orphaned states periodically
-  const cleanupOrphanedStates = useCallback(() => {
-    try {
-      const now = Date.now();
-      const maxAge = 10 * 60 * 1000; // 10 minutes
-      
-      for (const [threadId, state] of threadStatesRef.current.entries()) {
-        const stateAge = now - (state.lastActivity || 0);
-        if (stateAge > maxAge && !state.isStreaming && !state.showDynamicMessages) {
-          console.log(`[useStreamingChatV2] Cleaning up orphaned state for thread: ${threadId}`);
-          threadStatesRef.current.delete(threadId);
-          clearChatStreamingState(threadId);
-        }
-      }
-    } catch (error) {
-      console.warn('[useStreamingChatV2] Error during cleanup:', error);
-    }
-  }, []);
-
-  // Enhanced start streaming chat with full feature parity
+  // Start streaming chat with correlation tracking
   const startStreamingChat = useCallback(async (
     messageContent: string,
     targetThreadId: string,
     userId: string,
     messageCategory: string = 'JOURNAL_SPECIFIC',
-    userProfile?: any,
     parameters: Record<string, any> = {},
     messageId?: string
   ): Promise<void> => {
@@ -710,15 +495,14 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
       
       // Generate dynamic messages for JOURNAL_SPECIFIC queries
       if (messageCategory === 'JOURNAL_SPECIFIC') {
-        generateStreamingMessages(targetThreadId, messageContent, userProfile);
+        generateStreamingMessages(targetThreadId);
       } else {
         // For non-journal queries, show a simple processing state
         addStreamingMessage(targetThreadId, {
           id: 'processing-general',
           type: 'progress',
           content: 'Processing your request...',
-          isVisible: true,
-          timestamp: Date.now()
+          isVisible: true
         });
       }
 
@@ -765,8 +549,7 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
           id: 'error-' + Date.now(),
           type: 'error',
           content: `Error: ${error.message || 'Unknown error occurred'}`,
-          isVisible: true,
-          timestamp: Date.now()
+          isVisible: true
         });
 
         updateThreadState(targetThreadId, {
@@ -812,8 +595,7 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
           id: 'error-' + Date.now(),
           type: 'error',
           content: `Failed to process request: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          isVisible: true,
-          timestamp: Date.now()
+          isVisible: true
         });
 
         updateThreadState(targetThreadId, {
@@ -854,103 +636,12 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
     });
   }, [threadId, updateThreadState]);
 
-  // Enhanced recovery detection and cleanup
-  const detectStuckState = useCallback((targetThreadId: string): boolean => {
-    const state = getThreadState(targetThreadId);
-    const now = Date.now();
-    const stuckThreshold = 10 * 60 * 1000; // 10 minutes
-    
-    return (
-      (state.isStreaming || state.showDynamicMessages) &&
-      state.requestStartTime > 0 &&
-      (now - state.requestStartTime) > stuckThreshold
-    );
-  }, [getThreadState]);
-
-  const forceRecovery = useCallback((targetThreadId: string, reason: string = 'manual') => {
-    console.warn(`[useStreamingChatV2] Force recovery triggered for thread ${targetThreadId}, reason: ${reason}`);
-    
-    const currentState = getThreadState(targetThreadId);
-    
-    // Abort any active request
-    if (currentState.abortController) {
-      currentState.abortController.abort();
-    }
-    
-    // Clear state completely
-    updateThreadState(targetThreadId, {
-      ...createInitialState(),
-      lastActivity: Date.now()
-    });
-    
-    // Clear localStorage state
-    clearChatStreamingState(targetThreadId);
-    
-    // Emit recovery event
-    window.dispatchEvent(new CustomEvent('chatStateRecovered', {
-      detail: { threadId: targetThreadId, reason }
-    }));
-    
-    console.log(`[useStreamingChatV2] Recovery completed for thread: ${targetThreadId}`);
-  }, [getThreadState, updateThreadState]);
-
-  // Auto-recovery on mount for stuck states
-  useEffect(() => {
-    if (!threadId) return;
-    
-    const checkAndRecover = async () => {
-      // Check localStorage for stuck state
-      const savedState = getChatStreamingState(threadId);
-      if (savedState) {
-        const now = Date.now();
-        const stateAge = now - (savedState.savedAt || 0);
-        const stuckThreshold = 10 * 60 * 1000; // 10 minutes
-        
-        if (stateAge > stuckThreshold && (savedState.isStreaming || savedState.showDynamicMessages)) {
-          console.warn(`[useStreamingChatV2] Detected stuck state in localStorage for thread ${threadId}, age: ${stateAge}ms`);
-          forceRecovery(threadId, 'stuck_state_on_mount');
-          return;
-        }
-      }
-      
-      // Check current state
-      if (detectStuckState(threadId)) {
-        console.warn(`[useStreamingChatV2] Detected stuck state for thread ${threadId}`);
-        forceRecovery(threadId, 'stuck_state_detected');
-      }
-    };
-    
-    // Run check after a short delay to allow state restoration
-    const timer = setTimeout(checkAndRecover, 2000);
-    return () => clearTimeout(timer);
-  }, [threadId, detectStuckState, forceRecovery]);
-
-  // Setup cleanup timer with enhanced stuck state detection
-  useEffect(() => {
-    const cleanupTimer = setInterval(() => {
-      cleanupOrphanedStates();
-      
-      // Check all thread states for stuck conditions
-      for (const [checkThreadId] of threadStatesRef.current.entries()) {
-        if (detectStuckState(checkThreadId)) {
-          forceRecovery(checkThreadId, 'periodic_stuck_check');
-        }
-      }
-    }, 5 * 60 * 1000); // Every 5 minutes
-    
-    return () => clearInterval(cleanupTimer);
-  }, [cleanupOrphanedStates, detectStuckState, forceRecovery]);
-
   return {
     ...state,
     startStreamingChat,
     stopStreaming,
     clearStreamingMessages,
     generateCorrelationId,
-    generateIdempotencyKey,
-    retryLastMessage,
-    addStreamingMessage: (message: StreamingMessage) => addStreamingMessage(threadId, message),
-    forceRecovery: () => forceRecovery(threadId, 'user_manual'),
-    isStuck: detectStuckState(threadId)
+    generateIdempotencyKey
   };
 };

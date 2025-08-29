@@ -9,7 +9,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import ChatSuggestionButton from "./ChatSuggestionButton";
 import { Separator } from "@/components/ui/separator";
 import EmptyChatState from "@/components/chat/EmptyChatState";
-import { ChatRecoveryButton } from './ChatRecoveryButton';
 import { useDebouncedCallback } from 'use-debounce';
 import {
   Sheet,
@@ -34,7 +33,7 @@ import { getThreadMessages, saveMessage } from "@/services/chat";
 import { useDebugLog } from "@/utils/debug/DebugContext";
 import { TranslatableText } from "@/components/translation/TranslatableText";
 import { useChatMessageClassification, QueryCategory } from "@/hooks/use-chat-message-classification";
-import { useStreamingChatV2 } from "@/hooks/useStreamingChatV2";
+import { useStreamingChat } from "@/hooks/useStreamingChat";
 import { threadSafetyManager } from "@/utils/threadSafetyManager";
 import { useAutoScroll } from "@/hooks/use-auto-scroll";
 import {
@@ -107,81 +106,87 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
   // Use streaming chat for enhanced UX
   const {
     isStreaming,
+    // streamingThreadId - removed as part of thread isolation
     streamingMessages,
-    lastUserInput: currentUserMessage,
-    showDynamicMessages: showBackendAnimation,
+    currentUserMessage,
+    showBackendAnimation,
     startStreamingChat,
     queryCategory,
+    restoreStreamingState,
+    stopStreaming,
     dynamicMessages,
     translatedDynamicMessages,
     currentMessageIndex,
-    useThreeDotFallback,
-    stopStreaming,
-    forceRecovery,
-    isStuck
-  } = useStreamingChatV2(currentThreadId || '', {
-    onFinalResponse: async (response) => {
-      // Handle final streaming response
-      if (!response || !currentThreadId || !effectiveUserId) {
+    useThreeDotFallback
+  } = useStreamingChat({
+      threadId: currentThreadId,
+    onFinalResponse: async (response, analysis, originThreadId, requestId) => {
+      // Handle final streaming response scoped to its origin thread
+      if (!response || !originThreadId || !effectiveUserId) {
         debugLog.addEvent("Streaming Response", "Missing required data for final response", "error");
-        console.error("[Streaming] Missing response data:", { response: !!response, threadId: !!currentThreadId, userId: !!effectiveUserId });
+        console.error("[Streaming] Missing response data:", { response: !!response, originThreadId: !!originThreadId, userId: !!effectiveUserId });
         return;
       }
       
-      debugLog.addEvent("Streaming Response", `Final response received for ${currentThreadId}: ${response.substring(0, 100)}...`, "success");
+      debugLog.addEvent("Streaming Response", `Final response received for ${originThreadId}: ${response.substring(0, 100)}...`, "success");
 
       // NO manual loading states - useStreamingChat handles everything
       
       // Backend persists assistant message; UI will append via realtime
-      // Watchdog: if realtime insert doesn't arrive, persist client-side after a short delay
-      try {
-        setTimeout(async () => {
-          // Double-check still on same thread
-          if (!currentThreadIdRef.current || currentThreadIdRef.current !== currentThreadId) return;
+      if (originThreadId === currentThreadId) {
+        // Watchdog: if realtime insert doesn't arrive, persist client-side after a short delay
+        try {
+          setTimeout(async () => {
+            // Double-check still on same thread
+            if (!currentThreadIdRef.current || currentThreadIdRef.current !== originThreadId) return;
 
-          // Has an assistant message with same content arrived?
-          const { data: recent, error: recentErr } = await supabase
-            .from('chat_messages')
-            .select('id, content, sender, created_at')
-            .eq('thread_id', currentThreadId)
-            .order('created_at', { ascending: false })
-            .limit(5);
+            // Has an assistant message with same content arrived?
+            const { data: recent, error: recentErr } = await supabase
+              .from('chat_messages')
+              .select('id, content, sender, created_at')
+              .eq('thread_id', originThreadId)
+              .order('created_at', { ascending: false })
+              .limit(5);
 
-          if (recentErr) {
-            console.warn('[Streaming Watchdog] Failed to fetch recent messages:', recentErr.message);
-          }
-
-          const responseText = typeof response === 'string' ? response : response?.content || '';
-          const alreadyExists = (recent || []).some(m => (m as any).sender === 'assistant' && (m as any).content?.trim() === responseText.trim());
-          if (!alreadyExists) {
-            // Persist safely with an idempotency_key derived from threadId + response
-            try {
-              const enc = new TextEncoder();
-              const keySource = `${currentThreadId}:${responseText}`;
-              const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
-              const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
-              const idempotencyKey = hex.slice(0, 32);
-
-              await supabase.from('chat_messages').upsert({
-                thread_id: currentThreadId,
-                content: responseText,
-                sender: 'assistant',
-                role: 'assistant',
-                idempotency_key: idempotencyKey
-              }, { onConflict: 'thread_id,idempotency_key' });
-            } catch (e) {
-              console.warn('[Streaming Watchdog] Persist fallback failed:', (e as any)?.message || e);
+            if (recentErr) {
+              console.warn('[Streaming Watchdog] Failed to fetch recent messages:', recentErr.message);
             }
-          }
-        }, 1200);
-      } catch (e) {
-        console.warn('[Streaming Watchdog] Exception scheduling fallback:', (e as any)?.message || e);
+
+            const alreadyExists = (recent || []).some(m => (m as any).sender === 'assistant' && (m as any).content?.trim() === response.trim());
+            if (!alreadyExists) {
+              // Persist safely with an idempotency_key derived from threadId + response
+              try {
+                const enc = new TextEncoder();
+                const keySource = requestId || `${originThreadId}:${response}`;
+                const digest = await crypto.subtle.digest('SHA-256', enc.encode(keySource));
+                const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+                const idempotencyKey = hex.slice(0, 32);
+
+                await supabase.from('chat_messages').upsert({
+                  thread_id: originThreadId,
+                  content: response,
+                  sender: 'assistant',
+                  role: 'assistant',
+                  idempotency_key: idempotencyKey
+                }, { onConflict: 'thread_id,idempotency_key' });
+              } catch (e) {
+                console.warn('[Streaming Watchdog] Persist fallback failed:', (e as any)?.message || e);
+              }
+            }
+
+            // NO manual state clearing - useStreamingChat handles it
+          }, 1200);
+        } catch (e) {
+          console.warn('[Streaming Watchdog] Exception scheduling fallback:', (e as any)?.message || e);
+          // NO manual state clearing - useStreamingChat handles it
+        }
       }
     },
     onError: (error) => {
+      // NO manual state clearing - useStreamingChat handles errors
       toast({
         title: "Error",
-        description: typeof error === 'string' ? error : error?.message || 'Unknown error',
+        description: error,
         variant: "destructive"
       });
     }
@@ -283,6 +288,18 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
   useEffect(() => {
     if (propsThreadId && propsThreadId !== currentThreadId) {
       loadThreadMessages(propsThreadId);
+      // Try to restore streaming state for this thread (now async)
+      const tryRestore = async () => {
+        try {
+          const restored = await restoreStreamingState(propsThreadId);
+          if (restored) {
+            debugLog.addEvent("Props Thread Change", `Restored streaming state for props thread: ${propsThreadId}`, "info");
+          }
+        } catch (error) {
+          console.warn('[SmartChatInterface] Error restoring state for props thread:', error);
+        }
+      };
+      tryRestore();
       
       // Update local storage to maintain consistency
       if (propsThreadId) {
@@ -290,7 +307,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       }
       debugLog.addEvent("Props Thread Change", `Thread selected via props: ${propsThreadId}`, "info");
     }
-  }, [propsThreadId, currentThreadId]);
+  }, [propsThreadId, currentThreadId, restoreStreamingState]);
 
   useEffect(() => {
     // Only handle events and local storage if not using props
@@ -314,6 +331,18 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     if (storedThreadId && effectiveUserId) {
       setLocalThreadId(storedThreadId);
       loadThreadMessages(storedThreadId);
+      // Try to restore streaming state for stored thread (now async)
+      const tryRestoreStored = async () => {
+        try {
+          const restored = await restoreStreamingState(storedThreadId);
+          if (restored) {
+            debugLog.addEvent("Initialization", `Restored streaming state for stored thread: ${storedThreadId}`, "info");
+          }
+        } catch (error) {
+          console.warn('[SmartChatInterface] Error restoring state for stored thread:', error);
+        }
+      };
+      tryRestoreStored();
       debugLog.addEvent("Initialization", `Loading stored thread: ${storedThreadId}`, "info");
     } else {
       setInitialLoading(false);
@@ -337,8 +366,8 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
           correlationId
         });
         
-        // Force reload messages to show latest state, especially for completed/restored responses
-        loadThreadMessages(currentThreadId, restored || completed);
+        // Always reload messages to show latest state
+        loadThreadMessages(currentThreadId);
         
         // If this was a restoration event, also dispatch to any listening components
         if (restored || completed) {
@@ -355,20 +384,15 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
 
   // Auto-scroll is now handled by the useAutoScroll hook
 
-  const loadThreadMessages = async (threadId: string, forceReload: boolean = false) => {
+  const loadThreadMessages = async (threadId: string) => {
     if (!threadId || !effectiveUserId) {
       setInitialLoading(false);
       return;
     }
     
-    if (loadedThreadRef.current === threadId && !forceReload) {
+    if (loadedThreadRef.current === threadId) {
       debugLog.addEvent("Thread Loading", `Thread ${threadId} already loaded, skipping`, "info");
       return;
-    }
-    
-    if (forceReload) {
-      debugLog.addEvent("Thread Loading", `Force reloading thread ${threadId}`, "info");
-      loadedThreadRef.current = null; // Reset to ensure proper reload
     }
     
     setInitialLoading(true);
@@ -654,9 +678,9 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       // Start streaming chat for all queries
       await startStreamingChat(
         message,
-        threadId,
         effectiveUserId,
-        'JOURNAL_SPECIFIC',
+        threadId,
+        conversationContext,
         {
           useAllEntries: queryClassification.useAllEntries || false,
           hasPersonalPronouns: message.toLowerCase().includes('i ') || message.toLowerCase().includes('my '),
@@ -950,14 +974,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
         </div>
       </div>
       
-      <div className="chat-content flex-1 overflow-hidden flex flex-col">
-        {/* Recovery button for stuck states */}
-        <ChatRecoveryButton 
-          isStuck={isStuck} 
-          onForceRecovery={forceRecovery}
-          className="mx-4 mt-4"
-        />
-        
+      <div className="chat-content flex-1 overflow-hidden">
         {initialLoading ? (
           <div className="flex items-center justify-center h-full">
             <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></div>
