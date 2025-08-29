@@ -101,13 +101,7 @@ BEFORE analyzing the current message standalone, you MUST:
 3. Determine if this is a follow-up to previous journal analysis discussions
 4. Check if the user is responding to clarification questions or continuing analysis requests
 5. Look for conversational patterns that indicate ongoing journal-specific discussions
-
-**CONTEXT-DEPENDENT CLASSIFICATION RULES (HIGHEST PRIORITY):**
-- If the conversation shows ongoing journal analysis discussion → classify as JOURNAL_SPECIFIC
-- If user is responding to assistant's clarification questions about journal analysis → JOURNAL_SPECIFIC  
-- If conversation contains previous analysis requests and user continues the topic → JOURNAL_SPECIFIC
-- If assistant previously offered insights and user asks follow-up questions → JOURNAL_SPECIFIC
-- If conversation shows analysis flow progression → prevent NEEDS_CLARIFICATION loops
+6. Your job is to classify basis ongoing conversation context provided to you so that there is a fluid 1-1 conversation going on with the user and yourself. Use your best logic and emotional intelligence and wear the hat of a brilliant conversationalist who everybody confides in and loves talking and then decide the classification.
 
 **CONVERSATION FLOW EXAMPLES:**
 - User: "analyze me" → Assistant: analysis response → User: "what regret?" → JOURNAL_SPECIFIC (not NEEDS_CLARIFICATION)
