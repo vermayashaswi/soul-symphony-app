@@ -458,16 +458,28 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       // If no thread exists, try to create one if we have the callback
       if (onCreateNewThread) {
         debugLog.addEvent("Thread Creation", "No thread selected, creating new thread", "info");
-        const newThreadId = await onCreateNewThread();
-        if (newThreadId) {
-          threadId = newThreadId;
-          if (!propsThreadId) {
-            setLocalThreadId(newThreadId);
+        try {
+          const newThreadId = await onCreateNewThread();
+          if (newThreadId) {
+            threadId = newThreadId;
+            if (!propsThreadId) {
+              setLocalThreadId(newThreadId);
+            }
+            debugLog.addEvent("Thread Creation", `New thread created successfully: ${newThreadId}`, "success");
+          } else {
+            toast({
+              title: "Error",
+              description: "Failed to create new conversation",
+              variant: "destructive"
+            });
+            debugLog.addEvent("Thread Creation", "Failed to create new thread - null response", "error");
+            return;
           }
-        } else {
+        } catch (createError: any) {
+          debugLog.addEvent("Thread Creation", `Exception creating thread: ${createError.message}`, "error");
           toast({
             title: "Error",
-            description: "Failed to create new conversation",
+            description: `Failed to create conversation: ${createError.message}`,
             variant: "destructive"
           });
           return;

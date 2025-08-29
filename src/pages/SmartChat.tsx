@@ -98,6 +98,8 @@ const SmartChat = () => {
       console.log('[SmartChat] Creating new thread for user:', user.id);
       
       const newThreadId = uuidv4();
+      
+      // Enhanced error handling for thread creation
       const { error } = await supabase
         .from('chat_threads')
         .insert({
@@ -109,10 +111,31 @@ const SmartChat = () => {
         });
       
       if (error) {
-        console.error("[SmartChat] Error creating new thread:", error);
+        console.error("[SmartChat] Error creating new thread:", {
+          error_code: error.code,
+          error_message: error.message,
+          error_details: error.details,
+          error_hint: error.hint,
+          user_id: user.id,
+          new_thread_id: newThreadId
+        });
+        
+        // Enhanced error messages for common issues
+        let errorMessage = "Failed to create new conversation";
+        if (error.message?.includes('row-level security') || error.code === 'PGRST116') {
+          errorMessage = "Authentication issue detected. Please refresh the page and try again.";
+          console.error("[SmartChat] RLS POLICY VIOLATION during thread creation:", {
+            userId: user.id,
+            error_details: error
+          });
+        } else if (error.code === '23505') {
+          // Duplicate key error
+          errorMessage = "A conversation with this ID already exists. Please try again.";
+        }
+        
         toast({
           title: "Error",
-          description: "Failed to create new conversation",
+          description: errorMessage,
           variant: "destructive"
         });
         return null;
@@ -123,10 +146,14 @@ const SmartChat = () => {
       localStorage.setItem("lastActiveChatThreadId", newThreadId);
       return newThreadId;
     } catch (error) {
-      console.error("[SmartChat] Exception creating new thread:", error);
+      console.error("[SmartChat] Exception creating new thread:", {
+        error,
+        userId: user.id,
+        stack: error instanceof Error ? error.stack : 'No stack available'
+      });
       toast({
         title: "Error", 
-        description: "Failed to create new conversation",
+        description: "An unexpected error occurred while creating the conversation. Please try again.",
         variant: "destructive"
       });
       return null;

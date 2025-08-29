@@ -120,7 +120,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
         // If no processing time, check for very recent assistant messages
         const { data: recentMessages, error } = await supabase
           .from('chat_messages')
-          .select('id, created_at, content')
+          .select('id, created_at, content, idempotency_key')
           .eq('thread_id', threadId)
           .eq('sender', 'assistant')
           .gte('created_at', new Date(Date.now() - 5 * 60 * 1000).toISOString()) // Last 5 minutes
@@ -140,7 +140,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
       // Query for assistant messages created around the processing time
       const { data: messages, error } = await supabase
         .from('chat_messages')
-        .select('id, created_at, content')
+        .select('id, created_at, content, idempotency_key')
         .eq('thread_id', threadId)
         .eq('sender', 'assistant')
         .gte('created_at', searchStartTime.toISOString())
@@ -161,18 +161,19 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
         const isProcessingMessage = latestMessage.content.includes('...') || 
                                    latestMessage.content.length < 10;
         
-        // Also check for potential duplicate by content similarity
+        // Also check for potential duplicate by idempotency key or content
         const hasDuplicates = messages.length > 1 && 
           messages.some((msg, index) => 
-            index > 0 && 
-            msg.content.trim() === messages[0].content.trim() && 
-            msg.content.length > 20
+            index > 0 && (
+              (msg.idempotency_key && msg.idempotency_key === messages[0].idempotency_key) ||
+              (msg.content.trim() === messages[0].content.trim() && msg.content.length > 20)
+            )
           );
         
         if (hasDuplicates) {
           console.warn(`[useStreamingChat] Detected duplicate messages for thread ${threadId}`, {
             messageCount: messages.length,
-            similarContent: messages.map(m => m.content.substring(0, 50)).join(' | ')
+            duplicateIdempotencyKeys: messages.map(m => m.idempotency_key).filter(k => k)
           });
         }
         

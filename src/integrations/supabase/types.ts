@@ -21,6 +21,7 @@ export type Database = {
           created_at: string
           has_numeric_result: boolean | null
           id: string
+          idempotency_key: string | null
           is_processing: boolean | null
           reference_entries: Json | null
           request_correlation_id: string | null
@@ -38,6 +39,7 @@ export type Database = {
           created_at?: string
           has_numeric_result?: boolean | null
           id?: string
+          idempotency_key?: string | null
           is_processing?: boolean | null
           reference_entries?: Json | null
           request_correlation_id?: string | null
@@ -55,6 +57,7 @@ export type Database = {
           created_at?: string
           has_numeric_result?: boolean | null
           id?: string
+          idempotency_key?: string | null
           is_processing?: boolean | null
           reference_entries?: Json | null
           request_correlation_id?: string | null
