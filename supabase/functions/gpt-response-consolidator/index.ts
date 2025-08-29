@@ -130,6 +130,10 @@ serve(async (req) => {
       });
     }
 
+    // Initialize variables at function scope to avoid scoping issues
+    let hasJournalEntries = false;
+    let journalEntries: any[] = [];
+
     // Data integrity validation - check for processed research results
     if (researchResults && researchResults.length > 0) {
       console.log(`[RESEARCH DATA VALIDATION] ${consolidationId}:`, {
@@ -150,7 +154,7 @@ serve(async (req) => {
         r?.executionResults?.sqlResults || r?.executionResults?.vectorResults);
       
       // PHASE 4 FIX: Check specifically for journal entries from mandatory vector search
-      const hasJournalEntries = researchResults.some((r: any) => 
+      hasJournalEntries = researchResults.some((r: any) => 
         (r?.executionResults?.vectorResults && r.executionResults.vectorResults.length > 0) ||
         (r?.executionSummary?.resultType === 'journal_content_retrieval' && r.executionSummary?.count > 0)
       );
@@ -181,7 +185,7 @@ serve(async (req) => {
       }
       
       // PHASE 1 FIX: Extract and prominently feature journal entries
-      const journalEntries = researchResults.flatMap((research: any, index: number) => {
+      journalEntries = researchResults.flatMap((research: any, index: number) => {
         // Extract journal entries from vector search results
         const vectorResults = research?.executionResults?.vectorResults || [];
         const processedEntries = research?.executionSummary?.sampleEntries || [];
@@ -464,7 +468,7 @@ Your response MUST be structured with:
     **USER QUESTION:** "${userMessage}"
     
     **JOURNAL ENTRIES FOUND (PHASE 2 FIX - Prominently Featured):**
-    ${journalEntries.length > 0 ? journalEntries.map((entry: any, i: number) => {
+    ${journalEntries && journalEntries.length > 0 ? journalEntries.map((entry: any, i: number) => {
       const entryDate = new Date(entry.created_at).toLocaleDateString('en-US', { 
         timeZone: userTimezone, 
         month: 'long', 
@@ -773,7 +777,7 @@ Similarity: ${entry.similarity || 'N/A'}`;
         }));
 
         // PHASE 3 FIX: Enhanced reference entries with full context
-        const referenceEntries = journalEntries.map((entry: any) => ({
+        const referenceEntries = (journalEntries || []).map((entry: any) => ({
           id: entry.id,
           content_snippet: entry.content.substring(0, 500), // Increased from 200 to 500 chars
           full_content: entry.content, // Store full content for better context
