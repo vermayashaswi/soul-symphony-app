@@ -49,12 +49,6 @@ const App: React.FC = () => {
         // Apply a CSS class to the document body for theme-specific overrides
         document.body.classList.add('app-initialized');
         
-        // Initialize service worker message handler for notification navigation
-        if ('serviceWorker' in navigator) {
-          const { serviceWorkerMessageHandler } = await import('./services/serviceWorkerMessageHandler');
-          serviceWorkerMessageHandler.initialize();
-        }
-        
         // Initialize mobile optimization service first
         try {
           appLogger.debug('Initializing mobile optimization service');
