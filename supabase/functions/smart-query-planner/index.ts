@@ -1339,6 +1339,7 @@ ANALYSIS STATUS:
 
 SUB-QUESTION/QUERIES GENERATION GUIDELINE (MANDATORY): 
 - Break down user query (MANDATORY: remember that current user message might not be a direct query, so you'll have to look in to the conversation context provided to you and look at last user messages to guess the "ASK" and accordingly frame the sub-questions) into ATLEAST 2 sub-questions or more such that all sub-questions can be consolidated to answer the user's ASK 
+- **MANDATORY: Understand user queries in context of PREVIOUS AI RESPONSES with HIGH CONFIDENCE** - If chatbot said "You've been dealing with hope and anxiety emotions" and user asks "What's been their scores", focus ONLY on hope and anxiety scores. If AI mentioned "work stress themes" and user asks "how often", focus specifically on work stress frequency.
 - CRITICAL: When analyzing vague queries like "I'm confused between these two options" or "help me decide", look at the FULL conversation context to understand what the two options are (e.g., "jobs vs startup", "career choices", etc.) and generate specific sub-questions about those topics
 - If user's query is vague, examine the complete conversation history to derive what the user wants to know and frame sub-questions that address their specific decision or dilemma
 - For career/life decisions: Generate sub-questions about patterns, emotions, and insights related to the specific options being considered
