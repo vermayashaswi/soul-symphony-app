@@ -800,15 +800,13 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       // Start streaming chat for all queries
       await startStreamingChat(
         message,
-        threadId,
-        effectiveUserId,
-        'JOURNAL_SPECIFIC',
         {
           useAllEntries: queryClassification.useAllEntries || false,
           hasPersonalPronouns: message.toLowerCase().includes('i ') || message.toLowerCase().includes('my '),
           hasExplicitTimeReference: /\b(last week|yesterday|this week|last month|today|recently|lately)\b/i.test(message),
           threadMetadata: {}
-        }
+        },
+        threadId
       );
       
       // Streaming owns the lifecycle - NO manual state clearing needed
@@ -1056,7 +1054,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
               variant="outline"
               size="sm"
               onClick={() => {
-                stopStreaming(currentThreadId);
+                stopStreaming();
                 // NO manual state clearing - useStreamingChat handles cancellation
               }}
               aria-label="Cancel processing"
