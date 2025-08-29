@@ -77,15 +77,44 @@ async function gptClassifyMessage(
     };
   }
 
+  // Enhanced conversation context processing - last 10 messages with proper ordering
   const contextString = conversationContext.length > 0 
-    ? `\n\nCONVERSATION CONTEXT:\n${conversationContext.slice(-6).map((msg) => `${msg.role || msg.sender || 'user'}: ${msg.content}`).join('\n')}`
-    : '\n\nCONVERSATION CONTEXT:\nNo prior context';
+    ? `\n\nCONVERSATION CONTEXT (Last ${Math.min(conversationContext.length, 10)} messages, chronological order):\n${
+        conversationContext
+          .slice(-10) // Expand to last 10 messages
+          .map((msg, index) => {
+            // Standardize role mapping with proper sender field handling
+            const role = msg.sender === 'user' ? 'user' : (msg.sender === 'assistant' ? 'assistant' : (msg.role || 'user'));
+            const messageOrder = index + 1;
+            const timestamp = msg.created_at ? new Date(msg.created_at).toLocaleString() : '';
+            return `[Message ${messageOrder}] ${role.toUpperCase()}: ${msg.content}${timestamp ? ` (${timestamp})` : ''}`;
+          }).join('\n')
+      }`
+    : '\n\nCONVERSATION CONTEXT:\nNo prior context - this is the first message in the conversation';
 
-  const classificationPrompt = `You are the a chat conversation query classifier for a voice journaling app, SOuLO's chatot called "Ruh'. On this app users record their journal entries and SOuLO application has all their entries, emotions, themes, time of entry, entry text etc. available for analysis. People visit the Ruh chatbot on SOuLO to converse about their feelings, problems, share stories, get analysis out of their regular journaling etc. 
-  
-  Use the conversation context provided to you to classify the latest user message and return ONE JSON object that exactly matches the schema. Be decisive and consistent. Below we have the categories and information about what happens downstream in SOuLO app's back end code if you classify a certain way
+  const classificationPrompt = `You are the chat conversation query classifier for a voice journaling app, SOuLO's chatbot called "Ruh". On this app users record their journal entries and SOuLO application has all their entries, emotions, themes, time of entry, entry text etc. available for analysis. People visit the Ruh chatbot on SOuLO to converse about their feelings, problems, share stories, get analysis out of their regular journaling etc.
 
-**STRONG TRIGGER WORD OVERRIDE (HIGHEST PRIORITY):**
+🚨 **MANDATORY CONTEXT ANALYSIS FIRST** 🚨
+BEFORE analyzing the current message standalone, you MUST:
+1. Read the ENTIRE conversation context provided
+2. Identify the conversation flow and topic continuity
+3. Determine if this is a follow-up to previous journal analysis discussions
+4. Check if the user is responding to clarification questions or continuing analysis requests
+5. Look for conversational patterns that indicate ongoing journal-specific discussions
+
+**CONTEXT-DEPENDENT CLASSIFICATION RULES (HIGHEST PRIORITY):**
+- If the conversation shows ongoing journal analysis discussion → classify as JOURNAL_SPECIFIC
+- If user is responding to assistant's clarification questions about journal analysis → JOURNAL_SPECIFIC  
+- If conversation contains previous analysis requests and user continues the topic → JOURNAL_SPECIFIC
+- If assistant previously offered insights and user asks follow-up questions → JOURNAL_SPECIFIC
+- If conversation shows analysis flow progression → prevent NEEDS_CLARIFICATION loops
+
+**CONVERSATION FLOW EXAMPLES:**
+- User: "analyze me" → Assistant: analysis response → User: "what regret?" → JOURNAL_SPECIFIC (not NEEDS_CLARIFICATION)
+- User: "I'm sad" → Assistant: asks clarification → User: "you tell me" → JOURNAL_SPECIFIC (user wants analysis)
+- User: analysis request → Assistant: analysis → User: "check it" → JOURNAL_SPECIFIC (referring to analysis)
+
+**STRONG TRIGGER WORD OVERRIDE (SECOND PRIORITY):**
 - Messages similar to "analyze me", "score me", "rate me", "evaluate me", "assess me", "you tell me about my", "what am I like", "scale of [number]", "you help me uncover this" should ALWAYS be JOURNAL_SPECIFIC regardless of typos or informal grammar
 - Messages with personal pronouns + analysis requests ("analyze if I", "score me on", "rate my") = JOURNAL_SPECIFIC
 - Numerical scoring requests ("scale of 100", "1 to 10", "rate from 1-5") = JOURNAL_SPECIFIC
@@ -107,11 +136,19 @@ async function gptClassifyMessage(
   * If user previously expressed feelings/problems and now wants analysis → JOURNAL_SPECIFIC
 - Only upgrade to JOURNAL_SPECIFIC if the user is confident and specific, not tentative
 
-**CLARIFICATION LOOP PREVENTION:**
-- If user has already provided analysis request + specific parameters (like scoring method), do NOT ask for more clarification
+**CLARIFICATION LOOP PREVENTION (CRITICAL):**
+- NEVER classify follow-up messages in ongoing journal analysis as NEEDS_CLARIFICATION
 - If conversation shows user trying to proceed with analysis, classify as JOURNAL_SPECIFIC
-- Only use NEEDS_CLARIFICATION for genuinely vague messages or tentative/uncertain responses
+- If user is responding to previous analysis or clarification → JOURNAL_SPECIFIC
+- Only use NEEDS_CLARIFICATION for genuinely vague INITIAL messages without context
+- If conversation has 3+ messages and analysis is being discussed → JOURNAL_SPECIFIC
 - If the user acknowledged the chatbot's response, classify as "GENERAL_MENTAL_HEALTH"
+
+**CONVERSATION CONTINUITY RULES:**
+- Messages like "But what regret are we talking about?" in analysis context → JOURNAL_SPECIFIC
+- Messages like "I don't know you tell me" after analysis requests → JOURNAL_SPECIFIC  
+- Pronoun references ("it", "that", "this") in analysis conversations → JOURNAL_SPECIFIC
+- Follow-up questions about assistant's analysis → JOURNAL_SPECIFIC
 
 Categories (choose exactly one):
 - JOURNAL_SPECIFIC: First-person, analyzable questions about the user's own patterns/feelings/behaviors. Examples: "How have I felt this month?", "Did meditation help me?", "What are my stress patterns lately?", "Check my entries for anxiety", "Look at my data from last week". Post this classification in downstream, SOuLO does a RAG anaysis of user's journal entries and helps them out with the coversational query or any ask that they might have about their personal,physical, mental or emotional wellbeing. Even if you are 50% confident that you can go ahead and analyze, classify as journal specific

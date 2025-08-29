@@ -48,40 +48,46 @@ export async function processChatMessage(
       strategy: complexityAnalysis.recommendedStrategy
     });
     
-    // PHASE 1: Enhanced context retrieval with better conversation loading
-    console.log('[ChatService] Loading enhanced conversation context');
+    // PHASE 1: Enhanced context retrieval with better conversation loading (expanded to 10 messages)
+    console.log('[ChatService] Loading enhanced conversation context with expanded window');
     const { data: previousMessages } = await supabase
       .from('chat_messages')
-      .select('content, sender, role, created_at')
+      .select('content, sender, role, created_at, id')
       .eq('thread_id', threadId)
       .order('created_at', { ascending: false })
-      .limit(10); // Increased limit for better context
+      .limit(10); // Expanded limit for richer context analysis
 
-    // Build trimmed & capped conversational context
-    const MAX_CONTEXT_CHARS = 1600;
-    const MAX_MSG_CHARS = 500;
+    // Build enhanced conversational context with proper role mapping and ordering
+    const MAX_CONTEXT_CHARS = 2000; // Increased for better context
+    const MAX_MSG_CHARS = 600; // Increased for better message content
     const baseContext = previousMessages ?
       [...previousMessages]
-        .reverse()
-        .map(msg => ({
-          role: msg.sender === 'user' ? 'user' : 'assistant',
+        .reverse() // Chronological order (oldest to newest)
+        .map((msg, index) => ({
+          // Standardized role mapping using sender field
+          sender: msg.sender, // Keep original sender
+          role: msg.sender === 'user' ? 'user' : 'assistant', // Standardized role
           content: (msg.content || '').replace(/\s+/g, ' ').slice(0, MAX_MSG_CHARS).trim(),
-          timestamp: msg.created_at
+          created_at: msg.created_at,
+          messageOrder: index + 1, // Add message ordering
+          id: msg.id
         })) : [];
 
-    // Keep up to last 10 messages but cap total characters
+    // Keep up to last 10 messages but cap total characters for performance
     let conversationContext = baseContext.slice(-10);
     const totalChars = () => conversationContext.reduce((s, m) => s + (m.content?.length || 0), 0);
-    while (conversationContext.length > 0 && totalChars() > MAX_CONTEXT_CHARS) {
+    while (conversationContext.length > 2 && totalChars() > MAX_CONTEXT_CHARS) { // Keep at least 2 messages
       conversationContext.shift(); // drop oldest until within cap
     }
 
     const contextPreview = conversationContext.slice(-2).map(m => `${m.role}: ${m.content?.slice(0, 60)}`).join(' | ');
 
-    console.log('[ChatService] Conversation context loaded:', {
+    console.log('[ChatService] Enhanced conversation context loaded:', {
       messagesCount: conversationContext.length,
       preview: contextPreview,
-      isResumedSession: conversationContext.length > 0
+      isResumedSession: conversationContext.length > 0,
+      hasProperRoleMapping: conversationContext.every(m => m.role),
+      chronologicalOrder: conversationContext.length > 1 ? 'oldest-to-newest' : 'single-message'
     });
 
     // PHASE 3: Enhanced context-aware query classification with follow-up detection
@@ -102,12 +108,21 @@ export async function processChatMessage(
       contextLength: conversationContext.length
     });
 
-    // Classify message with conversation context for better follow-up detection
+    // Enhanced message classification with expanded conversation context and proper role tagging
+    console.log('[ChatService] Calling classifier with enhanced context:', {
+      messageLength: message.length,
+      contextMessages: conversationContext.length,
+      hasLastAssistant: !!lastAssistantMessage,
+      contextSample: conversationContext.slice(-2).map(m => `${m.role}: ${m.content.slice(0, 30)}`)
+    });
+    
     const { data: classificationData, error: classificationError } = await supabase.functions.invoke('chat-query-classifier', {
       body: { 
         message, 
-        conversationContext,
-        lastAssistantMessage: lastAssistantMessage?.content
+        conversationContext, // Now includes proper role mapping and ordering
+        lastAssistantMessage: lastAssistantMessage?.content,
+        messageCount: conversationContext.length,
+        isConversationContinuation: conversationContext.length > 0
       }
     });
 
