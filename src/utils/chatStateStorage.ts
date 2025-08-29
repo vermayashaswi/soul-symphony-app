@@ -3,19 +3,17 @@
 export interface ChatStreamingState {
   isStreaming: boolean;
   streamingMessages: any[];
-  currentUserMessage: string;
-  showBackendAnimation: boolean;
-  dynamicMessages: string[];
-  translatedDynamicMessages?: string[];
-  currentMessageIndex: number;
-  useThreeDotFallback: boolean;
+  showDynamicMessages: boolean;
+  lastUserInput: string;
+  requestStartTime: number;
+  requestCorrelationId?: string;
+  idempotencyKey?: string;
+  lastActivity?: number;
+  dynamicMessageIndex: number;
+  lastRotationTime: number;
+  retryCount: number;
   queryCategory: string;
-  expectedProcessingTime: number | null;
-  processingStartTime: number | null;
-  activeRequestId?: string | null;
-  pausedDueToBackground?: boolean;
-  savedAt?: number;
-  navigationSafe?: boolean;
+  abortController: any; // Will be null when saved/loaded
 }
 
 const CHAT_STATE_PREFIX = 'chat_streaming_state_';

@@ -237,6 +237,13 @@ export const getThreadMessages = getChatMessages;
 // Export classification helper
 export { updateUserMessageClassification } from '@/utils/chat/classificationHelpers';
 
+// Helper function to generate idempotency key
+const generateIdempotencyKey = (content: string, sender: 'user' | 'assistant', threadId: string, userId?: string) => {
+  const timestamp = Date.now();
+  const contentHash = content.slice(0, 50).toLowerCase().replace(/\s+/g, '');
+  return `${sender}_${threadId}_${userId || 'anon'}_${contentHash}_${timestamp}`;
+};
+
 // Updated saveMessage function with correct signature and idempotency support
 export const saveMessage = async (
   threadId: string, 
@@ -248,20 +255,25 @@ export const saveMessage = async (
   isInteractive?: boolean,
   interactiveOptions?: any[],
   idempotencyKey?: string,
-  analysisData?: any
+  analysisData?: any,
+  correlationId?: string
 ) => {
   console.log('[saveMessage] Starting message save:', {
     threadId,
     sender,
     userId,
     contentLength: content.length,
-    hasIdempotencyKey: !!idempotencyKey
+    hasIdempotencyKey: !!idempotencyKey,
+    hasCorrelationId: !!correlationId
   });
 
   if (!userId) {
     console.error('[saveMessage] User ID is required for saveMessage');
     return null;
   }
+
+  // Generate idempotency key if not provided
+  const finalIdempotencyKey = idempotencyKey || generateIdempotencyKey(content, sender, threadId, userId);
 
   // Process content for assistant messages to handle JSON responses
   let processedContent = content;
@@ -284,14 +296,19 @@ export const saveMessage = async (
   if (hasNumericResult !== undefined) additionalData.has_numeric_result = hasNumericResult;
   if (isInteractive) additionalData.isInteractive = isInteractive;
   if (interactiveOptions) additionalData.interactiveOptions = interactiveOptions;
-  if (idempotencyKey) additionalData.idempotency_key = idempotencyKey;
+  if (finalIdempotencyKey) additionalData.idempotency_key = finalIdempotencyKey;
   if (analysisData) additionalData.analysis_data = analysisData;
+  if (correlationId) (additionalData as any).request_correlation_id = correlationId;
 
-  console.log('[saveMessage] Processed data, calling createChatMessage');
+  console.log('[saveMessage] Processed data, calling createChatMessage with idempotency key:', finalIdempotencyKey);
   const result = await createChatMessage(threadId, processedContent, sender, userId, additionalData);
   
   if (result) {
-    console.log('[saveMessage] Message saved successfully:', result.id);
+    console.log('[saveMessage] Message saved successfully:', {
+      id: result.id,
+      idempotency_key: result.idempotency_key,
+      request_correlation_id: (result as any).request_correlation_id
+    });
   } else {
     console.error('[saveMessage] Failed to save message');
   }

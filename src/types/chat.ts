@@ -17,6 +17,7 @@ export interface ChatMessage {
   sub_query3?: string | null;
   sub_query_responses?: any[] | null;
   idempotency_key?: string | null; // For preventing duplicate messages
+  request_correlation_id?: string | null; // For tracking request-response pairs
   isInteractive?: boolean;
   interactiveOptions?: InteractiveOption[];
   references?: any[]; // Alias for reference_entries for backward compatibility
