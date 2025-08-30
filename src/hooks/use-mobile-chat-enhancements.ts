@@ -149,7 +149,7 @@ export const useMobileChatEnhancements = ({
     window.addEventListener('chatCompletionDetected', handleChatCompletion as EventListener);
     window.addEventListener('chatStateUpdated', handleStateUpdate as EventListener);
     
-    // Enhanced mobile browser specific enhancements with focus/visibility handling
+    // Mobile browser specific enhancements
     if (platform === 'android' || platform === 'ios') {
       // Add viewport change listener for mobile browsers
       const handleViewportChange = () => {
@@ -160,17 +160,6 @@ export const useMobileChatEnhancements = ({
             detail: { threadId, platform }
           }));
         }, 150);
-      };
-
-      // Enhanced mobile browser focus/visibility change handling
-      const handleMobileFocus = () => {
-        console.log('[MobileChatEnhancements] Mobile browser focus/visibility change, forcing state sync');
-        // Trigger immediate state synchronization
-        setTimeout(() => {
-          window.dispatchEvent(new CustomEvent('mobileFocusStateSync', {
-            detail: { threadId, platform, timestamp: Date.now() }
-          }));
-        }, 100);
       };
 
       // Listen for orientation changes which can affect chat state
@@ -185,18 +174,12 @@ export const useMobileChatEnhancements = ({
       
       window.addEventListener('resize', handleResize);
       
-      // Enhanced focus/visibility change listeners for mobile browsers
-      window.addEventListener('focus', handleMobileFocus);
-      document.addEventListener('visibilitychange', handleMobileFocus);
-      
       // Cleanup function
       return () => {
         window.removeEventListener('chatCompletionDetected', handleChatCompletion as EventListener);
         window.removeEventListener('chatStateUpdated', handleStateUpdate as EventListener);
         window.removeEventListener('orientationchange', handleViewportChange);
         window.removeEventListener('resize', handleResize);
-        window.removeEventListener('focus', handleMobileFocus);
-        document.removeEventListener('visibilitychange', handleMobileFocus);
         clearTimeout(resizeTimeout);
       };
     }

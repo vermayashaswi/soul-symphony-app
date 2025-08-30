@@ -495,7 +495,6 @@ export default function MobileChatInterface({
     }
   }, [threadId, user?.id, restoreStreamingState, isIOSDevice]);
   
-  // Enhanced event handling for state synchronization
   useEffect(() => {
     const onThreadChange = (event: CustomEvent) => {
       if (event.detail.threadId) {
@@ -504,35 +503,13 @@ export default function MobileChatInterface({
         debugLog.addEvent("Thread Change", `Thread selected: ${event.detail.threadId}`, "info");
       }
     };
-
-    const onChatCompletion = (event: CustomEvent) => {
-      const { threadId: completedThreadId } = event.detail;
-      if (completedThreadId === threadId) {
-        debugLog.addEvent("Chat Completion", `Completion detected for thread: ${completedThreadId}`, "info");
-        // Force reload messages to show the completed response
-        loadThreadMessages(completedThreadId);
-      }
-    };
-
-    const onChatStateUpdate = (event: CustomEvent) => {
-      const { threadId: updatedThreadId, completed } = event.detail;
-      if (updatedThreadId === threadId && completed) {
-        debugLog.addEvent("Chat State", `State update with completion for thread: ${updatedThreadId}`, "info");
-        // Force reload messages to ensure UI shows completed state
-        loadThreadMessages(updatedThreadId);
-      }
-    };
     
     window.addEventListener('threadSelected' as any, onThreadChange);
-    window.addEventListener('chatCompletionDetected' as any, onChatCompletion);
-    window.addEventListener('chatStateUpdated' as any, onChatStateUpdate);
     
     return () => {
       window.removeEventListener('threadSelected' as any, onThreadChange);
-      window.removeEventListener('chatCompletionDetected' as any, onChatCompletion);
-      window.removeEventListener('chatStateUpdated' as any, onChatStateUpdate);
     };
-  }, [threadId]);
+  }, []);
 
   // Auto-scroll is now handled by the useAutoScroll hook
 
@@ -577,22 +554,18 @@ export default function MobileChatInterface({
       const chatMessages = await getThreadMessages(currentThreadId, user.id);
       
       if (chatMessages && chatMessages.length > 0) {
-        // Enhanced message filtering - include all messages, not just non-processing
         const uiMessages = chatMessages
+          .filter(msg => !msg.is_processing)
           .map(msg => ({
             role: msg.sender as 'user' | 'assistant',
             content: msg.content,
             references: msg.reference_entries ? Array.isArray(msg.reference_entries) ? msg.reference_entries : [] : undefined,
             hasNumericResult: msg.has_numeric_result
-          }))
-          // Only filter out truly empty or invalid messages
-          .filter(msg => msg.content && msg.content.trim().length > 0);
+          }));
         
         setMessages(uiMessages);
         setShowSuggestions(false);
         loadedThreadRef.current = currentThreadId;
-        
-        debugLog.addEvent("Message Loading", `Loaded ${uiMessages.length} messages for thread: ${currentThreadId}`, "info");
       } else {
         setMessages([]);
         setShowSuggestions(true);
