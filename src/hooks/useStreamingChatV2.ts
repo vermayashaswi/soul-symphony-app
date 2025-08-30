@@ -3,6 +3,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { saveChatStreamingState, getChatStreamingState, clearChatStreamingState } from '@/utils/chatStateStorage';
 import { useAuth } from '@/contexts/AuthContext';
 
+// Capacitor imports with error handling
+let CapacitorApp: any = null;
+try {
+  CapacitorApp = require('@capacitor/app').App;
+} catch (error) {
+  console.log('[useStreamingChatV2] Capacitor App plugin not available (web environment)');
+}
+
 // Streaming message interface
 export interface StreamingMessage {
   id: string;
@@ -17,6 +25,9 @@ export interface ThreadStreamingState {
   isStreaming: boolean;
   streamingMessages: StreamingMessage[];
   showDynamicMessages: boolean;
+  showBackendAnimation: boolean;
+  pausedDueToBackground: boolean;
+  navigationSafe: boolean;
   lastUserInput: string;
   requestStartTime: number;
   requestCorrelationId?: string;
@@ -53,6 +64,9 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
       isStreaming: false,
       streamingMessages: [],
       showDynamicMessages: false,
+      showBackendAnimation: false,
+      pausedDueToBackground: false,
+      navigationSafe: true,
       lastUserInput: '',
       requestStartTime: 0,
       requestCorrelationId: undefined,
@@ -85,8 +99,8 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
       setState(updatedState);
     }
     
-    // Persist state if streaming
-    if (updatedState.isStreaming) {
+    // Persist state during any active processing phase
+    if (updatedState.isStreaming || updatedState.showBackendAnimation || updatedState.pausedDueToBackground) {
       saveStreamingState(threadId, updatedState);
     }
   }, [threadId]);
@@ -184,15 +198,95 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
     }
   }, []);
 
-  // Restore streaming state when switching threads or returning to app
+  // Enhanced visibility and app lifecycle handling
   useEffect(() => {
     if (!threadId || !user?.id) return;
+
+    let timeoutId: NodeJS.Timeout;
+    let retryCount = 0;
+    const maxRetries = 3;
+
+    // Handle page visibility changes
+    const handleVisibilityChange = () => {
+      const isVisible = !document.hidden;
+      console.log(`[useStreamingChatV2] Page visibility changed: ${isVisible ? 'visible' : 'hidden'}`);
+      
+      if (isVisible) {
+        // Page became visible - check if we need to restore state
+        setTimeout(() => restoreStateIfStillValid(), 100);
+      } else {
+        // Page became hidden - mark state as background-paused if active
+        const currentState = getThreadState(threadId);
+        if (currentState.isStreaming || currentState.showBackendAnimation) {
+          updateThreadState(threadId, {
+            pausedDueToBackground: true,
+            navigationSafe: false,
+            lastActivity: Date.now()
+          });
+        }
+      }
+    };
+
+    // Handle Capacitor app lifecycle (mobile apps)
+    const handleAppStateChange = (state: { isActive: boolean }) => {
+      console.log(`[useStreamingChatV2] App state changed: ${state.isActive ? 'active' : 'inactive'}`);
+      
+      if (state.isActive) {
+        // App became active - restore state
+        setTimeout(() => restoreStateIfStillValid(), 100);
+      } else {
+        // App became inactive - preserve state
+        const currentState = getThreadState(threadId);
+        if (currentState.isStreaming || currentState.showBackendAnimation) {
+          updateThreadState(threadId, {
+            pausedDueToBackground: true,
+            navigationSafe: false,
+            lastActivity: Date.now()
+          });
+        }
+      }
+    };
+
+    // 30-second timeout fallback mechanism
+    const setupTimeoutFallback = () => {
+      const currentState = getThreadState(threadId);
+      if (currentState.isStreaming || currentState.showBackendAnimation) {
+        timeoutId = setTimeout(() => {
+          console.log(`[useStreamingChatV2] 30s timeout reached for thread: ${threadId}, checking completion`);
+          
+          checkIfRequestCompleted(threadId, user.id || '', currentState.requestCorrelationId)
+            .then((completed) => {
+              if (!completed && retryCount < maxRetries) {
+                retryCount++;
+                console.log(`[useStreamingChatV2] Retry ${retryCount}/${maxRetries} for thread: ${threadId}`);
+                setupTimeoutFallback(); // Setup another timeout
+              } else if (!completed) {
+                console.log(`[useStreamingChatV2] Max retries reached, cleaning up stuck state for thread: ${threadId}`);
+                updateThreadState(threadId, {
+                  isStreaming: false,
+                  showBackendAnimation: false,
+                  showDynamicMessages: false,
+                  pausedDueToBackground: false,
+                  navigationSafe: true
+                });
+                clearChatStreamingState(threadId);
+              } else {
+                console.log(`[useStreamingChatV2] Request completed during timeout check for thread: ${threadId}`);
+                clearChatStreamingState(threadId);
+              }
+            })
+            .catch((error) => {
+              console.error(`[useStreamingChatV2] Error in timeout fallback: ${error}`);
+            });
+        }, 30000); // 30 seconds
+      }
+    };
 
     const restoreStateIfStillValid = async () => {
       try {
         // Restore state if it was saved and still valid
         const savedState = getChatStreamingState(threadId);
-        if (savedState && savedState.isStreaming) {
+        if (savedState && (savedState.isStreaming || savedState.showBackendAnimation || savedState.pausedDueToBackground)) {
           console.log(`[useStreamingChatV2] Found saved streaming state for thread: ${threadId}`);
           
           // Check if the request might still be processing (within last 5 minutes)
@@ -212,7 +306,9 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
               const restoredState = {
                 ...createInitialState(),
                 ...savedState,
-                abortController: new AbortController() // Create new abort controller
+                abortController: new AbortController(), // Create new abort controller
+                pausedDueToBackground: false, // Clear background pause flag
+                navigationSafe: true // Mark as navigation safe
               };
               
               updateThreadState(threadId, restoredState);
@@ -222,6 +318,9 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
               if (savedState.queryCategory === 'JOURNAL_SPECIFIC' && savedState.showDynamicMessages) {
                 generateStreamingMessages(threadId);
               }
+              
+              // Setup timeout fallback for restored state
+              setupTimeoutFallback();
               return;
             } else {
               console.log(`[useStreamingChatV2] Request completed while away, clearing saved state for thread: ${threadId}`);
@@ -244,7 +343,39 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
       }
     };
 
+    // Add event listeners
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Add Capacitor app lifecycle listener if available
+    let appStateChangeListener: any = null;
+    if (CapacitorApp) {
+      CapacitorApp.addListener('appStateChange', handleAppStateChange)
+        .then((listener: any) => {
+          appStateChangeListener = listener;
+        })
+        .catch((error: any) => {
+          console.log('[useStreamingChatV2] Failed to add app state listener:', error);
+        });
+    }
+
+    // Initial state restoration
     restoreStateIfStillValid();
+    
+    // Setup initial timeout fallback
+    setupTimeoutFallback();
+
+    // Cleanup function
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      
+      if (appStateChangeListener) {
+        appStateChangeListener.remove();
+      }
+      
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
   }, [threadId, user?.id, getThreadState, updateThreadState, checkIfRequestCompleted]);
 
   // Add streaming message to current thread
@@ -343,6 +474,9 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
       isStreaming: true,
       streamingMessages: [],
       showDynamicMessages: messageCategory === 'JOURNAL_SPECIFIC',
+      showBackendAnimation: messageCategory !== 'JOURNAL_SPECIFIC',
+      pausedDueToBackground: false,
+      navigationSafe: true,
       lastUserInput: messageContent,
       requestStartTime: Date.now(),
       requestCorrelationId: correlationId,
@@ -419,7 +553,10 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
         updateThreadState(targetThreadId, {
           ...currentState,
           isStreaming: false,
-          showDynamicMessages: false
+          showDynamicMessages: false,
+          showBackendAnimation: false,
+          pausedDueToBackground: false,
+          navigationSafe: true
         });
         return;
       }
@@ -431,7 +568,10 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
         ...currentState,
         isStreaming: false,
         streamingMessages: [],
-        showDynamicMessages: false
+        showDynamicMessages: false,
+        showBackendAnimation: false,
+        pausedDueToBackground: false,
+        navigationSafe: true
       });
 
       // Clear saved state since request is complete
@@ -460,7 +600,10 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
         updateThreadState(targetThreadId, {
           ...currentState,
           isStreaming: false,
-          showDynamicMessages: false
+          showDynamicMessages: false,
+          showBackendAnimation: false,
+          pausedDueToBackground: false,
+          navigationSafe: true
         });
       }
     }
@@ -478,6 +621,9 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
     updateThreadState(threadToStop, {
       isStreaming: false,
       showDynamicMessages: false,
+      showBackendAnimation: false,
+      pausedDueToBackground: false,
+      navigationSafe: true,
       streamingMessages: [],
       abortController: null
     });
@@ -491,7 +637,8 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
     const threadToClear = targetThreadId || threadId;
     updateThreadState(threadToClear, {
       streamingMessages: [],
-      showDynamicMessages: false
+      showDynamicMessages: false,
+      showBackendAnimation: false
     });
   }, [threadId, updateThreadState]);
 
