@@ -20,26 +20,64 @@ export const useMobileChatEnhancements = ({
 
   // Enhanced event listener for chat completion detection
   const handleChatCompletion = useCallback((event: CustomEvent) => {
-    const { threadId: eventThreadId, correlationId, restoredFromBackground } = event.detail;
+    const { threadId: eventThreadId, correlationId, restoredFromBackground, source } = event.detail;
     
     console.log('[MobileChatEnhancements] Chat completion detected:', {
       eventThreadId,
       currentThreadId: threadId,
       correlationId,
-      restoredFromBackground
+      restoredFromBackground,
+      source
     });
     
     // Only handle events for the current thread
     if (eventThreadId === threadId && onCompletionDetected) {
       onCompletionDetected({ threadId: eventThreadId, correlationId });
       
-      // Force a small delay to ensure UI updates properly on mobile
-      if (platform === 'android') {
+      // Enhanced mobile browser UI refresh with aggressive stuck state clearing
+      if (platform === 'android' || platform === 'ios') {
         setTimeout(() => {
-          console.log('[MobileChatEnhancements] Android mobile browser: Forcing UI refresh');
-          // Trigger a window resize event to force mobile browser redraw
+          console.log('[MobileChatEnhancements] Mobile browser: Forcing comprehensive UI refresh');
+          
+          // Multiple strategies to unstick mobile browser UI
+          // 1. Force resize event
           window.dispatchEvent(new Event('resize'));
+          
+          // 2. Force scroll refresh for chat containers
+          const chatContainer = document.querySelector('[data-chat-messages-container]');
+          if (chatContainer) {
+            const currentScroll = chatContainer.scrollTop;
+            chatContainer.scrollTop = currentScroll + 1;
+            chatContainer.scrollTop = currentScroll;
+          }
+          
+          // 3. Force DOM refresh by temporarily hiding/showing elements
+          const streamingIndicators = document.querySelectorAll('[data-streaming-indicator]');
+          streamingIndicators.forEach(indicator => {
+            const element = indicator as HTMLElement;
+            element.style.visibility = 'hidden';
+            setTimeout(() => {
+              element.style.visibility = '';
+            }, 50);
+          });
+          
         }, 100);
+        
+        // Additional Android-specific refresh for stubborn cases
+        if (platform === 'android') {
+          setTimeout(() => {
+            console.log('[MobileChatEnhancements] Android: Secondary UI refresh');
+            // Force repaint by manipulating viewport
+            const viewport = document.querySelector('meta[name="viewport"]');
+            if (viewport) {
+              const content = viewport.getAttribute('content');
+              viewport.setAttribute('content', content + ', minimal-ui');
+              setTimeout(() => {
+                viewport.setAttribute('content', content || '');
+              }, 100);
+            }
+          }, 300);
+        }
       }
     }
   }, [threadId, onCompletionDetected, platform]);

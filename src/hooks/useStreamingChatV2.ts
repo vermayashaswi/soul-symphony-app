@@ -545,12 +545,23 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
               setupTimeoutFallback();
               return;
             } else {
-              console.log(`[useStreamingChatV2] Request completed during restoration, updating UI and clearing state for thread: ${threadId}`);
+              console.log(`[useStreamingChatV2] Request completed during restoration, force-clearing all UI indicators for thread: ${threadId}`);
+              
+              // ENHANCED: Force-clear all UI streaming indicators immediately
+              updateThreadState(threadId, {
+                isStreaming: false,
+                showBackendAnimation: false,
+                showDynamicMessages: false,
+                pausedDueToBackground: false,
+                navigationSafe: true,
+                streamingMessages: [],
+                dynamicMessageIndex: 0
+              });
               
               // Clear saved state
               clearChatStreamingState(threadId);
               
-              // Force UI refresh to show completed response
+              // Force UI refresh with enhanced mobile browser handling
               window.dispatchEvent(new CustomEvent('chatCompletionDetected', {
                 detail: { 
                   threadId, 
@@ -558,6 +569,22 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
                   restoredFromBackground: true 
                 }
               }));
+              
+              // Mobile browser specific: Force immediate UI state synchronization
+              if (isMobileBrowser()) {
+                setTimeout(() => {
+                  console.log('[useStreamingChatV2] Mobile browser: Forcing additional UI sync');
+                  window.dispatchEvent(new CustomEvent('chatStateUpdated', {
+                    detail: { 
+                      threadId, 
+                      completed: true, 
+                      source: 'mobile_force_sync' 
+                    }
+                  }));
+                  // Force viewport refresh for stuck mobile browsers
+                  window.dispatchEvent(new Event('resize'));
+                }, 100);
+              }
             }
           } else {
             console.log(`[useStreamingChatV2] Saved state too old (${Math.round(timeSinceRequest / 1000)}s), clearing for thread: ${threadId}`);
@@ -565,29 +592,56 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
           }
         }
         
-        // Use fresh state
+        // Enhanced fresh state handling with mobile completion check
         const threadState = getThreadState(threadId);
         setState(threadState);
         
-        // Perform a final completion check even if no saved state for mobile browsers
+        // ENHANCED: Mobile browser aggressive completion detection
         if (isMobileBrowser()) {
-          const recentMessages = await supabase
-            .from('chat_messages')
-            .select('id, created_at, sender, is_processing')
-            .eq('thread_id', threadId)
-            .gte('created_at', new Date(Date.now() - 300000).toISOString()) // Last 5 minutes
-            .eq('sender', 'assistant')
-            .order('created_at', { ascending: false })
-            .limit(1);
+          console.log('[useStreamingChatV2] Mobile browser: Performing aggressive completion detection');
+          
+          try {
+            // Check for recently completed assistant messages
+            const recentMessages = await supabase
+              .from('chat_messages')
+              .select('id, created_at, sender, is_processing, content')
+              .eq('thread_id', threadId)
+              .gte('created_at', new Date(Date.now() - 300000).toISOString()) // Last 5 minutes
+              .eq('sender', 'assistant')
+              .order('created_at', { ascending: false })
+              .limit(3);
             
-          if (recentMessages.data && recentMessages.data.length > 0) {
-            const latestMessage = recentMessages.data[0];
-            if (!latestMessage.is_processing) {
-              console.log('[useStreamingChatV2] Mobile fallback: Found completed message, triggering UI refresh');
-              window.dispatchEvent(new CustomEvent('chatStateUpdated', {
-                detail: { threadId, completed: true, source: 'mobile_fallback' }
-              }));
+            if (recentMessages.data && recentMessages.data.length > 0) {
+              const mostRecent = recentMessages.data[0];
+              
+              // If we found a recent assistant message that's not marked as processing
+              if (!mostRecent.is_processing && mostRecent.content) {
+                console.log('[useStreamingChatV2] Mobile browser: Found completed recent message, forcing UI clear');
+                
+                // Force-clear any lingering UI indicators
+                updateThreadState(threadId, {
+                  isStreaming: false,
+                  showBackendAnimation: false,
+                  showDynamicMessages: false,
+                  pausedDueToBackground: false,
+                  navigationSafe: true,
+                  streamingMessages: [],
+                  dynamicMessageIndex: 0
+                });
+                
+                // Emit completion events for mobile UI synchronization
+                window.dispatchEvent(new CustomEvent('chatCompletionDetected', {
+                  detail: { 
+                    threadId, 
+                    correlationId: `mobile-sync-${Date.now()}`,
+                    restoredFromBackground: false,
+                    source: 'mobile_aggressive_detection'
+                  }
+                }));
+              }
             }
+          } catch (error) {
+            console.warn('[useStreamingChatV2] Mobile completion detection failed:', error);
           }
         }
       } catch (error) {

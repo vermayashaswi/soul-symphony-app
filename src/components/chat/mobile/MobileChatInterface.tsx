@@ -279,16 +279,41 @@ export default function MobileChatInterface({
     threadId,
     onCompletionDetected: (data) => {
       console.log('[MobileChatInterface] Chat completion detected via mobile enhancements:', data);
-      // Reload messages to ensure UI is in sync
+      
+      // Force immediate UI state clear for mobile browsers
       if (data.threadId === threadId) {
-        loadThreadMessages(data.threadId);
+        // Clear any lingering streaming indicators in the UI
+        const streamingElements = document.querySelectorAll('[data-streaming="true"]');
+        streamingElements.forEach(element => {
+          element.setAttribute('data-streaming', 'false');
+        });
+        
+        // Force message reload with UI sync
+        setTimeout(() => {
+          loadThreadMessages(data.threadId);
+        }, 100);
       }
     },
     onStateUpdated: (data) => {
       console.log('[MobileChatInterface] Chat state updated via mobile enhancements:', data);
-      // Force refresh if needed
+      
+      // Enhanced completion handling with immediate UI synchronization
       if (data.completed && data.threadId === threadId) {
+        // Force clear streaming indicators
+        const avatarElements = document.querySelectorAll('[data-chat-avatar-streaming]');
+        avatarElements.forEach(element => {
+          element.removeAttribute('data-chat-avatar-streaming');
+        });
+        
+        // Force message reload and UI refresh
         loadThreadMessages(data.threadId);
+        
+        // Additional mobile browser specific refresh
+        if (platform === 'android' || platform === 'ios') {
+          setTimeout(() => {
+            window.dispatchEvent(new Event('chat:forceScrollToBottom'));
+          }, 200);
+        }
       }
     }
   });
