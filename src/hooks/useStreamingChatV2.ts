@@ -296,14 +296,16 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
     let retryCount = 0;
     const maxRetries = 5; // Increased for mobile browsers
 
-    // Enhanced mobile browser visibility handling
+    // Enhanced mobile browser visibility handling with state restoration
     const handleVisibilityChange = () => {
       const isVisible = !document.hidden;
       console.log(`[useStreamingChatV2] Page visibility changed: ${isVisible ? 'visible' : 'hidden'}`);
       
       if (isVisible) {
-        // Page became visible - just check if request completed
-        console.log('[useStreamingChatV2] Page visible, checking for completion');
+        // Page became visible - restore streaming state if backend is still processing
+        console.log('[useStreamingChatV2] Page visible, restoring streaming state if needed');
+        setTimeout(() => restoreStreamingStateFromDatabase(), 200);
+        
         // Start periodic checking for mobile browsers that might miss events
         if (isMobileBrowser()) {
           startPeriodicCompletionCheck();
@@ -321,8 +323,61 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
     // Enhanced mobile browser support with focus/blur events
     const handleFocusEvents = () => {
       console.log('[useStreamingChatV2] Window focus/blur event triggered');
-      // Trigger visibility change logic as fallback
-      setTimeout(() => restoreStateIfStillValid(), 100);
+      // Trigger streaming state restoration as fallback
+      setTimeout(() => restoreStreamingStateFromDatabase(), 100);
+    };
+
+    // Restore streaming state from database when user returns
+    const restoreStreamingStateFromDatabase = async () => {
+      const currentState = getThreadState(threadId);
+      
+      try {
+        // Check if there's an ongoing processing request in the database
+        const { data: recentMessages, error } = await supabase
+          .from('chat_messages')
+          .select('id, created_at, sender, content, is_processing, request_correlation_id')
+          .eq('thread_id', threadId)
+          .eq('sender', 'assistant')
+          .gte('created_at', new Date(Date.now() - 600000).toISOString()) // Last 10 minutes
+          .eq('is_processing', true)
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (!error && recentMessages && recentMessages.length > 0) {
+          const processingMessage = recentMessages[0];
+          console.log('[useStreamingChatV2] Found processing message, restoring streaming state:', processingMessage.id);
+          
+          // Restore streaming state to show dynamic messages
+          updateThreadState(threadId, {
+            isStreaming: true,
+            showDynamicMessages: true,
+            showBackendAnimation: true,
+            pausedDueToBackground: false,
+            navigationSafe: true,
+            requestCorrelationId: processingMessage.request_correlation_id,
+            requestStartTime: new Date(processingMessage.created_at).getTime(),
+            queryCategory: 'JOURNAL_SPECIFIC' // Default to journal specific for dynamic messages
+          });
+
+          // Restart dynamic message rotation
+          generateStreamingMessages(threadId);
+          
+          // Emit event to notify UI components
+          window.dispatchEvent(new CustomEvent('streamingStateRestored', {
+            detail: { 
+              threadId, 
+              correlationId: processingMessage.request_correlation_id,
+              source: 'navigation_return'
+            }
+          }));
+          
+          console.log('[useStreamingChatV2] Streaming state restored from database');
+        } else {
+          console.log('[useStreamingChatV2] No processing messages found, keeping current state');
+        }
+      } catch (error) {
+        console.error('[useStreamingChatV2] Error restoring streaming state:', error);
+      }
     };
 
     // Detect mobile browser
@@ -339,7 +394,7 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
       
       periodicCheckInterval = setInterval(async () => {
         const currentState = getThreadState(threadId);
-        if (currentState.isStreaming || currentState.showBackendAnimation) {
+        if (currentState.isStreaming || currentState.showBackendAnimation || currentState.showDynamicMessages) {
           console.log('[useStreamingChatV2] Periodic mobile completion check');
           try {
             const isCompleted = await checkIfRequestCompleted(
@@ -360,9 +415,16 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
               });
               clearInterval(periodicCheckInterval);
               
-              // Trigger UI refresh
+              // Trigger UI refresh and completion events
+              window.dispatchEvent(new CustomEvent('chatCompletionDetected', {
+                detail: { 
+                  threadId, 
+                  correlationId: currentState.requestCorrelationId,
+                  source: 'periodic_check'
+                }
+              }));
               window.dispatchEvent(new CustomEvent('chatStateUpdated', {
-                detail: { threadId, completed: true }
+                detail: { threadId, completed: true, source: 'periodic_check' }
               }));
             }
           } catch (error) {

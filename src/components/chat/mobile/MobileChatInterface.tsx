@@ -75,6 +75,32 @@ export default function MobileChatInterface({
   useEffect(() => {
     threadSafetyManager.setActiveThread(threadId || null);
   }, [threadId]);
+
+  // Listen for streaming state restoration events
+  useEffect(() => {
+    const handleStreamingStateRestored = (event: CustomEvent) => {
+      const { threadId: eventThreadId, correlationId, source } = event.detail;
+      
+      console.log('[MobileChatInterface] Streaming state restored:', {
+        eventThreadId,
+        currentThreadId: threadId,
+        correlationId,
+        source
+      });
+      
+      if (eventThreadId === threadId) {
+        // UI should already show streaming state from the hook
+        // Just log for debugging
+        console.log('[MobileChatInterface] Streaming state restored for current thread');
+      }
+    };
+
+    window.addEventListener('streamingStateRestored', handleStreamingStateRestored as EventListener);
+    
+    return () => {
+      window.removeEventListener('streamingStateRestored', handleStreamingStateRestored as EventListener);
+    };
+  }, [threadId]);
   
   // Keep a ref of the latest active thread to guard async UI updates
   const currentThreadIdRef = useRef<string | null>(null);
