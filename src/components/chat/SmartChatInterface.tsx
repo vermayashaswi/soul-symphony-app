@@ -357,22 +357,9 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
   // Listen for completed responses and reload messages
   useEffect(() => {
     const onResponseReady = (event: CustomEvent) => {
-      const { threadId, completed, restored, correlationId } = event.detail;
-      
-      if (threadId === currentThreadId) {
-        console.log(`[SmartChatInterface] Response ready for thread ${currentThreadId}`, {
-          completed,
-          restored,
-          correlationId
-        });
-        
-        // Always reload messages to show latest state
+      if (event.detail.threadId === currentThreadId) {
+        console.log(`[SmartChatInterface] Response ready for thread ${currentThreadId}, reloading messages`);
         loadThreadMessages(currentThreadId);
-        
-        // If this was a restoration event, also dispatch to any listening components
-        if (restored || completed) {
-          debugLog.addEvent("Response Ready", `${restored ? 'Restored' : 'Completed'} response for thread: ${threadId}`, "success");
-        }
       }
     };
     
@@ -380,7 +367,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     return () => {
       window.removeEventListener('chatResponseReady' as any, onResponseReady);
     };
-  }, [currentThreadId, debugLog]);
+  }, [currentThreadId]);
 
   // Auto-scroll is now handled by the useAutoScroll hook
 

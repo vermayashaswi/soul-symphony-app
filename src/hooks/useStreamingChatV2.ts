@@ -12,7 +12,7 @@ export interface StreamingMessage {
   timestamp?: number;
 }
 
-  // Thread-specific streaming state interface  
+// Thread-specific streaming state interface  
 export interface ThreadStreamingState {
   isStreaming: boolean;
   streamingMessages: StreamingMessage[];
@@ -27,25 +27,6 @@ export interface ThreadStreamingState {
   retryCount: number;
   queryCategory: string;
   abortController: AbortController | null;
-  // Additional state for comprehensive restoration
-  pausedDueToBackground?: boolean;
-  currentUserMessage?: string;
-  showBackendAnimation?: boolean;
-  navigationSafe?: boolean;
-  dynamicMessages?: string[];
-  currentMessageIndex?: number;
-  lastMessageFingerprint?: string | null;
-  useThreeDotFallback?: boolean;
-  expectedProcessingTime?: number;
-  processingStartTime?: number;
-  activeRequestId?: string;
-  translatedDynamicMessages?: string[];
-  isRetrying?: boolean;
-  retryAttempts?: number;
-  lastFailedMessage?: any;
-  isAppBackgrounded?: boolean;
-  isPageHidden?: boolean;
-  wasBackgroundProcessing?: boolean;
 }
 
 // Props interface for the hook
@@ -81,25 +62,7 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
       lastRotationTime: 0,
       retryCount: 0,
       queryCategory: 'JOURNAL_SPECIFIC',
-      abortController: null,
-      pausedDueToBackground: false,
-      currentUserMessage: '',
-      showBackendAnimation: false,
-      navigationSafe: false,
-      dynamicMessages: [],
-      currentMessageIndex: 0,
-      lastMessageFingerprint: null,
-      useThreeDotFallback: false,
-      expectedProcessingTime: null,
-      processingStartTime: null,
-      activeRequestId: null,
-      translatedDynamicMessages: [],
-      isRetrying: false,
-      retryAttempts: 0,
-      lastFailedMessage: null,
-      isAppBackgrounded: false,
-      isPageHidden: false,
-      wasBackgroundProcessing: false
+      abortController: null
     };
   }
 
@@ -112,19 +75,19 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
   }, []);
 
   // Update thread state in map and persist
-  const updateThreadState = useCallback((targetThreadId: string, newState: Partial<ThreadStreamingState>) => {
-    const currentState = getThreadState(targetThreadId);
+  const updateThreadState = useCallback((threadId: string, newState: Partial<ThreadStreamingState>) => {
+    const currentState = getThreadState(threadId);
     const updatedState = { ...currentState, ...newState };
-    threadStatesRef.current.set(targetThreadId, updatedState);
+    threadStatesRef.current.set(threadId, updatedState);
     
     // Update local state if this is the current thread
-    if (targetThreadId === threadId) {
+    if (threadId === threadId) {
       setState(updatedState);
     }
     
-    // Persist state if streaming OR backend processing
-    if (updatedState.isStreaming || updatedState.showDynamicMessages || updatedState.queryCategory === 'JOURNAL_SPECIFIC') {
-      saveStreamingState(targetThreadId, updatedState);
+    // Persist state if streaming
+    if (updatedState.isStreaming) {
+      saveStreamingState(threadId, updatedState);
     }
   }, [threadId]);
 
@@ -202,6 +165,108 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
     }
   }, [supabase]);
 
+  // Save streaming state to localStorage with better structure
+  const saveStreamingState = useCallback((threadId: string, state: ThreadStreamingState) => {
+    try {
+      const stateToSave = {
+        ...state,
+        requestCorrelationId: state.requestCorrelationId,
+        idempotencyKey: state.idempotencyKey,
+        lastActivity: Date.now(),
+        // Don't save the abort controller
+        abortController: null
+      };
+      
+      saveChatStreamingState(threadId, stateToSave);
+      console.log(`[useStreamingChatV2] Saved streaming state for thread: ${threadId} with correlation ID: ${state.requestCorrelationId}`);
+    } catch (error) {
+      console.warn(`[useStreamingChatV2] Failed to save streaming state: ${error}`);
+    }
+  }, []);
+
+  // Restore streaming state when switching threads or returning to app
+  useEffect(() => {
+    if (!threadId || !user?.id) return;
+
+    const restoreStateIfStillValid = async () => {
+      try {
+        // Restore state if it was saved and still valid
+        const savedState = getChatStreamingState(threadId);
+        if (savedState && savedState.isStreaming) {
+          console.log(`[useStreamingChatV2] Found saved streaming state for thread: ${threadId}`);
+          
+          // Check if the request might still be processing (within last 5 minutes)
+          const timeSinceRequest = savedState.lastActivity ? Date.now() - savedState.lastActivity : 0;
+          const maxValidTime = 5 * 60 * 1000; // 5 minutes
+          
+          if (timeSinceRequest < maxValidTime) {
+            // Check if the request has completed using correlation ID
+            const isCompleted = await checkIfRequestCompleted(
+              threadId, 
+              user?.id || '', 
+              savedState.requestCorrelationId
+            );
+            
+            if (!isCompleted) {
+              console.log(`[useStreamingChatV2] Restoring active streaming state for thread: ${threadId} with correlation ID: ${savedState.requestCorrelationId}`);
+              const restoredState = {
+                ...createInitialState(),
+                ...savedState,
+                abortController: new AbortController() // Create new abort controller
+              };
+              
+              updateThreadState(threadId, restoredState);
+              setState(restoredState);
+              
+              // Continue dynamic messages if it's a journal-specific query
+              if (savedState.queryCategory === 'JOURNAL_SPECIFIC' && savedState.showDynamicMessages) {
+                generateStreamingMessages(threadId);
+              }
+              return;
+            } else {
+              console.log(`[useStreamingChatV2] Request completed while away, clearing saved state for thread: ${threadId}`);
+              clearChatStreamingState(threadId);
+            }
+          } else {
+            console.log(`[useStreamingChatV2] Saved state too old (${Math.round(timeSinceRequest / 1000)}s), clearing for thread: ${threadId}`);
+            clearChatStreamingState(threadId);
+          }
+        }
+        
+        // Use fresh state
+        const threadState = getThreadState(threadId);
+        setState(threadState);
+      } catch (error) {
+        console.warn(`[useStreamingChatV2] Error restoring thread state: ${error}`);
+        // Fallback to fresh state
+        const threadState = getThreadState(threadId);
+        setState(threadState);
+      }
+    };
+
+    restoreStateIfStillValid();
+  }, [threadId, user?.id, getThreadState, updateThreadState, checkIfRequestCompleted]);
+
+  // Add streaming message to current thread
+  const addStreamingMessage = useCallback((threadId: string, message: StreamingMessage) => {
+    const currentState = getThreadState(threadId);
+    const updatedMessages = [...currentState.streamingMessages, message];
+    
+    updateThreadState(threadId, {
+      streamingMessages: updatedMessages
+    });
+
+    // Call onFinalResponse if this is a final response
+    if (message.type === 'final_response' && onFinalResponse) {
+      onFinalResponse(message.content);
+    }
+
+    // Call onError if this is an error
+    if (message.type === 'error' && onError) {
+      onError(message.content);
+    }
+  }, [getThreadState, updateThreadState, onFinalResponse, onError]);
+
   // Generate streaming messages for journal-specific queries
   const generateStreamingMessages = useCallback((threadId: string) => {
     const journalMessages = [
@@ -248,207 +313,6 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
     // Start the first message immediately
     showNextMessage();
   }, [getThreadState, updateThreadState]);
-
-  // Save streaming state to localStorage with better structure
-  const saveStreamingState = useCallback((threadId: string, state: ThreadStreamingState) => {
-    try {
-      const stateToSave = {
-        ...state,
-        requestCorrelationId: state.requestCorrelationId,
-        idempotencyKey: state.idempotencyKey,
-        lastActivity: Date.now(),
-        savedAt: Date.now(),
-        navigationSafe: true,
-        // Enhanced background state tracking
-        pausedDueToBackground: state.pausedDueToBackground || false,
-        isAppBackgrounded: state.isAppBackgrounded || false,
-        isPageHidden: state.isPageHidden || false,
-        wasBackgroundProcessing: state.isStreaming || state.showDynamicMessages || false,
-        // Don't save the abort controller
-        abortController: null
-      };
-      
-      saveChatStreamingState(threadId, stateToSave);
-      console.log(`[useStreamingChatV2] Saved comprehensive streaming state for thread: ${threadId} with correlation ID: ${state.requestCorrelationId}`);
-    } catch (error) {
-      console.warn(`[useStreamingChatV2] Failed to save streaming state: ${error}`);
-    }
-  }, []);
-
-  // Enhanced page visibility and app lifecycle handlers
-  useEffect(() => {
-    if (!threadId || !user?.id) return;
-
-    // Page visibility handler
-    const handleVisibilityChange = () => {
-      const isHidden = document.hidden;
-      const currentState = getThreadState(threadId);
-      
-      if (isHidden) {
-        // Page backgrounded - save state if processing
-        if (currentState.isStreaming || currentState.showDynamicMessages) {
-          updateThreadState(threadId, {
-            ...currentState,
-            isPageHidden: true,
-            pausedDueToBackground: true,
-            wasBackgroundProcessing: true
-          });
-          console.log(`[useStreamingChatV2] Page backgrounded, saved state for thread: ${threadId}`);
-        }
-      } else {
-        // Page foregrounded - restore state
-        console.log(`[useStreamingChatV2] Page foregrounded, checking state for thread: ${threadId}`);
-        restoreStateIfStillValid();
-      }
-    };
-
-    // Capacitor app lifecycle handler
-    const handleAppStateChange = (state: any) => {
-      const currentState = getThreadState(threadId);
-      
-      if (!state.isActive) {
-        // App backgrounded
-        if (currentState.isStreaming || currentState.showDynamicMessages) {
-          updateThreadState(threadId, {
-            ...currentState,
-            isAppBackgrounded: true,
-            pausedDueToBackground: true,
-            wasBackgroundProcessing: true
-          });
-          console.log(`[useStreamingChatV2] App backgrounded, saved state for thread: ${threadId}`);
-        }
-      } else {
-        // App foregrounded
-        console.log(`[useStreamingChatV2] App foregrounded, checking state for thread: ${threadId}`);
-        restoreStateIfStillValid();
-      }
-    };
-
-    const restoreStateIfStillValid = async () => {
-      try {
-        // Enhanced state restoration logic
-        const savedState = getChatStreamingState(threadId);
-        if (savedState && (savedState.isStreaming || savedState.wasBackgroundProcessing || savedState.navigationSafe)) {
-          console.log(`[useStreamingChatV2] Found saved state for thread: ${threadId}`, {
-            isStreaming: savedState.isStreaming,
-            wasBackgroundProcessing: savedState.wasBackgroundProcessing,
-            queryCategory: savedState.queryCategory
-          });
-          
-          // Check if the request might still be processing (within last 5 minutes)
-          const timeSinceRequest = savedState.lastActivity ? Date.now() - savedState.lastActivity : 0;
-          const maxValidTime = 5 * 60 * 1000; // 5 minutes
-          
-          if (timeSinceRequest < maxValidTime) {
-            // Check if the request has completed using correlation ID
-            const isCompleted = await checkIfRequestCompleted(
-              threadId, 
-              user?.id || '', 
-              savedState.requestCorrelationId
-            );
-            
-            if (!isCompleted) {
-              console.log(`[useStreamingChatV2] Restoring comprehensive state for thread: ${threadId} with correlation ID: ${savedState.requestCorrelationId}`);
-              const restoredState = {
-                ...createInitialState(),
-                ...savedState,
-                abortController: new AbortController(), // Create new abort controller
-                isPageHidden: false,
-                isAppBackgrounded: false,
-                pausedDueToBackground: false
-              };
-              
-              updateThreadState(threadId, restoredState);
-              setState(restoredState);
-              
-              // Continue dynamic messages if it's a journal-specific query
-              if (savedState.queryCategory === 'JOURNAL_SPECIFIC' && savedState.showDynamicMessages) {
-                generateStreamingMessages(threadId);
-              }
-              
-              // Emit event so UI knows response might be ready
-              const completionEvent = new CustomEvent('chatResponseReady', {
-                detail: { threadId: threadId, restored: true, correlationId: savedState.requestCorrelationId }
-              });
-              window.dispatchEvent(completionEvent);
-              
-              return;
-            } else {
-              console.log(`[useStreamingChatV2] Request completed while away, emitting ready event for thread: ${threadId}`);
-              clearChatStreamingState(threadId);
-              
-              // Emit event so UI reloads to show completed response
-              const completionEvent = new CustomEvent('chatResponseReady', {
-                detail: { threadId: threadId, completed: true, correlationId: savedState.requestCorrelationId }
-              });
-              window.dispatchEvent(completionEvent);
-            }
-          } else {
-            console.log(`[useStreamingChatV2] Saved state too old (${Math.round(timeSinceRequest / 1000)}s), clearing for thread: ${threadId}`);
-            clearChatStreamingState(threadId);
-          }
-        }
-        
-        // Use fresh state
-        const threadState = getThreadState(threadId);
-        setState(threadState);
-      } catch (error) {
-        console.warn(`[useStreamingChatV2] Error restoring thread state: ${error}`);
-        // Fallback to fresh state
-        const threadState = getThreadState(threadId);
-        setState(threadState);
-      }
-    };
-
-    // Set up event listeners
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-    // Capacitor app lifecycle
-    if (typeof window !== 'undefined' && (window as any).Capacitor?.Plugins?.App) {
-      try {
-        const { App } = (window as any).Capacitor.Plugins;
-        App.addListener('appStateChange', handleAppStateChange);
-      } catch (error) {
-        console.warn('[useStreamingChatV2] Error setting up Capacitor listeners:', error);
-      }
-    }
-
-    // Initial state restoration
-    restoreStateIfStillValid();
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      if (typeof window !== 'undefined' && (window as any).Capacitor?.Plugins?.App) {
-        try {
-          const { App } = (window as any).Capacitor.Plugins;
-          App.removeAllListeners();
-        } catch (error) {
-          console.warn('[useStreamingChatV2] Error removing Capacitor listeners:', error);
-        }
-      }
-    };
-  }, [threadId, user?.id, getThreadState, updateThreadState, checkIfRequestCompleted, generateStreamingMessages]);
-
-
-  // Add streaming message to current thread
-  const addStreamingMessage = useCallback((threadId: string, message: StreamingMessage) => {
-    const currentState = getThreadState(threadId);
-    const updatedMessages = [...currentState.streamingMessages, message];
-    
-    updateThreadState(threadId, {
-      streamingMessages: updatedMessages
-    });
-
-    // Call onFinalResponse if this is a final response
-    if (message.type === 'final_response' && onFinalResponse) {
-      onFinalResponse(message.content);
-    }
-
-    // Call onError if this is an error
-    if (message.type === 'error' && onError) {
-      onError(message.content);
-    }
-  }, [getThreadState, updateThreadState, onFinalResponse, onError]);
 
   // Start streaming chat with correlation tracking
   const startStreamingChat = useCallback(async (
@@ -567,12 +431,7 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
         ...currentState,
         isStreaming: false,
         streamingMessages: [],
-        showDynamicMessages: false,
-        showBackendAnimation: false,
-        wasBackgroundProcessing: false,
-        pausedDueToBackground: false,
-        isPageHidden: false,
-        isAppBackgrounded: false
+        showDynamicMessages: false
       });
 
       // Clear saved state since request is complete
@@ -580,7 +439,7 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
 
       // Emit completion event for UI updates
       const completionEvent = new CustomEvent('chatResponseReady', {
-        detail: { threadId: targetThreadId, response: result, correlationId: correlationId, completed: true }
+        detail: { threadId: targetThreadId, response: result, correlationId: correlationId }
       });
       window.dispatchEvent(completionEvent);
 

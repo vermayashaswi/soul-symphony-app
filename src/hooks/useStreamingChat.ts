@@ -207,8 +207,6 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
             pausedDueToBackground: true,
             savedAt: Date.now(),
             navigationSafe: true, // Mark as safe for navigation restoration
-            wasBackgroundProcessing: threadState.isStreaming || threadState.showBackendAnimation,
-            isPageHidden: true
           });
           console.log(`[useStreamingChat] Saved enhanced state for navigation: ${threadId}`);
         }
@@ -281,8 +279,6 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
                 pausedDueToBackground: true,
                 savedAt: Date.now(),
                 navigationSafe: true,
-                wasBackgroundProcessing: threadState.isStreaming || threadState.showBackendAnimation,
-                isAppBackgrounded: true
               });
               console.log(`[useStreamingChat] Saved enhanced Capacitor state: ${threadId}`);
             }
@@ -374,7 +370,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
             clearChatStreamingState(threadId);
             // Dispatch event so UI can reload messages to show the completed response
             window.dispatchEvent(new CustomEvent('chatResponseReady', { 
-              detail: { threadId, completed: true, restored: false } 
+              detail: { threadId } 
             }));
             const threadState = getThreadState(threadId);
             setState(threadState);
@@ -1061,7 +1057,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
           clearChatStreamingState(targetThreadId);
           // Notify UI that the response is ready
           window.dispatchEvent(new CustomEvent('chatResponseReady', { 
-            detail: { threadId: targetThreadId, completed: true, restored: false } 
+            detail: { threadId: targetThreadId } 
           }));
           return false;
         }
@@ -1091,11 +1087,6 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
         if (targetThreadId === threadId) {
           setState(prev => ({ ...prev, ...updates }));
         }
-        
-        // Emit restoration event so UI knows state was restored
-        window.dispatchEvent(new CustomEvent('chatResponseReady', { 
-          detail: { threadId: targetThreadId, completed: false, restored: true } 
-        }));
         
         return true;
       }
