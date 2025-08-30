@@ -503,13 +503,23 @@ export default function MobileChatInterface({
         debugLog.addEvent("Thread Change", `Thread selected: ${event.detail.threadId}`, "info");
       }
     };
+
+    const onChatCompletion = (event: CustomEvent) => {
+      console.log('[MobileChatInterface] chatCompletionDetected event received:', event.detail);
+      // Only reload if it's for the current thread
+      if (event.detail.threadId === threadId) {
+        loadThreadMessages(threadId);
+      }
+    };
     
     window.addEventListener('threadSelected' as any, onThreadChange);
+    window.addEventListener('chatCompletionDetected' as any, onChatCompletion);
     
     return () => {
       window.removeEventListener('threadSelected' as any, onThreadChange);
+      window.removeEventListener('chatCompletionDetected' as any, onChatCompletion);
     };
-  }, []);
+  }, [threadId]);
 
   // Auto-scroll is now handled by the useAutoScroll hook
 
