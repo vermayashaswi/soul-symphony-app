@@ -2,6 +2,13 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { saveChatStreamingState, getChatStreamingState, clearChatStreamingState } from '@/utils/chatStateStorage';
 import { useAuth } from '@/contexts/AuthContext';
+import { 
+  reconcileStateWithDatabase, 
+  updateMessageTracking, 
+  shouldProcessMessage, 
+  coordinateAcrossTabsForIdempotency,
+  cleanupExpiredTracking
+} from './useIdempotencyStateManager';
 
 // Capacitor imports with error handling
 let CapacitorApp: any = null;
@@ -20,7 +27,17 @@ export interface StreamingMessage {
   timestamp?: number;
 }
 
-// Thread-specific streaming state interface  
+// Enhanced message tracking for idempotency
+export interface MessageTrackingInfo {
+  idempotencyKey: string;
+  correlationId?: string;
+  status: 'pending' | 'completed' | 'failed' | 'orphaned';
+  timestamp: number;
+  retryCount: number;
+  messageId?: string;
+}
+
+// Thread-specific streaming state interface with enhanced idempotency tracking
 export interface ThreadStreamingState {
   isStreaming: boolean;
   streamingMessages: StreamingMessage[];
@@ -38,6 +55,12 @@ export interface ThreadStreamingState {
   retryCount: number;
   queryCategory: string;
   abortController: AbortController | null;
+  // Enhanced idempotency tracking
+  messageTracking: Map<string, MessageTrackingInfo>;
+  pendingIdempotencyKeys: Set<string>;
+  completedIdempotencyKeys: Set<string>;
+  failedIdempotencyKeys: Set<string>;
+  lastReconciliationCheck?: number;
 }
 
 // Props interface for the hook
@@ -58,7 +81,7 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
     createInitialState()
   );
 
-  // Create initial state for a thread
+  // Create initial state for a thread with enhanced idempotency tracking
   function createInitialState(): ThreadStreamingState {
     return {
       isStreaming: false,
@@ -76,7 +99,13 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
       lastRotationTime: 0,
       retryCount: 0,
       queryCategory: 'JOURNAL_SPECIFIC',
-      abortController: null
+      abortController: null,
+      // Enhanced idempotency tracking
+      messageTracking: new Map(),
+      pendingIdempotencyKeys: new Set(),
+      completedIdempotencyKeys: new Set(),
+      failedIdempotencyKeys: new Set(),
+      lastReconciliationCheck: undefined
     };
   }
 
@@ -117,16 +146,19 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
     return `${sender}_${threadId}_${userId || 'anon'}_${contentHash}_${timestamp}`;
   }, []);
 
-  // Enhanced completion detection with better mobile browser support
-  const checkIfRequestCompleted = useCallback(async (threadId: string, userId: string, correlationId?: string): Promise<boolean> => {
+  // Enhanced dual-layer completion detection with idempotency key validation
+  const checkIfRequestCompleted = useCallback(async (threadId: string, userId: string, correlationId?: string, idempotencyKey?: string): Promise<boolean> => {
     try {
-      console.log(`[useStreamingChatV2] Checking completion for thread: ${threadId} with correlation ID: ${correlationId}`);
+      console.log(`[useStreamingChatV2] Dual-layer completion check for thread: ${threadId}`, {
+        correlationId,
+        idempotencyKey
+      });
       
-      // Enhanced correlation ID-based check
+      // Primary: Enhanced correlation ID-based check
       if (correlationId) {
         const { data: correlatedMessages, error: correlatedError } = await supabase
           .from('chat_messages')
-          .select('id, created_at, sender, content, is_processing, request_correlation_id')
+          .select('id, created_at, sender, content, is_processing, request_correlation_id, idempotency_key')
           .eq('thread_id', threadId)
           .eq('request_correlation_id', correlationId)
           .order('created_at', { ascending: false });
@@ -134,40 +166,96 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
         if (!correlatedError && correlatedMessages && correlatedMessages.length > 0) {
           const assistantMessage = correlatedMessages.find(msg => msg.sender === 'assistant');
           if (assistantMessage) {
-            // Enhanced completion logic - check content length and processing status
+            // Enhanced completion validation with dual verification
             const hasContent = assistantMessage.content && assistantMessage.content.trim().length > 0;
             const isNotProcessing = !assistantMessage.is_processing;
             const isNotProcessingMessage = !assistantMessage.content.toLowerCase().includes('processing');
             const isNotTechnicalMessage = !assistantMessage.content.toLowerCase().includes('wait') && 
                                          !assistantMessage.content.toLowerCase().includes('working');
             
-            const isCompleted = hasContent && isNotProcessing && isNotProcessingMessage && isNotTechnicalMessage;
-            console.log(`[useStreamingChatV2] Enhanced correlation completion check: ${isCompleted} for ${correlationId}`, {
+            const correlationCompleted = hasContent && isNotProcessing && isNotProcessingMessage && isNotTechnicalMessage;
+            
+            // Cross-validate with idempotency key if available
+            let idempotencyValidated = true;
+            if (idempotencyKey) {
+              const userMessage = correlatedMessages.find(msg => 
+                msg.sender === 'user' && msg.idempotency_key === idempotencyKey
+              );
+              idempotencyValidated = !!userMessage;
+            }
+            
+            const isCompleted = correlationCompleted && idempotencyValidated;
+            console.log(`[useStreamingChatV2] Dual-layer correlation completion check: ${isCompleted}`, {
+              correlationCompleted,
+              idempotencyValidated,
               hasContent,
               isNotProcessing,
-              isNotProcessingMessage,
-              isNotTechnicalMessage,
+              correlationId,
+              idempotencyKey,
               contentPreview: assistantMessage.content.substring(0, 100)
             });
+            
             return isCompleted;
           }
         }
       }
 
-      // Enhanced fallback with broader time window for mobile browsers
+      // Secondary: Idempotency key-based fallback detection
+      if (idempotencyKey) {
+        const { data: idempotentMessages, error: idempotentError } = await supabase
+          .from('chat_messages')
+          .select('id, created_at, sender, content, is_processing, idempotency_key')
+          .eq('thread_id', threadId)
+          .eq('idempotency_key', idempotencyKey)
+          .order('created_at', { ascending: false });
+
+        if (!idempotentError && idempotentMessages && idempotentMessages.length > 0) {
+          const userMessage = idempotentMessages.find(msg => msg.sender === 'user');
+          if (userMessage) {
+            // Look for corresponding assistant response after user message
+            const { data: followupMessages, error: followupError } = await supabase
+              .from('chat_messages')
+              .select('id, created_at, sender, content, is_processing')
+              .eq('thread_id', threadId)
+              .eq('sender', 'assistant')
+              .gte('created_at', userMessage.created_at)
+              .order('created_at', { ascending: false })
+              .limit(3);
+
+            if (!followupError && followupMessages && followupMessages.length > 0) {
+              const completedResponse = followupMessages.find(msg => {
+                const hasContent = msg.content && msg.content.trim().length > 20;
+                const isNotProcessing = !msg.is_processing;
+                const isNotProcessingText = !msg.content.toLowerCase().includes('processing');
+                const isNotWaitingText = !msg.content.toLowerCase().includes('wait') && 
+                                        !msg.content.toLowerCase().includes('working');
+                
+                return hasContent && isNotProcessing && isNotProcessingText && isNotWaitingText;
+              });
+
+              if (completedResponse) {
+                console.log(`[useStreamingChatV2] Idempotency key completion detected for ${idempotencyKey}`);
+                return true;
+              }
+            }
+          }
+        }
+      }
+
+      // Tertiary: Enhanced fallback pattern matching
       const fallbackTimeWindow = 300000; // 5 minutes for mobile browser compatibility
       const recentTime = new Date(Date.now() - fallbackTimeWindow).toISOString();
       const { data: messages, error } = await supabase
         .from('chat_messages')
-        .select('id, created_at, sender, content, is_processing, request_correlation_id')
+        .select('id, created_at, sender, content, is_processing, request_correlation_id, idempotency_key')
         .eq('thread_id', threadId)
         .gte('created_at', recentTime)
         .eq('sender', 'assistant')
         .order('created_at', { ascending: false })
-        .limit(5); // Increased limit for better detection
+        .limit(5);
 
       if (error) {
-        console.error('[useStreamingChatV2] Error checking completion:', error);
+        console.error('[useStreamingChatV2] Error in fallback completion check:', error);
         return false;
       }
 
@@ -176,7 +264,7 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
         return false;
       }
 
-      // Enhanced completion detection with multiple criteria
+      // Enhanced pattern-based completion detection
       const completedMessage = messages.find(msg => {
         const hasSubstantialContent = msg.content && msg.content.trim().length > 20;
         const isNotProcessing = !msg.is_processing;
@@ -191,30 +279,44 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
       console.log(`[useStreamingChatV2] Enhanced fallback completion check result: ${isCompleted}`, {
         messagesFound: messages.length,
         hasCompletedMessage: isCompleted,
+        correlationId,
+        idempotencyKey,
         mostRecentContent: messages[0]?.content?.substring(0, 100)
       });
       
       return isCompleted;
     } catch (error) {
-      console.error('[useStreamingChatV2] Exception checking completion:', error);
+      console.error('[useStreamingChatV2] Exception in dual-layer completion check:', error);
       return false;
     }
   }, [supabase]);
 
-  // Save streaming state to localStorage with better structure
+  // Save streaming state to localStorage with enhanced idempotency tracking
   const saveStreamingState = useCallback((threadId: string, state: ThreadStreamingState) => {
     try {
+      // Convert Sets and Maps to serializable format for storage
       const stateToSave = {
         ...state,
         requestCorrelationId: state.requestCorrelationId,
         idempotencyKey: state.idempotencyKey,
         lastActivity: Date.now(),
+        // Convert Sets to arrays for serialization
+        pendingIdempotencyKeys: Array.from(state.pendingIdempotencyKeys),
+        completedIdempotencyKeys: Array.from(state.completedIdempotencyKeys),
+        failedIdempotencyKeys: Array.from(state.failedIdempotencyKeys),
+        // Convert Map to object for serialization
+        messageTrackingData: Object.fromEntries(state.messageTracking),
         // Don't save the abort controller
         abortController: null
       };
       
       saveChatStreamingState(threadId, stateToSave);
-      console.log(`[useStreamingChatV2] Saved streaming state for thread: ${threadId} with correlation ID: ${state.requestCorrelationId}`);
+      console.log(`[useStreamingChatV2] Enhanced state saved for thread: ${threadId}`, {
+        correlationId: state.requestCorrelationId,
+        idempotencyKey: state.idempotencyKey,
+        pendingCount: state.pendingIdempotencyKeys.size,
+        completedCount: state.completedIdempotencyKeys.size
+      });
     } catch (error) {
       console.warn(`[useStreamingChatV2] Failed to save streaming state: ${error}`);
     }
@@ -291,7 +393,8 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
             const isCompleted = await checkIfRequestCompleted(
               threadId, 
               user?.id || '', 
-              currentState.requestCorrelationId
+              currentState.requestCorrelationId,
+              currentState.idempotencyKey
             );
             
             if (isCompleted) {
@@ -348,7 +451,7 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
         timeoutId = setTimeout(() => {
           console.log(`[useStreamingChatV2] 30s timeout reached for thread: ${threadId}, checking completion`);
           
-          checkIfRequestCompleted(threadId, user.id || '', currentState.requestCorrelationId)
+          checkIfRequestCompleted(threadId, user.id || '', currentState.requestCorrelationId, currentState.idempotencyKey)
             .then((completed) => {
               if (!completed && retryCount < maxRetries) {
                 retryCount++;
@@ -401,18 +504,28 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
             const isCompleted = await checkIfRequestCompleted(
               threadId, 
               user?.id || '', 
-              savedState.requestCorrelationId
+              savedState.requestCorrelationId,
+              savedState.idempotencyKey
             );
             
             if (!isCompleted) {
               console.log(`[useStreamingChatV2] Request still processing, restoring streaming state for thread: ${threadId}`);
+              
+              // Enhanced state restoration with proper type conversion
+              const initialState = createInitialState();
               const restoredState = {
-                ...createInitialState(),
+                ...initialState,
                 ...savedState,
                 abortController: new AbortController(),
                 pausedDueToBackground: false,
                 navigationSafe: true,
-                lastActivity: Date.now() // Update activity timestamp
+                lastActivity: Date.now(),
+                // Restore arrays as Sets
+                pendingIdempotencyKeys: new Set(savedState.pendingIdempotencyKeys || []),
+                completedIdempotencyKeys: new Set(savedState.completedIdempotencyKeys || []),
+                failedIdempotencyKeys: new Set(savedState.failedIdempotencyKeys || []),
+                // Restore tracking data as Map
+                messageTracking: new Map(Object.entries(savedState.messageTrackingData || {}))
               };
               
               updateThreadState(threadId, restoredState);
@@ -508,14 +621,54 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
     // Setup initial timeout fallback
     setupTimeoutFallback();
     
+    // Periodic state reconciliation and cleanup
+    const reconciliationInterval = setInterval(async () => {
+      const currentState = getThreadState(threadId);
+      const now = Date.now();
+      
+      // Perform reconciliation every 2 minutes
+      if (!currentState.lastReconciliationCheck || (now - currentState.lastReconciliationCheck) > 120000) {
+        try {
+          const reconciliationResult = await reconcileStateWithDatabase(threadId, user?.id || '', currentState);
+          
+          if (reconciliationResult.hasOrphanedStates || reconciliationResult.recommendations.length > 0) {
+            console.log(`[useStreamingChatV2] State reconciliation recommendations:`, reconciliationResult.recommendations);
+            
+            // Update state based on reconciliation results with proper type handling
+            let updatedState: ThreadStreamingState = { 
+              ...currentState, 
+              lastReconciliationCheck: now 
+            };
+            
+            // Mark completed keys
+            for (const completedKey of reconciliationResult.completedKeys) {
+              updatedState = updateMessageTracking(updatedState, completedKey, 'completed');
+            }
+            
+            // Mark failed keys
+            for (const failedKey of reconciliationResult.failedKeys) {
+              updatedState = updateMessageTracking(updatedState, failedKey, 'failed');
+            }
+            
+            // Cleanup expired tracking data
+            updatedState = cleanupExpiredTracking(updatedState);
+            
+            updateThreadState(threadId, updatedState);
+          }
+        } catch (error) {
+          console.error('[useStreamingChatV2] Error during state reconciliation:', error);
+        }
+      }
+    }, 60000); // Check every minute
+    
     // Start periodic checking for mobile browsers immediately if there's active state
     const currentState = getThreadState(threadId);
     if (isMobileBrowser() && (currentState.isStreaming || currentState.showBackendAnimation)) {
       setTimeout(() => startPeriodicCompletionCheck(), 1000);
     }
-
-    // Enhanced cleanup function
-    return () => {
+    
+    // Enhanced cleanup to include reconciliation interval
+    const originalCleanup = () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', handleFocusEvents);
       window.removeEventListener('blur', handleFocusEvents);
@@ -531,7 +684,13 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
       if (periodicCheckInterval) {
         clearInterval(periodicCheckInterval);
       }
+      
+      if (reconciliationInterval) {
+        clearInterval(reconciliationInterval);
+      }
     };
+
+    return originalCleanup;
   }, [threadId, user?.id, getThreadState, updateThreadState, checkIfRequestCompleted]);
 
   // Add streaming message to current thread
@@ -622,11 +781,25 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
     const correlationId = generateCorrelationId();
     const idempotencyKey = generateIdempotencyKey(messageContent, 'user', targetThreadId, userId);
     
+    // Enhanced deduplication check using idempotency keys
+    if (!shouldProcessMessage(threadState, idempotencyKey)) {
+      console.log(`[useStreamingChatV2] Blocking duplicate request for idempotency key: ${idempotencyKey}`);
+      return;
+    }
+    
     console.log(`[useStreamingChatV2] Generated correlation ID: ${correlationId}, idempotency key: ${idempotencyKey}`);
     
-    // Reset state for new request
-    const newState = {
-      ...threadState,
+    // Enhanced state initialization with idempotency tracking
+    let updatedState = updateMessageTracking(
+      threadState,
+      idempotencyKey,
+      'pending',
+      correlationId,
+      messageId
+    );
+    
+    updatedState = {
+      ...updatedState,
       isStreaming: true,
       streamingMessages: [],
       showDynamicMessages: messageCategory === 'JOURNAL_SPECIFIC',
@@ -642,7 +815,10 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
       queryCategory: messageCategory
     };
     
-    updateThreadState(targetThreadId, newState);
+    // Cross-tab coordination
+    coordinateAcrossTabsForIdempotency(targetThreadId, idempotencyKey, 'start');
+    
+    updateThreadState(targetThreadId, updatedState);
 
     try {
       console.log(`[useStreamingChatV2] Generating streaming messages for category: ${messageCategory}`);
@@ -699,6 +875,16 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
       if (error) {
         console.error('[useStreamingChatV2] Backend function error:', error);
         
+        // Enhanced error handling with idempotency tracking
+        const errorState = updateMessageTracking(
+          currentState,
+          idempotencyKey,
+          'failed',
+          correlationId
+        );
+        
+        coordinateAcrossTabsForIdempotency(targetThreadId, idempotencyKey, 'fail');
+        
         addStreamingMessage(targetThreadId, {
           id: 'error-' + Date.now(),
           type: 'error',
@@ -707,7 +893,7 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
         });
 
         updateThreadState(targetThreadId, {
-          ...currentState,
+          ...errorState,
           isStreaming: false,
           showDynamicMessages: false,
           showBackendAnimation: false,
@@ -725,9 +911,19 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
         responseLength: result ? JSON.stringify(result).length : 0
       });
 
+      // Enhanced completion handling with idempotency tracking
+      const completedState = updateMessageTracking(
+        currentState,
+        idempotencyKey,
+        'completed',
+        correlationId
+      );
+      
+      coordinateAcrossTabsForIdempotency(targetThreadId, idempotencyKey, 'complete');
+      
       // Clear streaming messages and update state
       updateThreadState(targetThreadId, {
-        ...currentState,
+        ...completedState,
         isStreaming: false,
         streamingMessages: [],
         showDynamicMessages: false,
