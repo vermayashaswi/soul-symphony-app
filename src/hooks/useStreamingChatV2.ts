@@ -561,24 +561,26 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
               // Clear saved state
               clearChatStreamingState(threadId);
               
-              // Force UI refresh with enhanced mobile browser handling
+              // Enhanced force UI refresh with immediate message reload trigger
               window.dispatchEvent(new CustomEvent('chatCompletionDetected', {
                 detail: { 
                   threadId, 
                   correlationId: savedState.requestCorrelationId,
-                  restoredFromBackground: true 
+                  restoredFromBackground: true,
+                  forceMessageReload: true
                 }
               }));
               
               // Mobile browser specific: Force immediate UI state synchronization
               if (isMobileBrowser()) {
                 setTimeout(() => {
-                  console.log('[useStreamingChatV2] Mobile browser: Forcing additional UI sync');
+                  console.log('[useStreamingChatV2] Mobile browser: Forcing additional UI sync and message reload');
                   window.dispatchEvent(new CustomEvent('chatStateUpdated', {
                     detail: { 
                       threadId, 
                       completed: true, 
-                      source: 'mobile_force_sync' 
+                      source: 'mobile_force_sync',
+                      forceMessageReload: true
                     }
                   }));
                   // Force viewport refresh for stuck mobile browsers
@@ -629,13 +631,14 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
                   dynamicMessageIndex: 0
                 });
                 
-                // Emit completion events for mobile UI synchronization
+                // Enhanced completion events for mobile UI synchronization with message reload
                 window.dispatchEvent(new CustomEvent('chatCompletionDetected', {
                   detail: { 
                     threadId, 
                     correlationId: `mobile-sync-${Date.now()}`,
                     restoredFromBackground: false,
-                    source: 'mobile_aggressive_detection'
+                    source: 'mobile_aggressive_detection',
+                    forceMessageReload: true
                   }
                 }));
               }
