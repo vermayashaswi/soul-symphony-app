@@ -696,6 +696,46 @@ async function executeSubQuestion(
   themes: [${sqlContext.themes.slice(0, 3).map(t => `"${t.theme}"`).join(', ')}],
   sentiments: [${sqlContext.sentiments.map(s => `{ sentiment: ${s.sentiment} }`).join(', ')}]
 }`);
+            } else if (step.resultContext === "unrestricted_with_time_filter") {
+              // NEW: Unrestricted mode - collect SQL context for enhancement but don't restrict search
+              sqlContext = {
+                emotions: [],
+                themes: [],
+                sentiments: [],
+                timeRange: null
+              };
+              
+              // Collect both context and time range from dependencies
+              Object.values(subResults.executionResults.dependencyContext).forEach((depContext: any) => {
+                if (depContext.sqlResults) {
+                  depContext.sqlResults.forEach((row: any) => {
+                    // Collect emotions for enhancement
+                    if (row.emotion && (row.avg_score !== undefined || row.score !== undefined)) {
+                      const emotionScore = row.avg_score || row.score;
+                      sqlContext.emotions.push({ emotion: row.emotion, score: emotionScore });
+                    }
+                    // Collect themes for enhancement
+                    if (row.theme && (row.count !== undefined || row.entry_count !== undefined)) {
+                      const themeCount = row.count || row.entry_count;
+                      sqlContext.themes.push({ theme: row.theme, count: themeCount });
+                    }
+                    if (row.master_theme) {
+                      sqlContext.themes.push({ theme: row.master_theme, count: row.entry_count || 1 });
+                    }
+                  });
+                }
+                
+                // Extract time range from any dependency that has it
+                if (depContext.timeRange) {
+                  sqlContext.timeRange = depContext.timeRange;
+                }
+              });
+              
+              console.log(`[${requestId}] Built unrestricted context for vector search with time filter: {
+  emotions: [${sqlContext.emotions.slice(0, 3).map(e => `"${e.emotion}"`).join(', ')}],
+  themes: [${sqlContext.themes.slice(0, 2).map(t => `"${t.theme}"`).join(', ')}],
+  timeRange: ${JSON.stringify(sqlContext.timeRange)}
+}`);
             }
             
             const vectorResult = await executeVectorSearch(step.vectorSearch, userId, supabaseClient, requestId, step.timeRange, userTimezone, sqlContext);
@@ -760,10 +800,17 @@ async function executeVectorSearch(
   try {
     let enhancedQuery = vectorSearch.query;
     
-    // CRITICAL FIX: Replace [DYNAMIC_CONTEXT_QUERY] with actual SQL results
+    // Handle different context modes
     if (vectorSearch.query === '[DYNAMIC_CONTEXT_QUERY]' || vectorSearch.query.includes('[DYNAMIC_CONTEXT_QUERY]')) {
-      enhancedQuery = buildDynamicVectorQuery(sqlContext, requestId);
-      console.log(`[${requestId}] Built dynamic vector query from SQL context: "${enhancedQuery}"`);
+      if (sqlContext && sqlContext.timeRange !== undefined) {
+        // NEW: Unrestricted mode - use original user query enhanced with context
+        enhancedQuery = buildUnrestrictedVectorQuery(vectorSearch.originalUserQuery || 'feelings emotions mood thoughts', sqlContext, requestId);
+        console.log(`[${requestId}] Built unrestricted vector query: "${enhancedQuery}"`);
+      } else {
+        // Legacy restricted mode
+        enhancedQuery = buildDynamicVectorQuery(sqlContext, requestId);
+        console.log(`[${requestId}] Built dynamic vector query from SQL context: "${enhancedQuery}"`);
+      }
     }
     // Handle legacy placeholder queries
     else if (sqlContext && (vectorSearch.query.includes('[Combine user\'s original') || vectorSearch.query.includes('sadness depression hurt'))) {
@@ -772,7 +819,13 @@ async function executeVectorSearch(
     }
     // If sqlContext exists but query is static, enhance it
     else if (sqlContext) {
-      enhancedQuery = enhanceStaticQuery(vectorSearch.query, sqlContext, requestId);
+      if (sqlContext.timeRange !== undefined) {
+        // Unrestricted mode: minimal enhancement
+        enhancedQuery = enhanceUnrestrictedQuery(vectorSearch.query, sqlContext, requestId);
+      } else {
+        // Legacy mode: full enhancement
+        enhancedQuery = enhanceStaticQuery(vectorSearch.query, sqlContext, requestId);
+      }
     }
     
     // Generate embedding for the search query
@@ -780,16 +833,17 @@ async function executeVectorSearch(
     
     let vectorResults;
     
-    // Try with time range if available
-    if (timeRange && (timeRange.start || timeRange.end)) {
-      console.log(`[${requestId}] Vector search with time range: ${timeRange.start} to ${timeRange.end}`);
+    // Try with time range from sqlContext or step-level timeRange
+    const effectiveTimeRange = (sqlContext?.timeRange) || timeRange;
+    if (effectiveTimeRange && (effectiveTimeRange.start || effectiveTimeRange.end)) {
+      console.log(`[${requestId}] Vector search with inherited time range: ${effectiveTimeRange.start} to ${effectiveTimeRange.end}`);
       const { data, error } = await supabaseClient.rpc('match_journal_entries_with_date', {
         query_embedding: embedding,
         match_threshold: Math.max(0.12, (vectorSearch.threshold || 0.2) - 0.05),
         match_count: Math.min(30, (vectorSearch.limit || 12) + 10),
         user_id_filter: userId,
-        start_date: timeRange.start || null,
-        end_date: timeRange.end || null
+        start_date: effectiveTimeRange.start || null,
+        end_date: effectiveTimeRange.end || null
       });
 
       if (error) {
@@ -884,7 +938,58 @@ function buildDynamicVectorQuery(sqlContext: any, requestId: string): string {
 }
 
 /**
- * Enhance static query with SQL context
+ * NEW: Build unrestricted vector query - uses original user query + minimal context enhancement
+ */
+function buildUnrestrictedVectorQuery(originalUserQuery: string, sqlContext: any, requestId: string): string {
+  const terms: string[] = [];
+  
+  // Start with original user query terms as primary focus
+  terms.push(originalUserQuery);
+  
+  // Add minimal enhancement from SQL context (not replacement)
+  if (sqlContext?.emotions && Array.isArray(sqlContext.emotions) && sqlContext.emotions.length > 0) {
+    const topEmotion = sqlContext.emotions[0]?.emotion;
+    if (topEmotion) {
+      terms.push(topEmotion);
+    }
+  }
+  
+  if (sqlContext?.themes && Array.isArray(sqlContext.themes) && sqlContext.themes.length > 0) {
+    const topTheme = sqlContext.themes[0]?.theme;
+    if (topTheme) {
+      terms.push(topTheme);
+    }
+  }
+  
+  const unrestrictedQuery = terms.join(' ').trim();
+  console.log(`[${requestId}] Built unrestricted vector query: "${originalUserQuery}" → "${unrestrictedQuery}"`);
+  return unrestrictedQuery;
+}
+
+/**
+ * NEW: Enhance query for unrestricted mode - minimal enhancement only
+ */
+function enhanceUnrestrictedQuery(originalQuery: string, sqlContext: any, requestId: string): string {
+  const contextTerms: string[] = [];
+  
+  // Add only top emotion from SQL context (minimal enhancement)
+  if (sqlContext?.emotions && Array.isArray(sqlContext.emotions) && sqlContext.emotions.length > 0) {
+    const topEmotion = sqlContext.emotions[0]?.emotion || sqlContext.emotions[0]?.key;
+    if (topEmotion) {
+      contextTerms.push(topEmotion);
+    }
+  }
+  
+  const enhancedQuery = contextTerms.length > 0 
+    ? `${originalQuery} ${contextTerms.join(' ')}`.trim()
+    : originalQuery;
+  
+  console.log(`[${requestId}] Enhanced unrestricted query: "${originalQuery}" → "${enhancedQuery}"`);
+  return enhancedQuery;
+}
+
+/**
+ * Enhance static query with SQL context (legacy mode)
  */
 function enhanceStaticQuery(originalQuery: string, sqlContext: any, requestId: string): string {
   const contextTerms: string[] = [];
@@ -1390,28 +1495,38 @@ Every query plan MUST include a final vector search step that:
       "limit": 25
     },
     "timeRange": "[Inherit from previous SQL analysis timeRange if any]",
-    "resultContext": "use_sql_context_for_semantic_search",
+    "resultContext": "unrestricted_with_time_filter",
     "dependencies": ["sq1", "sq2"]
   }]
 }
 
-**CRITICAL: DYNAMIC VECTOR QUERY GENERATION RULES:**
-The [DYNAMIC_CONTEXT_QUERY] MUST be replaced with a query that:
-1. **USES TOP EMOTIONS from SQL analysis results** (e.g., if SQL finds "contentment, joy, celebration" → use these in vector query)
-2. **EXPANDS with emotion families** (e.g., if "contentment" found → add "happiness, satisfaction, peace, calm")
-3. **INCLUDES user's original semantic terms** from their query
-4. **ADDS time context terms** if applicable ("recent", "lately", "this week", etc.)
+**CRITICAL: UNRESTRICTED VECTOR SEARCH WITH TIME FILTER:**
+The "unrestricted_with_time_filter" mode ensures broad semantic search coverage while preserving time constraints:
 
-**EXAMPLES OF DYNAMIC QUERY GENERATION:**
+1. **PRIMARY FOCUS**: User's original semantic query terms (no restriction to SQL results)
+2. **TIME INHERITANCE**: Inherits time range from previous SQL sub-questions automatically
+3. **MINIMAL ENHANCEMENT**: Optionally adds top 1-2 emotions/themes from SQL context for relevance
+4. **BROAD COVERAGE**: Searches entire corpus within time constraints (not limited to SQL-filtered entries)
 
-If SQL analysis finds emotions: ["contentment", "joy", "celebration"]
-→ Vector query: "contentment joy celebration happiness satisfaction peace feelings emotions mood recent"
+**NEW UNRESTRICTED MODE BENEFITS:**
+- ✅ Prevents zero-result scenarios from overly narrow SQL context filtering
+- ✅ Maintains time-based relevance from SQL analysis
+- ✅ Preserves user's original semantic intent
+- ✅ Enhances with analysis context without restricting coverage
 
-If SQL analysis finds emotions: ["sadness", "regret", "disappointment"] 
-→ Vector query: "sadness regret disappointment hurt loneliness depression feelings emotions mood recent"
+**EXAMPLES OF UNRESTRICTED QUERY GENERATION:**
 
-If SQL analysis finds emotions: ["anxiety", "concern", "worry"]
-→ Vector query: "anxiety concern worry stress overwhelm fear feelings emotions mood recent"
+User Query: "How have I been feeling about work stress"
+SQL Analysis: ["anxiety", "overwhelm", "burnout"] + timeRange: last 2 weeks
+→ Unrestricted Vector Query: "work stress feelings anxiety" + time filter: last 2 weeks
+
+User Query: "My relationship with my family lately"  
+SQL Analysis: ["contentment", "love", "gratitude"] + timeRange: last month
+→ Unrestricted Vector Query: "family relationship feelings contentment" + time filter: last month
+
+**CRITICAL DIFFERENCE FROM LEGACY MODE:**
+- ❌ Legacy: Restricts vector search to ONLY SQL context terms (causes zero results)
+- ✅ Unrestricted: Uses user's original query + minimal SQL enhancement + time filter inheritance
 
 **EMOTION FAMILY MAPPINGS:**
 - Joy family: joy, happiness, contentment, satisfaction, celebration, gratitude, love
