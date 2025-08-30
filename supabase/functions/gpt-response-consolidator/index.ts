@@ -442,7 +442,7 @@ Your feelings around **family and identity** are quite nuanced. The journal entr
 **What This Reveals:** 📍
 You're processing complex *family dynamics* while maintaining strong emotional intelligence."
 
-**FORMATTING REQUIREMENTS YOU MUST FOLLOW:**
+**FORMATTING REQUIREMENTS YOU MUST FOLLOW (TRY TO USE ALL BELOW):**
 1. **Use ## or ### for main headers** (e.g., **Key Insights**, **Emotional Patterns**)
 2. **Use ** for bold emphasis** on important terms, emotions, themes
 3. **Use * for italics* on subtle emphasis
@@ -522,6 +522,9 @@ Similarity: ${entry.similarity || 'N/A'}`;
 
   
 
+  **CRITICAL NULL CHECK INSTRUCTION:**
+  ONLY state "couldn't retrieve any entries" or similar language if the ENTIRE analysis results object is null/empty/undefined. If ANY sub-question returns valid analysis data (emotion scores, SQL results, themes, etc.), you MUST acknowledge and use this available data rather than claiming no entries were found. Partial data is still valuable data that should be analyzed and presented to the user.
+  
   MANDATORY: If you receive null or irrelevant analysis results, feel free to inform the user and accordingly generate the response and follow-ups.
 
   **STRICT OUTPUT RULES:**
