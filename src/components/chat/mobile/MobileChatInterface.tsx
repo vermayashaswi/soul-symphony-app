@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Menu, Plus, Trash2 } from "lucide-react";
+import { Menu, Plus, Trash2, RefreshCw } from "lucide-react";
 import MobileChatMessage from "./MobileChatMessage";
 import MobileChatInput from "./MobileChatInput";
 import { supabase } from "@/integrations/supabase/client";
@@ -25,6 +25,7 @@ import { useStreamingChat } from "@/hooks/useStreamingChat";
 import { threadSafetyManager } from "@/utils/threadSafetyManager";
 import ChatErrorBoundary from "../ChatErrorBoundary";
 import { useAutoScroll } from "@/hooks/use-auto-scroll";
+import { useMobileChatEnhancements } from "@/hooks/use-mobile-chat-enhancements";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -272,6 +273,25 @@ export default function MobileChatInterface({
   const { translate } = useTranslation();
   const loadedThreadRef = useRef<string | null>(null);
   const userVerificationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Enhanced mobile chat functionality for stuck state recovery
+  const { triggerManualRefresh, canManualRefresh, isMobile, platform } = useMobileChatEnhancements({
+    threadId,
+    onCompletionDetected: (data) => {
+      console.log('[MobileChatInterface] Chat completion detected via mobile enhancements:', data);
+      // Reload messages to ensure UI is in sync
+      if (data.threadId === threadId) {
+        loadThreadMessages(data.threadId);
+      }
+    },
+    onStateUpdated: (data) => {
+      console.log('[MobileChatInterface] Chat state updated via mobile enhancements:', data);
+      // Force refresh if needed
+      if (data.completed && data.threadId === threadId) {
+        loadThreadMessages(data.threadId);
+      }
+    }
+  });
   
   // Detect iOS device for specific handling
   useEffect(() => {
@@ -1015,6 +1035,22 @@ export default function MobileChatInterface({
             </h1>
           </div>
           
+          {/* Manual refresh button for mobile browsers (Android) */}
+          {canManualRefresh() && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="ml-2 text-muted-foreground hover:text-primary"
+              onClick={triggerManualRefresh}
+              title="Refresh chat state"
+            >
+              <RefreshCw className="h-4 w-4" />
+              <span className="sr-only">
+                <TranslatableText text="Refresh Chat" />
+              </span>
+            </Button>
+          )}
+          
           <Button
             variant="ghost"
             size="icon"
@@ -1034,10 +1070,11 @@ export default function MobileChatInterface({
         </div>
       </div>
       
-      {/* Chat Content */}
+       {/* Chat Content */}
       <div 
         className={`mobile-chat-content ${isKeyboardVisible ? 'keyboard-visible' : ''}`} 
         ref={scrollElementRef}
+        data-chat-messages-container="true"
       >
         {initialLoading ? (
           <div className="flex items-center justify-center py-10">
