@@ -81,7 +81,19 @@ export function useChatRealtime(threadId: string | null) {
             const messageData = payload.new as any;
             console.log(`[useChatRealtime] Updated message in thread ${threadId}:`, messageData.sender);
             
-            // Real-time message update subscription - processing handled by useStreamingChat
+            // Check if assistant message processing completed
+            if (messageData.sender === 'assistant' && !messageData.is_processing) {
+              console.log(`[useChatRealtime] Chat response ready for thread ${threadId}`);
+              
+              // Emit custom event that components can listen to
+              const completionEvent = new CustomEvent('chatResponseReady', {
+                detail: { 
+                  threadId: threadId,
+                  messageId: messageData.id 
+                }
+              });
+              window.dispatchEvent(completionEvent);
+            }
           }
         )
         .on('postgres_changes',

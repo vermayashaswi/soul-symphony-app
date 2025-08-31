@@ -91,7 +91,8 @@ export default function MobileChatInterface({
       console.log('[MobileChatInterface] Chat response ready event received for thread:', completedThreadId, 'current:', threadId);
       
       if (completedThreadId && completedThreadId === threadId) {
-        console.log('[MobileChatInterface] Locking state and reloading messages for completed thread:', completedThreadId);
+        console.log('[MobileChatInterface] Stopping streaming and reloading messages for completed thread:', completedThreadId);
+        stopStreaming(); // Clear streaming state immediately
         lockState('Chat completion detected');
         // Reload messages to show the completed response immediately
         loadThreadMessages(completedThreadId);
@@ -631,19 +632,57 @@ export default function MobileChatInterface({
         setShowSuggestions(false);
         loadedThreadRef.current = currentThreadId;
         
-        // Check for active streaming and resume state
-        const streamingResumed = resumeStreamingState(currentThreadId);
-        if (streamingResumed) {
-          debugLog.addEvent("Thread Loading", `Resumed streaming state for thread: ${currentThreadId}`, "info");
-        }
+        // CHECK FOR COMPLETION FIRST - before resuming any streaming state
+        const hasCompletedResponse = chatMessages.some(msg => 
+          msg.sender === 'assistant' && !msg.is_processing
+        );
         
-        // Check if the most recent message indicates completion
-        const lastMessage = chatMessages[chatMessages.length - 1];
-        if (lastMessage && lastMessage.sender === 'assistant' && !lastMessage.is_processing) {
-          // If we have a completed response but streaming is active, clear streaming state
+        if (hasCompletedResponse) {
+          // Don't resume streaming - just show completed messages
+          debugLog.addEvent("Thread Loading", `Found completed response for thread: ${currentThreadId}`, "info");
+          
+          // Clear any existing streaming state
           if (isStreaming) {
             stopStreaming();
             debugLog.addEvent("Thread Loading", `Cleared streaming state - found completed response`, "info");
+          }
+        } else {
+          // Still processing - check if we should resume streaming state
+          const streamingResumed = resumeStreamingState(currentThreadId);
+          if (streamingResumed) {
+            debugLog.addEvent("Thread Loading", `Resumed streaming state for thread: ${currentThreadId}`, "info");
+            
+            // Start periodic completion check while streaming
+            const checkInterval = setInterval(async () => {
+              try {
+                const updatedMessages = await getThreadMessages(currentThreadId, user.id);
+                const hasCompleted = updatedMessages?.some(msg => 
+                  msg.sender === 'assistant' && !msg.is_processing
+                );
+                
+                if (hasCompleted) {
+                  clearInterval(checkInterval);
+                  stopStreaming();
+                  // Reload messages to show the completed response
+                  const finalMessages = updatedMessages
+                    .filter(msg => !msg.is_processing)
+                    .map(msg => ({
+                      role: msg.sender as 'user' | 'assistant',
+                      content: msg.content,
+                      references: msg.reference_entries ? Array.isArray(msg.reference_entries) ? msg.reference_entries : [] : undefined,
+                      hasNumericResult: msg.has_numeric_result
+                    }));
+                  setMessages(finalMessages);
+                  debugLog.addEvent("Periodic Check", `Found completed response via periodic check for thread: ${currentThreadId}`, "info");
+                }
+              } catch (error) {
+                clearInterval(checkInterval);
+                debugLog.addEvent("Periodic Check", `Error during periodic completion check: ${error}`, "error");
+              }
+            }, 3000); // Check every 3 seconds
+            
+            // Clean up interval if component unmounts or thread changes
+            setTimeout(() => clearInterval(checkInterval), 60000); // Max 1 minute of checking
           }
         }
       } else {

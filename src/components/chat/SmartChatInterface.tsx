@@ -117,7 +117,8 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     dynamicMessages,
     translatedDynamicMessages,
     currentMessageIndex,
-    useThreeDotFallback
+    useThreeDotFallback,
+    resumeStreamingState
   } = useStreamingChat({
       threadId: currentThreadId,
     onFinalResponse: async (response, analysis, originThreadId, requestId) => {
@@ -334,7 +335,8 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
   useEffect(() => {
     const onResponseReady = (event: CustomEvent) => {
       if (event.detail.threadId === currentThreadId) {
-        console.log(`[SmartChatInterface] Response ready for thread ${currentThreadId}, reloading messages`);
+        console.log(`[SmartChatInterface] Response ready for thread ${currentThreadId}, stopping streaming and reloading messages`);
+        stopStreaming(); // Clear streaming state immediately
         loadThreadMessages(currentThreadId);
       }
     };
@@ -343,7 +345,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     return () => {
       window.removeEventListener('chatResponseReady' as any, onResponseReady);
     };
-  }, [currentThreadId]);
+  }, [currentThreadId, stopStreaming]);
 
   // Auto-scroll is now handled by the useAutoScroll hook
 
@@ -395,6 +397,57 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
         setChatHistory(typedMessages);
         setShowSuggestions(false);
         loadedThreadRef.current = threadId;
+        
+        // CHECK FOR COMPLETION FIRST - before resuming any streaming state
+        const hasCompletedResponse = messages.some(msg => 
+          msg.sender === 'assistant' && !msg.is_processing
+        );
+        
+        if (hasCompletedResponse) {
+          // Don't resume streaming - just show completed messages
+          debugLog.addEvent("Thread Loading", `Found completed response for thread: ${threadId}`, "info");
+          
+          // Clear any existing streaming state
+          if (isStreaming) {
+            stopStreaming();
+            debugLog.addEvent("Thread Loading", `Cleared streaming state - found completed response`, "info");
+          }
+        } else {
+          // Still processing - check if we should resume streaming state
+          const streamingResumed = resumeStreamingState(threadId);
+          if (streamingResumed) {
+            debugLog.addEvent("Thread Loading", `Resumed streaming state for thread: ${threadId}`, "info");
+            
+            // Start periodic completion check while streaming
+            const checkInterval = setInterval(async () => {
+              try {
+                const updatedMessages = await getThreadMessages(threadId, effectiveUserId);
+                const hasCompleted = updatedMessages?.some(msg => 
+                  msg.sender === 'assistant' && !msg.is_processing
+                );
+                
+                if (hasCompleted) {
+                  clearInterval(checkInterval);
+                  stopStreaming();
+                  // Reload messages to show the completed response
+                  const finalTypedMessages: ChatMessage[] = updatedMessages.map(msg => ({
+                    ...msg,
+                    sender: msg.sender as 'user' | 'assistant' | 'error',
+                    role: msg.role as 'user' | 'assistant' | 'error'
+                  }));
+                  setChatHistory(finalTypedMessages);
+                  debugLog.addEvent("Periodic Check", `Found completed response via periodic check for thread: ${threadId}`, "info");
+                }
+              } catch (error) {
+                clearInterval(checkInterval);
+                debugLog.addEvent("Periodic Check", `Error during periodic completion check: ${error}`, "error");
+              }
+            }, 3000); // Check every 3 seconds
+            
+            // Clean up interval if component unmounts or thread changes
+            setTimeout(() => clearInterval(checkInterval), 60000); // Max 1 minute of checking
+          }
+        }
       } else {
         debugLog.addEvent("Thread Loading", `No messages found for thread ${threadId}`, "info");
         console.log(`No messages found for thread ${threadId}`);
