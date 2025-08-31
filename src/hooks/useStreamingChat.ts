@@ -44,6 +44,7 @@ interface ThreadStreamingState {
   abortController: AbortController | null;
   activeRequestId: string | null; // Track active request to prevent duplicates
   lastMessageFingerprint: string | null; // Prevent duplicate messages
+  uiPaused?: boolean; // UI is paused due to navigation, but backend may still be processing
 }
 
 const createInitialState = (): ThreadStreamingState => ({
@@ -194,7 +195,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
           // Enhanced state saving with more complete information
           saveChatStreamingState(threadId, {
             ...threadState,
-            pausedDueToBackground: true,
+            uiPaused: true, // UI is paused, but stream continues on backend
             savedAt: Date.now(),
             navigationSafe: true, // Mark as safe for navigation restoration
           });
@@ -207,7 +208,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
         const restoreVisibilityState = async () => {
           try {
             const savedState: any = getChatStreamingState(threadId);
-            if (savedState && (savedState.isStreaming || savedState.pausedDueToBackground || savedState.navigationSafe)) {
+            if (savedState && (savedState.isStreaming || savedState.uiPaused || savedState.navigationSafe)) {
               
               // PRIORITY: Check if request completed while away - this takes precedence over state restoration
               const isAlreadyCompleted = await checkIfRequestCompleted(threadId, savedState);
@@ -223,21 +224,24 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
                 return;
               }
               
-              console.log(`[useStreamingChat] Restoring navigation-safe state for thread: ${threadId}`);
+              // If NOT completed - just resume UI exactly where it left off (seamless continuation)
+              console.log(`[useStreamingChat] Resuming UI state for thread: ${threadId} (isStreaming: ${savedState.isStreaming})`);
               updateThreadState(threadId, {
-                isStreaming: true,
+                // Keep the EXACT streaming state as it was
+                isStreaming: savedState.isStreaming, // Don't force to true - use saved value
                 streamingMessages: savedState.streamingMessages || [],
                 currentUserMessage: savedState.currentUserMessage || '',
-                showBackendAnimation: !!savedState.showBackendAnimation,
+                showBackendAnimation: savedState.showBackendAnimation, // Resume exact animation state
                 dynamicMessages: savedState.dynamicMessages || [],
                 translatedDynamicMessages: savedState.translatedDynamicMessages || [],
-                currentMessageIndex: savedState.currentMessageIndex || 0,
-                useThreeDotFallback: !!savedState.useThreeDotFallback,
+                currentMessageIndex: savedState.currentMessageIndex || 0, // Resume from exact position
+                useThreeDotFallback: savedState.useThreeDotFallback,
                 queryCategory: savedState.queryCategory || '',
                 expectedProcessingTime: savedState.expectedProcessingTime || null,
                 processingStartTime: savedState.processingStartTime || Date.now(),
-                abortController: new AbortController(),
+                abortController: new AbortController(), // New controller for resumed session
                 activeRequestId: savedState.activeRequestId || null,
+                uiPaused: false, // UI is no longer paused
               });
             }
           } catch (error) {
@@ -268,54 +272,57 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
             console.log(`[useStreamingChat] Capacitor app backgrounded for thread: ${threadId}`);
             const threadState = getThreadState(threadId);
             if (threadState.isStreaming || threadState.showBackendAnimation) {
-              // Enhanced state saving for Capacitor
+              // Save EXACT current state for Capacitor - don't change isStreaming
               saveChatStreamingState(threadId, {
                 ...threadState,
-                pausedDueToBackground: true,
+                uiPaused: true, // UI is paused, but stream continues on backend
                 savedAt: Date.now(),
                 navigationSafe: true,
               });
-              console.log(`[useStreamingChat] Saved enhanced Capacitor state: ${threadId}`);
+              console.log(`[useStreamingChat] Saved exact Capacitor state (UI paused): ${threadId}`);
             }
            } else if (state.isActive && threadId) {
                // App foregrounded
                console.log(`[useStreamingChat] Capacitor app foregrounded for thread: ${threadId}`);
                
-               const restoreCapacitorState = async () => {
-                 try {
-                   const savedState: any = getChatStreamingState(threadId);
-                   if (savedState && (savedState.isStreaming || savedState.pausedDueToBackground || savedState.navigationSafe)) {
-                     
-                       // PRIORITY: Check if request completed while app was backgrounded
-                      const isAlreadyCompleted = await checkIfRequestCompleted(threadId, savedState);
+                const restoreCapacitorState = async () => {
+                  try {
+                    const savedState: any = getChatStreamingState(threadId);
+                    if (savedState && (savedState.isStreaming || savedState.uiPaused || savedState.navigationSafe)) {
                       
-                       if (isAlreadyCompleted) {
-                         console.log(`[useStreamingChat] ✓ Request completed while app backgrounded, clearing state and dispatching event: ${threadId}`);
-                         clearChatStreamingState(threadId);
-                         updateThreadState(threadId, createInitialState()); // Clear streaming state
-                         // Dispatch event to trigger UI reload
-                         window.dispatchEvent(new CustomEvent('chatResponseReady', { 
-                           detail: { threadId } 
-                         }));
-                         return;
-                       }
-                     
-                     console.log(`[useStreamingChat] Restoring Capacitor navigation-safe state: ${threadId}`);
-                     updateThreadState(threadId, {
-                       isStreaming: true,
-                       streamingMessages: savedState.streamingMessages || [],
-                       currentUserMessage: savedState.currentUserMessage || '',
-                       showBackendAnimation: !!savedState.showBackendAnimation,
-                       dynamicMessages: savedState.dynamicMessages || [],
-                       translatedDynamicMessages: savedState.translatedDynamicMessages || [],
-                       currentMessageIndex: savedState.currentMessageIndex || 0,
-                       useThreeDotFallback: !!savedState.useThreeDotFallback,
-                       queryCategory: savedState.queryCategory || '',
-                       expectedProcessingTime: savedState.expectedProcessingTime || null,
-                       processingStartTime: savedState.processingStartTime || Date.now(),
-                       abortController: new AbortController(),
-                       activeRequestId: savedState.activeRequestId || null,
-                     });
+                        // PRIORITY: Check if request completed while app was backgrounded
+                       const isAlreadyCompleted = await checkIfRequestCompleted(threadId, savedState);
+                       
+                        if (isAlreadyCompleted) {
+                          console.log(`[useStreamingChat] ✓ Request completed while app backgrounded, clearing state and dispatching event: ${threadId}`);
+                          clearChatStreamingState(threadId);
+                          updateThreadState(threadId, createInitialState()); // Clear streaming state
+                          // Dispatch event to trigger UI reload
+                          window.dispatchEvent(new CustomEvent('chatResponseReady', { 
+                            detail: { threadId } 
+                          }));
+                          return;
+                        }
+                      
+                      // If NOT completed - just resume UI exactly where it left off (seamless continuation)
+                      console.log(`[useStreamingChat] Resuming Capacitor UI state for thread: ${threadId} (isStreaming: ${savedState.isStreaming})`);
+                      updateThreadState(threadId, {
+                        // Keep the EXACT streaming state as it was
+                        isStreaming: savedState.isStreaming, // Don't force to true - use saved value
+                        streamingMessages: savedState.streamingMessages || [],
+                        currentUserMessage: savedState.currentUserMessage || '',
+                        showBackendAnimation: savedState.showBackendAnimation, // Resume exact animation state
+                        dynamicMessages: savedState.dynamicMessages || [],
+                        translatedDynamicMessages: savedState.translatedDynamicMessages || [],
+                        currentMessageIndex: savedState.currentMessageIndex || 0, // Resume from exact position
+                        useThreeDotFallback: savedState.useThreeDotFallback,
+                        queryCategory: savedState.queryCategory || '',
+                        expectedProcessingTime: savedState.expectedProcessingTime || null,
+                        processingStartTime: savedState.processingStartTime || Date.now(),
+                        abortController: new AbortController(), // New controller for resumed session
+                        activeRequestId: savedState.activeRequestId || null,
+                        uiPaused: false, // UI is no longer paused
+                      });
                    }
                  } catch (error) {
                    console.warn(`[useStreamingChat] Error restoring Capacitor state: ${error}`);
@@ -354,7 +361,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     const restoreStateIfStillValid = async () => {
       try {
         const savedState: any = getChatStreamingState(threadId);
-        if (savedState && (savedState.isStreaming || savedState.pausedDueToBackground || savedState.navigationSafe)) {
+        if (savedState && (savedState.isStreaming || savedState.uiPaused || savedState.navigationSafe)) {
           
           console.log(`[useStreamingChat] Found saved state for thread: ${threadId}`, {
             isStreaming: savedState.isStreaming,
@@ -1074,7 +1081,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
   const restoreStreamingState = useCallback(async (targetThreadId: string) => {
     try {
       const savedState: any = getChatStreamingState(targetThreadId);
-      if (savedState && (savedState.isStreaming || savedState.pausedDueToBackground || savedState.navigationSafe)) {
+      if (savedState && (savedState.isStreaming || savedState.uiPaused || savedState.navigationSafe)) {
         
         // Enhanced completion check with wider time window
         const isCompleted = await checkIfRequestCompleted(targetThreadId, savedState);
@@ -1154,7 +1161,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
             const stateAge = now - (parsed.savedAt || 0);
             const isOld = stateAge > 10 * 60 * 1000; // 10 minutes
             
-            if (isOld && (parsed.isStreaming || parsed.pausedDueToBackground)) {
+            if (isOld && (parsed.isStreaming || parsed.uiPaused)) {
               // Check if request was completed
               const isCompleted = await checkIfRequestCompleted(threadId, parsed);
               

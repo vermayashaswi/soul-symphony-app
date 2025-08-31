@@ -14,7 +14,7 @@ export interface ChatStreamingState {
   retryCount?: number;
   queryCategory?: string;
   abortController?: any; // Will be null when saved/loaded
-  pausedDueToBackground?: boolean;
+  uiPaused?: boolean; // UI is paused due to navigation, but backend may still be processing
   currentUserMessage?: string;
   savedAt?: number;
   showBackendAnimation?: boolean;
