@@ -611,6 +611,39 @@ export const useNotifications = () => {
     loadUnreadCountStable();
   }, [loadNotificationsStable, loadUnreadCountStable]);
 
+  // Dismiss all notifications
+  const dismissAllNotifications = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      // Optimistically update UI
+      setNotifications([]);
+      setUnreadCount(0);
+
+      // Dismiss all non-dismissed notifications in the database
+      const { error } = await supabase
+        .from('user_app_notifications')
+        .update({ dismissed_at: new Date().toISOString() })
+        .eq('user_id', user.id)
+        .is('dismissed_at', null);
+
+      if (error) {
+        console.error('Error dismissing all notifications:', error);
+        // Reload on error to restore correct state
+        loadNotificationsStable();
+        loadUnreadCountStable();
+        return;
+      }
+
+      console.log('[useNotifications] All notifications dismissed successfully');
+    } catch (error) {
+      console.error('Error in dismissAllNotifications:', error);
+      // Reload on error to restore correct state
+      loadNotificationsStable();
+      loadUnreadCountStable();
+    }
+  }, [user, supabase, loadNotificationsStable, loadUnreadCountStable]);
+
   // Force refresh notifications - useful for push notification sync
   const forceRefresh = useCallback(() => {
     console.log('[useNotifications] Force refreshing notifications...');
@@ -627,6 +660,7 @@ export const useNotifications = () => {
     markAsRead,
     markAsUnread,
     dismissNotification,
+    dismissAllNotifications,
     markAllAsRead,
     createNotification,
     loadNotifications: retryLoadNotifications,
