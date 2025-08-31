@@ -1,5 +1,50 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
 
+// Shared notification type mappings
+const NOTIFICATION_TYPE_MAPPING: Record<string, string> = {
+  // In-App Notifications
+  'success': 'in_app_notifications',
+  'info': 'in_app_notifications', 
+  'warning': 'in_app_notifications',
+  'error': 'in_app_notifications',
+  'achievement': 'in_app_notifications',
+  
+  // Insightful Reminders
+  'goal_achievement': 'insightful_reminders',
+  'streak_reward': 'insightful_reminders',
+  'sleep_reflection': 'insightful_reminders',
+  'journal_insights': 'insightful_reminders',
+  'mood_tracking_prompt': 'insightful_reminders',
+  'inactivity_nudge': 'insightful_reminders',
+  'insights_ready': 'insightful_reminders',
+  
+  // Journaling Reminders
+  'journal_reminder': 'journaling_reminders',
+  'daily_prompt': 'journaling_reminders',
+  'writing_reminder': 'journaling_reminders',
+  
+  // Feature Updates (special category - always shown regardless of preferences)
+  'feature_update': 'system',
+  'smart_chat_invite': 'system',
+  'custom': 'system'
+};
+
+function getNotificationCategory(notificationType: string): string | null {
+  return NOTIFICATION_TYPE_MAPPING[notificationType] || null;
+}
+
+function shouldBypassPreferences(notificationType: string): boolean {
+  const category = getNotificationCategory(notificationType);
+  return category === 'system';
+}
+
+interface NotificationPreferences {
+  master_notifications: boolean;
+  in_app_notifications: boolean;
+  insightful_reminders: boolean;
+  journaling_reminders: boolean;
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -53,24 +98,66 @@ Deno.serve(async (req) => {
       
       for (const userId of notificationRequest.userIds) {
         try {
-          const { error: inAppError } = await supabase
-            .from('user_app_notifications')
-            .insert({
-              user_id: userId,
-              title: notificationRequest.title,
-              message: notificationRequest.body,
-              type: getInAppNotificationType(notificationRequest.type),
-              action_url: notificationRequest.actionUrl,
-              action_label: notificationRequest.actionLabel,
-              data: notificationRequest.data || {}
-            })
+          // Check if we should bypass user preferences for system notifications
+          const shouldBypass = shouldBypassPreferences(notificationRequest.type);
+          let shouldSendInApp = true;
 
-          if (inAppError) {
-            console.error('[CustomNotification] In-app notification error:', inAppError);
-            results.inAppNotifications.failed++
-            results.errors.push(`In-app notification failed for user ${userId}: ${inAppError.message}`)
+          if (!shouldBypass) {
+            // Check user's notification preferences
+            const { data: profileData, error: profileError } = await supabase
+              .from('profiles')
+              .select('notification_preferences')
+              .eq('id', userId)
+              .single();
+
+            if (profileError) {
+              console.warn(`[CustomNotification] Could not fetch preferences for user ${userId}:`, profileError);
+              // Continue with default behavior (send notification)
+            } else {
+              const preferences: NotificationPreferences = profileData?.notification_preferences || {
+                master_notifications: false,
+                in_app_notifications: true,
+                insightful_reminders: true,
+                journaling_reminders: true
+              };
+
+              // Check master notifications first
+              if (!preferences.master_notifications) {
+                console.log(`[CustomNotification] Master notifications disabled for user ${userId}`);
+                shouldSendInApp = false;
+              } else {
+                // Check specific category
+                const category = getNotificationCategory(notificationRequest.type);
+                if (category && !preferences[category as keyof NotificationPreferences]) {
+                  console.log(`[CustomNotification] Category '${category}' disabled for user ${userId}`);
+                  shouldSendInApp = false;
+                }
+              }
+            }
+          }
+
+          if (shouldSendInApp) {
+            const { error: inAppError } = await supabase
+              .from('user_app_notifications')
+              .insert({
+                user_id: userId,
+                title: notificationRequest.title,
+                message: notificationRequest.body,
+                type: getInAppNotificationType(notificationRequest.type),
+                action_url: notificationRequest.actionUrl,
+                action_label: notificationRequest.actionLabel,
+                data: notificationRequest.data || {}
+              })
+
+            if (inAppError) {
+              console.error('[CustomNotification] In-app notification error:', inAppError);
+              results.inAppNotifications.failed++
+              results.errors.push(`In-app notification failed for user ${userId}: ${inAppError.message}`)
+            } else {
+              results.inAppNotifications.success++
+            }
           } else {
-            results.inAppNotifications.success++
+            console.log(`[CustomNotification] Skipping in-app notification for user ${userId} due to preferences`);
           }
         } catch (error) {
           console.error('[CustomNotification] In-app notification error:', error);

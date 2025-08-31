@@ -40,6 +40,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, 
     markAsRead, 
     markAsUnread, 
     dismissNotification,
+    dismissAllNotifications,
     loadNotifications 
   } = useNotifications();
   const { toast } = useToast();
@@ -127,6 +128,15 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, 
             >
               <TranslatableText text="Unread" /> ({displayUnreadCount})
             </Button>
+            {filteredNotifications.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={dismissAllNotifications}
+              >
+                <TranslatableText text="Clear All" />
+              </Button>
+            )}
           </div>
         </div>
 

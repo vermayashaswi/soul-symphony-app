@@ -39,6 +39,7 @@ const NOTIFICATION_TYPE_MAPPING: Record<string, string> = {
   'journal_insights': 'insightful_reminders',
   'mood_tracking_prompt': 'insightful_reminders',
   'inactivity_nudge': 'insightful_reminders',
+  'insights_ready': 'insightful_reminders',
   
   // Journaling Reminders
   'journal_reminder': 'journaling_reminders',
