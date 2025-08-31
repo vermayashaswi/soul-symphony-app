@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Menu, Plus, Trash2, RefreshCw } from "lucide-react";
@@ -69,9 +69,21 @@ export default function MobileChatInterface({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [isIOSDevice, setIsIOSDevice] = useState(false);
+  const [stateLocked, setStateLocked] = useState(false);
   const debugLog = useDebugLog();
 
-  // CRITICAL: Listen for chat response completion events FIRST to fix navigation issues
+  // CRITICAL: State locking system to prevent overrides during completion
+  const lockState = useCallback((reason: string) => {
+    console.log('[MobileChatInterface] Locking state:', reason);
+    setStateLocked(true);
+    // Auto-unlock after 2 seconds to prevent permanent locks
+    setTimeout(() => {
+      setStateLocked(false);
+      console.log('[MobileChatInterface] State auto-unlocked');
+    }, 2000);
+  }, []);
+
+  // CRITICAL: Listen for chat response completion events FIRST - now with state locking
   useEffect(() => {
     const handleChatResponseReady = (event: CustomEvent) => {
       const { threadId: completedThreadId } = event.detail || {};
@@ -79,7 +91,8 @@ export default function MobileChatInterface({
       console.log('[MobileChatInterface] Chat response ready event received for thread:', completedThreadId, 'current:', threadId);
       
       if (completedThreadId && completedThreadId === threadId) {
-        console.log('[MobileChatInterface] Reloading messages for completed thread:', completedThreadId);
+        console.log('[MobileChatInterface] Locking state and reloading messages for completed thread:', completedThreadId);
+        lockState('Chat completion detected');
         // Reload messages to show the completed response immediately
         loadThreadMessages(completedThreadId);
       }
@@ -90,7 +103,7 @@ export default function MobileChatInterface({
     return () => {
       window.removeEventListener('chatResponseReady', handleChatResponseReady as EventListener);
     };
-  }, [threadId]); // Dependencies include threadId for proper event filtering
+  }, [threadId, lockState]); // Dependencies include threadId for proper event filtering
   
   // Track active thread for safety manager
   useEffect(() => {

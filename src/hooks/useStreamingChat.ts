@@ -110,42 +110,47 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     return `${userId}_${threadId}_${normalizedMessage.substring(0, 50)}_${timeWindow}`;
   }, []);
 
-  // Aggressive completion detection - simplified and more reliable
+  // Aggressive completion detection - simplified and more reliable with immediate priority
   const checkIfRequestCompleted = useCallback(async (threadId: string, savedState: any): Promise<boolean> => {
     try {
-      console.log(`[useStreamingChat] Checking completion for thread ${threadId}...`);
+      console.log(`[useStreamingChat] PRIORITY CHECK: Checking completion for thread ${threadId}...`);
       
-      // Strategy 1: Check for ANY recent assistant messages (last 15 minutes) - more aggressive
+      // PRIORITY Strategy: Check for ANY recent assistant messages (last 20 minutes) - ultra aggressive
       const { data: recentMessages, error: recentError } = await supabase
         .from('chat_messages')
         .select('id, created_at, content, sender')
         .eq('thread_id', threadId)
         .eq('sender', 'assistant')
-        .gte('created_at', new Date(Date.now() - 15 * 60 * 1000).toISOString()) // Last 15 minutes
+        .gte('created_at', new Date(Date.now() - 20 * 60 * 1000).toISOString()) // Last 20 minutes
         .order('created_at', { ascending: false })
-        .limit(5);
+        .limit(10);
 
       if (!recentError && recentMessages && recentMessages.length > 0) {
-        // Accept ANY assistant message that's not obviously a processing indicator
+        console.log(`[useStreamingChat] Found ${recentMessages.length} recent assistant messages`);
+        
+        // Accept ANY assistant message that's substantial (lowered threshold)
         const latestMessage = recentMessages[0];
-        const isValidMessage = latestMessage.content.length > 10 && 
-                              !latestMessage.content.includes('...') &&
-                              !latestMessage.content.toLowerCase().includes('processing') &&
-                              !latestMessage.content.toLowerCase().includes('analyzing');
+        const isValidMessage = latestMessage.content.length > 5 && 
+                              !latestMessage.content.includes('...');
         
         if (isValidMessage) {
-          console.log(`[useStreamingChat] ✓ Found valid recent assistant message for thread ${threadId}`);
+          console.log(`[useStreamingChat] ✓ PRIORITY: Found valid recent assistant message for thread ${threadId}`);
+          // IMMEDIATE EVENT DISPATCH - dispatch BEFORE clearing state
+          setTimeout(() => {
+            console.log(`[useStreamingChat] Dispatching chatResponseReady event for thread ${threadId}`);
+            window.dispatchEvent(new CustomEvent('chatResponseReady', { detail: { threadId } }));
+          }, 0);
           return true;
         }
       }
 
-      // Strategy 2: Check for ANY assistant message after the last user message (more aggressive)
+      // Fallback Strategy: Check for ANY assistant message after the last user message
       const { data: threadMessages, error: threadError } = await supabase
         .from('chat_messages')
         .select('id, created_at, content, sender')
         .eq('thread_id', threadId)
         .order('created_at', { ascending: false })
-        .limit(15);
+        .limit(20);
 
       if (!threadError && threadMessages && threadMessages.length > 0) {
         const lastUserMessageIndex = threadMessages.findIndex(msg => msg.sender === 'user');
