@@ -141,12 +141,16 @@ export default function MobileChatInterface({
   });
   
   // Use streaming chat for enhanced UX
+  const streamingState = useStreamingChatV2(threadId || '');
   const {
     isStreaming,
     streamingMessages,
     startStreamingChat,
-    showDynamicMessages
-   } = useStreamingChatV2(threadId || '');
+    showDynamicMessages,
+    dynamicMessages,
+    translatedDynamicMessages,
+    useThreeDotFallback
+   } = streamingState;
   
   const suggestionQuestions = [
     {
@@ -1047,18 +1051,28 @@ export default function MobileChatInterface({
             {(isStreaming || showDynamicMessages) ? (
               (() => {
                 const visibleMessage = streamingMessages.find(msg => msg.isVisible);
+                const currentDynamicMessages = translatedDynamicMessages.length > 0 
+                  ? translatedDynamicMessages 
+                  : dynamicMessages;
+                
                 console.log('[MobileChatInterface] Streaming display logic:', { 
                   showDynamicMessages, 
                   streamingMessagesCount: streamingMessages.length,
                   visibleMessage: visibleMessage?.content,
+                  useThreeDotFallback,
+                  dynamicMessagesCount: currentDynamicMessages.length,
                   isStreaming 
                 });
+                
+                // Display logic matching original hook
+                const shouldShowDots = useThreeDotFallback || currentDynamicMessages.length === 0;
+                const displayMessage = shouldShowDots ? undefined : visibleMessage?.content;
                 
                 return (
                   <ChatErrorBoundary>
                     <MobileChatMessage 
                       message={{ role: 'assistant', content: '' }}
-                      streamingMessage={visibleMessage?.content}
+                      streamingMessage={displayMessage}
                       showStreamingDots={true}
                     />
                   </ChatErrorBoundary>

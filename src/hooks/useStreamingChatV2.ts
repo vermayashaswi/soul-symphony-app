@@ -60,6 +60,11 @@ export interface ThreadStreamingState {
   completedIdempotencyKeys: Set<string>;
   failedIdempotencyKeys: Set<string>;
   lastReconciliationCheck?: number;
+  // Original dynamic message system
+  dynamicMessages: string[];
+  translatedDynamicMessages: string[];
+  currentMessageIndex: number;
+  useThreeDotFallback: boolean;
 }
 
 // Props interface for the hook
@@ -104,7 +109,12 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
       pendingIdempotencyKeys: new Set(),
       completedIdempotencyKeys: new Set(),
       failedIdempotencyKeys: new Set(),
-      lastReconciliationCheck: undefined
+      lastReconciliationCheck: undefined,
+      // Original dynamic message system
+      dynamicMessages: [],
+      translatedDynamicMessages: [],
+      currentMessageIndex: 0,
+      useThreeDotFallback: true,
     };
   }
 
@@ -710,71 +720,150 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
     }
   }, [getThreadState, updateThreadState, onFinalResponse, onError]);
 
-  // Generate streaming messages for journal-specific queries
-  const generateStreamingMessages = useCallback((threadId: string) => {
-    const journalMessages = [
-      "Analyzing your journal entries...",
-      "Looking for patterns and insights...",
-      "Examining emotional themes...",
-      "Processing your personal data...",
-      "Generating personalized insights..."
-    ];
+  // Generate streaming messages using backend integration (original logic)
+  const generateStreamingMessages = useCallback(async (
+    threadId: string, 
+    userMessage: string = '',
+    category: string = 'JOURNAL_SPECIFIC',
+    conversationContext: any[] = [],
+    userProfile: any = {}
+  ) => {
+    console.log('[useStreamingChatV2] Generating streaming messages for category:', category);
+    
+    try {
+      // Call backend to generate contextual dynamic messages
+      const { data: result, error } = await supabase.functions.invoke('generate-streaming-messages', {
+        body: {
+          userMessage,
+          category,
+          conversationContext,
+          userProfile
+        }
+      });
 
-    const currentState = getThreadState(threadId);
-    let messageIndex = currentState.dynamicMessageIndex;
-    let timeoutId: NodeJS.Timeout | null = null;
-    
-    console.log('[useStreamingChatV2] Starting generateStreamingMessages for thread:', threadId, 'messageIndex:', messageIndex);
-    
-    const showNextMessage = () => {
-      const state = getThreadState(threadId);
-      if (!state.showDynamicMessages) {
-        console.log('[useStreamingChatV2] Stopping dynamic messages - showDynamicMessages is false');
+      if (error) {
+        console.error('[useStreamingChatV2] Error generating streaming messages:', error);
+        // Fall back to three dots
+        updateThreadState(threadId, {
+          useThreeDotFallback: true,
+          dynamicMessages: [],
+          translatedDynamicMessages: []
+        });
         return;
       }
-      
-      // Clear any existing timeouts to prevent overlaps
+
+      const messages = result?.messages || [];
+      const shouldUseFallback = result?.shouldUseFallback || messages.length === 0;
+
+      console.log('[useStreamingChatV2] Generated messages:', { messages, shouldUseFallback });
+
+      // Update state with generated messages
+      updateThreadState(threadId, {
+        dynamicMessages: messages,
+        translatedDynamicMessages: messages, // No translation for now
+        useThreeDotFallback: shouldUseFallback,
+        currentMessageIndex: 0
+      });
+
+      // Start cycling through messages if we have them
+      if (!shouldUseFallback && messages.length > 0) {
+        startMessageCycling(threadId, category);
+      }
+
+    } catch (error) {
+      console.error('[useStreamingChatV2] Exception generating streaming messages:', error);
+      // Fall back to three dots
+      updateThreadState(threadId, {
+        useThreeDotFallback: true,
+        dynamicMessages: [],
+        translatedDynamicMessages: []
+      });
+    }
+  }, [getThreadState, updateThreadState]);
+
+  // Start message cycling with proper timing (original logic)
+  const startMessageCycling = useCallback((threadId: string, category: string) => {
+    const state = getThreadState(threadId);
+    const messages = state.translatedDynamicMessages.length > 0 
+      ? state.translatedDynamicMessages 
+      : state.dynamicMessages;
+
+    if (messages.length === 0) return;
+
+    let currentIndex = state.currentMessageIndex;
+    let timeoutId: NodeJS.Timeout | null = null;
+
+    console.log('[useStreamingChatV2] Starting message cycling for category:', category, 'messages:', messages.length);
+
+    const showNextMessage = () => {
+      const currentState = getThreadState(threadId);
+      if (!currentState.showDynamicMessages || currentState.useThreeDotFallback) {
+        console.log('[useStreamingChatV2] Stopping message cycling');
+        return;
+      }
+
+      // Clear existing timeouts
       if (timeoutId) {
         clearTimeout(timeoutId);
       }
-      
-      // Clear previous message
-      const clearedMessages = state.streamingMessages.map(msg => 
-        msg.id.startsWith('dynamic-') ? { ...msg, isVisible: false } : msg
+
+      const availableMessages = currentState.translatedDynamicMessages.length > 0 
+        ? currentState.translatedDynamicMessages 
+        : currentState.dynamicMessages;
+
+      if (availableMessages.length === 0) return;
+
+      // Clear previous dynamic messages
+      const clearedMessages = currentState.streamingMessages.filter(msg => 
+        !msg.id.startsWith('dynamic-')
       );
-      
-      // Add new message
+
+      // Add current message
+      const currentMessage = availableMessages[currentIndex % availableMessages.length];
       const newMessage: StreamingMessage = {
-        id: `dynamic-${messageIndex}`,
+        id: `dynamic-${currentIndex}`,
         type: 'progress',
-        content: journalMessages[messageIndex % journalMessages.length],
+        content: currentMessage,
         isVisible: true,
         timestamp: Date.now()
       };
-      
-      console.log('[useStreamingChatV2] Showing dynamic message:', newMessage.content);
-      
+
+      console.log('[useStreamingChatV2] Showing message:', currentMessage);
+
       updateThreadState(threadId, {
         streamingMessages: [...clearedMessages, newMessage],
-        dynamicMessageIndex: messageIndex + 1,
-        lastRotationTime: Date.now()
+        currentMessageIndex: currentIndex
       });
-      
-      messageIndex++;
-      
-      // Schedule next message with robust restart handling
-      timeoutId = setTimeout(() => {
-        const currentState = getThreadState(threadId);
-        if (currentState.showDynamicMessages) {
-          showNextMessage();
+
+      // Determine timing based on category
+      let nextDelay = 2000; // Default for general queries
+      let shouldContinue = true;
+
+      if (category === 'JOURNAL_SPECIFIC') {
+        nextDelay = 7000; // 7 seconds for journal-specific
+        // For journal-specific, stick on the last message
+        if (currentIndex >= availableMessages.length - 1) {
+          shouldContinue = false;
+          console.log('[useStreamingChatV2] Sticking on last message for JOURNAL_SPECIFIC');
         }
-      }, 2000);
+      }
+
+      if (shouldContinue) {
+        currentIndex++;
+        
+        timeoutId = setTimeout(() => {
+          const state = getThreadState(threadId);
+          if (state.showDynamicMessages && !state.useThreeDotFallback) {
+            showNextMessage();
+          }
+        }, nextDelay);
+      }
     };
-    
-    // Start the first message immediately
+
+    // Start immediately
     showNextMessage();
-    
-    // Return cleanup function
+
+    // Return cleanup
     return () => {
       if (timeoutId) {
         clearTimeout(timeoutId);
@@ -845,19 +934,6 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
     try {
       console.log(`[useStreamingChatV2] Generating streaming messages for category: ${messageCategory}`);
       
-      // Generate dynamic messages for JOURNAL_SPECIFIC queries
-      if (messageCategory === 'JOURNAL_SPECIFIC') {
-        generateStreamingMessages(targetThreadId);
-      } else {
-        // For non-journal queries, show a simple processing state
-        addStreamingMessage(targetThreadId, {
-          id: 'processing-general',
-          type: 'progress',
-          content: 'Processing your request...',
-          isVisible: true
-        });
-      }
-
       console.log('[useStreamingChatV2] Calling chat backend...');
       
       // Get conversation context
@@ -873,6 +949,15 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
         role: msg.sender === 'user' ? 'user' : 'assistant',
         timestamp: msg.created_at
       }));
+
+      // Generate dynamic messages using backend integration
+      await generateStreamingMessages(
+        targetThreadId,
+        messageContent,
+        messageCategory,
+        conversationContext,
+        {} // userProfile placeholder
+      );
 
       // Call the backend function with correlation ID
       const { data: result, error } = await supabase.functions.invoke('chat-with-rag', {
