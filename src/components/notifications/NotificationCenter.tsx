@@ -201,11 +201,12 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, 
                             variant="ghost"
                             size="sm"
                             className="h-6 w-6 p-0"
-                            onClick={() => 
+                            onClick={(e) => {
+                              e.stopPropagation();
                               notification.read_at 
                                 ? markAsUnread(notification.id)
-                                : markAsRead(notification.id)
-                            }
+                                : markAsRead(notification.id);
+                            }}
                           >
                             {notification.read_at ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
                           </Button>
@@ -214,7 +215,10 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, 
                             variant="ghost"
                             size="sm"
                             className="h-6 w-6 p-0"
-                            onClick={() => dismissNotification(notification.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              dismissNotification(notification.id);
+                            }}
                           >
                             <X className="h-3 w-3" />
                           </Button>

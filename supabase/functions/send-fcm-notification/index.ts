@@ -238,69 +238,9 @@ serve(async (req) => {
 
     console.log('[FCM] Real FCM Results:', fcmResults);
 
-    // Create in-app notifications only if preferences allow and sendInApp is true
-    let inAppNotificationsCreated = 0;
-    if (sendInApp) {
-      // Check user preferences for in-app notifications
-      const usersToNotify = [];
-      
-      for (const userId of userIds) {
-        // Check if notification should bypass preferences
-        if (shouldBypassPreferences(type)) {
-          usersToNotify.push(userId);
-          continue;
-        }
-        
-        // Get user's notification preferences
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('notification_preferences')
-          .eq('id', userId)
-          .single();
-        
-        if (profile?.notification_preferences) {
-          const prefs = profile.notification_preferences as NotificationPreferences;
-          const category = getNotificationCategory(type);
-          
-          // Check if master notifications and the specific category are enabled
-          const masterEnabled = prefs.master_notifications !== false; // default to true if undefined
-          
-          // For simplified system: only system notifications and journaling reminders
-          if (category === 'system') {
-            usersToNotify.push(userId); // System notifications always go through
-          } else if (category === 'journaling_reminders' && masterEnabled && prefs.journaling_reminders !== false) {
-            usersToNotify.push(userId);
-          } else {
-            console.log(`[FCM] Skipping in-app notification for user ${userId} - category ${category} disabled or master disabled`);
-          }
-        } else {
-          // If no preferences found, default to allowing notifications
-          usersToNotify.push(userId);
-        }
-      }
-      
-      if (usersToNotify.length > 0) {
-        const inAppNotifications = usersToNotify.map(userId => ({
-          user_id: userId,
-          title,
-          message: body,
-          type: 'info',
-          data: data || {},
-          action_url: actionUrl,
-          action_label: 'View',
-        }));
-
-        const { error: notificationError } = await supabase
-          .from('user_app_notifications')
-          .insert(inAppNotifications);
-
-        if (notificationError) {
-          console.error('[FCM] Error creating in-app notifications:', notificationError);
-        } else {
-          inAppNotificationsCreated = usersToNotify.length;
-        }
-      }
-    }
+    // Note: In-app notifications are now handled exclusively by send-custom-notification function
+    // This prevents duplicate notification creation when both functions are called
+    const inAppNotificationsCreated = 0;
 
     const successCount = fcmResults.filter(r => r.success).length;
     const failureCount = fcmResults.filter(r => !r.success).length;

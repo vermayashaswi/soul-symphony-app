@@ -447,14 +447,15 @@ export const useNotifications = () => {
     }
   }, [loadNotificationsStable, loadUnreadCountStable]);
 
-  const dismissNotification = async (notificationId: string) => {
-    if (!user) return;
+  const dismissNotification = useCallback(async (notificationId: string) => {
+    const userId = currentUserIdRef.current;
+    if (!userId || !isMountedRef.current) return;
 
     // Find the notification to check if it was unread
     const notification = notifications.find(n => n.id === notificationId);
     const wasUnread = notification && !notification.read_at;
 
-    // Optimistic updates
+    // Optimistic updates - immediately remove from UI
     setNotifications(prev => prev.filter(n => n.id !== notificationId));
     if (wasUnread) {
       setUnreadCount(prev => Math.max(0, prev - 1));
@@ -464,18 +465,20 @@ export const useNotifications = () => {
       const { error } = await supabase
         .from('user_app_notifications')
         .update({ dismissed_at: new Date().toISOString() })
-        .eq('id', notificationId);
+        .eq('id', notificationId)
+        .eq('user_id', userId);
 
       if (error) {
         // Check for RLS issues and retry once
         if (error.code === 'PGRST116' || error.message?.includes('RLS')) {
-          console.log('RLS issue detected, retrying dismiss notification...');
+          console.log('[useNotifications] RLS issue detected, retrying dismiss notification...');
           await new Promise(resolve => setTimeout(resolve, 100));
           
           const { error: retryError } = await supabase
             .from('user_app_notifications')
             .update({ dismissed_at: new Date().toISOString() })
-            .eq('id', notificationId);
+            .eq('id', notificationId)
+            .eq('user_id', userId);
           
           if (retryError) throw retryError;
         } else {
@@ -483,21 +486,18 @@ export const useNotifications = () => {
         }
       }
 
-      // Immediate consistency check for bell icon update
-      loadUnreadCountStable();
-      
-      console.log('[useNotifications] All notifications dismissed successfully');
+      console.log('[useNotifications] Notification dismissed successfully');
 
     } catch (error) {
-      console.error('Error dismissing notification:', error);
+      console.error('[useNotifications] Error dismissing notification:', error);
       
       // Revert optimistic updates on failure
-      if (notification) {
+      if (notification && isMountedRef.current && currentUserIdRef.current === userId) {
         setNotifications(prev => [...prev, notification].sort((a, b) => 
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         ));
       }
-      if (wasUnread) {
+      if (wasUnread && isMountedRef.current && currentUserIdRef.current === userId) {
         setUnreadCount(prev => prev + 1);
       }
       
@@ -505,7 +505,7 @@ export const useNotifications = () => {
       loadNotifications();
       loadUnreadCount();
     }
-  };
+  }, [loadNotificationsStable, loadUnreadCountStable]);
 
   const markAllAsRead = useCallback(async () => {
     const userId = currentUserIdRef.current;
