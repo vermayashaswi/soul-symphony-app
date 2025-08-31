@@ -21,7 +21,7 @@ import { useChatRealtime } from "@/hooks/use-chat-realtime";
 import { updateThreadProcessingStatus, generateThreadTitle } from "@/utils/chat/threadUtils";
 import { useUnifiedKeyboard } from "@/hooks/use-unified-keyboard";
 import { useEnhancedSwipeGestures } from "@/hooks/use-enhanced-swipe-gestures";
-import { useStreamingChatV2 } from "@/hooks/useStreamingChatV2";
+import { useStreamingChat } from "@/hooks/useStreamingChat";
 import { threadSafetyManager } from "@/utils/threadSafetyManager";
 import ChatErrorBoundary from "../ChatErrorBoundary";
 import { useAutoScroll } from "@/hooks/use-auto-scroll";
@@ -141,16 +141,22 @@ export default function MobileChatInterface({
   });
   
   // Use streaming chat for enhanced UX
-  const streamingState = useStreamingChatV2(threadId || '');
   const {
     isStreaming,
     streamingMessages,
     startStreamingChat,
-    showDynamicMessages,
+    stopStreaming,
+    clearStreamingMessages,
+    showBackendAnimation,
     dynamicMessages,
     translatedDynamicMessages,
-    useThreeDotFallback
-   } = streamingState;
+    useThreeDotFallback,
+    currentMessageIndex
+  } = useStreamingChat({ 
+    threadId: threadId || undefined,
+    onFinalResponse: undefined,
+    onError: undefined
+  });
   
   const suggestionQuestions = [
     {
@@ -1048,36 +1054,18 @@ export default function MobileChatInterface({
             ))}
             
             {/* Show streaming status or basic loading */}
-            {(isStreaming || showDynamicMessages) ? (
-              (() => {
-                const visibleMessage = streamingMessages.find(msg => msg.isVisible);
-                const currentDynamicMessages = translatedDynamicMessages.length > 0 
-                  ? translatedDynamicMessages 
-                  : dynamicMessages;
-                
-                console.log('[MobileChatInterface] Streaming display logic:', { 
-                  showDynamicMessages, 
-                  streamingMessagesCount: streamingMessages.length,
-                  visibleMessage: visibleMessage?.content,
-                  useThreeDotFallback,
-                  dynamicMessagesCount: currentDynamicMessages.length,
-                  isStreaming 
-                });
-                
-                // Display logic matching original hook
-                const shouldShowDots = useThreeDotFallback || currentDynamicMessages.length === 0;
-                const displayMessage = shouldShowDots ? undefined : visibleMessage?.content;
-                
-                return (
-                  <ChatErrorBoundary>
-                    <MobileChatMessage 
-                      message={{ role: 'assistant', content: '' }}
-                      streamingMessage={displayMessage}
-                      showStreamingDots={true}
-                    />
-                  </ChatErrorBoundary>
-                );
-              })()
+            {(isStreaming || showBackendAnimation) ? (
+              <ChatErrorBoundary>
+                <MobileChatMessage 
+                  message={{ role: 'assistant', content: '' }}
+                  streamingMessage={
+                    useThreeDotFallback || dynamicMessages.length === 0
+                      ? undefined
+                      : translatedDynamicMessages[currentMessageIndex] || dynamicMessages[currentMessageIndex]
+                  }
+                  showStreamingDots={true}
+                />
+              </ChatErrorBoundary>
             ) : (!isStreaming && false) ? ( // NO fallback processing states
               <ChatErrorBoundary>
                 <MobileChatMessage 
