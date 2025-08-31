@@ -94,7 +94,7 @@ async function gptClassifyMessage(
 
   const classificationPrompt = `You are the chat conversation query classifier for SOuLO's mental health chatbot "Ruh". 
 
-**🧠 SYSTEM CONTEXT:**
+**🧠 SYSTEM CONTEXT (HIGHEST PRIORITY IN DECIDING CLASSIFICATION):**
 The user is interacting with a sophisticated mental health chatbot that has access to their personal journal entries. These entries contain:
 - Daily journal text and voice recordings
 - Emotion scores and sentiment analysis
@@ -120,6 +120,7 @@ You are the gatekeeper for creating a BRILLIANT, FLUID conversation like with th
 - Enable seamless transitions between general advice and personal analysis
 - Feel like talking to an emotionally intelligent friend who truly understands
 - Never interrupt the conversational flow with rigid classifications
+- IF THE USER ASKS ABOUT A QUESTION AND DEMANDS AN ANSWER THAT CAN BE ANSWERED OR DEDUCED FROM THEIR EMOTIONS, RECORDINGS, THEMES, ENTITIES, JOURNAL ENTRIES ETC., CLASSIFY AS JOURNAL_SPECIFIC
 
 **🚨 MANDATORY CONTEXT ANALYSIS:**
 BEFORE classifying, you MUST:
