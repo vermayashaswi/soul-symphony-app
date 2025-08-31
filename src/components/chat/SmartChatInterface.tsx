@@ -114,6 +114,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     queryCategory,
     
     stopStreaming,
+    clearStreamingMessages,
     dynamicMessages,
     translatedDynamicMessages,
     currentMessageIndex,
@@ -256,6 +257,21 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
         (payload) => {
           const m: any = payload.new;
           if (m.sender === 'assistant') {
+            // CRITICAL: Check if this message just completed processing
+            if (m.is_processing === false) {
+              console.log('[SmartChatInterface] Detected completion via UPDATE event, clearing streaming state');
+              debugLog.addEvent("Real-time Update", `Message completed processing: ${m.id}`, "success");
+              
+              // Immediately stop streaming and clear dynamic messages
+              stopStreaming();
+              clearStreamingMessages();
+              
+              // Dispatch completion event for any other listeners
+              window.dispatchEvent(new CustomEvent('chatResponseReady', {
+                detail: { threadId: currentThreadId, messageId: m.id }
+              }));
+            }
+            
             setChatHistory(prev => {
               const updatedMsg: ChatMessage = {
                 id: m.id,

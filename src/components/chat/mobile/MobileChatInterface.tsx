@@ -157,6 +157,7 @@ export default function MobileChatInterface({
     showBackendAnimation,
     startStreamingChat,
     stopStreaming,
+    clearStreamingMessages,
     dynamicMessages,
     translatedDynamicMessages,
     currentMessageIndex,
@@ -507,6 +508,21 @@ export default function MobileChatInterface({
         (payload) => {
           const m: any = payload.new;
           if (m.sender === 'assistant') {
+            // CRITICAL: Check if this message just completed processing
+            if (m.is_processing === false) {
+              console.log('[MobileChatInterface] Detected completion via UPDATE event, clearing streaming state');
+              debugLog.addEvent("Real-time Update", `Message completed processing: ${m.id}`, "success");
+              
+              // Immediately stop streaming and clear dynamic messages
+              stopStreaming();
+              clearStreamingMessages();
+              
+              // Dispatch completion event for any other listeners
+              window.dispatchEvent(new CustomEvent('chatResponseReady', {
+                detail: { threadId, messageId: m.id }
+              }));
+            }
+            
             setMessages(prev => {
               // If last assistant message already matches, skip; else append updated
               const last = prev[prev.length - 1];
