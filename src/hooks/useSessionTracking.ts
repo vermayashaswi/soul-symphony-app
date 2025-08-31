@@ -58,26 +58,6 @@ export const useSessionTracking = () => {
     sessionTrackingService.trackPageView(currentPath);
   }, [location.pathname, location.search]);
 
-  // Handle app state changes for mobile
-  useEffect(() => {
-    if (!location.pathname.startsWith('/app')) {
-      return;
-    }
-
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        sessionTrackingService.handleAppStateChange('background');
-      } else {
-        sessionTrackingService.handleAppStateChange('foreground');
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [location.pathname]);
 
   // Cleanup expired sessions periodically
   useEffect(() => {

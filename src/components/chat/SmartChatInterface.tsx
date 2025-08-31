@@ -112,7 +112,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     showBackendAnimation,
     startStreamingChat,
     queryCategory,
-    restoreStreamingState,
+    
     stopStreaming,
     dynamicMessages,
     translatedDynamicMessages,

@@ -310,33 +310,6 @@ class SessionTrackingService {
     }
   }
 
-  async handleAppStateChange(state: 'background' | 'foreground' | 'terminated'): Promise<void> {
-    const session = this.getCurrentSession();
-    if (!session) return;
-
-    switch (state) {
-      case 'background':
-        console.log('[SessionTracking] App backgrounded - continuing session');
-        // Only save to database for authenticated users
-        if (this.currentSessionId) {
-          await this.saveCurrentState();
-        }
-        break;
-        
-      case 'foreground':
-        console.log('[SessionTracking] App foregrounded - resuming session');
-        this.updateLastActivity();
-        if (this.currentSessionId) {
-          await this.extendSessionActivity();
-        }
-        break;
-        
-      case 'terminated':
-        console.log('[SessionTracking] App terminated - ending session');
-        await this.endSession('app_close');
-        break;
-    }
-  }
 
   private getCurrentSession(): { sessionId: string } | null {
     if (this.currentSessionId) {

@@ -566,7 +566,7 @@ export default function MobileChatInterface({
       // For non-iOS or when user is available, load immediately
       loadWithIOSDelay();
     }
-  }, [threadId, user?.id, restoreStreamingState, isIOSDevice]);
+  }, [threadId, user?.id,  isIOSDevice]);
   
   useEffect(() => {
     const onThreadChange = (event: CustomEvent) => {
