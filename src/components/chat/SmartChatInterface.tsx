@@ -117,7 +117,8 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     dynamicMessages,
     translatedDynamicMessages,
     currentMessageIndex,
-    useThreeDotFallback
+    useThreeDotFallback,
+    resumeStreamingState
   } = useStreamingChat({
       threadId: currentThreadId,
     onFinalResponse: async (response, analysis, originThreadId, requestId) => {
@@ -395,6 +396,22 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
         setChatHistory(typedMessages);
         setShowSuggestions(false);
         loadedThreadRef.current = threadId;
+        
+        // Check for active streaming and resume state
+        const streamingResumed = resumeStreamingState && resumeStreamingState(threadId);
+        if (streamingResumed) {
+          debugLog.addEvent("Thread Loading", `Resumed streaming state for thread: ${threadId}`, "info");
+        }
+        
+        // Check if the most recent message indicates completion
+        const lastMessage = messages[messages.length - 1];
+        if (lastMessage && lastMessage.sender === 'assistant' && !lastMessage.is_processing) {
+          // If we resumed streaming but have a completed response, clear streaming state immediately
+          if (streamingResumed) {
+            stopStreaming();
+            debugLog.addEvent("Thread Loading", `Cleared streaming state - found completed response after resume`, "info");
+          }
+        }
       } else {
         debugLog.addEvent("Thread Loading", `No messages found for thread ${threadId}`, "info");
         console.log(`No messages found for thread ${threadId}`);

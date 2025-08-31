@@ -640,10 +640,10 @@ export default function MobileChatInterface({
         // Check if the most recent message indicates completion
         const lastMessage = chatMessages[chatMessages.length - 1];
         if (lastMessage && lastMessage.sender === 'assistant' && !lastMessage.is_processing) {
-          // If we have a completed response but streaming is active, clear streaming state
-          if (isStreaming) {
+          // If we resumed streaming but have a completed response, clear streaming state immediately
+          if (streamingResumed) {
             stopStreaming();
-            debugLog.addEvent("Thread Loading", `Cleared streaming state - found completed response`, "info");
+            debugLog.addEvent("Thread Loading", `Cleared streaming state - found completed response after resume`, "info");
           }
         }
       } else {
