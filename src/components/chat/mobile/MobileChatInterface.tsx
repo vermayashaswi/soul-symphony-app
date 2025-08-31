@@ -160,8 +160,7 @@ export default function MobileChatInterface({
     translatedDynamicMessages,
     currentMessageIndex,
     useThreeDotFallback,
-    queryCategory,
-    restoreStreamingState
+    queryCategory
    } = useStreamingChat({
       threadId: threadId,
      onFinalResponse: async (response, analysis, originThreadId, requestId) => {
@@ -533,22 +532,12 @@ export default function MobileChatInterface({
     const loadWithIOSDelay = () => {
       if (threadId) {
         loadThreadMessages(threadId);
-        // Try to restore streaming state for this thread
-        const restored = restoreStreamingState(threadId);
-        if (restored) {
-          debugLog.addEvent("Thread Initialization", `Restored streaming state for thread: ${threadId}`, "info");
-        }
         debugLog.addEvent("Thread Initialization", `Loading current thread: ${threadId}`, "info");
       } else {
         const storedThreadId = localStorage.getItem("lastActiveChatThreadId");
         if (storedThreadId && user?.id) {
           setThreadId(storedThreadId);
           loadThreadMessages(storedThreadId);
-          // Try to restore streaming state for stored thread
-          const restored = restoreStreamingState(storedThreadId);
-          if (restored) {
-            debugLog.addEvent("Thread Initialization", `Restored streaming state for stored thread: ${storedThreadId}`, "info");
-          }
           debugLog.addEvent("Thread Initialization", `Loading stored thread: ${storedThreadId}`, "info");
         } else {
           setInitialLoading(false);
