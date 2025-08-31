@@ -438,40 +438,65 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     }
   }, [threadId, getThreadState, updateThreadState, generateStreamingMessages, invokeWithBackoff, isEdgeFunctionError, addStreamingMessage, resetRetryState]);
 
-  // Message rotation timing
+  // Time-based message rotation with resume capability
   useEffect(() => {
     if (!threadId || !state.isStreaming || state.useThreeDotFallback || state.dynamicMessages.length === 0) return;
 
     let timeoutId: NodeJS.Timeout;
+    let interval: NodeJS.Timeout;
     
     if (state.queryCategory === 'JOURNAL_SPECIFIC') {
+      // Calculate elapsed time since streaming started
+      const elapsedMs = Date.now() - (state.processingStartTime || Date.now());
+      const expectedIndex = Math.floor(elapsedMs / 7000);
+      const targetIndex = Math.min(expectedIndex, state.dynamicMessages.length - 1);
+      
+      // Update to correct position if behind
+      if (state.currentMessageIndex < targetIndex) {
+        updateThreadState(threadId, { currentMessageIndex: targetIndex });
+      }
+      
+      // Continue rotation if not at the end
       const isLast = state.currentMessageIndex >= state.dynamicMessages.length - 1;
       if (!isLast) {
+        const nextChangeIn = 7000 - (elapsedMs % 7000);
         timeoutId = setTimeout(() => {
           if (threadId && getThreadState(threadId).isStreaming) {
             updateThreadState(threadId, {
               currentMessageIndex: state.currentMessageIndex + 1
             });
           }
-        }, 7000);
+        }, nextChangeIn);
       }
     } else {
-      const interval = setInterval(() => {
-        if (threadId && getThreadState(threadId).isStreaming) {
-          const currentState = getThreadState(threadId);
-          updateThreadState(threadId, {
-            currentMessageIndex: (currentState.currentMessageIndex + 1) % currentState.dynamicMessages.length
-          });
-        }
-      }, 2000);
+      // Calculate elapsed time for circular rotation
+      const elapsedMs = Date.now() - (state.processingStartTime || Date.now());
+      const expectedIndex = Math.floor(elapsedMs / 2000) % state.dynamicMessages.length;
       
-      return () => clearInterval(interval);
+      // Update to correct position if behind
+      if (state.currentMessageIndex !== expectedIndex) {
+        updateThreadState(threadId, { currentMessageIndex: expectedIndex });
+      }
+      
+      // Continue circular rotation
+      const nextChangeIn = 2000 - (elapsedMs % 2000);
+      timeoutId = setTimeout(() => {
+        interval = setInterval(() => {
+          if (threadId && getThreadState(threadId).isStreaming) {
+            const currentState = getThreadState(threadId);
+            updateThreadState(threadId, {
+              currentMessageIndex: (currentState.currentMessageIndex + 1) % currentState.dynamicMessages.length
+            });
+          }
+        }, 2000);
+      }, nextChangeIn);
     }
 
     return () => {
       if (timeoutId) clearTimeout(timeoutId);
+      if (interval) clearInterval(interval);
     };
-  }, [threadId, state.isStreaming, state.useThreeDotFallback, state.dynamicMessages.length, state.currentMessageIndex, state.queryCategory, getThreadState, updateThreadState]);
+  }, [threadId, state.isStreaming, state.useThreeDotFallback, state.dynamicMessages.length, state.currentMessageIndex, state.queryCategory, state.processingStartTime, getThreadState, updateThreadState]);
 
   // Safety completion guard
   useEffect(() => {
@@ -717,6 +742,27 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     };
   }, [threadId, getThreadState]);
 
+  // Resume streaming state for active requests
+  const resumeStreamingState = useCallback((targetThreadId: string) => {
+    if (!targetThreadId) return false;
+    
+    const threadState = getThreadState(targetThreadId);
+    if (!threadState.isStreaming) return false;
+    
+    // Calculate time-based message position
+    const elapsedMs = Date.now() - (threadState.processingStartTime || Date.now());
+    let targetIndex = 0;
+    
+    if (threadState.queryCategory === 'JOURNAL_SPECIFIC') {
+      targetIndex = Math.min(Math.floor(elapsedMs / 7000), threadState.dynamicMessages.length - 1);
+    } else if (threadState.dynamicMessages.length > 0) {
+      targetIndex = Math.floor(elapsedMs / 2000) % threadState.dynamicMessages.length;
+    }
+    
+    updateThreadState(targetThreadId, { currentMessageIndex: targetIndex });
+    return true;
+  }, [getThreadState, updateThreadState]);
+
   return {
     // Thread-isolated state
     isStreaming: state.isStreaming,
@@ -740,6 +786,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     retryLastMessage: () => retryLastMessage(threadId),
     
     // Utility methods
-    addStreamingMessage: (message: StreamingMessage) => addStreamingMessage(message, threadId)
+    addStreamingMessage: (message: StreamingMessage) => addStreamingMessage(message, threadId),
+    resumeStreamingState
   };
 };

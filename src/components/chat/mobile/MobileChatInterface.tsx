@@ -149,18 +149,20 @@ export default function MobileChatInterface({
   });
   
   // Use streaming chat for enhanced UX
-  const {
+   const {
     isStreaming,
     // streamingThreadId - removed as part of thread isolation
     streamingMessages,
     currentUserMessage,
     showBackendAnimation,
     startStreamingChat,
+    stopStreaming,
     dynamicMessages,
     translatedDynamicMessages,
     currentMessageIndex,
     useThreeDotFallback,
-    queryCategory
+    queryCategory,
+    resumeStreamingState
    } = useStreamingChat({
       threadId: threadId,
      onFinalResponse: async (response, analysis, originThreadId, requestId) => {
@@ -628,6 +630,22 @@ export default function MobileChatInterface({
         setMessages(uiMessages);
         setShowSuggestions(false);
         loadedThreadRef.current = currentThreadId;
+        
+        // Check for active streaming and resume state
+        const streamingResumed = resumeStreamingState(currentThreadId);
+        if (streamingResumed) {
+          debugLog.addEvent("Thread Loading", `Resumed streaming state for thread: ${currentThreadId}`, "info");
+        }
+        
+        // Check if the most recent message indicates completion
+        const lastMessage = chatMessages[chatMessages.length - 1];
+        if (lastMessage && lastMessage.sender === 'assistant' && !lastMessage.is_processing) {
+          // If we have a completed response but streaming is active, clear streaming state
+          if (isStreaming) {
+            stopStreaming();
+            debugLog.addEvent("Thread Loading", `Cleared streaming state - found completed response`, "info");
+          }
+        }
       } else {
         setMessages([]);
         setShowSuggestions(true);
