@@ -447,9 +447,9 @@ export default function MobileChatInterface({
       const chatMessages = await getThreadMessages(currentThreadId, user.id);
       
       if (chatMessages && chatMessages.length > 0) {
-        const uiMessages = chatMessages
-          .filter(msg => !msg.is_processing)
-          .map(msg => ({
+      const uiMessages = chatMessages
+        .filter(msg => !msg.is_processing || msg.sender === 'assistant')
+        .map(msg => ({
             role: msg.sender as 'user' | 'assistant',
             content: msg.content,
             references: msg.reference_entries ? Array.isArray(msg.reference_entries) ? msg.reference_entries : [] : undefined,
@@ -1045,17 +1045,25 @@ export default function MobileChatInterface({
             
             {/* Show streaming status or basic loading */}
             {(isStreaming || showDynamicMessages) ? (
-              <ChatErrorBoundary>
-                <MobileChatMessage 
-                  message={{ role: 'assistant', content: '' }}
-                  streamingMessage={
-                    streamingMessages.length > 0 
-                      ? streamingMessages[0]?.content // Show dynamic streaming message content
-                      : undefined // Show only three-dot animation
-                  }
-                  showStreamingDots={true}
-                />
-              </ChatErrorBoundary>
+              (() => {
+                const visibleMessage = streamingMessages.find(msg => msg.isVisible);
+                console.log('[MobileChatInterface] Streaming display logic:', { 
+                  showDynamicMessages, 
+                  streamingMessagesCount: streamingMessages.length,
+                  visibleMessage: visibleMessage?.content,
+                  isStreaming 
+                });
+                
+                return (
+                  <ChatErrorBoundary>
+                    <MobileChatMessage 
+                      message={{ role: 'assistant', content: '' }}
+                      streamingMessage={visibleMessage?.content}
+                      showStreamingDots={true}
+                    />
+                  </ChatErrorBoundary>
+                );
+              })()
             ) : (!isStreaming && false) ? ( // NO fallback processing states
               <ChatErrorBoundary>
                 <MobileChatMessage 

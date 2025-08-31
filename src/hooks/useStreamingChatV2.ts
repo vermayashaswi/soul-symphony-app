@@ -722,12 +722,23 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
 
     const currentState = getThreadState(threadId);
     let messageIndex = currentState.dynamicMessageIndex;
+    let timeoutId: NodeJS.Timeout | null = null;
+    
+    console.log('[useStreamingChatV2] Starting generateStreamingMessages for thread:', threadId, 'messageIndex:', messageIndex);
     
     const showNextMessage = () => {
-      if (!getThreadState(threadId).showDynamicMessages) return;
+      const state = getThreadState(threadId);
+      if (!state.showDynamicMessages) {
+        console.log('[useStreamingChatV2] Stopping dynamic messages - showDynamicMessages is false');
+        return;
+      }
+      
+      // Clear any existing timeouts to prevent overlaps
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
       
       // Clear previous message
-      const state = getThreadState(threadId);
       const clearedMessages = state.streamingMessages.map(msg => 
         msg.id.startsWith('dynamic-') ? { ...msg, isVisible: false } : msg
       );
@@ -741,6 +752,8 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
         timestamp: Date.now()
       };
       
+      console.log('[useStreamingChatV2] Showing dynamic message:', newMessage.content);
+      
       updateThreadState(threadId, {
         streamingMessages: [...clearedMessages, newMessage],
         dynamicMessageIndex: messageIndex + 1,
@@ -749,12 +762,24 @@ export const useStreamingChatV2 = (threadId: string, props: UseStreamingChatProp
       
       messageIndex++;
       
-      // Schedule next message
-      setTimeout(showNextMessage, 2000);
+      // Schedule next message with robust restart handling
+      timeoutId = setTimeout(() => {
+        const currentState = getThreadState(threadId);
+        if (currentState.showDynamicMessages) {
+          showNextMessage();
+        }
+      }, 2000);
     };
     
     // Start the first message immediately
     showNextMessage();
+    
+    // Return cleanup function
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
   }, [getThreadState, updateThreadState]);
 
   // Start streaming chat with correlation tracking
