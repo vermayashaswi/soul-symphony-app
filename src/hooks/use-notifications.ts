@@ -454,18 +454,60 @@ export const useNotifications = () => {
   const dismissNotification = async (notificationId: string) => {
     if (!user) return;
 
+    // Find the notification to check if it was unread
+    const notification = notifications.find(n => n.id === notificationId);
+    const wasUnread = notification && !notification.read_at;
+
+    // Optimistic updates
+    setNotifications(prev => prev.filter(n => n.id !== notificationId));
+    if (wasUnread) {
+      setUnreadCount(prev => Math.max(0, prev - 1));
+    }
+
     try {
       const { error } = await supabase
         .from('user_app_notifications')
         .update({ dismissed_at: new Date().toISOString() })
         .eq('id', notificationId);
 
-      if (error) throw error;
+      if (error) {
+        // Check for RLS issues and retry once
+        if (error.code === 'PGRST116' || error.message?.includes('RLS')) {
+          console.log('RLS issue detected, retrying dismiss notification...');
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+          const { error: retryError } = await supabase
+            .from('user_app_notifications')
+            .update({ dismissed_at: new Date().toISOString() })
+            .eq('id', notificationId);
+          
+          if (retryError) throw retryError;
+        } else {
+          throw error;
+        }
+      }
 
-      setNotifications(prev => prev.filter(n => n.id !== notificationId));
-      loadUnreadCount();
+      // Consistency check after successful API call
+      setTimeout(() => {
+        loadUnreadCount();
+      }, 500);
+
     } catch (error) {
       console.error('Error dismissing notification:', error);
+      
+      // Revert optimistic updates on failure
+      if (notification) {
+        setNotifications(prev => [...prev, notification].sort((a, b) => 
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        ));
+      }
+      if (wasUnread) {
+        setUnreadCount(prev => prev + 1);
+      }
+      
+      // Reload to ensure consistency
+      loadNotifications();
+      loadUnreadCount();
     }
   };
 
