@@ -157,7 +157,6 @@ export default function MobileChatInterface({
     showBackendAnimation,
     startStreamingChat,
     stopStreaming,
-    clearStreamingMessages,
     dynamicMessages,
     translatedDynamicMessages,
     currentMessageIndex,
@@ -508,21 +507,6 @@ export default function MobileChatInterface({
         (payload) => {
           const m: any = payload.new;
           if (m.sender === 'assistant') {
-            // CRITICAL: Check if this message just completed processing
-            if (m.is_processing === false) {
-              console.log('[MobileChatInterface] Detected completion via UPDATE event, clearing streaming state');
-              debugLog.addEvent("Real-time Update", `Message completed processing: ${m.id}`, "success");
-              
-              // Immediately stop streaming and clear dynamic messages
-              stopStreaming();
-              clearStreamingMessages();
-              
-              // Dispatch completion event for any other listeners
-              window.dispatchEvent(new CustomEvent('chatResponseReady', {
-                detail: { threadId, messageId: m.id }
-              }));
-            }
-            
             setMessages(prev => {
               // If last assistant message already matches, skip; else append updated
               const last = prev[prev.length - 1];
@@ -634,22 +618,6 @@ export default function MobileChatInterface({
       const chatMessages = await getThreadMessages(currentThreadId, user.id);
       
       if (chatMessages && chatMessages.length > 0) {
-        // Check for active streaming and resume state FIRST
-        const streamingResumed = resumeStreamingState(currentThreadId);
-        if (streamingResumed) {
-          debugLog.addEvent("Thread Loading", `Resumed streaming state for thread: ${currentThreadId}`, "info");
-        }
-        
-        // Check if the most recent message indicates completion BEFORE setting UI
-        const lastMessage = chatMessages[chatMessages.length - 1];
-        if (lastMessage && lastMessage.sender === 'assistant' && !lastMessage.is_processing) {
-          // If we resumed streaming but have a completed response, clear streaming state immediately
-          if (streamingResumed) {
-            stopStreaming();
-            debugLog.addEvent("Thread Loading", `Cleared streaming state - found completed response after resume`, "info");
-          }
-        }
-
         const uiMessages = chatMessages
           .filter(msg => !msg.is_processing)
           .map(msg => ({
@@ -662,6 +630,22 @@ export default function MobileChatInterface({
         setMessages(uiMessages);
         setShowSuggestions(false);
         loadedThreadRef.current = currentThreadId;
+        
+        // Check for active streaming and resume state
+        const streamingResumed = resumeStreamingState(currentThreadId);
+        if (streamingResumed) {
+          debugLog.addEvent("Thread Loading", `Resumed streaming state for thread: ${currentThreadId}`, "info");
+        }
+        
+        // Check if the most recent message indicates completion
+        const lastMessage = chatMessages[chatMessages.length - 1];
+        if (lastMessage && lastMessage.sender === 'assistant' && !lastMessage.is_processing) {
+          // If we have a completed response but streaming is active, clear streaming state
+          if (isStreaming) {
+            stopStreaming();
+            debugLog.addEvent("Thread Loading", `Cleared streaming state - found completed response`, "info");
+          }
+        }
       } else {
         setMessages([]);
         setShowSuggestions(true);

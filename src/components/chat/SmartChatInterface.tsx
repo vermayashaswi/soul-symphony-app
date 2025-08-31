@@ -114,12 +114,10 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     queryCategory,
     
     stopStreaming,
-    clearStreamingMessages,
     dynamicMessages,
     translatedDynamicMessages,
     currentMessageIndex,
-    useThreeDotFallback,
-    resumeStreamingState
+    useThreeDotFallback
   } = useStreamingChat({
       threadId: currentThreadId,
     onFinalResponse: async (response, analysis, originThreadId, requestId) => {
@@ -257,21 +255,6 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
         (payload) => {
           const m: any = payload.new;
           if (m.sender === 'assistant') {
-            // CRITICAL: Check if this message just completed processing
-            if (m.is_processing === false) {
-              console.log('[SmartChatInterface] Detected completion via UPDATE event, clearing streaming state');
-              debugLog.addEvent("Real-time Update", `Message completed processing: ${m.id}`, "success");
-              
-              // Immediately stop streaming and clear dynamic messages
-              stopStreaming();
-              clearStreamingMessages();
-              
-              // Dispatch completion event for any other listeners
-              window.dispatchEvent(new CustomEvent('chatResponseReady', {
-                detail: { threadId: currentThreadId, messageId: m.id }
-              }));
-            }
-            
             setChatHistory(prev => {
               const updatedMsg: ChatMessage = {
                 id: m.id,
@@ -402,22 +385,6 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
         debugLog.addEvent("Thread Loading", `Loaded ${messages.length} messages for thread ${threadId}`, "success");
         console.log(`Loaded ${messages.length} messages for thread ${threadId}`);
         
-        // Check for active streaming and resume state FIRST
-        const streamingResumed = resumeStreamingState && resumeStreamingState(threadId);
-        if (streamingResumed) {
-          debugLog.addEvent("Thread Loading", `Resumed streaming state for thread: ${threadId}`, "info");
-        }
-        
-        // Check if the most recent message indicates completion BEFORE setting UI
-        const lastMessage = messages[messages.length - 1];
-        if (lastMessage && lastMessage.sender === 'assistant' && !lastMessage.is_processing) {
-          // If we resumed streaming but have a completed response, clear streaming state immediately
-          if (streamingResumed) {
-            stopStreaming();
-            debugLog.addEvent("Thread Loading", `Cleared streaming state - found completed response after resume`, "info");
-          }
-        }
-
         // Convert the messages to the correct type
         const typedMessages: ChatMessage[] = messages.map(msg => ({
           ...msg,
