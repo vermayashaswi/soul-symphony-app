@@ -9,6 +9,7 @@ interface SwipeGestureOptions {
   onSwipeDown?: () => void;
   minDistance?: number;
   disabled?: boolean;
+  debugMode?: boolean;
 }
 
 interface TouchPoint {

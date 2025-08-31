@@ -37,9 +37,11 @@ const config: CapacitorConfig = {
       splashScreenDelay: 2000
     },
     Keyboard: {
-      resize: "ionic",
+      resize: "native",
       style: "light",
-      resizeOnFullScreen: true
+      resizeOnFullScreen: true,
+      accessoryBarVisible: false,
+      scrollAssist: false
     },
     StatusBar: {
       style: "dark",
@@ -70,7 +72,7 @@ const config: CapacitorConfig = {
     handleApplicationURL: true
   },
   android: {
-    allowMixedContent: true, // Allow loading avatars from external sources
+    allowMixedContent: true,
     captureInput: true,
     webContentsDebuggingEnabled: false,
     backgroundColor: "#FFFFFF",
@@ -83,7 +85,13 @@ const config: CapacitorConfig = {
     loadOnMainThread: true,
     handlePermissions: true,
     allowNavigationBarColorChange: true,
-    navigationBarColor: "#FFFFFF"
+    navigationBarColor: "#FFFFFF",
+    allowBackgroundProcessing: false,
+    mixedContentMode: 2,
+    hardwareAccelerated: true,
+    domStorageEnabled: true,
+    databaseEnabled: true,
+    webViewEngine: "crosswalk"
   }
 };
 

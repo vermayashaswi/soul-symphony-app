@@ -20,7 +20,8 @@ import { MentalHealthInsights } from "@/hooks/use-mental-health-insights";
 import { useChatRealtime } from "@/hooks/use-chat-realtime";
 import { updateThreadProcessingStatus, generateThreadTitle } from "@/utils/chat/threadUtils";
 import { useUnifiedKeyboard } from "@/hooks/use-unified-keyboard";
-import { useEnhancedSwipeGestures } from "@/hooks/use-enhanced-swipe-gestures";
+import { useDualModeGestureDetection } from "@/hooks/use-dual-mode-gesture-detection";
+import { useWebViewGestureOptimizer } from "@/hooks/use-webview-gesture-optimizer";
 import { useStreamingChat } from "@/hooks/useStreamingChat";
 import { threadSafetyManager } from "@/utils/threadSafetyManager";
 import ChatErrorBoundary from "../ChatErrorBoundary";
@@ -124,8 +125,11 @@ export default function MobileChatInterface({
   
   const { isKeyboardVisible } = useUnifiedKeyboard();
   
-  // Enhanced swipe gesture support for navigation and quick actions
-  const chatContainerRef = useEnhancedSwipeGestures({
+  // Initialize WebView gesture optimizations
+  const { isOptimized, deviceInfo, platform: detectedPlatform } = useWebViewGestureOptimizer();
+  
+  // Enhanced dual-mode swipe gesture support with Capacitor optimization
+  const gestureDetection = useDualModeGestureDetection({
     onSwipeLeft: () => {
       console.log('[MobileChatInterface] Swipe left - could open thread list');
       // Future: implement thread list navigation
@@ -145,9 +149,12 @@ export default function MobileChatInterface({
       console.log('[MobileChatInterface] Swipe down - refresh or pull to refresh');
       // Future: implement pull to refresh
     },
-    minDistance: 75,
-    disabled: false
+    minDistance: 70, // Fixed distance for WebView
+    disabled: false,
+    debugMode: false
   });
+  
+  const chatContainerRef = gestureDetection.ref;
   
   // Use streaming chat for enhanced UX
    const {
