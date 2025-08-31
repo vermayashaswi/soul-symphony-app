@@ -618,6 +618,22 @@ export default function MobileChatInterface({
       const chatMessages = await getThreadMessages(currentThreadId, user.id);
       
       if (chatMessages && chatMessages.length > 0) {
+        // Check for active streaming and resume state FIRST
+        const streamingResumed = resumeStreamingState(currentThreadId);
+        if (streamingResumed) {
+          debugLog.addEvent("Thread Loading", `Resumed streaming state for thread: ${currentThreadId}`, "info");
+        }
+        
+        // Check if the most recent message indicates completion BEFORE setting UI
+        const lastMessage = chatMessages[chatMessages.length - 1];
+        if (lastMessage && lastMessage.sender === 'assistant' && !lastMessage.is_processing) {
+          // If we resumed streaming but have a completed response, clear streaming state immediately
+          if (streamingResumed) {
+            stopStreaming();
+            debugLog.addEvent("Thread Loading", `Cleared streaming state - found completed response after resume`, "info");
+          }
+        }
+
         const uiMessages = chatMessages
           .filter(msg => !msg.is_processing)
           .map(msg => ({
@@ -630,22 +646,6 @@ export default function MobileChatInterface({
         setMessages(uiMessages);
         setShowSuggestions(false);
         loadedThreadRef.current = currentThreadId;
-        
-        // Check for active streaming and resume state
-        const streamingResumed = resumeStreamingState(currentThreadId);
-        if (streamingResumed) {
-          debugLog.addEvent("Thread Loading", `Resumed streaming state for thread: ${currentThreadId}`, "info");
-        }
-        
-        // Check if the most recent message indicates completion
-        const lastMessage = chatMessages[chatMessages.length - 1];
-        if (lastMessage && lastMessage.sender === 'assistant' && !lastMessage.is_processing) {
-          // If we resumed streaming but have a completed response, clear streaming state immediately
-          if (streamingResumed) {
-            stopStreaming();
-            debugLog.addEvent("Thread Loading", `Cleared streaming state - found completed response after resume`, "info");
-          }
-        }
       } else {
         setMessages([]);
         setShowSuggestions(true);
