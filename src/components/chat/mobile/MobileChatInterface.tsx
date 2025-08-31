@@ -21,7 +21,7 @@ import { useChatRealtime } from "@/hooks/use-chat-realtime";
 import { updateThreadProcessingStatus, generateThreadTitle } from "@/utils/chat/threadUtils";
 import { useUnifiedKeyboard } from "@/hooks/use-unified-keyboard";
 import { useEnhancedSwipeGestures } from "@/hooks/use-enhanced-swipe-gestures";
-import { useStreamingChat } from "@/hooks/useStreamingChat";
+import { useStreamingChatV2 } from "@/hooks/useStreamingChatV2";
 import { threadSafetyManager } from "@/utils/threadSafetyManager";
 import ChatErrorBoundary from "../ChatErrorBoundary";
 import { useAutoScroll } from "@/hooks/use-auto-scroll";
@@ -143,133 +143,10 @@ export default function MobileChatInterface({
   // Use streaming chat for enhanced UX
   const {
     isStreaming,
-    // streamingThreadId - removed as part of thread isolation
     streamingMessages,
-    currentUserMessage,
-    showBackendAnimation,
     startStreamingChat,
-    dynamicMessages,
-    translatedDynamicMessages,
-    currentMessageIndex,
-    useThreeDotFallback,
-    queryCategory,
-    restoreStreamingState
-   } = useStreamingChat({
-      threadId: threadId,
-     onFinalResponse: async (response, analysis, originThreadId, requestId) => {
-       // Handle final streaming response scoped to its origin thread
-       if (!response || !originThreadId || !user?.id) {
-         debugLog.addEvent("Streaming Response", "[Mobile] Missing required data for final response", "error");
-         console.error("[Mobile] [Streaming] Missing response data:", { response: !!response, originThreadId: !!originThreadId, userId: !!user?.id });
-         return;
-       }
-       
-        debugLog.addEvent("Streaming Response", `[Mobile] Final response received for ${originThreadId}: ${response.substring(0, 100)}...`, "success");
-
-         // CRITICAL: Immediate UI update for first messages to prevent blank screen
-         if (originThreadId === threadId) {
-           setMessages(prev => {
-             // Check if this is a duplicate
-             const lastMsg = prev[prev.length - 1];
-             if (lastMsg && lastMsg.role === 'assistant' && lastMsg.content === response) {
-               return prev; // Skip duplicate
-             }
-             return [...prev, { role: 'assistant', content: response, analysis }];
-           });
-           setShowSuggestions(false);
-            // NO manual state clearing - useStreamingChat handles it
-           
-           debugLog.addEvent("Streaming Response", `[Mobile] Assistant message added to UI for thread ${originThreadId}`, "success");
-         }
-
-         // Update user message with classification data if available
-         if (analysis?.classification && requestId) {
-           try {
-             // Find the most recent user message to update with classification
-             const { data: recentUserMessages } = await supabase
-               .from('chat_messages')
-               .select('id')
-               .eq('thread_id', originThreadId)
-               .eq('sender', 'user')
-               .order('created_at', { ascending: false })
-               .limit(1);
-
-             if (recentUserMessages && recentUserMessages.length > 0) {
-               await updateUserMessageClassification(
-                 recentUserMessages[0].id,
-                 analysis.classification,
-                 user.id
-               );
-               debugLog.addEvent("Classification", "Updated user message with classification data", "success");
-             }
-           } catch (classificationError) {
-             console.warn('[Mobile] Failed to update user message classification:', classificationError);
-           }
-         }
-        
-         // Ensure backend persistence with enhanced fallback for first messages
-         if (originThreadId === threadId) {
-          // Enhanced watchdog: reduced delay for first message reliability
-          try {
-            setTimeout(async () => {
-              // Double-check still on same thread
-              if (!currentThreadIdRef.current || currentThreadIdRef.current !== originThreadId) return;
-
-              // Check if message already exists in database
-              const { data: recent, error: recentErr } = await supabase
-                .from('chat_messages')
-                .select('id, content, sender, created_at')
-                .eq('thread_id', originThreadId)
-                .order('created_at', { ascending: false })
-                .limit(5);
-
-              if (recentErr) {
-                console.warn('[Mobile Streaming Watchdog] Failed to fetch recent messages:', recentErr.message);
-              }
-
-              const alreadyExists = (recent || []).some(m => (m as any).sender === 'assistant' && (m as any).content?.trim() === response.trim());
-              if (!alreadyExists) {
-                 // Enhanced persistence with proper database interaction
-                 try {
-                   const correlationId = requestId || `assistant-${originThreadId}-${Date.now()}`;
-
-                   const { data: savedMsg, error: saveError } = await supabase.from('chat_messages').insert({
-                     thread_id: originThreadId,
-                     content: response,
-                     sender: 'assistant',
-                     role: 'assistant',
-                     request_correlation_id: correlationId,
-                     analysis_data: analysis || null
-                   }).select().single();
-                   
-                   if (saveError) {
-                     console.warn('[Mobile Streaming Watchdog] Persist failed:', saveError);
-                   } else {
-                     debugLog.addEvent("Streaming Watchdog", `[Mobile] Successfully persisted assistant message: ${savedMsg?.id}`, "success");
-                   }
-                } catch (e) {
-                  console.warn('[Mobile Streaming Watchdog] Persist fallback failed:', (e as any)?.message || e);
-                }
-              } else {
-                debugLog.addEvent("Streaming Watchdog", `[Mobile] Assistant message already exists in database`, "info");
-              }
-
-              // NO manual state clearing - useStreamingChat handles it
-            }, 800); // Reduced delay for faster first message experience
-          } catch (e) {
-            console.warn('[Mobile Streaming Watchdog] Exception scheduling fallback:', (e as any)?.message || e);
-            // NO manual state clearing - useStreamingChat handles it
-          }
-        }
-    },
-     onError: (error) => {
-       toast({
-         title: "Error",
-         description: error,
-         variant: "destructive"
-       });
-     }
-   });
+    showDynamicMessages
+   } = useStreamingChatV2(threadId || '');
   
   const suggestionQuestions = [
     {
@@ -486,22 +363,12 @@ export default function MobileChatInterface({
     const loadWithIOSDelay = () => {
       if (threadId) {
         loadThreadMessages(threadId);
-        // Try to restore streaming state for this thread
-        const restored = restoreStreamingState(threadId);
-        if (restored) {
-          debugLog.addEvent("Thread Initialization", `Restored streaming state for thread: ${threadId}`, "info");
-        }
         debugLog.addEvent("Thread Initialization", `Loading current thread: ${threadId}`, "info");
       } else {
         const storedThreadId = localStorage.getItem("lastActiveChatThreadId");
         if (storedThreadId && user?.id) {
           setThreadId(storedThreadId);
           loadThreadMessages(storedThreadId);
-          // Try to restore streaming state for stored thread
-          const restored = restoreStreamingState(storedThreadId);
-          if (restored) {
-            debugLog.addEvent("Thread Initialization", `Restored streaming state for stored thread: ${storedThreadId}`, "info");
-          }
           debugLog.addEvent("Thread Initialization", `Loading stored thread: ${storedThreadId}`, "info");
         } else {
           setInitialLoading(false);
@@ -519,7 +386,7 @@ export default function MobileChatInterface({
       // For non-iOS or when user is available, load immediately
       loadWithIOSDelay();
     }
-  }, [threadId, user?.id, restoreStreamingState, isIOSDevice]);
+  }, [threadId, user?.id, isIOSDevice]);
   
   useEffect(() => {
     const onThreadChange = (event: CustomEvent) => {
@@ -744,18 +611,11 @@ export default function MobileChatInterface({
     try {
       debugLog.addEvent("Message Sending", `[Mobile] Starting streaming chat for thread: ${currentThreadId}`, "info");
       
-      // PHASE 4: Start streaming immediately after UI update
-      const conversationContext = messages.slice(-5).map(msg => ({
-        role: msg.role,
-        content: msg.content
-      }));
-      
+      // PHASE 4: Start streaming immediately after UI update  
       await startStreamingChat(
         message,
-        user.id,
         currentThreadId,
-        conversationContext,
-        {}
+        user.id
       );
 
       // PHASE 5: Background operations (don't block streaming)
@@ -1184,14 +1044,14 @@ export default function MobileChatInterface({
             ))}
             
             {/* Show streaming status or basic loading */}
-            {isStreaming ? (
+            {(isStreaming || showDynamicMessages) ? (
               <ChatErrorBoundary>
                 <MobileChatMessage 
                   message={{ role: 'assistant', content: '' }}
                   streamingMessage={
-                    useThreeDotFallback || dynamicMessages.length === 0
-                      ? undefined // Show only three-dot animation
-                      : translatedDynamicMessages[currentMessageIndex] || dynamicMessages[currentMessageIndex] // Use pre-translated message
+                    streamingMessages.length > 0 
+                      ? streamingMessages[0]?.content // Show dynamic streaming message content
+                      : undefined // Show only three-dot animation
                   }
                   showStreamingDots={true}
                 />
