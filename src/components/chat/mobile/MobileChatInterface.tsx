@@ -384,6 +384,25 @@ export default function MobileChatInterface({
     };
   }, [scrollToBottom]);
 
+  // Listen for chat response completion events - CRITICAL for navigation state restoration
+  useEffect(() => {
+    const handleChatResponseReady = (event: CustomEvent) => {
+      const { threadId: completedThreadId } = event.detail || {};
+      
+      if (completedThreadId && completedThreadId === threadId) {
+        console.log('[MobileChatInterface] Chat response ready event received for thread:', completedThreadId);
+        // Reload messages to show the completed response
+        loadThreadMessages(completedThreadId);
+      }
+    };
+
+    window.addEventListener('chatResponseReady', handleChatResponseReady as EventListener);
+    
+    return () => {
+      window.removeEventListener('chatResponseReady', handleChatResponseReady as EventListener);
+    };
+  }, [threadId]);
+
   // Notify parent of processing state changes - ONLY useStreamingChat states
   useEffect(() => {
     const isProcessingActive = isStreaming;

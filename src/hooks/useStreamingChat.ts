@@ -110,76 +110,89 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     return `${userId}_${threadId}_${normalizedMessage.substring(0, 50)}_${timeWindow}`;
   }, []);
 
-  // Enhanced completion check with better detection logic and duplicate prevention
+  // Enhanced completion check with better detection logic and aggressive completion detection
   const checkIfRequestCompleted = useCallback(async (threadId: string, savedState: any): Promise<boolean> => {
     try {
-      // More flexible completion detection
+      // More flexible completion detection with multiple strategies
       const processingStartTime = savedState.processingStartTime || savedState.savedAt;
       
-      if (!processingStartTime) {
-        // If no processing time, check for very recent assistant messages
-        const { data: recentMessages, error } = await supabase
-          .from('chat_messages')
-          .select('id, created_at, content, idempotency_key')
-          .eq('thread_id', threadId)
-          .eq('sender', 'assistant')
-          .gte('created_at', new Date(Date.now() - 5 * 60 * 1000).toISOString()) // Last 5 minutes
-          .order('created_at', { ascending: false })
-          .limit(1);
-
-        if (!error && recentMessages && recentMessages.length > 0) {
-          console.log(`[useStreamingChat] Found recent assistant message for thread ${threadId}`);
-          return true;
-        }
-        return false;
-      }
-
-      // Expand time window for better detection
-      const searchStartTime = new Date(processingStartTime - 30000); // 30 seconds before processing started
-      
-      // Query for assistant messages created around the processing time
-      const { data: messages, error } = await supabase
+      // Strategy 1: Check for any recent assistant messages (last 10 minutes)
+      const { data: recentMessages, error: recentError } = await supabase
         .from('chat_messages')
-        .select('id, created_at, content, idempotency_key')
+        .select('id, created_at, content, sender, idempotency_key')
         .eq('thread_id', threadId)
         .eq('sender', 'assistant')
-        .gte('created_at', searchStartTime.toISOString())
+        .gte('created_at', new Date(Date.now() - 10 * 60 * 1000).toISOString()) // Last 10 minutes
         .order('created_at', { ascending: false })
         .limit(3);
 
-      if (error) {
-        console.warn('[useStreamingChat] Error checking message completion:', error);
-        return false;
+      if (!recentError && recentMessages && recentMessages.length > 0) {
+        // Check if we have a substantial assistant message (not just processing indicators)
+        const latestMessage = recentMessages[0];
+        const isSubstantialMessage = latestMessage.content.length > 15 && 
+                                   !latestMessage.content.includes('...') &&
+                                   !latestMessage.content.toLowerCase().includes('processing');
+        
+        if (isSubstantialMessage) {
+          console.log(`[useStreamingChat] Found substantial recent assistant message for thread ${threadId}`);
+          return true;
+        }
       }
 
-      // Enhanced detection logic with duplicate checking
-      const hasCompletedResponse = messages && messages.length > 0;
-      
-      if (hasCompletedResponse) {
-        // Check if we have a non-processing message
-        const latestMessage = messages[0];
-        const isProcessingMessage = latestMessage.content.includes('...') || 
-                                   latestMessage.content.length < 10;
+      // Strategy 2: If we have processing start time, check around that time
+      if (processingStartTime) {
+        // Expand time window significantly for better detection
+        const searchStartTime = new Date(processingStartTime - 60000); // 1 minute before processing started
         
-        // Also check for potential duplicate by idempotency key or content
-        const hasDuplicates = messages.length > 1 && 
-          messages.some((msg, index) => 
-            index > 0 && (
-              (msg.idempotency_key && msg.idempotency_key === messages[0].idempotency_key) ||
-              (msg.content.trim() === messages[0].content.trim() && msg.content.length > 20)
-            )
+        // Query for assistant messages created around the processing time
+        const { data: messages, error } = await supabase
+          .from('chat_messages')
+          .select('id, created_at, content, sender, idempotency_key')
+          .eq('thread_id', threadId)
+          .eq('sender', 'assistant')
+          .gte('created_at', searchStartTime.toISOString())
+          .order('created_at', { ascending: false })
+          .limit(5);
+
+        if (!error && messages && messages.length > 0) {
+          // Find the most recent substantial assistant message
+          const substantialMessage = messages.find(msg => 
+            msg.content.length > 15 && 
+            !msg.content.includes('...') &&
+            !msg.content.toLowerCase().includes('processing')
           );
-        
-        if (hasDuplicates) {
-          console.warn(`[useStreamingChat] Detected duplicate messages for thread ${threadId}`, {
-            messageCount: messages.length,
-            duplicateIdempotencyKeys: messages.map(m => m.idempotency_key).filter(k => k)
-          });
+          
+          if (substantialMessage) {
+            console.log(`[useStreamingChat] Found completed response for thread ${threadId}, message created at:`, substantialMessage.created_at);
+            return true;
+          }
         }
+      }
+
+      // Strategy 3: Check if there's any assistant message created after the last user message
+      const { data: threadMessages, error: threadError } = await supabase
+        .from('chat_messages')
+        .select('id, created_at, content, sender')
+        .eq('thread_id', threadId)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (!threadError && threadMessages && threadMessages.length > 0) {
+        const lastUserMessageIndex = threadMessages.findIndex(msg => msg.sender === 'user');
         
-        if (!isProcessingMessage) {
-          console.log(`[useStreamingChat] Found completed response for thread ${threadId}, message created at:`, latestMessage.created_at);
-          return true;
+        if (lastUserMessageIndex > 0) {
+          // There are assistant messages after the last user message
+          const assistantMessagesAfterUser = threadMessages.slice(0, lastUserMessageIndex);
+          const hasSubstantialResponse = assistantMessagesAfterUser.some(msg => 
+            msg.content.length > 15 && 
+            !msg.content.includes('...') &&
+            !msg.content.toLowerCase().includes('processing')
+          );
+          
+          if (hasSubstantialResponse) {
+            console.log(`[useStreamingChat] Found assistant response after last user message for thread ${threadId}`);
+            return true;
+          }
         }
       }
 
@@ -223,8 +236,12 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
               const isAlreadyCompleted = await checkIfRequestCompleted(threadId, savedState);
               
               if (isAlreadyCompleted) {
-                console.log(`[useStreamingChat] Request completed while page hidden, clearing state: ${threadId}`);
+                console.log(`[useStreamingChat] Request completed while page hidden, clearing state and dispatching event: ${threadId}`);
                 clearChatStreamingState(threadId);
+                // Dispatch event to trigger UI reload
+                window.dispatchEvent(new CustomEvent('chatResponseReady', { 
+                  detail: { threadId } 
+                }));
                 return;
               }
               
@@ -294,11 +311,15 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
                      // Check if request completed while app was backgrounded
                      const isAlreadyCompleted = await checkIfRequestCompleted(threadId, savedState);
                      
-                     if (isAlreadyCompleted) {
-                       console.log(`[useStreamingChat] Request completed while app backgrounded, clearing state: ${threadId}`);
-                       clearChatStreamingState(threadId);
-                       return;
-                     }
+                      if (isAlreadyCompleted) {
+                        console.log(`[useStreamingChat] Request completed while app backgrounded, clearing state and dispatching event: ${threadId}`);
+                        clearChatStreamingState(threadId);
+                        // Dispatch event to trigger UI reload
+                        window.dispatchEvent(new CustomEvent('chatResponseReady', { 
+                          detail: { threadId } 
+                        }));
+                        return;
+                      }
                      
                      console.log(`[useStreamingChat] Restoring Capacitor navigation-safe state: ${threadId}`);
                      updateThreadState(threadId, {
@@ -415,9 +436,37 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
 
     restoreStateIfStillValid();
     
+    // Add periodic completion check as safety net for navigation edge cases
+    const periodicCompletionCheck = setInterval(async () => {
+      if (!threadId) return;
+      
+      const currentState = getThreadState(threadId);
+      if (!currentState.isStreaming) return;
+      
+      const savedState = getChatStreamingState(threadId);
+      if (!savedState) return;
+      
+      // Check if processing has completed
+      const isCompleted = await checkIfRequestCompleted(threadId, savedState);
+      if (isCompleted) {
+        console.log(`[useStreamingChat] Periodic check detected completion for thread: ${threadId}`);
+        clearChatStreamingState(threadId);
+        updateThreadState(threadId, {
+          isStreaming: false,
+          showBackendAnimation: false,
+          activeRequestId: null
+        });
+        
+        // Dispatch event to trigger UI reload
+        window.dispatchEvent(new CustomEvent('chatResponseReady', { 
+          detail: { threadId } 
+        }));
+      }
+    }, 3000); // Check every 3 seconds for completed responses
+    
     // Clear any event listeners from previous threads
     return () => {
-      // Cleanup will be handled by the abort controller
+      clearInterval(periodicCompletionCheck);
     };
   }, [threadId, getThreadState, updateThreadState, checkIfRequestCompleted]);
 
