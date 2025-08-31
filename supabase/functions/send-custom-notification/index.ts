@@ -2,31 +2,27 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
 
 // Shared notification type mappings
 const NOTIFICATION_TYPE_MAPPING: Record<string, string> = {
-  // In-App Notifications
-  'success': 'in_app_notifications',
-  'info': 'in_app_notifications', 
-  'warning': 'in_app_notifications',
-  'error': 'in_app_notifications',
-  'achievement': 'in_app_notifications',
-  
-  // Insightful Reminders
-  'goal_achievement': 'insightful_reminders',
-  'streak_reward': 'insightful_reminders',
-  'sleep_reflection': 'insightful_reminders',
-  'journal_insights': 'insightful_reminders',
-  'mood_tracking_prompt': 'insightful_reminders',
-  'inactivity_nudge': 'insightful_reminders',
-  'insights_ready': 'insightful_reminders',
-  
   // Journaling Reminders
   'journal_reminder': 'journaling_reminders',
   'daily_prompt': 'journaling_reminders',
   'writing_reminder': 'journaling_reminders',
   
-  // Feature Updates (special category - always shown regardless of preferences)
+  // System notifications (bypass preferences - always shown)
   'feature_update': 'system',
   'smart_chat_invite': 'system',
-  'custom': 'system'
+  'custom': 'system',
+  'success': 'system',
+  'info': 'system', 
+  'warning': 'system',
+  'error': 'system',
+  'achievement': 'system',
+  'goal_achievement': 'system',
+  'streak_reward': 'system',
+  'sleep_reflection': 'system',
+  'journal_insights': 'system',
+  'mood_tracking_prompt': 'system',
+  'inactivity_nudge': 'system',
+  'insights_ready': 'system'
 };
 
 function getNotificationCategory(notificationType: string): string | null {
@@ -40,8 +36,6 @@ function shouldBypassPreferences(notificationType: string): boolean {
 
 interface NotificationPreferences {
   master_notifications: boolean;
-  in_app_notifications: boolean;
-  insightful_reminders: boolean;
   journaling_reminders: boolean;
 }
 
@@ -116,22 +110,25 @@ Deno.serve(async (req) => {
             } else {
               const preferences: NotificationPreferences = profileData?.notification_preferences || {
                 master_notifications: false,
-                in_app_notifications: true,
-                insightful_reminders: true,
                 journaling_reminders: true
               };
 
-              // Check master notifications first
-              if (!preferences.master_notifications) {
-                console.log(`[CustomNotification] Master notifications disabled for user ${userId}`);
-                shouldSendInApp = false;
-              } else {
-                // Check specific category
-                const category = getNotificationCategory(notificationRequest.type);
-                if (category && !preferences[category as keyof NotificationPreferences]) {
-                  console.log(`[CustomNotification] Category '${category}' disabled for user ${userId}`);
+              // Check notifications based on simplified schema
+              const category = getNotificationCategory(notificationRequest.type);
+              
+              if (category === 'system') {
+                // System notifications always go through
+                shouldSendInApp = true;
+              } else if (category === 'journaling_reminders') {
+                // Check master notifications and journaling_reminders preference
+                if (!preferences.master_notifications || !preferences.journaling_reminders) {
+                  console.log(`[CustomNotification] Journaling reminders disabled for user ${userId}`);
                   shouldSendInApp = false;
                 }
+              } else {
+                // Unknown category - default to not sending
+                console.log(`[CustomNotification] Unknown category '${category}' for user ${userId}`);
+                shouldSendInApp = false;
               }
             }
           }

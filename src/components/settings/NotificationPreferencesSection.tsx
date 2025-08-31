@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bell, Brain, Edit3, HelpCircle } from 'lucide-react';
+import { Bell, Edit3, HelpCircle } from 'lucide-react';
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,8 +13,6 @@ import { CustomTimeRemindersModal } from './CustomTimeRemindersModal';
 
 interface NotificationPreferences {
   master_notifications: boolean;
-  in_app_notifications: boolean;
-  insightful_reminders: boolean;
   journaling_reminders: boolean;
 }
 
@@ -26,8 +24,6 @@ export function NotificationPreferencesSection({ className }: NotificationPrefer
   const { user } = useAuth();
   const [preferences, setPreferences] = useState<NotificationPreferences>({
     master_notifications: false,
-    in_app_notifications: true,
-    insightful_reminders: true,
     journaling_reminders: true
   });
   const [isLoading, setIsLoading] = useState(true);
@@ -61,26 +57,6 @@ export function NotificationPreferencesSection({ className }: NotificationPrefer
       if (data?.notification_preferences) {
         const prefs = data.notification_preferences as unknown as NotificationPreferences;
         setPreferences(prefs);
-        
-        // Auto-check permissions if master notifications are enabled
-        if (prefs.master_notifications) {
-          console.log('[NotificationPreferencesSection] Master notifications enabled, checking permissions...');
-          try {
-            const permissionState = await fcmNotificationService.checkPermissionStatus();
-            console.log('[NotificationPreferencesSection] Current permission state:', permissionState);
-            
-            if (permissionState === 'default') {
-              console.log('[NotificationPreferencesSection] Requesting permissions for enabled master notifications...');
-              const permissionResult = await fcmNotificationService.requestPermissions();
-              if (permissionResult.granted) {
-                console.log('[NotificationPreferencesSection] Permissions granted, registering device token...');
-                await fcmNotificationService.registerDeviceToken();
-              }
-            }
-          } catch (error) {
-            console.error('[NotificationPreferencesSection] Error checking/requesting permissions:', error);
-          }
-        }
       }
       
       // Load reminder settings for custom time modal
@@ -175,7 +151,11 @@ export function NotificationPreferencesSection({ className }: NotificationPrefer
           console.warn('[NotificationPreferencesSection] Device token registration failed:', tokenResult.error);
         }
         
-        const newPreferences = { ...preferences, master_notifications: true };
+        const newPreferences = { 
+          ...preferences, 
+          master_notifications: true,
+          journaling_reminders: true
+        };
         const saved = await savePreferences(newPreferences);
         if (saved) {
           toast.success(<TranslatableText text="Notifications enabled successfully" forceTranslate={true} />);
@@ -188,8 +168,6 @@ export function NotificationPreferencesSection({ className }: NotificationPrefer
       // Disable all notifications when master is turned off
       const newPreferences = {
         master_notifications: false,
-        in_app_notifications: false,
-        insightful_reminders: false,
         journaling_reminders: false
       };
       const saved = await savePreferences(newPreferences);
@@ -199,7 +177,7 @@ export function NotificationPreferencesSection({ className }: NotificationPrefer
     }
   };
 
-  const handleCategoryToggle = async (category: keyof Omit<NotificationPreferences, 'master_notifications'>, enabled: boolean) => {
+  const handleCategoryToggle = async (category: 'journaling_reminders', enabled: boolean) => {
     if (!preferences.master_notifications && enabled) {
       toast.warning(<TranslatableText text="Please enable master notifications first" forceTranslate={true} />);
       return;
@@ -307,76 +285,6 @@ export function NotificationPreferencesSection({ className }: NotificationPrefer
           {/* Sub-category toggles - only show when master is enabled */}
           {preferences.master_notifications && (
             <>
-              {/* In-App Notifications */}
-              <div className="flex items-center justify-between pl-6">
-                <div className="flex items-center gap-2">
-                  <Bell className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                  <span className="text-sm">
-                    <TranslatableText text="In-App Notifications" />
-                  </span>
-                  <Tooltip 
-                    open={openTooltips['inapp'] || false}
-                    onOpenChange={(open) => open ? handleTooltipOpen('inapp') : handleTooltipClose('inapp')}
-                  >
-                    <TooltipTrigger asChild>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="p-0 h-4 w-4"
-                        onClick={() => handleTooltipOpen('inapp')}
-                      >
-                        <HelpCircle className="h-3 w-3 text-muted-foreground" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent onPointerDownOutside={() => handleTooltipClose('inapp')}>
-                      <p className="max-w-xs text-xs">
-                        <TranslatableText text="Notifications that appear within the app's notification center" />
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-                <Switch
-                  checked={preferences.in_app_notifications}
-                  onCheckedChange={(enabled) => handleCategoryToggle('in_app_notifications', enabled)}
-                  disabled={isLoading}
-                />
-              </div>
-
-              {/* Insightful Reminders */}
-              <div className="flex items-center justify-between pl-6">
-                <div className="flex items-center gap-2">
-                  <Brain className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                  <span className="text-sm">
-                    <TranslatableText text="Insightful Reminders" />
-                  </span>
-                  <Tooltip 
-                    open={openTooltips['insights'] || false}
-                    onOpenChange={(open) => open ? handleTooltipOpen('insights') : handleTooltipClose('insights')}
-                  >
-                    <TooltipTrigger asChild>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="p-0 h-4 w-4"
-                        onClick={() => handleTooltipOpen('insights')}
-                      >
-                        <HelpCircle className="h-3 w-3 text-muted-foreground" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent onPointerDownOutside={() => handleTooltipClose('insights')}>
-                      <p className="max-w-xs text-xs">
-                        <TranslatableText text="Smart notifications about your progress, insights, and wellness reminders" />
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-                <Switch
-                  checked={preferences.insightful_reminders}
-                  onCheckedChange={(enabled) => handleCategoryToggle('insightful_reminders', enabled)}
-                  disabled={isLoading}
-                />
-              </div>
-
               {/* Journaling Reminders */}
               <div className="flex items-center justify-between pl-6">
                 <div className="flex items-center gap-2">

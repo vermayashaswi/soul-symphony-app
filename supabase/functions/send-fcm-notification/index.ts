@@ -3,31 +3,27 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // Shared notification type mappings and constants
 const NOTIFICATION_TYPE_MAPPING: Record<string, string> = {
-  // In-App Notifications
-  'success': 'in_app_notifications',
-  'info': 'in_app_notifications', 
-  'warning': 'in_app_notifications',
-  'error': 'in_app_notifications',
-  'achievement': 'in_app_notifications',
-  
-  // Insightful Reminders
-  'goal_achievement': 'insightful_reminders',
-  'streak_reward': 'insightful_reminders',
-  'sleep_reflection': 'insightful_reminders',
-  'journal_insights': 'insightful_reminders',
-  'mood_tracking_prompt': 'insightful_reminders',
-  'inactivity_nudge': 'insightful_reminders',
-  'insights_ready': 'insightful_reminders',
-  
   // Journaling Reminders
   'journal_reminder': 'journaling_reminders',
   'daily_prompt': 'journaling_reminders',
   'writing_reminder': 'journaling_reminders',
   
-  // Feature Updates (special category - always shown regardless of preferences)
+  // System notifications (bypass preferences - always shown)
   'feature_update': 'system',
   'smart_chat_invite': 'system',
-  'custom': 'system'
+  'custom': 'system',
+  'success': 'system',
+  'info': 'system', 
+  'warning': 'system',
+  'error': 'system',
+  'achievement': 'system',
+  'goal_achievement': 'system',
+  'streak_reward': 'system',
+  'sleep_reflection': 'system',
+  'journal_insights': 'system',
+  'mood_tracking_prompt': 'system',
+  'inactivity_nudge': 'system',
+  'insights_ready': 'system'
 };
 
 function getNotificationCategory(notificationType: string): string | null {
@@ -41,8 +37,6 @@ function shouldBypassPreferences(notificationType: string): boolean {
 
 interface NotificationPreferences {
   master_notifications: boolean;
-  in_app_notifications: boolean;
-  insightful_reminders: boolean;
   journaling_reminders: boolean;
 }
 
@@ -270,12 +264,14 @@ serve(async (req) => {
           
           // Check if master notifications and the specific category are enabled
           const masterEnabled = prefs.master_notifications !== false; // default to true if undefined
-          const categoryEnabled = category ? prefs[category as keyof NotificationPreferences] !== false : true;
           
-          if (masterEnabled && categoryEnabled) {
+          // For simplified system: only system notifications and journaling reminders
+          if (category === 'system') {
+            usersToNotify.push(userId); // System notifications always go through
+          } else if (category === 'journaling_reminders' && masterEnabled && prefs.journaling_reminders !== false) {
             usersToNotify.push(userId);
           } else {
-            console.log(`[FCM] Skipping in-app notification for user ${userId} - category ${category} disabled`);
+            console.log(`[FCM] Skipping in-app notification for user ${userId} - category ${category} disabled or master disabled`);
           }
         } else {
           // If no preferences found, default to allowing notifications

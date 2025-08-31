@@ -1,31 +1,27 @@
 // Shared notification type mappings and constants
 
 export const NOTIFICATION_TYPE_MAPPING: Record<string, string> = {
-  // In-App Notifications
-  'success': 'in_app_notifications',
-  'info': 'in_app_notifications', 
-  'warning': 'in_app_notifications',
-  'error': 'in_app_notifications',
-  'achievement': 'in_app_notifications',
-  
-  // Insightful Reminders
-  'goal_achievement': 'insightful_reminders',
-  'streak_reward': 'insightful_reminders',
-  'sleep_reflection': 'insightful_reminders',
-  'journal_insights': 'insightful_reminders',
-  'mood_tracking_prompt': 'insightful_reminders',
-  'inactivity_nudge': 'insightful_reminders',
-  'insights_ready': 'insightful_reminders',
-  
   // Journaling Reminders
   'journal_reminder': 'journaling_reminders',
   'daily_prompt': 'journaling_reminders',
   'writing_reminder': 'journaling_reminders',
   
-  // Feature Updates (special category - always shown regardless of preferences)
+  // System notifications (bypass preferences - always shown)
   'feature_update': 'system',
   'smart_chat_invite': 'system',
-  'custom': 'system'
+  'custom': 'system',
+  'success': 'system',
+  'info': 'system', 
+  'warning': 'system',
+  'error': 'system',
+  'achievement': 'system',
+  'goal_achievement': 'system',
+  'streak_reward': 'system',
+  'sleep_reflection': 'system',
+  'journal_insights': 'system',
+  'mood_tracking_prompt': 'system',
+  'inactivity_nudge': 'system',
+  'insights_ready': 'system'
 };
 
 export function getNotificationCategory(notificationType: string): string | null {

@@ -2,12 +2,10 @@ import { supabase } from '@/integrations/supabase/client';
 
 export interface NotificationPreferences extends Record<string, boolean> {
   master_notifications: boolean;
-  in_app_notifications: boolean;
-  insightful_reminders: boolean;
   journaling_reminders: boolean;
 }
 
-export type NotificationCategory = 'in_app_notifications' | 'insightful_reminders' | 'journaling_reminders';
+export type NotificationCategory = 'journaling_reminders';
 
 export class NotificationPreferencesService {
   /**
@@ -28,8 +26,6 @@ export class NotificationPreferencesService {
 
       return (data?.notification_preferences as NotificationPreferences) || {
         master_notifications: false,
-        in_app_notifications: true,
-        insightful_reminders: true,
         journaling_reminders: true
       };
     } catch (error) {
@@ -93,15 +89,11 @@ export class NotificationPreferencesService {
     
     if (!preferences || !preferences.master_notifications) {
       return {
-        in_app_notifications: false,
-        insightful_reminders: false,
         journaling_reminders: false
       };
     }
 
     return {
-      in_app_notifications: preferences.in_app_notifications,
-      insightful_reminders: preferences.insightful_reminders,
       journaling_reminders: preferences.journaling_reminders
     };
   }
@@ -112,8 +104,6 @@ export class NotificationPreferencesService {
   static async enableMasterNotifications(userId: string): Promise<boolean> {
     const defaultPreferences: NotificationPreferences = {
       master_notifications: true,
-      in_app_notifications: true,
-      insightful_reminders: true,
       journaling_reminders: true
     };
 
@@ -126,8 +116,6 @@ export class NotificationPreferencesService {
   static async disableAllNotifications(userId: string): Promise<boolean> {
     const disabledPreferences: NotificationPreferences = {
       master_notifications: false,
-      in_app_notifications: false,
-      insightful_reminders: false,
       journaling_reminders: false
     };
 
@@ -142,21 +130,6 @@ export async function shouldSendNotification(userId: string, category: Notificat
 
 // Map notification types to categories for easy lookup
 export const NOTIFICATION_TYPE_MAPPING: Record<string, NotificationCategory> = {
-  // In-App Notifications (appear in notification center)
-  'success': 'in_app_notifications',
-  'info': 'in_app_notifications',
-  'warning': 'in_app_notifications',
-  'error': 'in_app_notifications',
-  'achievement': 'in_app_notifications',
-  
-  // Insightful Reminders (push notifications for insights/progress)
-  'goal_achievement': 'insightful_reminders',
-  'streak_reward': 'insightful_reminders',
-  'sleep_reflection': 'insightful_reminders',
-  'journal_insights': 'insightful_reminders',
-  'mood_tracking_prompt': 'insightful_reminders',
-  'inactivity_nudge': 'insightful_reminders',
-  
   // Journaling Reminders (custom time-based reminders)
   'journal_reminder': 'journaling_reminders',
   'daily_prompt': 'journaling_reminders',
