@@ -70,6 +70,27 @@ export default function MobileChatInterface({
   const [sheetOpen, setSheetOpen] = useState(false);
   const [isIOSDevice, setIsIOSDevice] = useState(false);
   const debugLog = useDebugLog();
+
+  // CRITICAL: Listen for chat response completion events FIRST to fix navigation issues
+  useEffect(() => {
+    const handleChatResponseReady = (event: CustomEvent) => {
+      const { threadId: completedThreadId } = event.detail || {};
+      
+      console.log('[MobileChatInterface] Chat response ready event received for thread:', completedThreadId, 'current:', threadId);
+      
+      if (completedThreadId && completedThreadId === threadId) {
+        console.log('[MobileChatInterface] Reloading messages for completed thread:', completedThreadId);
+        // Reload messages to show the completed response immediately
+        loadThreadMessages(completedThreadId);
+      }
+    };
+
+    window.addEventListener('chatResponseReady', handleChatResponseReady as EventListener);
+    
+    return () => {
+      window.removeEventListener('chatResponseReady', handleChatResponseReady as EventListener);
+    };
+  }, [threadId]); // Dependencies include threadId for proper event filtering
   
   // Track active thread for safety manager
   useEffect(() => {
@@ -384,22 +405,42 @@ export default function MobileChatInterface({
     };
   }, [scrollToBottom]);
 
-  // Listen for chat response completion events - CRITICAL for navigation state restoration
+  // Mobile-specific navigation safety net - triggers immediately on page visibility
   useEffect(() => {
-    const handleChatResponseReady = (event: CustomEvent) => {
-      const { threadId: completedThreadId } = event.detail || {};
-      
-      if (completedThreadId && completedThreadId === threadId) {
-        console.log('[MobileChatInterface] Chat response ready event received for thread:', completedThreadId);
-        // Reload messages to show the completed response
-        loadThreadMessages(completedThreadId);
+    const handlePageVisibility = async () => {
+      if (!document.hidden && threadId) {
+        console.log('[MobileChatInterface] Page became visible, checking for completion:', threadId);
+        
+        // Quick completion check for mobile navigation scenarios
+        try {
+          const { data: recentMessages } = await supabase
+            .from('chat_messages')
+            .select('id, created_at, content, sender')
+            .eq('thread_id', threadId)
+            .eq('sender', 'assistant')
+            .gte('created_at', new Date(Date.now() - 5 * 60 * 1000).toISOString()) // Last 5 minutes
+            .order('created_at', { ascending: false })
+            .limit(1);
+
+          if (recentMessages && recentMessages.length > 0) {
+            const message = recentMessages[0];
+            if (message.content.length > 15 && !message.content.includes('...')) {
+              console.log('[MobileChatInterface] Found recent completion, triggering reload');
+              window.dispatchEvent(new CustomEvent('chatResponseReady', { 
+                detail: { threadId } 
+              }));
+            }
+          }
+        } catch (error) {
+          console.warn('[MobileChatInterface] Error in visibility check:', error);
+        }
       }
     };
 
-    window.addEventListener('chatResponseReady', handleChatResponseReady as EventListener);
+    document.addEventListener('visibilitychange', handlePageVisibility);
     
     return () => {
-      window.removeEventListener('chatResponseReady', handleChatResponseReady as EventListener);
+      document.removeEventListener('visibilitychange', handlePageVisibility);
     };
   }, [threadId]);
 
