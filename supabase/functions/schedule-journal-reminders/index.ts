@@ -73,25 +73,28 @@ serve(async (req) => {
         
         const randomMessage = messages[Math.floor(Math.random() * messages.length)];
 
-        // Call the FCM notification function
-        const fcmResponse = await supabase.functions.invoke('send-fcm-notification', {
+        // Use send-custom-notification to respect user preferences
+        const customNotificationResponse = await supabase.functions.invoke('send-custom-notification', {
           body: {
             userIds: [notification.user_id],
             title: notification.title,
             body: randomMessage,
+            type: 'journal_reminder',
             data: {
-              type: 'journal_reminder',
               reminder_id: notification.id,
             },
-            actionUrl: 'https://571d731e-b54b-453e-9f48-a2c79a572930.lovableproject.com/app/journal'
+            actionUrl: '/app/journal',
+            actionLabel: 'Start Writing',
+            sendInApp: true,
+            sendPush: true
           }
         });
 
         notificationResults.push({
           userId: notification.user_id,
           notificationId: notification.id,
-          success: !fcmResponse.error,
-          error: fcmResponse.error?.message
+          success: !customNotificationResponse.error,
+          error: customNotificationResponse.error?.message
         });
 
         console.log('[Scheduler] Sent notification to user:', notification.user_id);

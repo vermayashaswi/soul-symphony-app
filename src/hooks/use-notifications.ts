@@ -93,17 +93,17 @@ export const useNotifications = () => {
         .on(
           'postgres_changes',
           {
-            event: '*',
+            event: 'INSERT',
             schema: 'public',
             table: 'user_app_notifications',
             filter: `user_id=eq.${userId}`
           },
           (payload) => {
-            console.log('[useNotifications] Real-time notification update:', payload);
+            console.log('[useNotifications] Real-time notification insert:', payload);
             // Only process if user is still the same and component is mounted
             if (currentUserIdRef.current === userId && isMountedRef.current) {
               // Show toast for new notifications
-              if (payload.eventType === 'INSERT' && payload.new) {
+              if (payload.new) {
                 const newNotification = payload.new as AppNotification;
                 toast({
                   title: newNotification.title,
@@ -112,13 +112,9 @@ export const useNotifications = () => {
                 });
               }
               
-              // Debounced reload to prevent excessive calls
-              setTimeout(() => {
-                if (currentUserIdRef.current === userId && isMountedRef.current) {
-                  loadNotificationsStable();
-                  loadUnreadCountStable();
-                }
-              }, 100);
+              // Reload for new notifications only - no debounce needed for bell updates
+              loadNotificationsStable();
+              loadUnreadCountStable();
             }
           }
         )
@@ -487,10 +483,10 @@ export const useNotifications = () => {
         }
       }
 
-      // Consistency check after successful API call
-      setTimeout(() => {
-        loadUnreadCount();
-      }, 500);
+      // Immediate consistency check for bell icon update
+      loadUnreadCountStable();
+      
+      console.log('[useNotifications] All notifications dismissed successfully');
 
     } catch (error) {
       console.error('Error dismissing notification:', error);

@@ -1,6 +1,51 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+// Shared notification type mappings and constants
+const NOTIFICATION_TYPE_MAPPING: Record<string, string> = {
+  // In-App Notifications
+  'success': 'in_app_notifications',
+  'info': 'in_app_notifications', 
+  'warning': 'in_app_notifications',
+  'error': 'in_app_notifications',
+  'achievement': 'in_app_notifications',
+  
+  // Insightful Reminders
+  'goal_achievement': 'insightful_reminders',
+  'streak_reward': 'insightful_reminders',
+  'sleep_reflection': 'insightful_reminders',
+  'journal_insights': 'insightful_reminders',
+  'mood_tracking_prompt': 'insightful_reminders',
+  'inactivity_nudge': 'insightful_reminders',
+  'insights_ready': 'insightful_reminders',
+  
+  // Journaling Reminders
+  'journal_reminder': 'journaling_reminders',
+  'daily_prompt': 'journaling_reminders',
+  'writing_reminder': 'journaling_reminders',
+  
+  // Feature Updates (special category - always shown regardless of preferences)
+  'feature_update': 'system',
+  'smart_chat_invite': 'system',
+  'custom': 'system'
+};
+
+function getNotificationCategory(notificationType: string): string | null {
+  return NOTIFICATION_TYPE_MAPPING[notificationType] || null;
+}
+
+function shouldBypassPreferences(notificationType: string): boolean {
+  const category = getNotificationCategory(notificationType);
+  return category === 'system';
+}
+
+interface NotificationPreferences {
+  master_notifications: boolean;
+  in_app_notifications: boolean;
+  insightful_reminders: boolean;
+  journaling_reminders: boolean;
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -13,6 +58,8 @@ interface FCMNotificationRequest {
   data?: Record<string, string>;
   imageUrl?: string;
   actionUrl?: string;
+  type?: string; // notification type for preference checking
+  sendInApp?: boolean; // control in-app notification creation
 }
 
 serve(async (req) => {
@@ -27,7 +74,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { userIds, title, body, data, imageUrl, actionUrl }: FCMNotificationRequest = await req.json();
+    const { userIds, title, body, data, imageUrl, actionUrl, type = 'info', sendInApp = true }: FCMNotificationRequest = await req.json();
 
     console.log('[FCM] Sending notification to users:', userIds);
 
@@ -197,23 +244,66 @@ serve(async (req) => {
 
     console.log('[FCM] Real FCM Results:', fcmResults);
 
-    // Create in-app notifications for all users
-    const inAppNotifications = userIds.map(userId => ({
-      user_id: userId,
-      title,
-      message: body,
-      type: 'info',
-      data: data || {},
-      action_url: actionUrl,
-      action_label: 'View',
-    }));
+    // Create in-app notifications only if preferences allow and sendInApp is true
+    let inAppNotificationsCreated = 0;
+    if (sendInApp) {
+      // Check user preferences for in-app notifications
+      const usersToNotify = [];
+      
+      for (const userId of userIds) {
+        // Check if notification should bypass preferences
+        if (shouldBypassPreferences(type)) {
+          usersToNotify.push(userId);
+          continue;
+        }
+        
+        // Get user's notification preferences
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('notification_preferences')
+          .eq('id', userId)
+          .single();
+        
+        if (profile?.notification_preferences) {
+          const prefs = profile.notification_preferences as NotificationPreferences;
+          const category = getNotificationCategory(type);
+          
+          // Check if master notifications and the specific category are enabled
+          const masterEnabled = prefs.master_notifications !== false; // default to true if undefined
+          const categoryEnabled = category ? prefs[category as keyof NotificationPreferences] !== false : true;
+          
+          if (masterEnabled && categoryEnabled) {
+            usersToNotify.push(userId);
+          } else {
+            console.log(`[FCM] Skipping in-app notification for user ${userId} - category ${category} disabled`);
+          }
+        } else {
+          // If no preferences found, default to allowing notifications
+          usersToNotify.push(userId);
+        }
+      }
+      
+      if (usersToNotify.length > 0) {
+        const inAppNotifications = usersToNotify.map(userId => ({
+          user_id: userId,
+          title,
+          message: body,
+          type: 'info',
+          data: data || {},
+          action_url: actionUrl,
+          action_label: 'View',
+        }));
 
-    const { error: notificationError } = await supabase
-      .from('user_app_notifications')
-      .insert(inAppNotifications);
+        const { error: notificationError } = await supabase
+          .from('user_app_notifications')
+          .insert(inAppNotifications);
 
-    if (notificationError) {
-      console.error('[FCM] Error creating in-app notifications:', notificationError);
+        if (notificationError) {
+          console.error('[FCM] Error creating in-app notifications:', notificationError);
+        } else {
+          inAppNotificationsCreated = usersToNotify.length;
+        }
+      }
     }
 
     const successCount = fcmResults.filter(r => r.success).length;
@@ -223,7 +313,7 @@ serve(async (req) => {
       success: true,
       fcmResults,
       devicesNotified: devices.length,
-      inAppNotificationsCreated: userIds.length,
+      inAppNotificationsCreated,
       pushNotificationStats: {
         sent: successCount,
         failed: failureCount,

@@ -1,4 +1,5 @@
 import { nativeIntegrationService } from './nativeIntegrationService';
+import { Capacitor } from '@capacitor/core';
 
 export class NativeNavigationService {
   private static instance: NativeNavigationService;
@@ -116,22 +117,54 @@ export class NativeNavigationService {
 
   /**
    * Optimized native navigation with retry mechanism
+   * Handles both internal app paths and external URLs appropriately
    */
   private performNativeNavigation(path: string): void {
+    console.log('[NativeNav] Performing native navigation to:', path);
+    
+    // Check if this is from a push notification (external URL) vs internal app path
+    const isExternalUrl = path.startsWith('http://') || path.startsWith('https://');
+    const isInternalPath = path.startsWith('/') || !isExternalUrl;
+    
+    if (Capacitor.isNativePlatform() && isExternalUrl) {
+      // For external URLs from push notifications, check if it's our own app URL
+      const appBaseUrl = 'https://571d731e-b54b-453e-9f48-a2c79a572930.lovableproject.com';
+      if (path.startsWith(appBaseUrl)) {
+        // Extract the internal path and navigate within the app
+        const internalPath = path.replace(appBaseUrl, '') || '/';
+        console.log('[NativeNav] Converting external app URL to internal path:', internalPath);
+        this.navigateToPath(internalPath);
+        return;
+      } else {
+        // For truly external URLs, use Browser plugin
+        console.log('[NativeNav] Opening external URL in browser');
+        import('@capacitor/browser').then(({ Browser }) => {
+          Browser.open({ url: path });
+        }).catch(error => {
+          console.error('[NativeNav] Error opening external URL:', error);
+          window.open(path, '_blank');
+        });
+        return;
+      }
+    }
+    
+    // For internal paths or web platform, use standard navigation
     try {
-      console.log('[NativeNav] Performing native navigation to:', path);
+      if (isInternalPath) {
+        this.navigateToPath(path);
+      } else {
+        window.location.href = path;
+      }
       
-      // For bundled assets, direct window.location change is most reliable
-      window.location.href = path;
-      
-      // Add fallback check after a delay
-      setTimeout(() => {
-        if (window.location.pathname !== path) {
-          console.log('[NativeNav] Navigation verification failed, retrying...');
-          // Retry once more
-          window.location.href = path;
-        }
-      }, 1000);
+      // Add fallback check after a delay for direct URL changes
+      if (!isInternalPath) {
+        setTimeout(() => {
+          if (window.location.href !== path) {
+            console.log('[NativeNav] Navigation verification failed, retrying...');
+            window.location.href = path;
+          }
+        }, 1000);
+      }
       
     } catch (error) {
       console.error('[NativeNav] Native navigation error:', error);
