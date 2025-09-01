@@ -16,6 +16,7 @@ import { useDebugLog } from "@/utils/debug/DebugContext";
 import { getThreadMessages, saveMessage, updateUserMessageClassification } from "@/services/chat";
 import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
 import { processChatMessage } from "@/services/chatService";
+import { useFeatureFlag } from "@/hooks/useFeatureFlag";
 import { MentalHealthInsights } from "@/hooks/use-mental-health-insights";
 import { useChatRealtime } from "@/hooks/use-chat-realtime";
 import { updateThreadProcessingStatus, generateThreadTitle } from "@/utils/chat/threadUtils";
@@ -71,7 +72,9 @@ export default function MobileChatInterface({
   const [sheetOpen, setSheetOpen] = useState(false);
   const [isIOSDevice, setIsIOSDevice] = useState(false);
   const [stateLocked, setStateLocked] = useState(false);
+  const [isProcessingMessage, setIsProcessingMessage] = useState(false);
   const debugLog = useDebugLog();
+  const { isEnabled: useGeminiFlow } = useFeatureFlag('smartChatSwitch');
 
   // CRITICAL: State locking system to prevent overrides during completion
   const lockState = useCallback((reason: string) => {
@@ -173,31 +176,37 @@ export default function MobileChatInterface({
     resumeStreamingState
    } = useStreamingChat({
       threadId: threadId,
-     onFinalResponse: async (response, analysis, originThreadId, requestId) => {
-       // Handle final streaming response scoped to its origin thread
-       if (!response || !originThreadId || !user?.id) {
-         debugLog.addEvent("Streaming Response", "[Mobile] Missing required data for final response", "error");
-         console.error("[Mobile] [Streaming] Missing response data:", { response: !!response, originThreadId: !!originThreadId, userId: !!user?.id });
-         return;
-       }
-       
-        debugLog.addEvent("Streaming Response", `[Mobile] Final response received for ${originThreadId}: ${response.substring(0, 100)}...`, "success");
-
-         // CRITICAL: Immediate UI update for first messages to prevent blank screen
-         if (originThreadId === threadId) {
-           setMessages(prev => {
-             // Check if this is a duplicate
-             const lastMsg = prev[prev.length - 1];
-             if (lastMsg && lastMsg.role === 'assistant' && lastMsg.content === response) {
-               return prev; // Skip duplicate
-             }
-             return [...prev, { role: 'assistant', content: response, analysis }];
-           });
-           setShowSuggestions(false);
-            // NO manual state clearing - useStreamingChat handles it
+         onFinalResponse: async (response, analysis, originThreadId, requestId) => {
+           // Handle final streaming response scoped to its origin thread
+           if (!response || !originThreadId || !user?.id) {
+             debugLog.addEvent("Streaming Response", "[Mobile] Missing required data for final response", "error");
+             console.error("[Mobile] [Streaming] Missing response data:", { response: !!response, originThreadId: !!originThreadId, userId: !!user?.id });
+             return;
+           }
            
-           debugLog.addEvent("Streaming Response", `[Mobile] Assistant message added to UI for thread ${originThreadId}`, "success");
-         }
+           debugLog.addEvent("Streaming Response", `[Mobile] Final Gemini response received for ${originThreadId}: ${response.substring(0, 100)}...`, "success");
+
+           // CRITICAL: Only process if we're using Gemini flow
+           if (!useGeminiFlow) {
+             console.log('[Mobile] Ignoring streaming response - not using Gemini flow');
+             return;
+           }
+
+           // CRITICAL: Immediate UI update for Gemini responses
+           if (originThreadId === threadId) {
+             setMessages(prev => {
+               // Check if this is a duplicate
+               const lastMsg = prev[prev.length - 1];
+               if (lastMsg && lastMsg.role === 'assistant' && lastMsg.content === response) {
+                 return prev; // Skip duplicate
+               }
+               return [...prev, { role: 'assistant', content: response, analysis }];
+             });
+             setShowSuggestions(false);
+             setIsProcessingMessage(false); // Clear processing state for Gemini flow
+             
+             debugLog.addEvent("Streaming Response", `[Mobile] Gemini assistant message added to UI for thread ${originThreadId}`, "success");
+           }
 
          // Update user message with classification data if available
          if (analysis?.classification && requestId) {
@@ -279,13 +288,17 @@ export default function MobileChatInterface({
           }
         }
     },
-     onError: (error) => {
-       toast({
-         title: "Error",
-         description: error,
-         variant: "destructive"
-       });
-     }
+         onError: (error) => {
+           // Only handle errors from Gemini flow
+           if (useGeminiFlow) {
+             setIsProcessingMessage(false);
+             toast({
+               title: "Gemini Processing Error",
+               description: error,
+               variant: "destructive"
+             });
+           }
+         }
    });
   
   const suggestionQuestions = [
@@ -721,11 +734,12 @@ export default function MobileChatInterface({
       return;
     }
 
-    // Prevent multiple concurrent requests - ONLY useStreamingChat state
-    if (isStreaming) {
+    // Prevent multiple concurrent requests based on active flow
+    const isCurrentlyProcessing = useGeminiFlow ? isStreaming : isProcessingMessage;
+    if (isCurrentlyProcessing) {
       toast({
         title: "Please wait",
-        description: "Another request is currently being processed.",
+        description: `Another request is currently being processed using ${useGeminiFlow ? 'Gemini' : 'GPT'} flow.`,
         variant: "default"
       });
       return;
@@ -842,21 +856,53 @@ export default function MobileChatInterface({
     const userMessagePromise = saveUserMessageAsync();
 
     try {
-      debugLog.addEvent("Message Sending", `[Mobile] Starting streaming chat for thread: ${currentThreadId}`, "info");
+      debugLog.addEvent("Message Sending", `[Mobile] Starting ${useGeminiFlow ? 'Gemini' : 'GPT'} chat processing for thread: ${currentThreadId}`, "info");
       
-      // PHASE 4: Start streaming immediately after UI update
+      // PHASE 4: Route to appropriate processing based on feature flag
       const conversationContext = messages.slice(-5).map(msg => ({
         role: msg.role,
         content: msg.content
       }));
       
-      await startStreamingChat(
-        message,
-        user.id,
-        currentThreadId,
-        conversationContext,
-        {}
-      );
+      if (useGeminiFlow) {
+        // Gemini flow: Use useStreamingChat (which routes to chat-with-rag)
+        console.log('[MobileChatInterface] Using Gemini flow via useStreamingChat');
+        setIsProcessingMessage(true);
+        
+        await startStreamingChat(
+          message,
+          user.id,
+          currentThreadId,
+          conversationContext,
+          {}
+        );
+      } else {
+        // GPT flow: Use legacy chatService
+        console.log('[MobileChatInterface] Using GPT flow via chatService');
+        setIsProcessingMessage(true);
+        
+        const queryTypes = analyzeQueryTypes(message);
+        const response = await processChatMessage(
+          message,
+          user.id,
+          queryTypes,
+          currentThreadId,
+          false,
+          {}
+        );
+        
+        // Add assistant response to UI for GPT flow
+        if (currentThreadId === currentThreadIdRef.current) {
+          setMessages(prev => [...prev, { 
+            role: 'assistant', 
+            content: response.content,
+            analysis: response.analysis,
+            references: response.references
+          }]);
+        }
+        
+        setIsProcessingMessage(false);
+      }
 
       // PHASE 5: Background operations (don't block streaming)
       if (isFirstMessage) {
@@ -882,8 +928,10 @@ export default function MobileChatInterface({
       }
 
     } catch (error: any) {
-      console.error("[Mobile] Error in streaming chat:", error);
-      debugLog.addEvent("Message Sending", `[Mobile] Streaming error: ${error}`, "error");
+      console.error(`[Mobile] Error in ${useGeminiFlow ? 'Gemini' : 'GPT'} chat processing:`, error);
+      debugLog.addEvent("Message Sending", `[Mobile] ${useGeminiFlow ? 'Gemini' : 'GPT'} processing error: ${error}`, "error");
+      
+      setIsProcessingMessage(false);
       
       const errorMessageContent = "I'm having trouble processing your request. Please try again later. " + 
                  (error?.message ? `Error: ${error.message}` : "");
@@ -980,8 +1028,8 @@ export default function MobileChatInterface({
       return;
     }
 
-    // Prevent deletion if currently processing - ONLY useStreamingChat state
-    if (isStreaming) {
+    // Prevent deletion if currently processing based on active flow
+    if (isProcessingActive) {
       console.log('[MobileChat] Cannot delete thread while processing');
       toast({
         title: "Cannot delete conversation",
@@ -1083,8 +1131,8 @@ export default function MobileChatInterface({
   // Check if deletion should be disabled - ONLY useStreamingChat state
   const isDeletionDisabled = isStreaming;
   
-  // Calculate if any processing is active - ONLY useStreamingChat state
-  const isProcessingActive = isStreaming;
+  // Calculate if any processing is active based on current flow
+  const isProcessingActive = useGeminiFlow ? isStreaming : isProcessingMessage;
 
   return (
     <div className="mobile-chat-interface">
@@ -1258,7 +1306,7 @@ export default function MobileChatInterface({
                       size="sm"
                       className="px-3 py-2 h-auto justify-start text-sm text-left bg-muted/50 hover:bg-muted w-full"
                       onClick={() => handleSendMessage(question.text)}
-                      disabled={isStreaming}
+                      disabled={isProcessingActive}
                     >
                       <div className="flex items-start w-full">
                         <span className="mr-2">{question.icon}</span>
@@ -1314,7 +1362,7 @@ export default function MobileChatInterface({
       {/* Chat Input */}
       <MobileChatInput 
         onSendMessage={handleSendMessage} 
-        isLoading={isStreaming}
+        isLoading={isProcessingActive}
         userId={userId || user?.id}
       />
       

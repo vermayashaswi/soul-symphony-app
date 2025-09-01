@@ -140,7 +140,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
 
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-  // Backoff wrapper for supabase.functions.invoke with abort support
+  // Enhanced backoff wrapper with feature flag detection
   const invokeWithBackoff = useCallback(
     async (
       body: Record<string, any>,
@@ -155,6 +155,20 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
       const baseDelay = options?.baseDelay ?? 900;
       const threadState = getThreadState(targetThreadId);
 
+      // Check feature flag to determine routing
+      let useGeminiFlow = false;
+      try {
+        const { data: featureFlags } = await supabase
+          .from('feature_flags')
+          .select('name, is_enabled')
+          .eq('name', 'smartChatSwitch');
+        useGeminiFlow = featureFlags?.[0]?.is_enabled === true;
+      } catch (error) {
+        console.warn('[useStreamingChat] Failed to fetch feature flag, defaulting to GPT flow');
+      }
+
+      console.log(`[useStreamingChat] Using ${useGeminiFlow ? 'Gemini' : 'GPT'} flow for message processing`);
+
       let lastErr: any = null;
       for (let i = 0; i < attempts; i++) {
         // Check abort signal
@@ -165,18 +179,46 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
         try {
           let result: { data: any; error: any };
 
-          console.log(`[useStreamingChat] Invoking chat-with-rag for orchestration`);
+          if (useGeminiFlow) {
+            console.log(`[useStreamingChat] Invoking chat-with-rag for Gemini orchestration`);
+            
+            // Gemini flow: Direct to chat-with-rag orchestrator (handles all routing)
+            const timeoutMs = 25000 + i * 5000; // Longer timeout for Gemini processing
+            const timeoutPromise = new Promise((_, rej) =>
+              setTimeout(() => rej(new Error('Request timed out')), timeoutMs)
+            );
 
-          // ALL messages go through chat-with-rag for unified orchestration
-          const timeoutMs = 20000 + i * 5000;
-          const timeoutPromise = new Promise((_, rej) =>
-            setTimeout(() => rej(new Error('Request timed out')), timeoutMs)
-          );
+            result = (await Promise.race([
+              supabase.functions.invoke('chat-with-rag', { body }),
+              timeoutPromise,
+            ])) as { data: any; error: any };
+          } else {
+            console.log(`[useStreamingChat] Using chatService for GPT processing`);
+            
+            // GPT flow: Use chatService for compatibility with legacy architecture
+            const { processChatMessage } = await import('@/services/chatService');
+            const { analyzeQueryTypes } = await import('@/utils/chat/queryAnalyzer');
+            
+            const queryTypes = analyzeQueryTypes(body.message);
+            
+            const response = await processChatMessage(
+              body.message,
+              body.userId,
+              queryTypes,
+              body.threadId,
+              false,
+              {}
+            );
 
-          result = (await Promise.race([
-            supabase.functions.invoke('chat-with-rag', { body }),
-            timeoutPromise,
-          ])) as { data: any; error: any };
+            result = {
+              data: {
+                response: response.content,
+                analysis: response.analysis,
+                references: response.references
+              },
+              error: null
+            };
+          }
           
           if ((result as any)?.error) {
             lastErr = (result as any).error;
@@ -271,22 +313,80 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     });
   }, [threadId, updateThreadState]);
 
-  // Generate simple fallback messages - no dynamic generation since classification is done by backend
+  // Enhanced dynamic message generation for both GPT and Gemini flows
   const generateStreamingMessages = useCallback(async (
     message: string, 
-    targetThreadId?: string
+    targetThreadId?: string,
+    queryCategory?: string
   ) => {
     const activeThreadId = targetThreadId || threadId;
     if (!activeThreadId) return;
 
-    // Always use simple fallback since we don't know category yet
+    // Check if we have smartChatSwitch feature flag enabled for Gemini
+    let useGeminiFlow = false;
+    try {
+      const { data: featureFlags } = await supabase
+        .from('feature_flags')
+        .select('name, is_enabled')
+        .eq('name', 'smartChatSwitch');
+      useGeminiFlow = featureFlags?.[0]?.is_enabled === true;
+    } catch (error) {
+      console.warn('[useStreamingChat] Failed to fetch feature flag, defaulting to GPT flow');
+    }
+
+    console.log(`[useStreamingChat] Generating messages for ${useGeminiFlow ? 'Gemini' : 'GPT'} flow`);
+
+    // Generate dynamic messages based on query category (same for both flows)
+    let dynamicMessages: string[] = [];
+    let expectedTime = 30000;
+
+    if (queryCategory === 'JOURNAL_SPECIFIC' || /\b(journal|entry|entries|feeling|emotion|mood)\b/i.test(message)) {
+      dynamicMessages = [
+        "Understanding your emotional patterns...",
+        "Analyzing your journal entries...",
+        "Looking for meaningful connections...",
+        "Processing your emotional journey...",
+        "Gathering insights from your experiences...",
+        "Connecting themes across your entries...",
+        "Finalizing personalized insights..."
+      ];
+      expectedTime = 45000;
+    } else if (/\b(anxious|anxiety|stress|worried)\b/i.test(message)) {
+      dynamicMessages = [
+        "Understanding your emotional state...",
+        "Finding supportive insights...",
+        "Analyzing your patterns..."
+      ];
+    } else if (/\b(confident|confidence|strong|proud)\b/i.test(message)) {
+      dynamicMessages = [
+        "Exploring your strengths...",
+        "Identifying confidence patterns...",
+        "Gathering positive insights..."
+      ];
+    } else {
+      dynamicMessages = [
+        "Processing your question...",
+        "Gathering relevant insights...",
+        "Preparing your response..."
+      ];
+    }
+
+    // Translate messages for better UX
+    const translatedMessages = await Promise.all(
+      dynamicMessages.map(msg => translate(msg))
+    );
+
     updateThreadState(activeThreadId, {
-      useThreeDotFallback: true,
-      dynamicMessages: [],
-      translatedDynamicMessages: [],
-      currentMessageIndex: 0
+      useThreeDotFallback: false,
+      dynamicMessages,
+      translatedDynamicMessages: translatedMessages,
+      currentMessageIndex: 0,
+      queryCategory: queryCategory || 'unknown',
+      expectedProcessingTime: expectedTime
     });
-  }, [threadId, updateThreadState]);
+
+    console.log(`[useStreamingChat] Generated ${dynamicMessages.length} dynamic messages for ${queryCategory || 'unknown'} category`);
+  }, [threadId, updateThreadState, translate]);
 
   // Automatic retry function for failed messages
   const retryLastMessage = useCallback(async (targetThreadId?: string) => {
@@ -535,12 +635,23 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
       console.error('[useStreamingChat] Error fetching user timezone:', error);
     }
 
-    // NO FRONTEND CLASSIFICATION - Let chat-with-rag be the sole orchestrator
-    console.log(`[useStreamingChat] Sending message to chat-with-rag for classification and orchestration`);
+    // Enhanced message generation with dynamic categorization
+    console.log(`[useStreamingChat] Generating streaming messages and preparing for processing`);
+    
+    // Pre-classify message for better UX (will be validated by backend)
+    let preliminaryCategory = 'GENERAL_MENTAL_HEALTH';
+    if (/\b(journal|entry|entries|feeling|emotion|mood|confident|anxiety|stress)\b/i.test(message)) {
+      preliminaryCategory = 'JOURNAL_SPECIFIC';
+    }
+    
+    // Generate dynamic messages before invoking backend
+    await generateStreamingMessages(message, targetThreadId, preliminaryCategory);
+    
+    console.log(`[useStreamingChat] Pre-classified as ${preliminaryCategory}, starting processing`);
     
     updateThreadState(targetThreadId, { 
-      queryCategory: 'unknown', // Will be determined by backend
-      expectedProcessingTime: 45000 // Default estimate, backend will adjust if needed
+      queryCategory: preliminaryCategory,
+      expectedProcessingTime: preliminaryCategory === 'JOURNAL_SPECIFIC' ? 45000 : 30000
     });
 
     try {
