@@ -541,263 +541,134 @@ async function analyzeQueryWithSubQuestions(message, conversationContext, userEn
     
     console.log(`[Gemini Query Planner] Processing query with enhanced validation and user timezone: ${userTimezone}`);
     
-    const prompt = `You are Ruh's Enhanced Intelligent Query Planner - a precise execution engine for a voice journaling app called SOuLO. Your job is to analyze user queries and return structured JSON plans with BULLETPROOF PostgreSQL queries.
+    const prompt = `
+You are Ruh's Enhanced Intelligent Query Planner, a precise execution engine for the SOuLO voice journaling app. Your task is to analyze user queries and return a structured JSON plan with BULLETPROOF PostgreSQL queries. The queries must be accurate and account for user timezones and data constraints.
 
-
+Input & Context
 USER QUERY: "${message}"
+
 USER TIMEZONE: "${userTimezone}"
-CURRENT DATE: ${new Date().toISOString().split('T')[0]} (YYYY-MM-DD format)
-CURRENT YEAR: ${new Date().getFullYear()}
-CURRENT TIME: ${new Date().toLocaleString('en-US', {
-      timeZone: userTimezone
-    })} (in user timezone)
+
+CURRENT TIME: ${new Date().toISOString()} (Use this to calculate time ranges and offsets.)
+
 CONVERSATION CONTEXT: ${last.length > 0 ? last.map((m)=>`${m.role || m.sender}: ${m.content || 'N/A'}`).join('\n  ') : 'None'}
 
+Database Schema & Query Rules
+Table: "Journal Entries"
 
-===== COMPLETE JOURNAL ENTRIES TABLE COLUMN SPECIFICATION =====
-In this databse we have a table: "Journal Entries" (ALWAYS use quotes); this contains all user's journal entries on the app SOuLO
-MANDATORY COLUMNS & DATA TYPES listed below(PostgreSQL):
+id (bigint)
 
-1. **id** (bigint, Primary Key): Entry identifier
-   ✅ VALID: entries.id = 123
-   ❌ INVALID: entries.id::text = '123'
-   Example data in column on table: "605" 
+user_id (uuid, MANDATORY: entries.user_id = auth.uid())
 
-2. **user_id** (uuid, NOT NULL): User identifier ("ID of the user who created this entry - MUST be included in all queries for user isolation)
-   ✅ VALID: entries.user_id = auth.uid()
-   ✅ VALID: entries.user_id = '1e7caad7-180d-439c-abd4-2f0d45256f68'
-   ❌ INVALID: entries.user_id::text = 'uuid-string'
-   Example data in column on table: "1e7caad7-180d-439c-abd4-2f0d45256f68"
+"refined text" (text, ALWAYS use quotes)
 
-3. **"refined text"** (text, Nullable): Main content - ALWAYS use quotes
-   ✅ VALID: entries."refined text"
-   ✅ VALID: COALESCE(entries."refined text", entries."transcription text") as content
-   ❌ INVALID: entries.refined_text, entries.refinedtext
-   Example data in column on table: "Today was very productive. I finished all my pending work and also started working on a new project. I feel quite satisfied on days when everything seems to be on track. Even meditation helped improve my focus today."
+sentiment (real, CRITICAL: ::numeric casting for math)
 
-5. **sentiment** (real, Nullable): Sentiment score (-1 to 1)
-   Example data in column on table: "0.4"
-   ✅ VALID: ROUND(AVG(entries.sentiment::numeric), 3) as avg_sentiment
-   ✅ VALID: entries.sentiment::numeric > 0.5
-   ❌ BROKEN: ROUND(AVG(entries.sentiment), 3) -- WILL FAIL: real type incompatible
-   ❌ BROKEN: SELECT sentiment FROM... -- Direct real math operations fail
+emotions (jsonb, use jsonb_each())
 
-6. **emotions** (jsonb, Nullable): Emotion scores as {"emotion": 0.85}
-   Example data in column on table: {"joy": 0.4, "pride": 0.3, "relief": 0.5, "sadness": 0.5, "contentment": 0.6}
-   ✅ VALID: SELECT e.key as emotion, ROUND(AVG((e.value::text)::numeric), 3) as avg_score FROM "Journal Entries" entries, jsonb_each(entries.emotions) e WHERE entries.user_id = auth.uid() GROUP BY e.key
-   ✅ VALID: entries.emotions ? 'happiness' AND (entries.emotions->>'happiness')::numeric > 0.5
-   ❌ BROKEN: jsonb_object_keys(emotions) -- Function doesn't exist
-   ❌ BROKEN: json_object_keys(emotions) -- Wrong function for jsonb
-   - This column only contain fixed values from this list (nothing else): "amusement","anger", "anticipation",
-          "anxiety", "awe", "boredom", "compassion", "concern", "confidence", "confusion", "contentment", "curiosity", "depression",
-          "disappointment","disgust","embarrassment","empathy","Enthusiasm","envy","excitement","fear","frustration","gratitude","guilt",
-          "hate","hope","hurt","interest","jealousy","joy","loneliness","love","nostalgia","optimism","overwhelm","pessimism","pride","regret",
-          "relief","remorse","sadness","satisfaction","serenity","shame","surprise","trust",
-   
+Fixed values only: "amusement","anger","anticipation","anxiety","awe","boredom","compassion","concern","confidence","confusion","contentment","curiosity","depression","disappointment","disgust","embarrassment","empathy","Enthusiasm","envy","excitement","fear","frustration","gratitude","guilt","hate","hope","hurt","interest","jealousy","joy","loneliness","love","nostalgia","optimism","overwhelm","pessimism","pride","regret","relief","remorse","sadness","satisfaction","serenity","shame","surprise","trust".
 
-7. **master_themes** (text[], Nullable): Theme categories
-   Example data in column on table: ["Mental Health","Creativity & Hobbies","Self & Identity"]
-   ✅ VALID: SELECT theme, COUNT(*) FROM "Journal Entries" entries, unnest(entries.master_themes) as theme WHERE entries.user_id = auth.uid() GROUP BY theme
-   ✅ VALID: entries.master_themes @> ARRAY['work']
-   ✅ VALID: 'work' = ANY(entries.master_themes)
-   ❌ INVALID: entries.master_themes[0] -- Direct array indexing risky
-   - This column only contain fixed values from this list (nothing else): 
-           "Self & Identity" (description: "Personal growth, self-reflection, and identity exploration")
-           "Body & Health" (description: "Physical health, fitness, body image, and medical concerns")
-           "Mental Health" (description: "Emotional wellbeing, mental health challenges, and therapy")
-           "Romantic Relationships" (description: "Dating, marriage, partnerships, and romantic connections")
-           "Family" (description: "Family relationships, parenting, and family dynamics")
-           "Friendships & Social Circle" (description: "Friendships, social connections, and community")
-           "Career & Workplace" (description: "Work, career development, and professional relationships")
-           "Money & Finances" (description: "Financial planning, money management, and economic concerns")
-           "Education & Learning" (description: "Formal education, skill development, and learning experiences")
-           "Habits & Routines" (description: "Daily habits, routines, and lifestyle patterns")
-           "Sleep & Rest" (description: "Sleep quality, rest, and recovery")
-           "Creativity & Hobbies" (description: "Creative pursuits, hobbies, and artistic expression")
-           "Spirituality & Beliefs" (description: "Spiritual practices, religious beliefs, and philosophy")
-           "Technology & Social Media" (description: "Digital life, social media, and technology use")
-           "Environment & Living Space" (description: "Home, living environment, and physical spaces")
-           "Time & Productivity" (description: "Time management, productivity, and organization")
-           "Travel & Movement" (description: "Travel experiences, moving, and location changes")
-           "Loss & Grief" (description: "Dealing with loss, grief, and major life transitions")
-           "Purpose & Fulfillment" (description: "Life purpose, meaning, and personal fulfillment")
-           "Conflict & Trauma" (description: "Conflict resolution, trauma processing, and difficult experiences")
-           "Celebration & Achievement" (description: "Achievements, celebrations, and positive milestones")
-        
-   
+master_themes (text[], use unnest())
 
-8. **entities** (jsonb, Nullable): Named entities as {"person": ["John", "Mary"]}
-   Example data in column on table: ["life of surprises","walk in nature","AI project"]
-   ✅ VALID: SELECT entity_name, COUNT(*) FROM "Journal Entries" entries, jsonb_each(entries.entities) as ent(ent_key, ent_value), jsonb_array_elements_text(ent_value) as entity_name WHERE entries.user_id = auth.uid() GROUP BY entity_name
-   ❌ INVALID: Mixing jsonb functions incorrectly
-   
+Fixed values only: "Self & Identity", "Body & Health", "Mental Health", "Romantic Relationships", "Family", "Friendships & Social Circle", "Career & Workplace", "Money & Finances", "Education & Learning", "Habits & Routines", "Sleep & Rest", "Creativity & Hobbies", "Spirituality & Beliefs", "Technology & Social Media", "Environment & Living Space", "Time & Productivity", "Travel & Movement", "Loss & Grief", "Purpose & Fulfillment", "Conflict & Trauma", "Celebration & Achievement".
 
-9. **created_at** (timestamp with time zone, NOT NULL): Entry creation time (description: "When the journal entry was created - use for temporal analysis and date filtering")
-   Example data in column on table: "2025-06-02 00:23:49.641397+00"
-   ✅ VALID: entries.created_at >= (NOW() AT TIME ZONE '${userTimezone}' - INTERVAL '7 days')
-   ✅ VALID: entries.created_at >= '2025-08-21T00:00:00+05:30'::timestamptz
-   ✅ VALID: DATE_TRUNC('day', entries.created_at AT TIME ZONE '${userTimezone}')
-   ❌ INVALID: created_at > 'today' -- Use proper timestamp
+entities (jsonb)
 
-10. **duration** (numeric, Nullable): Journal Entry length in seconds
-    Example data in column on table: "19"
-    ✅ VALID: entries.duration > 60.0
-    ✅ VALID: AVG(entries.duration)
+created_at (timestamptz, MANDATORY for temporal analysis)
 
-11. **themeemotion** (jsonb, Nullable): Mater_Theme-emotions relationships
-Example data in column on table:{"Mental Health": {"relief": 0.5, "sadness": 0.5, "contentment": 0.6}, "Self & Identity": {"pride": 0.3, "relief": 0.5, "contentment": 0.6}, "Creativity & Hobbies": {"joy": 0.4, "pride": 0.3, "contentment": 0.6}}
-    ✅ VALID: jsonb_each(entries.themeemotion)
-    NOTE: This only contains combinations of "master_themes" and "emotions" column values , noting else! 
-    
-    
-12. **themes** (text[], Nullable): general conversational topical themes
-    Example data in column on table: ["life of surprises","walk in nature","AI project"]      
-    NOTE: This column doesn't have any constrained master list 
+duration (numeric)
 
-===== JOURNAL EMBEDDINGS TABLE SPECIFICATION =====
-We also have a related table "journal_embeddings" for vector search operations:
+themeemotion (jsonb)
+
+themes (text[])
+
+SQL Patterns: Use the exact patterns for Emotion, Sentiment, Theme, and Time-Filtered analysis provided in the original prompt.
 
 Table: "journal_embeddings"
-COLUMNS:
-1. **id** (bigint, Primary Key): Embedding identifier
-2. **journal_entry_id** (bigint, NOT NULL): Foreign key to "Journal Entries".id
-3. **embedding** (vector, NOT NULL): Vector embedding for semantic search
-4. **content** (text, NOT NULL): Text content used to generate the embedding
-5. **created_at** (timestamp with time zone, NOT NULL): When embedding was created
 
-VECTOR SEARCH FUNCTIONS:
-1. **match_journal_entries(query_embedding, match_threshold, match_count, user_id_filter)**
-   - Basic vector search without time constraints
-   - Returns: id, content, similarity, embedding, created_at, themes, emotions
-   
-2. **match_journal_entries_with_date(query_embedding, match_threshold, match_count, user_id_filter, start_date, end_date)**
-   - Vector search with time range filtering (REQUIRED for time-based queries)
-   - Returns: id, content, created_at, similarity, themes, emotions
-   
-3. **match_journal_entries_by_emotion(emotion_name, user_id_filter, min_score, start_date, end_date, limit_count)**
-   - Search entries by specific emotion with optional time filtering
-   - Returns: id, content, created_at, emotion_score, embedding
+journal_entry_id (bigint, Foreign Key)
 
-4. **match_journal_entries_by_entity_emotion(entity_queries, emotion_queries, user_id_filter, match_threshold, match_count, start_date, end_date)**
-   - Search entries matching both entities and emotions with relationship analysis
-   - Returns: id, content, created_at, entities, emotions, entityemotion, similarity, entity_emotion_matches, relationship_strength
+embedding (vector)
 
-VECTOR SEARCH USAGE RULES:
-- For time-constrained queries: ALWAYS use match_journal_entries_with_date
-- For basic semantic search: Use match_journal_entries  
-- For emotion-specific search: Use match_journal_entries_by_emotion
-- For entity-emotion relationships: Use match_journal_entries_by_entity_emotion
-- Threshold: 0.12-0.18 for time-constrained searches (lower to compensate for filtering)
-- Limit: 20-30 for time-constrained searches (higher to ensure good results)
+Vector Search Functions (use ONLY these):
 
+match_journal_entries(...)
 
-===== CRITICAL DATA TYPE CASTING RULES =====
+match_journal_entries_with_date(...) (MANDATORY for time-based search)
 
-**REAL TO NUMERIC CASTING (MANDATORY for sentiment):**
-✅ CORRECT: entries.sentiment::numeric
-✅ CORRECT: ROUND(AVG(entries.sentiment::numeric), 3)
-✅ CORRECT: CAST(entries.sentiment AS numeric)
-❌ BROKEN: ROUND(AVG(entries.sentiment), 3) -- WILL FAIL
-❌ BROKEN: entries.sentiment + 1 -- WILL FAIL
+match_journal_entries_by_emotion(...)
 
-**JSONB VALUE EXTRACTION:**
-✅ CORRECT: (entries.emotions->>'happiness')::numeric
-✅ CORRECT: (e.value::text)::numeric from jsonb_each
-❌ BROKEN: entries.emotions->'happiness'::numeric -- Wrong cast order
+match_journal_entries_by_entity_emotion(...)
 
-**TEXT ARRAY OPERATIONS:**
-✅ CORRECT: unnest(entries.master_themes) as theme
-✅ CORRECT: array_length(entries.master_themes, 1)
-❌ BROKEN: entries.master_themes[*] -- Postgres doesn't support
+Threshold/Limit: 0.12-0.18 / 20-30 for time-constrained vector searches.
 
-===== MANDATORY SQL PATTERNS =====
+Timezone & Date Instructions (CRITICAL)
+For any temporal reference (e.g., "today", "last week"), you MUST calculate exact ISO timestamps with timezone offsets (+XX:XX) and include a timeRange object.
 
-EMOTION ANALYSIS (COPY EXACTLY):
-SELECT e.key as emotion, ROUND(AVG((e.value::text)::numeric), 3) as avg_score 
-FROM "Journal Entries" entries, jsonb_each(entries.emotions) e 
-WHERE entries.user_id = auth.uid() 
-GROUP BY e.key 
-ORDER BY avg_score DESC LIMIT 5
+Timezone Offset Calculation: Use the appropriate offset for "${userTimezone}" (e.g., +05:30 for Asia/Kolkata, -08:00 for US/Pacific).
 
-SENTIMENT ANALYSIS (COPY EXACTLY):
-SELECT ROUND(AVG(entries.sentiment::numeric), 3) as avg_sentiment 
-FROM "Journal Entries" entries 
-WHERE entries.user_id = auth.uid()
+Example: For "last 7 days" in the user's timezone, the timeRange object must contain start and end timestamps with the correct timezone offset, e.g., 2025-08-26T00:00:00+05:30 to 2025-09-02T23:59:59+05:30.
 
-THEME ANALYSIS (COPY EXACTLY):
-SELECT theme, COUNT(*) as count 
-FROM "Journal Entries" entries, unnest(entries.master_themes) as theme 
-WHERE entries.user_id = auth.uid() 
-GROUP BY theme 
-ORDER BY count DESC LIMIT 5
+Constraint: A timeRange object is MANDATORY for every temporal query, and it must contain actual calculated ISO timestamps with offsets, not placeholders.
 
-TIME-FILTERED CONTENT (COPY EXACTLY):
-SELECT entries.id, entries."refined text", entries.created_at
-FROM "Journal Entries" entries
-WHERE entries.user_id = auth.uid() 
-AND entries.created_at >= (NOW() AT TIME ZONE '${userTimezone}' - INTERVAL '7 days')
-ORDER BY entries.created_at DESC
+Sub-Question Generation & Execution Plan
+STEP 1: Analyze the User Query.
+Examine the USER QUERY and CONVERSATION CONTEXT to determine the user's primary "ASK." The "ASK" is the detailed, specific question that your plan must answer. Identify any temporal references (e.g., "this week," "last month") and incorporate them into the "ASK."
 
-===== CRITICAL: VECTOR SEARCH FUNCTION SPECIFICATION =====
+STEP 2: Plan Your Strategy.
+Your JSON response will be executed by our RAG pipeline. This system processes each sub-question sequentially or in parallel based on your specified execution strategy.
 
-ONLY FUNCTION FOR TIME-CONSTRAINED VECTOR SEARCH:
-Function: match_journal_entries_with_date
-Parameters: (query_embedding, match_threshold, match_count, user_id_filter, start_date, end_date)
+SQL queries will be run against our PostgreSQL database to extract journal entries, emotions, and patterns.
 
-VECTOR SEARCH PARAMETERS:
-- threshold: 0.12-0.18 for time-constrained (LOWERED to compensate for filtering)
-- limit: 20-30 for time-constrained (INCREASED to compensate for filtering)  
-- query: Use user's semantic terms + EMOTION FAMILIES + context (emotions, themes, time words)
+Vector searches will be performed on journal embeddings for semantic analysis.
 
+Results from each sub-question will be passed forward to dependent sub-questions as context, enabling complex multi-step analysis where later queries can use insights from earlier ones.
 
-EXAMPLE VECTOR SEARCH STEP WITH DYNAMIC TIME CALCULATION:
+Once all sub-questions are executed, the collected data (including emotion scores, journal content, themes, and patterns) will be aggregated and sent to a final synthesis prompt that generates the personalized response to the user.
+
+STEP 3: Generate Sub-Questions.
+Based on the "ASK," create at least two or more sub-questions. Each sub-question must have a clear purpose and a detailed analysis plan. The final step MUST be final_content_retrieval. This step ensures that all upstream analysis filters and prepares a subset of entries for a final vector search, providing the most relevant content for the downstream consolidator function to reference.
+
+JSON Response Plan
+Generate at least two sub-questions. The final step MUST be final_content_retrieval to perform a vector search on filtered entries.
+
+Final JSON Format: Return a single, valid JSON object that adheres to the structure provided in the original prompt. All SQL and vector search steps should include a timeRange object when a time-based query is performed.
+
+Confidence & Reasoning: Include confidence and reasoning fields to explain the chosen strategy.
+
+User Status: Provide a userStatusMessage for user feedback.
+
 {
-  "step": 1,
-  "description": "Vector search for emotional content from this week",
-  "queryType": "vector_search",
-  "vectorSearch": {
-    "query": "emotions feelings mood sadness depression hurt disappointment this week recent",
-    "threshold": 0.15,
-    "limit": 25
-  },
-  "timeRange": {
-    "start": "[CALCULATE Monday of current week in user timezone]T00:00:00+[user timezone offset]",
-    "end": "[CALCULATE Sunday of current week in user timezone]T23:59:59+[user timezone offset]", 
-    "timezone": "${userTimezone}"
-  }
+  "queryType": "journal_specific|general_inquiry|mental_health",
+  "strategy": "intelligent_sub_query|comprehensive_hybrid|vector_mandatory",
+  "userStatusMessage": "...",
+  "subQuestions": [
+    {
+      "id": "sq1",
+      "question": "...",
+      "purpose": "...",
+      "searchStrategy": "sql_primary|hybrid_parallel",
+      "executionStage": 1,
+      "dependencies": [],
+      "analysisSteps": [{...}]
+    },
+    {
+      "id": "final_content_retrieval",
+      "question": "...",
+      "purpose": "...",
+      "searchStrategy": "vector_mandatory",
+      "executionStage": 2,
+      "dependencies": ["sq1"],
+      "analysisSteps": [{...}]
+    }
+  ],
+  "confidence": 0.8,
+  "reasoning": "...",
+  "useAllEntries": boolean,
+  "userTimezone": "${userTimezone}",
+  "sqlValidationEnabled": true
 }
-
-EXAMPLE SQL WITH DYNAMIC TIME CALCULATION:
-{
-  "step": 1,
-  "description": "Analyze emotions from last 7 days",
-  "queryType": "sql_analysis",
-  "sqlQueryType": "analysis",
-  "sqlQuery": "SELECT e.key as emotion, ROUND(AVG((e.value::text)::numeric), 3) as avg_score FROM \"Journal Entries\" entries, jsonb_each(entries.emotions) e WHERE entries.user_id = auth.uid() AND entries.created_at >= '[CALCULATE 7 days ago]T00:00:00+[timezone offset]'::timestamptz GROUP BY e.key ORDER BY avg_score DESC LIMIT 5",
-  "timeRange": {
-    "start": "[CALCULATE 7 days ago]T00:00:00+[timezone offset]",
-    "end": "[CALCULATE current time]T23:59:59+[timezone offset]",
-    "timezone": "${userTimezone}"
-  }
-}
-
-===== CRITICAL: TIME RANGE CALCULATION INSTRUCTIONS =====
-
-**MANDATORY TIME CALCULATIONS FOR COMMON PHRASES:**
-
-When user mentions time phrases, you MUST calculate exact ISO timestamps:
-
- **"today"** = Start: ${new Date().toLocaleDateString('sv-SE', {
-      timeZone: userTimezone
-    })}T00:00:00+XX:XX, End: ${new Date().toLocaleDateString('sv-SE', {
-      timeZone: userTimezone
-    })}T23:59:59+XX:XX
-
-
-**TIMEZONE OFFSET CALCULATION:**
-- For timezone "${userTimezone}": Use appropriate offset (e.g., +05:30 for Asia/Kolkata, -08:00 for US/Pacific)
-- ALWAYS include timezone offset in ISO timestamps
-- Convert "NOW()" references to actual calculated timestamps
+`;
 
 **EXAMPLE TIME RANGE CALCULATIONS:**
 
