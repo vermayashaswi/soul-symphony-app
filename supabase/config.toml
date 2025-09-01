@@ -96,3 +96,6 @@ verify_jwt = true
 
 [functions.schedule-journal-reminders]
 verify_jwt = false
+
+[functions.smart-query-planner-gemini]
+verify_jwt = true
