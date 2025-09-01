@@ -313,7 +313,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     });
   }, [threadId, updateThreadState]);
 
-  // Enhanced dynamic message generation for both GPT and Gemini flows
+  // Enhanced dynamic message generation - unified for both GPT and Gemini flows
   const generateStreamingMessages = useCallback(async (
     message: string, 
     targetThreadId?: string,
@@ -334,9 +334,25 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
       console.warn('[useStreamingChat] Failed to fetch feature flag, defaulting to GPT flow');
     }
 
-    console.log(`[useStreamingChat] Generating messages for ${useGeminiFlow ? 'Gemini' : 'GPT'} flow`);
+    console.log(`[useStreamingChat] Setting up messaging for ${useGeminiFlow ? 'Gemini' : 'GPT'} flow`);
 
-    // Generate dynamic messages based on query category (same for both flows)
+    if (useGeminiFlow) {
+      // GEMINI FLOW: No frontend dynamic messages - backend userStatusMessage will drive display
+      console.log('[useStreamingChat] Gemini flow: Using backend userStatusMessage, no frontend generation');
+      updateThreadState(activeThreadId, {
+        useThreeDotFallback: true, // Use three-dot animation until backend provides userStatusMessage
+        dynamicMessages: [], // No frontend messages
+        translatedDynamicMessages: [],
+        currentMessageIndex: 0,
+        queryCategory: queryCategory || 'unknown',
+        expectedProcessingTime: 45000,
+        processingStartTime: Date.now()
+      });
+      return;
+    }
+
+    // GPT FLOW: Generate frontend dynamic messages (original behavior)
+    console.log('[useStreamingChat] GPT flow: Generating frontend dynamic messages');
     let dynamicMessages: string[] = [];
     let expectedTime = 30000;
 
@@ -645,18 +661,15 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
       preliminaryCategory = 'JOURNAL_SPECIFIC';
     }
     
-    // Generate dynamic messages before invoking backend - CRITICAL FOR GEMINI FLOW
+    // Setup messages based on flow type
     await generateStreamingMessages(message, targetThreadId, preliminaryCategory);
     
-    console.log(`[useStreamingChat] Pre-classified as ${preliminaryCategory}, starting processing with dynamic messages`);
+    console.log(`[useStreamingChat] Pre-classified as ${preliminaryCategory}, messages setup complete`);
     
     updateThreadState(targetThreadId, { 
       queryCategory: preliminaryCategory,
       expectedProcessingTime: preliminaryCategory === 'JOURNAL_SPECIFIC' ? 45000 : 30000
     });
-
-    // Add delay to allow dynamic messages to show before backend call
-    await new Promise(resolve => setTimeout(resolve, 1500));
 
     try {
       const { data, error } = await invokeWithBackoff({
@@ -688,7 +701,27 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
         throw new Error(error?.message || 'Request failed');
       }
 
+      // Extract response and userStatusMessage for unified handling across both flows
       const text = data?.response ?? data?.data ?? data?.message ?? (typeof data === 'string' ? data : null);
+      const userStatusMessage = data?.userStatusMessage;
+      
+      console.log(`[useStreamingChat] Response received:`, {
+        hasResponse: !!text,
+        hasUserStatusMessage: !!userStatusMessage,
+        responseLength: text?.length
+      });
+
+      // CRITICAL FOR GEMINI FLOW: If we have userStatusMessage from backend, update display
+      if (userStatusMessage) {
+        updateThreadState(targetThreadId, {
+          dynamicMessages: [userStatusMessage],
+          translatedDynamicMessages: [userStatusMessage],
+          currentMessageIndex: 0,
+          useThreeDotFallback: false
+        });
+        console.log(`[useStreamingChat] Updated display with backend userStatusMessage: "${userStatusMessage}"`);
+      }
+
       if (text) {
         addStreamingMessage({
           type: 'final_response',
