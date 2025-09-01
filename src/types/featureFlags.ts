@@ -5,6 +5,7 @@ export type AppFeatureFlag =
   | "emotionCalendar"
   | "insightsV2"
   | "journalVoicePlayback"
+  | "smartChatSwitch"
   | "otherReservedFlags";
 
 /**

@@ -241,8 +241,19 @@ export async function processChatMessage(
       userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
     }
 
+    // Get smart chat switch setting
+    const { data: featureFlags } = await supabase
+      .from('feature_flags')
+      .select('name, is_enabled')
+      .eq('name', 'smartChatSwitch');
+
+    const useGemini = featureFlags?.[0]?.is_enabled === true;
+    const plannerFunction = useGemini ? 'smart-query-planner-gemini' : 'smart-query-planner';
+    
+    console.log(`[ChatService] Using ${plannerFunction} for query planning`);
+
     // Get intelligent query plan with enhanced database-aware dual-search requirements
-    const queryPlanResponse = await supabase.functions.invoke('smart-query-planner', {
+    const queryPlanResponse = await supabase.functions.invoke(plannerFunction, {
       body: {
         message,
         userId,

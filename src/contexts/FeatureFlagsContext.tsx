@@ -18,6 +18,7 @@ const defaultFlags: FeatureFlags = {
   emotionCalendar: false,
   insightsV2: false,
   journalVoicePlayback: false,
+  smartChatSwitch: false,
   otherReservedFlags: false,
 };
 
