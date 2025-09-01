@@ -685,21 +685,6 @@ User Status: Provide a userStatusMessage for user feedback.
         {
           parts: [
             {
-
-    // Get Google API key from environment
-    const googleApiKey = Deno.env.get('GOOGLE_API');
-    if (!googleApiKey) {
-      throw new Error('Google API key not configured');
-    }
-
-    // Use the Generative Language API endpoint (consistent with other Gemini functions)
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`;
-
-    const requestBody = {
-      contents: [
-        {
-          parts: [
-            {
               text: `${prompt}\n\nUser Message: ${message}`
             }
           ]
