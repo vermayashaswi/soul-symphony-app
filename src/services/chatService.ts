@@ -34,17 +34,11 @@ export async function processChatMessage(
   try {
     console.log('[ChatService] Processing message with RAG optimizations:', message);
     
-    // Get smart chat switch setting once for the entire function
-    const { data: featureFlags } = await supabase
-      .from('feature_flags')
-      .select('name, is_enabled')
-      .eq('name', 'smartChatSwitch');
-
-    const useGemini = featureFlags?.[0]?.is_enabled === true;
-    const classifierFunction = useGemini ? 'chat-query-classifier-gemini' : 'chat-query-classifier';
-    const plannerFunction = useGemini ? 'smart-query-planner-gemini' : 'smart-query-planner';
+    // GPT FLOW ONLY - No feature flag logic (restored original architecture)
+    const classifierFunction = 'chat-query-classifier';
+    const plannerFunction = 'smart-query-planner';
     
-    console.log(`[ChatService] Using Gemini models: ${useGemini} (classifier: ${classifierFunction}, planner: ${plannerFunction})`);
+    console.log(`[ChatService] GPT Flow - Using classifier: ${classifierFunction}, planner: ${plannerFunction}`);
     
     // PHASE 2: Initialize conversation state persistence
     const conversationPersistence = new ConversationStatePersistence(threadId, userId);
@@ -253,7 +247,7 @@ export async function processChatMessage(
       userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
     }
 
-    console.log(`[ChatService] Using ${plannerFunction} for query planning`);
+    console.log('[ChatService] GPT Flow - Using smart-query-planner for query planning');
 
     // Get intelligent query plan with enhanced database-aware dual-search requirements
     const queryPlanResponse = await supabase.functions.invoke(plannerFunction, {

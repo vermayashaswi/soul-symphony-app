@@ -140,107 +140,25 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
 
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-  // Enhanced backoff wrapper with feature flag detection
-  const invokeWithBackoff = useCallback(
-    async (
-      body: Record<string, any>,
-      options?: { attempts?: number; baseDelay?: number },
-      targetThreadId?: string
-    ): Promise<{ data: any; error: any }> => {
-      if (!targetThreadId) {
-        throw new Error('Missing target thread');
+  // GEMINI FLOW ONLY - Backend invocation
+  const invokeWithBackoff = useCallback(async (
+    body: Record<string, any>,
+    options?: { attempts?: number; baseDelay?: number },
+    targetThreadId?: string
+  ): Promise<{ data: any; error: any }> => {
+    console.log('[useStreamingChat] GEMINI FLOW - Invoking chat-with-rag');
+    
+    // GEMINI FLOW ONLY - Always use chat-with-rag
+    return await supabase.functions.invoke('chat-with-rag', {
+      body: {
+        message: body.message,
+        userId: body.userId,
+        conversationContext: body.conversationContext,
+        threadId: body.threadId || targetThreadId,
+        userTimezone: body.userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone
       }
-
-      const attempts = options?.attempts ?? 3;
-      const baseDelay = options?.baseDelay ?? 900;
-      const threadState = getThreadState(targetThreadId);
-
-      // Check feature flag to determine routing
-      let useGeminiFlow = false;
-      try {
-        const { data: featureFlags } = await supabase
-          .from('feature_flags')
-          .select('name, is_enabled')
-          .eq('name', 'smartChatSwitch');
-        useGeminiFlow = featureFlags?.[0]?.is_enabled === true;
-      } catch (error) {
-        console.warn('[useStreamingChat] Failed to fetch feature flag, defaulting to GPT flow');
-      }
-
-      console.log(`[useStreamingChat] Using ${useGeminiFlow ? 'Gemini' : 'GPT'} flow for message processing`);
-
-      let lastErr: any = null;
-      for (let i = 0; i < attempts; i++) {
-        // Check abort signal
-        if (threadState.abortController?.signal.aborted) {
-          throw new Error('Operation aborted');
-        }
-
-        try {
-          let result: { data: any; error: any };
-
-          if (useGeminiFlow) {
-            console.log(`[useStreamingChat] Invoking chat-with-rag for Gemini orchestration`);
-            
-            // Gemini flow: Direct to chat-with-rag orchestrator (handles all routing)
-            const timeoutMs = 25000 + i * 5000; // Longer timeout for Gemini processing
-            const timeoutPromise = new Promise((_, rej) =>
-              setTimeout(() => rej(new Error('Request timed out')), timeoutMs)
-            );
-
-            result = (await Promise.race([
-              supabase.functions.invoke('chat-with-rag', { body }),
-              timeoutPromise,
-            ])) as { data: any; error: any };
-          } else {
-            console.log(`[useStreamingChat] Using chatService for GPT processing`);
-            
-            // GPT flow: Use chatService for compatibility with legacy architecture
-            const { processChatMessage } = await import('@/services/chatService');
-            const { analyzeQueryTypes } = await import('@/utils/chat/queryAnalyzer');
-            
-            const queryTypes = analyzeQueryTypes(body.message);
-            
-            const response = await processChatMessage(
-              body.message,
-              body.userId,
-              queryTypes,
-              body.threadId,
-              false,
-              {}
-            );
-
-            result = {
-              data: {
-                response: response.content,
-                analysis: response.analysis,
-                references: response.references
-              },
-              error: null
-            };
-          }
-          
-          if ((result as any)?.error) {
-            lastErr = (result as any).error;
-            if (isEdgeFunctionError(lastErr) || isNetworkError(lastErr)) {
-              // retryable
-            } else {
-              return result;
-            }
-          } else {
-            return result;
-          }
-        } catch (e) {
-          lastErr = e;
-        }
-        
-        const delay = Math.min(6000, baseDelay * Math.pow(2, i)) + Math.floor(Math.random() * 250);
-        await sleep(delay);
-      }
-      return { data: null, error: lastErr || new Error('Unknown error') };
-    },
-    [isEdgeFunctionError, isNetworkError, getThreadState]
-  );
+    });
+  }, []);
 
   const addStreamingMessage = useCallback((message: StreamingMessage, targetThreadId?: string) => {
     const activeThreadId = targetThreadId || threadId;
@@ -313,7 +231,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     });
   }, [threadId, updateThreadState]);
 
-  // Enhanced dynamic message generation - unified for both GPT and Gemini flows
+  // GEMINI FLOW ONLY - No frontend dynamic messages, use backend userStatusMessage
   const generateStreamingMessages = useCallback(async (
     message: string, 
     targetThreadId?: string,
@@ -322,88 +240,21 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     const activeThreadId = targetThreadId || threadId;
     if (!activeThreadId) return;
 
-    // Check if we have smartChatSwitch feature flag enabled for Gemini
-    let useGeminiFlow = false;
-    try {
-      const { data: featureFlags } = await supabase
-        .from('feature_flags')
-        .select('name, is_enabled')
-        .eq('name', 'smartChatSwitch');
-      useGeminiFlow = featureFlags?.[0]?.is_enabled === true;
-    } catch (error) {
-      console.warn('[useStreamingChat] Failed to fetch feature flag, defaulting to GPT flow');
-    }
-
-    console.log(`[useStreamingChat] Setting up messaging for ${useGeminiFlow ? 'Gemini' : 'GPT'} flow`);
-
-    if (useGeminiFlow) {
-      // GEMINI FLOW: No frontend dynamic messages - backend userStatusMessage will drive display
-      console.log('[useStreamingChat] Gemini flow: Using backend userStatusMessage, no frontend generation');
-      updateThreadState(activeThreadId, {
-        useThreeDotFallback: true, // Use three-dot animation until backend provides userStatusMessage
-        dynamicMessages: [], // No frontend messages
-        translatedDynamicMessages: [],
-        currentMessageIndex: 0,
-        queryCategory: queryCategory || 'unknown',
-        expectedProcessingTime: 45000,
-        processingStartTime: Date.now()
-      });
-      return;
-    }
-
-    // GPT FLOW: Generate frontend dynamic messages (original behavior)
-    console.log('[useStreamingChat] GPT flow: Generating frontend dynamic messages');
-    let dynamicMessages: string[] = [];
-    let expectedTime = 30000;
-
-    if (queryCategory === 'JOURNAL_SPECIFIC' || /\b(journal|entry|entries|feeling|emotion|mood|top emotions|last week)\b/i.test(message)) {
-      dynamicMessages = [
-        "Understanding your emotional patterns...",
-        "Analyzing your journal entries...",
-        "Looking for meaningful connections...",
-        "Processing your emotional journey...",
-        "Gathering insights from your experiences...",
-        "Connecting themes across your entries...",
-        "Finalizing personalized insights..."
-      ];
-      expectedTime = 45000;
-    } else if (/\b(anxious|anxiety|stress|worried)\b/i.test(message)) {
-      dynamicMessages = [
-        "Understanding your emotional state...",
-        "Finding supportive insights...",
-        "Analyzing your patterns..."
-      ];
-    } else if (/\b(confident|confidence|strong|proud)\b/i.test(message)) {
-      dynamicMessages = [
-        "Exploring your strengths...",
-        "Identifying confidence patterns...",
-        "Gathering positive insights..."
-      ];
-    } else {
-      dynamicMessages = [
-        "Processing your question...",
-        "Gathering relevant insights...",
-        "Preparing your response..."
-      ];
-    }
-
-    // Translate messages for better UX
-    const translatedMessages = await Promise.all(
-      dynamicMessages.map(msg => translate(msg))
-    );
-
+    console.log('[useStreamingChat] GEMINI FLOW - Using backend userStatusMessage, no frontend generation');
+    
+    // GEMINI FLOW: No frontend dynamic messages - backend userStatusMessage will drive display
     updateThreadState(activeThreadId, {
-      useThreeDotFallback: false,
-      dynamicMessages,
-      translatedDynamicMessages: translatedMessages,
+      useThreeDotFallback: true, // Use three-dot animation until backend provides userStatusMessage
+      dynamicMessages: [], // No frontend messages
+      translatedDynamicMessages: [],
       currentMessageIndex: 0,
       queryCategory: queryCategory || 'unknown',
-      expectedProcessingTime: expectedTime,
+      expectedProcessingTime: 45000,
       processingStartTime: Date.now()
     });
-
-    console.log(`[useStreamingChat] Generated ${dynamicMessages.length} dynamic messages for ${queryCategory || 'unknown'} category`);
-  }, [threadId, updateThreadState, translate]);
+    
+    console.log('[useStreamingChat] GEMINI FLOW - Backend userStatusMessage will drive display');
+  }, [threadId, updateThreadState]);
 
   // Automatic retry function for failed messages
   const retryLastMessage = useCallback(async (targetThreadId?: string) => {

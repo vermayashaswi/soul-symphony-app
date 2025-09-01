@@ -865,8 +865,8 @@ export default function MobileChatInterface({
       }));
       
       if (useGeminiFlow) {
-        // Gemini flow: ONLY use useStreamingChat (identical to GPT flow frontend behavior)
-        console.log('[MobileChatInterface] Using Gemini flow - single processing path via useStreamingChat');
+        // GEMINI FLOW: Use useStreamingChat -> chat-with-rag -> Gemini functions
+        console.log('[MobileChatInterface] GEMINI FLOW - Using useStreamingChat');
         setIsProcessingMessage(true);
         
         await startStreamingChat(
@@ -876,10 +876,10 @@ export default function MobileChatInterface({
           conversationContext,
           {}
         );
-        // Response is handled by onFinalResponse callback - same as GPT flow
+        // Response handled by onFinalResponse callback
       } else {
-        // GPT flow: Use legacy chatService
-        console.log('[MobileChatInterface] Using GPT flow via chatService');
+        // GPT FLOW: Use chatService -> individual GPT functions (RESTORED ORIGINAL)
+        console.log('[MobileChatInterface] GPT FLOW - Using chatService (restored original)');
         setIsProcessingMessage(true);
         
         const queryTypes = analyzeQueryTypes(message);
@@ -892,7 +892,7 @@ export default function MobileChatInterface({
           {}
         );
         
-        // Add assistant response to UI for GPT flow
+        // Add assistant response to UI
         if (currentThreadId === currentThreadIdRef.current) {
           setMessages(prev => [...prev, { 
             role: 'assistant', 
