@@ -166,7 +166,19 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
           const category = (body as any)?.category || threadState.queryCategory;
           let result: { data: any; error: any };
 
+          // Get smart chat switch setting for dynamic function routing
+          const { data: featureFlags } = await supabase
+            .from('feature_flags')
+            .select('name, is_enabled')
+            .eq('name', 'smartChatSwitch');
+
+          const useGemini = featureFlags?.[0]?.is_enabled === true;
+          const mentalHealthFunction = useGemini ? 'general-mental-health-chat-gemini' : 'general-mental-health-chat';
+          
+          console.log(`[useStreamingChat] Using Gemini: ${useGemini}, Category: ${category}, MentalHealthFunction: ${mentalHealthFunction}`);
+
           if (category === 'JOURNAL_SPECIFIC') {
+            // chat-with-rag already handles its own Gemini routing internally
             result = (await supabase.functions.invoke('chat-with-rag', { body })) as { data: any; error: any };
           } else if (category === 'GENERAL_MENTAL_HEALTH') {
             const timeoutMs = 20000 + i * 5000;
@@ -175,7 +187,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
             );
 
             result = (await Promise.race([
-              supabase.functions.invoke('general-mental-health-chat', { body }),
+              supabase.functions.invoke(mentalHealthFunction, { body }),
               timeoutPromise,
             ])) as { data: any; error: any };
           } else {
@@ -185,7 +197,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
             );
 
             result = (await Promise.race([
-              supabase.functions.invoke('general-mental-health-chat', { body }),
+              supabase.functions.invoke(mentalHealthFunction, { body }),
               timeoutPromise,
             ])) as { data: any; error: any };
           }
@@ -606,10 +618,21 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
       console.error('[useStreamingChat] Error fetching user timezone:', error);
     }
 
-    // Classify message
+    // Classify message with Gemini routing
     let messageCategory = 'GENERAL_MENTAL_HEALTH';
     try {
-      const { data: classificationData, error: classificationError } = await supabase.functions.invoke('chat-query-classifier', {
+      // Get smart chat switch setting for classification routing
+      const { data: featureFlags } = await supabase
+        .from('feature_flags')
+        .select('name, is_enabled')
+        .eq('name', 'smartChatSwitch');
+
+      const useGemini = featureFlags?.[0]?.is_enabled === true;
+      const classifierFunction = useGemini ? 'chat-query-classifier-gemini' : 'chat-query-classifier';
+      
+      console.log(`[useStreamingChat] Using ${classifierFunction} for classification`);
+
+      const { data: classificationData, error: classificationError } = await supabase.functions.invoke(classifierFunction, {
         body: {
           message,
           conversationContext: conversationContext || []
