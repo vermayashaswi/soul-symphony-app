@@ -177,30 +177,16 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
           
           console.log(`[useStreamingChat] Using Gemini: ${useGemini}, Category: ${category}, MentalHealthFunction: ${mentalHealthFunction}`);
 
-          if (category === 'JOURNAL_SPECIFIC') {
-            // chat-with-rag already handles its own Gemini routing internally
-            result = (await supabase.functions.invoke('chat-with-rag', { body })) as { data: any; error: any };
-          } else if (category === 'GENERAL_MENTAL_HEALTH') {
-            const timeoutMs = 20000 + i * 5000;
-            const timeoutPromise = new Promise((_, rej) =>
-              setTimeout(() => rej(new Error('Request timed out')), timeoutMs)
-            );
+          // ALL categories now go through chat-with-rag for unified orchestration and logging
+          const timeoutMs = 20000 + i * 5000;
+          const timeoutPromise = new Promise((_, rej) =>
+            setTimeout(() => rej(new Error('Request timed out')), timeoutMs)
+          );
 
-            result = (await Promise.race([
-              supabase.functions.invoke(mentalHealthFunction, { body }),
-              timeoutPromise,
-            ])) as { data: any; error: any };
-          } else {
-            const timeoutMs = 20000 + i * 5000;
-            const timeoutPromise = new Promise((_, rej) =>
-              setTimeout(() => rej(new Error('Request timed out')), timeoutMs)
-            );
-
-            result = (await Promise.race([
-              supabase.functions.invoke(mentalHealthFunction, { body }),
-              timeoutPromise,
-            ])) as { data: any; error: any };
-          }
+          result = (await Promise.race([
+            supabase.functions.invoke('chat-with-rag', { body }),
+            timeoutPromise,
+          ])) as { data: any; error: any };
           
           if ((result as any)?.error) {
             lastErr = (result as any).error;
