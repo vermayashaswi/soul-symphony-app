@@ -64,8 +64,9 @@ serve(async (req) => {
     const consolidatorFunction = useGemini ? 'gpt-response-consolidator-gemini' : 'gpt-response-consolidator';
     const mentalHealthFunction = useGemini ? 'general-mental-health-chat-gemini' : 'general-mental-health-chat';
     const clarificationFunction = useGemini ? 'gpt-clarification-generator-gemini' : 'gpt-clarification-generator';
+    const plannerFunction = useGemini ? 'smart-query-planner-gemini' : 'smart-query-planner';
     
-    console.log(`[chat-with-rag] Using functions: classifier=${classifierFunction}, consolidator=${consolidatorFunction}, mentalHealth=${mentalHealthFunction}, clarification=${clarificationFunction}`);
+    console.log(`[chat-with-rag] Using functions: classifier=${classifierFunction}, planner=${plannerFunction}, consolidator=${consolidatorFunction}, mentalHealth=${mentalHealthFunction}, clarification=${clarificationFunction}`);
     
     // Update user message with correlation ID to track RAG pipeline execution
     if (messageId) {
@@ -179,7 +180,7 @@ serve(async (req) => {
       console.log("[chat-with-rag] EXECUTING: JOURNAL_SPECIFIC pipeline - full RAG processing");
       
       // Step 2: Enhanced Query Planning with timezone support
-      const queryPlanResponse = await supabaseClient.functions.invoke('smart-query-planner', {
+      const queryPlanResponse = await supabaseClient.functions.invoke(plannerFunction, {
         body: { 
           message, 
           userId, 
