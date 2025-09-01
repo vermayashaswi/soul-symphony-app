@@ -185,7 +185,7 @@ MUST HAVE/DO: ALWAYS BE AWARE OF THE CONVERSATION HISTORY TO UNDERSTAND WHAT THE
 
     if (!content) {
       console.warn('[General Mental Health Gemini] Using graceful fallback after Gemini failure');
-      const fallback = "Hey, I'm here with you. *Even if tech is being moody right now*, I'm still listening. **What's been most on your mind or heart today?** If it helps, try finishing this: *"Lately, I've been feeling… because…"* 💛";
+      const fallback = "Hey, I'm here with you. *Even if tech is being moody right now*, I'm still listening. **What's been most on your mind or heart today?** If it helps, try finishing this: *\"Lately, I've been feeling… because…\"* 💛";
       return new Response(
         JSON.stringify({ response: fallback, fallbackUsed: true }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
