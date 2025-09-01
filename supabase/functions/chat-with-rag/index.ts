@@ -44,6 +44,29 @@ serve(async (req) => {
     const requestCorrelationId = crypto.randomUUID();
     console.log(`[chat-with-rag] Generated correlation ID: ${requestCorrelationId}`);
     
+    // Get smart chat switch setting for dynamic function routing
+    let useGemini = false;
+    try {
+      const { data: featureFlags } = await supabaseClient
+        .from('feature_flags')
+        .select('name, is_enabled')
+        .eq('name', 'smartChatSwitch');
+      
+      useGemini = featureFlags?.[0]?.is_enabled === true;
+      console.log(`[chat-with-rag] Smart chat switch enabled: ${useGemini}`);
+    } catch (error) {
+      console.warn('[chat-with-rag] Error fetching feature flag, defaulting to GPT:', error);
+      useGemini = false;
+    }
+    
+    // Dynamic function names based on feature flag
+    const classifierFunction = useGemini ? 'chat-query-classifier-gemini' : 'chat-query-classifier';
+    const consolidatorFunction = useGemini ? 'gpt-response-consolidator-gemini' : 'gpt-response-consolidator';
+    const mentalHealthFunction = useGemini ? 'general-mental-health-chat-gemini' : 'general-mental-health-chat';
+    const clarificationFunction = useGemini ? 'gpt-clarification-generator-gemini' : 'gpt-clarification-generator';
+    
+    console.log(`[chat-with-rag] Using functions: classifier=${classifierFunction}, consolidator=${consolidatorFunction}, mentalHealth=${mentalHealthFunction}, clarification=${clarificationFunction}`);
+    
     // Update user message with correlation ID to track RAG pipeline execution
     if (messageId) {
       try {
@@ -84,7 +107,7 @@ serve(async (req) => {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       console.log(`[chat-with-rag] Classification attempt ${attempt}/${maxRetries}`);
       
-      const classificationResponse = await supabaseClient.functions.invoke('chat-query-classifier', {
+      const classificationResponse = await supabaseClient.functions.invoke(classifierFunction, {
         body: { message, conversationContext }
       });
       
@@ -193,7 +216,7 @@ serve(async (req) => {
         } : null
       });
       
-      const consolidationResponse = await supabaseClient.functions.invoke('gpt-response-consolidator', {
+      const consolidationResponse = await supabaseClient.functions.invoke(consolidatorFunction, {
         body: {
           userMessage: message,
           researchResults: executionResult || [], // Processed results from smart query planner
@@ -306,7 +329,7 @@ serve(async (req) => {
       // Handle general mental health queries using dedicated function
       console.log(`[chat-with-rag] EXECUTING: GENERAL_MENTAL_HEALTH pipeline - general mental health chat`);
       
-      const generalResponse = await supabaseClient.functions.invoke('general-mental-health-chat', {
+      const generalResponse = await supabaseClient.functions.invoke(mentalHealthFunction, {
         body: {
           message: message,
           conversationContext: conversationContext,
@@ -349,7 +372,7 @@ serve(async (req) => {
       // Handle queries that need clarification
       console.log(`[chat-with-rag] EXECUTING: JOURNAL_SPECIFIC_NEEDS_CLARIFICATION pipeline - clarification request`);
       
-      const clarificationResponse = await supabaseClient.functions.invoke('gpt-clarification-generator', {
+      const clarificationResponse = await supabaseClient.functions.invoke(clarificationFunction, {
         body: {
           userMessage: message,
           conversationContext: conversationContext,
