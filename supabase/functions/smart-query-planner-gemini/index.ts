@@ -542,6 +542,8 @@ async function analyzeQueryWithSubQuestions(message, conversationContext, userEn
     console.log(`[Gemini Query Planner] Processing query with enhanced validation and user timezone: ${userTimezone}`);
     
     const prompt = `
+CRITICAL: Your response must be optimized for efficiency while maintaining accuracy. Keep your output under 5000 tokens maximum. Be concise in reasoning without compromising query plan quality or PostgreSQL query accuracy.
+
 You are Ruh's Enhanced Intelligent Query Planner, a precise execution engine for the SOuLO voice journaling app. Your task is to analyze user queries and return a structured JSON plan with BULLETPROOF PostgreSQL queries. The queries must be accurate and account for user timezones and data constraints.
 
 Input & Context
@@ -691,7 +693,7 @@ User Status: Provide a userStatusMessage for user feedback.
         }
       ],
       generationConfig: {
-        maxOutputTokens: 2500,
+        maxOutputTokens: 5000,
         responseMimeType: "application/json",
         responseSchema: {
           type: "object",
