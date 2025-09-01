@@ -346,11 +346,13 @@ serve(async (req) => {
 
       // Update the assistant message with the mental health response
       if (assistantMessageId && generalResponse.data) {
+        const responseContent = generalResponse.data.response || generalResponse.data;
         try {
           await supabaseClient
             .from('chat_messages')
             .update({
-              content: generalResponse.data.response
+              content: responseContent,
+              is_processing: false
             })
             .eq('id', assistantMessageId);
           console.log(`[chat-with-rag] Updated assistant message ${assistantMessageId} with mental health response`);
@@ -360,7 +362,7 @@ serve(async (req) => {
       }
 
       return new Response(JSON.stringify({
-        response: generalResponse.data,
+        response: generalResponse.data.response || generalResponse.data,
         assistantMessageId: assistantMessageId,
         metadata: {
           classification: classification,

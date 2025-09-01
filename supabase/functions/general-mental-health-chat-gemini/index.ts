@@ -122,25 +122,20 @@ and ask if they want helpline numbers (if asked, provide them with relevant help
 Add relevant follow up questions mandatorily. 
 MUST HAVE/DO: ALWAYS BE AWARE OF THE CONVERSATION HISTORY TO UNDERSTAND WHAT THE USER DESIRES NEXT IN THE CONVERSATION. Response can be 10 words, 30 words or 50 words. It all depends on you understanding the emotional tone of the past conversation history!`;
 
-    // Format conversation context for Gemini
-    const geminiMessages = [
-      {
-        parts: [{ text: systemMessage }]
-      }
-    ];
-
-    // Add conversation context
+    // Format conversation context for Gemini (corrected format)
+    let conversationHistory = '';
     if (conversationContext.length > 0) {
-      const contextMessages = conversationContext.slice(-6).map(msg => ({
-        parts: [{ text: `${msg.role === 'assistant' ? 'Assistant' : 'User'}: ${msg.content}` }]
-      }));
-      geminiMessages.push(...contextMessages);
+      conversationHistory = conversationContext.slice(-6).map(msg => 
+        `${msg.role === 'assistant' ? 'Assistant' : 'User'}: ${msg.content}`
+      ).join('\n');
     }
 
-    // Add current message
-    geminiMessages.push({
-      parts: [{ text: `User: ${message}` }]
-    });
+    const fullPrompt = `${systemMessage}
+
+${conversationHistory ? `CONVERSATION HISTORY:\n${conversationHistory}\n` : ''}
+Current User Message: ${message}
+
+Please respond as Ruh with empathy, wit, and emotional intelligence.`;
 
     // Try Gemini with lightweight retries and graceful fallback
     const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -155,7 +150,11 @@ MUST HAVE/DO: ALWAYS BE AWARE OF THE CONVERSATION HISTORY TO UNDERSTAND WHAT THE
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            contents: geminiMessages,
+            contents: [
+              {
+                parts: [{ text: fullPrompt }]
+              }
+            ],
             generationConfig: {
               maxOutputTokens: 800,
               temperature: 0.7
