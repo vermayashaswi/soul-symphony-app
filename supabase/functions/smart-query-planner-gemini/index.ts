@@ -541,64 +541,18 @@ async function analyzeQueryWithSubQuestions(message, conversationContext, userEn
     
     console.log(`[Gemini Query Planner] Processing query with enhanced validation and user timezone: ${userTimezone}`);
     
-    const prompt = `You are Ruh's Enhanced Intelligent Query Planner - a precise execution engine for a voice journaling app called SOuLO. Your job is to analyze user queries and return structured JSON plans with BULLETPROOF PostgreSQL queries.
+    const prompt = `Query Planner for SOuLO voice journaling app. Generate valid JSON with PostgreSQL queries.
 
-===== COMPLETE JOURNAL ENTRIES TABLE COLUMN SPECIFICATION =====
-In this databse we have a table: "Journal Entries" (ALWAYS use quotes); this contains all user's journal entries on the app SOuLO
-MANDATORY COLUMNS & DATA TYPES listed below(PostgreSQL):
+TABLE: "Journal Entries" (use quotes)
+KEY COLUMNS:
 
-1. **id** (bigint, Primary Key): Entry identifier
-   ✅ VALID: entries.id = 123
-   ❌ INVALID: entries.id::text = '123'
-   Example data in column on table: "605" 
-
-2. **user_id** (uuid, NOT NULL): User identifier ("ID of the user who created this entry - MUST be included in all queries for user isolation)
-   ✅ VALID: entries.user_id = auth.uid()
-   ✅ VALID: entries.user_id = '1e7caad7-180d-439c-abd4-2f0d45256f68'
-   ❌ INVALID: entries.user_id::text = 'uuid-string'
-   Example data in column on table: "1e7caad7-180d-439c-abd4-2f0d45256f68"
-
-3. **"refined text"** (text, Nullable): Main content - ALWAYS use quotes
-   ✅ VALID: entries."refined text"
-   ✅ VALID: COALESCE(entries."refined text", entries."transcription text") as content
-   ❌ INVALID: entries.refined_text, entries.refinedtext
-   Example data in column on table: "Today was very productive. I finished all my pending work and also started working on a new project. I feel quite satisfied on days when everything seems to be on track. Even meditation helped improve my focus today."
-
-5. **sentiment** (real, Nullable): Sentiment score (-1 to 1)
-   Example data in column on table: "0.4"
-   ✅ VALID: ROUND(AVG(entries.sentiment::numeric), 3) as avg_sentiment
-   ✅ VALID: entries.sentiment::numeric > 0.5
-   ❌ BROKEN: ROUND(AVG(entries.sentiment), 3) -- WILL FAIL: real type incompatible
-   ❌ BROKEN: SELECT sentiment FROM... -- Direct real math operations fail
-
-6. **emotions** (jsonb, Nullable): Emotion scores as {"emotion": 0.85}
-   Example data in column on table: {"joy": 0.4, "pride": 0.3, "relief": 0.5, "sadness": 0.5, "contentment": 0.6}
-   ✅ VALID: SELECT e.key as emotion, ROUND(AVG((e.value::text)::numeric), 3) as avg_score FROM "Journal Entries" entries, jsonb_each(entries.emotions) e WHERE entries.user_id = auth.uid() GROUP BY e.key
-   ✅ VALID: entries.emotions ? 'happiness' AND (entries.emotions->>'happiness')::numeric > 0.5
-   ❌ BROKEN: jsonb_object_keys(emotions) -- Function doesn't exist
-   ❌ BROKEN: json_object_keys(emotions) -- Wrong function for jsonb
-   - This column only contain fixed values from this list (nothing else): "amusement","anger", "anticipation",
-          "anxiety", "awe", "boredom", "compassion", "concern", "confidence", "confusion", "contentment", "curiosity", "depression",
-          "disappointment","disgust","embarrassment","empathy","Enthusiasm","envy","excitement","fear","frustration","gratitude","guilt",
-          "hate","hope","hurt","interest","jealousy","joy","loneliness","love","nostalgia","optimism","overwhelm","pessimism","pride",
-          "relief","remorse","sadness","satisfaction","serenity","shame","surprise","trust",
-   
-
-7. **master_themes** (text[], Nullable): Theme categories
-   Example data in column on table: ["Mental Health","Creativity & Hobbies","Self & Identity"]
-   ✅ VALID: SELECT theme, COUNT(*) FROM "Journal Entries" entries, unnest(entries.master_themes) as theme WHERE entries.user_id = auth.uid() GROUP BY theme
-   ✅ VALID: entries.master_themes @> ARRAY['work']
-   ✅ VALID: 'work' = ANY(entries.master_themes)
-   ❌ INVALID: entries.master_themes[0] -- Direct array indexing risky
-   - This column only contain fixed values from this list (nothing else): 
-           "Self & Identity" (description: "Personal growth, self-reflection, and identity exploration")
-           "Body & Health" (description: "Physical health, fitness, body image, and medical concerns")
-           "Mental Health" (description: "Emotional wellbeing, mental health challenges, and therapy")
-           "Romantic Relationships" (description: "Dating, marriage, partnerships, and romantic connections")
-           "Family" (description: "Family relationships, parenting, and family dynamics")
-           "Friendships & Social Circle" (description: "Friendships, social connections, and community")
-           "Career & Workplace" (description: "Work, career development, and professional relationships")
-           "Money & Finances" (description: "Financial planning, money management, and economic concerns")
+- id (bigint, PK)
+- user_id (uuid) - ALWAYS: WHERE entries.user_id = auth.uid()
+- "refined text" (text) - ALWAYS use quotes
+- sentiment (real) - CAST: entries.sentiment::numeric  
+- emotions (jsonb) - USE: jsonb_each(entries.emotions) 
+- master_themes (text[]) - USE: unnest(entries.master_themes)
+- created_at (timestamptz) - TIME: entries.created_at >= (NOW() AT TIME ZONE '${userTimezone}' - INTERVAL '7 days')
            "Education & Learning" (description: "Formal education, skill development, and learning experiences")
            "Habits & Routines" (description: "Daily habits, routines, and lifestyle patterns")
            "Sleep & Rest" (description: "Sleep quality, rest, and recovery")
@@ -895,7 +849,90 @@ Every query plan MUST include a final vector search step that:
       ],
       generationConfig: {
         maxOutputTokens: 2500,
-        responseMimeType: "application/json"
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: "object",
+          properties: {
+            queryType: {
+              type: "string",
+              enum: ["journal_specific", "general_inquiry", "mental_health"]
+            },
+            strategy: {
+              type: "string",
+              enum: ["intelligent_sub_query", "comprehensive_hybrid", "vector_mandatory"]
+            },
+            userStatusMessage: {
+              type: "string"
+            },
+            subQuestions: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  id: { type: "string" },
+                  question: { type: "string" },
+                  purpose: { type: "string" },
+                  searchStrategy: {
+                    type: "string",
+                    enum: ["sql_primary", "hybrid_parallel", "vector_mandatory"]
+                  },
+                  executionStage: { type: "integer" },
+                  dependencies: {
+                    type: "array",
+                    items: { type: "string" }
+                  },
+                  resultForwarding: { type: "string" },
+                  executionMode: {
+                    type: "string",
+                    enum: ["parallel", "sequential"]
+                  },
+                  analysisSteps: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        step: { type: "integer" },
+                        description: { type: "string" },
+                        queryType: { type: "string" },
+                        sqlQueryType: { type: "string" },
+                        sqlQuery: { type: "string" },
+                        vectorSearch: {
+                          type: "object",
+                          properties: {
+                            query: { type: "string" },
+                            threshold: { type: "number" },
+                            limit: { type: "integer" }
+                          }
+                        },
+                        timeRange: {
+                          type: "object",
+                          properties: {
+                            start: { type: "string" },
+                            end: { type: "string" },
+                            timezone: { type: "string" }
+                          }
+                        },
+                        resultContext: { type: "string" },
+                        dependencies: {
+                          type: "array",
+                          items: { type: "string" }
+                        }
+                      },
+                      required: ["step", "description", "queryType"]
+                    }
+                  }
+                },
+                required: ["id", "question", "purpose", "searchStrategy", "executionStage", "dependencies", "executionMode", "analysisSteps"]
+              }
+            },
+            confidence: { type: "number" },
+            reasoning: { type: "string" },
+            useAllEntries: { type: "boolean" },
+            userTimezone: { type: "string" },
+            sqlValidationEnabled: { type: "boolean" }
+          },
+          required: ["queryType", "strategy", "userStatusMessage", "subQuestions", "confidence", "reasoning"]
+        }
       }
     };
 
@@ -918,11 +955,22 @@ Every query plan MUST include a final vector search step that:
     const data = await response.json();
     console.log(`[Gemini Query Planner] Vertex AI API response received`);
 
+    // Check for MAX_TOKENS finish reason which indicates incomplete response
+    const finishReason = data.candidates?.[0]?.finishReason;
+    if (finishReason === 'MAX_TOKENS') {
+      console.error(`[Gemini Query Planner] MAX_TOKENS reached - response incomplete due to token limit`);
+      console.error(`[Gemini Query Planner] Token usage:`, data.usageMetadata);
+      throw new Error('Gemini response incomplete due to token limit (MAX_TOKENS)');
+    }
+
     let queryPlan;
     try {
       // Extract the text from Gemini response structure
       const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text;
       if (!generatedText) {
+        console.error(`[Gemini Query Planner] No text content in Gemini response`);
+        console.error(`[Gemini Query Planner] Finish reason:`, finishReason);
+        console.error(`[Gemini Query Planner] Full response structure:`, JSON.stringify(data, null, 2));
         throw new Error('No text content in Gemini response');
       }
       
@@ -931,7 +979,7 @@ Every query plan MUST include a final vector search step that:
       console.log(`[Gemini Query Planner] Enhanced query plan generated with ${queryPlan.subQuestions?.length || 0} sub-questions`);
     } catch (parseError) {
       console.error(`[Gemini Query Planner] JSON parsing error:`, parseError);
-      console.error(`[Gemini Query Planner] Raw response:`, data);
+      console.error(`[Gemini Query Planner] Raw response:`, JSON.stringify(data, null, 2));
       throw new Error('Failed to parse enhanced query plan from Gemini response');
     }
 
