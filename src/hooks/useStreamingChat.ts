@@ -606,6 +606,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
 
     // Classify message with Gemini routing
     let messageCategory = 'GENERAL_MENTAL_HEALTH';
+    let classificationData = null;
     try {
       // Get smart chat switch setting for classification routing
       const { data: featureFlags } = await supabase
@@ -618,16 +619,22 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
       
       console.log(`[useStreamingChat] Using ${classifierFunction} for classification`);
 
-      const { data: classificationData, error: classificationError } = await supabase.functions.invoke(classifierFunction, {
+      const { data: classificationResponse, error: classificationError } = await supabase.functions.invoke(classifierFunction, {
         body: {
           message,
           conversationContext: conversationContext || []
         }
       });
       
-      if (!classificationError && classificationData?.category) {
-        messageCategory = classificationData.category;
+      if (!classificationError && classificationResponse?.category) {
+        classificationData = classificationResponse;
+        messageCategory = classificationResponse.category;
         console.log(`[useStreamingChat] Message classified as: ${messageCategory} for thread: ${targetThreadId}`);
+        console.log(`[useStreamingChat] Classification details:`, {
+          category: classificationData.category,
+          confidence: classificationData.confidence,
+          reasoning: classificationData.reasoning
+        });
       }
     } catch (error) {
       console.error('[useStreamingChat] Classification failed, using fallback:', error);
@@ -650,6 +657,8 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
         streamingMode: false,
         requestId,
         category: messageCategory,
+        confidence: classificationData?.confidence,
+        reasoning: classificationData?.reasoning,
         userTimezone,
       }, { attempts: 3, baseDelay: 900 }, targetThreadId);
       

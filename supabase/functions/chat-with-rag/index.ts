@@ -35,10 +35,14 @@ serve(async (req) => {
       messageId = null,
       conversationContext = [],
       userProfile = null,
-      userTimezone = 'UTC'
+      userTimezone = 'UTC',
+      category = null, // Accept pre-existing classification
+      confidence = null,
+      reasoning = null
     } = await req.json();
 
     console.log(`[chat-with-rag] Processing query: "${message}" for user: ${userId} (threadId: ${threadId}, messageId: ${messageId})`);
+    console.log(`[chat-with-rag] Pre-existing classification: ${category ? `${category} (confidence: ${confidence})` : 'None - will classify'}`);
     
     // Generate correlation ID for this request
     const requestCorrelationId = crypto.randomUUID();
@@ -98,47 +102,59 @@ serve(async (req) => {
       issues: timezoneDebug.validation.issues
     });
 
-    // Step 1: Query Classification with retry logic
-    console.log("[chat-with-rag] Step 1: Query Classification");
-    
-    const maxRetries = 3;
+    // Step 1: Query Classification with retry logic (skip if already classified)
     let classification = null;
-    let lastError = null;
     
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      console.log(`[chat-with-rag] Classification attempt ${attempt}/${maxRetries}`);
+    if (category) {
+      // Use pre-existing classification from request
+      classification = {
+        category,
+        confidence: confidence || 0.9,
+        reasoning: reasoning || 'Pre-classified by frontend'
+      };
+      console.log(`[chat-with-rag] Using pre-existing classification: ${classification.category} (confidence: ${classification.confidence})`);
+    } else {
+      // Perform classification as fallback
+      console.log("[chat-with-rag] Step 1: Query Classification (fallback mode)");
       
-      const classificationResponse = await supabaseClient.functions.invoke(classifierFunction, {
-        body: { message, conversationContext }
-      });
+      const maxRetries = 3;
+      let lastError = null;
       
-      if (!classificationResponse.error && classificationResponse.data) {
-        classification = classificationResponse.data;
-        break;
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        console.log(`[chat-with-rag] Classification attempt ${attempt}/${maxRetries}`);
+        
+        const classificationResponse = await supabaseClient.functions.invoke(classifierFunction, {
+          body: { message, conversationContext }
+        });
+        
+        if (!classificationResponse.error && classificationResponse.data) {
+          classification = classificationResponse.data;
+          break;
+        }
+        
+        lastError = classificationResponse.error;
+        console.error(`[chat-with-rag] Classification attempt ${attempt} failed:`, lastError);
+        
+        if (attempt < maxRetries) {
+          const delay = Math.pow(2, attempt - 1) * 1000; // Exponential backoff: 1s, 2s, 4s
+          console.log(`[chat-with-rag] Retrying classification in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
       }
       
-      lastError = classificationResponse.error;
-      console.error(`[chat-with-rag] Classification attempt ${attempt} failed:`, lastError);
-      
-      if (attempt < maxRetries) {
-        const delay = Math.pow(2, attempt - 1) * 1000; // Exponential backoff: 1s, 2s, 4s
-        console.log(`[chat-with-rag] Retrying classification in ${delay}ms...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
+      if (!classification) {
+        console.error("[chat-with-rag] All classification attempts failed. Last error:", lastError);
+        return new Response(
+          JSON.stringify({ 
+            error: 'Classification service unavailable. Please try again.',
+            details: lastError
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 503 }
+        );
       }
-    }
-    
-    if (!classification) {
-      console.error("[chat-with-rag] All classification attempts failed. Last error:", lastError);
-      return new Response(
-        JSON.stringify({ 
-          error: 'Classification service unavailable. Please try again.',
-          details: lastError
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 503 }
-      );
-    }
 
-    console.log(`[chat-with-rag] Query classified as: ${classification.category} (confidence: ${classification.confidence})`);
+      console.log(`[chat-with-rag] Query classified as: ${classification.category} (confidence: ${classification.confidence})`);
+    }
 
     // Enhanced classification override for debugging
     if (req.headers.get('x-classification-hint')) {
