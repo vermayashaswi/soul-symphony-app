@@ -875,21 +875,17 @@ Every query plan MUST include a final vector search step that:
     console.log(`[Gemini Query Planner] Calling Google Vertex AI Gemini 2.5 Flash model`);
 
     // Get Google API key from environment
-    const googleApiKey = Deno.env.get('GOOGLE_API_KEY');
+    const googleApiKey = Deno.env.get('GOOGLE_API');
     if (!googleApiKey) {
       throw new Error('Google API key not configured');
     }
 
-    // Construct the Vertex AI endpoint URL for Gemini 2.5 Flash
-    const projectId = 'your-project-id'; // This should be configured as an environment variable
-    const region = 'us-central1';
-    const model = 'gemini-2.5-flash-002';
-    const endpoint = `https://${region}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${region}/publishers/google/models/${model}:generateContent`;
+    // Use the Generative Language API endpoint (consistent with other Gemini functions)
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${googleApiKey}`;
 
     const requestBody = {
       contents: [
         {
-          role: 'user',
           parts: [
             {
               text: `${prompt}\n\nUser Message: ${message}`
@@ -907,7 +903,6 @@ Every query plan MUST include a final vector search step that:
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${googleApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(requestBody),
