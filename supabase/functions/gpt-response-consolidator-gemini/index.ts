@@ -7,7 +7,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const googleApiKey = Deno.env.get('GOOGLE_API_KEY');
+const googleApiKey = Deno.env.get('GOOGLE_API');
 
 // JSON sanitization utilities for consolidator
 function stripCodeFences(s: string): string {

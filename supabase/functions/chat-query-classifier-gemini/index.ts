@@ -30,11 +30,11 @@ serve(async (req) => {
     console.log(`[Query Classifier Gemini] Analyzing message: "${message}"`);
 
     // Get Google API key
-    const googleApiKey = Deno.env.get('GOOGLE_API_KEY');
+    const googleApiKey = Deno.env.get('GOOGLE_API');
     if (!googleApiKey) {
-      console.error('[Query Classifier Gemini] GOOGLE_API_KEY missing - cannot classify via Gemini');
+      console.error('[Query Classifier Gemini] GOOGLE_API missing - cannot classify via Gemini');
       return new Response(
-        JSON.stringify({ error: 'GOOGLE_API_KEY not configured for chat-query-classifier-gemini' }),
+        JSON.stringify({ error: 'GOOGLE_API not configured for chat-query-classifier-gemini' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
       );
     }

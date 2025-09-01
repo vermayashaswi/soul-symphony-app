@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const googleApiKey = Deno.env.get('GOOGLE_API_KEY');
+const googleApiKey = Deno.env.get('GOOGLE_API');
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
