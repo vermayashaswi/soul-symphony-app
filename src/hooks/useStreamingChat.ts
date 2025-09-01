@@ -340,7 +340,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     let dynamicMessages: string[] = [];
     let expectedTime = 30000;
 
-    if (queryCategory === 'JOURNAL_SPECIFIC' || /\b(journal|entry|entries|feeling|emotion|mood)\b/i.test(message)) {
+    if (queryCategory === 'JOURNAL_SPECIFIC' || /\b(journal|entry|entries|feeling|emotion|mood|top emotions|last week)\b/i.test(message)) {
       dynamicMessages = [
         "Understanding your emotional patterns...",
         "Analyzing your journal entries...",
@@ -382,7 +382,8 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
       translatedDynamicMessages: translatedMessages,
       currentMessageIndex: 0,
       queryCategory: queryCategory || 'unknown',
-      expectedProcessingTime: expectedTime
+      expectedProcessingTime: expectedTime,
+      processingStartTime: Date.now()
     });
 
     console.log(`[useStreamingChat] Generated ${dynamicMessages.length} dynamic messages for ${queryCategory || 'unknown'} category`);
@@ -640,19 +641,22 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     
     // Pre-classify message for better UX (will be validated by backend)
     let preliminaryCategory = 'GENERAL_MENTAL_HEALTH';
-    if (/\b(journal|entry|entries|feeling|emotion|mood|confident|anxiety|stress)\b/i.test(message)) {
+    if (/\b(journal|entry|entries|feeling|emotion|mood|confident|anxiety|stress|top emotions|last week)\b/i.test(message)) {
       preliminaryCategory = 'JOURNAL_SPECIFIC';
     }
     
-    // Generate dynamic messages before invoking backend
+    // Generate dynamic messages before invoking backend - CRITICAL FOR GEMINI FLOW
     await generateStreamingMessages(message, targetThreadId, preliminaryCategory);
     
-    console.log(`[useStreamingChat] Pre-classified as ${preliminaryCategory}, starting processing`);
+    console.log(`[useStreamingChat] Pre-classified as ${preliminaryCategory}, starting processing with dynamic messages`);
     
     updateThreadState(targetThreadId, { 
       queryCategory: preliminaryCategory,
       expectedProcessingTime: preliminaryCategory === 'JOURNAL_SPECIFIC' ? 45000 : 30000
     });
+
+    // Add delay to allow dynamic messages to show before backend call
+    await new Promise(resolve => setTimeout(resolve, 1500));
 
     try {
       const { data, error } = await invokeWithBackoff({

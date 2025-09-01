@@ -865,8 +865,8 @@ export default function MobileChatInterface({
       }));
       
       if (useGeminiFlow) {
-        // Gemini flow: Use useStreamingChat (which routes to chat-with-rag)
-        console.log('[MobileChatInterface] Using Gemini flow via useStreamingChat');
+        // Gemini flow: ONLY use useStreamingChat (bypasses chatService completely)
+        console.log('[MobileChatInterface] Using Gemini flow - bypassing chatService completely');
         setIsProcessingMessage(true);
         
         await startStreamingChat(
@@ -876,6 +876,7 @@ export default function MobileChatInterface({
           conversationContext,
           {}
         );
+        // Response is handled by onFinalResponse callback
       } else {
         // GPT flow: Use legacy chatService
         console.log('[MobileChatInterface] Using GPT flow via chatService');
