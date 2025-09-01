@@ -41,7 +41,10 @@ const config: CapacitorConfig = {
       style: "light",
       resizeOnFullScreen: true,
       accessoryBarVisible: false,
-      scrollAssist: false
+      scrollAssist: false,
+      // Enhanced IME composition support
+      disableScroll: false,
+      hideKeyboardAccessoryBar: true
     },
     StatusBar: {
       style: "dark",
@@ -91,7 +94,15 @@ const config: CapacitorConfig = {
     hardwareAccelerated: true,
     domStorageEnabled: true,
     databaseEnabled: true,
-    webViewEngine: "crosswalk"
+    webViewEngine: "crosswalk",
+    // Enhanced IME and composition support
+    allowFileAccess: true,
+    allowFileAccessFromFileURLs: true,
+    allowUniversalAccessFromFileURLs: true,
+    // WebView optimizations for gesture and IME
+    enableViewportScale: false,
+    enableDoubleTapZoom: false,
+    textZoom: 100
   }
 };
 

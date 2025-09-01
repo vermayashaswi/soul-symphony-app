@@ -7,6 +7,8 @@ import { useTutorial } from "@/contexts/TutorialContext";
 import { useTranslation } from "@/contexts/TranslationContext";
 import { cn } from "@/lib/utils";
 import { useUnifiedKeyboard } from "@/hooks/use-unified-keyboard";
+import { useCompositionEvents } from "@/hooks/use-composition-events";
+import { useDualModeGestureDetection } from "@/hooks/use-dual-mode-gesture-detection";
 import { VoiceChatRecorder, AudioVisualizer, RecordingState, VoiceChatRecorderRef } from "./VoiceChatRecorder";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, ArrowUp, Loader2 } from "lucide-react";
@@ -43,6 +45,25 @@ export default function MobileChatInput({
     isCapacitorWebView,
     hideKeyboard 
   } = useUnifiedKeyboard();
+
+  // Enhanced IME composition handling for swipe keyboards
+  const { 
+    isComposing, 
+    compositionText, 
+    keyboardType, 
+    hasCompositionSupport 
+  } = useCompositionEvents(inputRef, {
+    enableDebugMode: true,
+    preventConflicts: true,
+    androidOptimized: true
+  });
+
+  // Gesture detection that respects composition events
+  const gestureDetection = useDualModeGestureDetection({
+    disabled: isComposing, // Disable gestures during IME composition
+    debugMode: true,
+    minDistance: 50
+  });
 
   const isInChatTutorialStep = isActive && isInStep(5);
 
@@ -102,7 +123,19 @@ export default function MobileChatInput({
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setInputValue(e.target.value);
+    const newValue = e.target.value;
+    setInputValue(newValue);
+    
+    // Debug composition events
+    if (isComposing && compositionText) {
+      console.log('[MobileChatInput] Composition active:', {
+        isComposing,
+        compositionText,
+        inputValue: newValue,
+        keyboardType,
+        platform
+      });
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -185,15 +218,19 @@ export default function MobileChatInput({
 
   return (
     <div 
-      ref={inputContainerRef}
+      ref={gestureDetection.ref as any}
       className={cn(
         "mobile-chat-input-container flex items-center gap-2 p-3 relative",
         isKeyboardVisible && "keyboard-visible",
         isCapacitorWebView && isKeyboardVisible && "capacitor-keyboard-visible",
         isMobileBrowser && isKeyboardVisible && "mobile-browser-keyboard-visible",
         platform === 'android' && "platform-android",
-        platform === 'ios' && "platform-ios"
+        platform === 'ios' && "platform-ios",
+        isComposing && "composition-active",
+        keyboardType && `keyboard-${keyboardType}`
       )}
+      data-gesture-mode={gestureDetection.mode}
+      data-composition-active={isComposing}
     >
       {/* Text Input Container */}
       <div className="flex-1 relative">
@@ -213,6 +250,14 @@ export default function MobileChatInput({
           spellCheck="true"
           inputMode="text"
           data-testid="mobile-chat-input"
+          // IME composition optimizations
+          data-composition-supported={hasCompositionSupport}
+          data-keyboard-type={keyboardType}
+          data-platform={platform}
+          style={{
+            imeMode: 'active',
+            touchAction: isComposing ? 'none' : 'manipulation'
+          }}
         />
         
         {/* Recording Overlay - Positioned absolutely to cover the input */}
