@@ -881,7 +881,7 @@ Every query plan MUST include a final vector search step that:
     }
 
     // Use the Generative Language API endpoint (consistent with other Gemini functions)
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${googleApiKey}`;
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent`;
 
     const requestBody = {
       contents: [
@@ -903,6 +903,7 @@ Every query plan MUST include a final vector search step that:
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
+        'x-goog-api-key': googleApiKey,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(requestBody),
