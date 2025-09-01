@@ -99,3 +99,15 @@ verify_jwt = false
 
 [functions.smart-query-planner-gemini]
 verify_jwt = true
+
+[functions.chat-query-classifier-gemini]
+verify_jwt = true
+
+[functions.gpt-response-consolidator-gemini]
+verify_jwt = true
+
+[functions.gpt-clarification-generator-gemini]
+verify_jwt = true
+
+[functions.general-mental-health-chat-gemini]
+verify_jwt = true
