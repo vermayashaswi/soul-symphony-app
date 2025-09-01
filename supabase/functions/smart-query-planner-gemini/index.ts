@@ -669,130 +669,22 @@ User Status: Provide a userStatusMessage for user feedback.
   "sqlValidationEnabled": true
 }
 `;
-
-**EXAMPLE TIME RANGE CALCULATIONS:**
-
-For "last 7 days" in Asia/Kolkata timezone:
-{
-  "timeRange": {
-    "start": "${new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}T00:00:00+05:30",
-    "end": "${new Date().toISOString().split('T')[0]}T23:59:59+05:30",
-    "timezone": "${userTimezone}"
-  }
-}
-
-For "this week" in user timezone:
-{
-  "timeRange": {
-    "start": "[Calculate Monday of current week]T00:00:00+[offset]",
-    "end": "[Calculate Sunday of current week]T23:59:59+[offset]", 
-    "timezone": "${userTimezone}"
-  }
-}
-
-**CRITICAL: EVERY TIME REFERENCE MUST HAVE CALCULATED timeRange**
-- NO null timeRange values when user mentions time
-- NO "recent" without specific date calculations  
-- NO relative terms without absolute timestamps
-- ALWAYS provide both start and end ISO timestamps with timezone offset
-
-
-ANALYSIS STATUS:
-- User timezone: ${userTimezone}
-
-SUB-QUESTION/QUERIES GENERATION GUIDELINE (MANDATORY): 
-
-STEP1: 
-Look at the USER QUERY: "${message}" and find out if this alone is sufficient to generate sub-questions (each will have a research plan). If the user query is ambiguous, the look at conversation context provided to you and the figure out what the "ASK" is. ("ASK" refers to a detailed questions that will answer user's queries)
-
-STEP2: 
-Find out if there are any time references in the conversation context and modify the "ASK"
-
-STEP3: 
-Your JSON response will be executed by our RAG pipeline system that processes each sub-question sequentially or in parallel based on your specified execution strategy and dependencies. The system will run your SQL queries against our PostgreSQL database to extract journal entries, emotions, and patterns, while simultaneously performing vector searches on journal embeddings when specified. Results from each sub-question will be collected and passed forward to dependent sub-questions as context (when resultForwarding is specified), allowing complex multi-step analysis where later queries can use insights from earlier ones. Once all sub-questions are executed, the collected data - including emotion scores, journal content, themes, and patterns - will be aggregated and sent to a final synthesis prompt that generates the personalized response to the user. 
-
-STEP4:
-Now, depending on the "ASK" ,create atleast 2 or more sub-questions other things required form you in the JSON response format that will answer the ASK as each sub-question will be analyzed in totality. FINAL step must be a final_content_retrieval step (see below in JSON response format). This is basically done so that all upstream sql question provide filtered resuls to this final_content_retrieval step so that a vector search is performed only on this subset of entries primarily to be provided downstream to the consolidator function to reference actual entries w.r.t the ASK
-
-
-**RESPONSE FORMAT (MUST be valid JSON):**
-{
-  "queryType": "journal_specific|general_inquiry|mental_health",
-  "strategy": "intelligent_sub_query|comprehensive_hybrid|vector_mandatory",
-  "userStatusMessage": "Brief status for user",
-  "subQuestions": [
-    {
-      "id": "sq1",
-      "question": "Specific sub-question",
-      "purpose": "Why this question is needed",
-      "searchStrategy": "sql_primary|hybrid_parallel",
-      "executionStage": 1,
-      "dependencies": [],
-      "resultForwarding": "emotion_data_for_ranking|theme_data_for_context|null",
-      "executionMode": "parallel",
-      "analysisSteps": [
-        {
-          "step": 1,
-          "description": "What this step does",
-          "queryType": "sql_analysis",
-          "sqlQueryType": "analysis",
-          "sqlQuery": "COMPLETE PostgreSQL query using EXACT patterns above",
-          "vectorSearch": null,
-          "timeRange": {"start": "[CALCULATED ISO TIMESTAMP WITH TIMEZONE]", "end": "[CALCULATED ISO TIMESTAMP WITH TIMEZONE]", "timezone": "${userTimezone}"} or null,
-          "resultContext": null,
-          "dependencies": []
-        }
-      ]
-    },
-    {
-      "id": "final_content_retrieval",
-      "question": "Retrieve actual journal entries that match the analysis",
-      "purpose": "Provide specific journal content to support and illustrate the statistical findings",
-      "searchStrategy": "vector_mandatory",
-      "executionStage": 2,
-      "dependencies": ["sq1"],
-      "resultForwarding": "journal_entries_for_consolidator",
-      "executionMode": "sequential",
-      "analysisSteps": [{
-        "step": 1,
-        "description": "Vector search for journal entries matching user's semantic query with context from SQL results",
-        "queryType": "vector_search",
-        "vectorSearch": {
-          "query": "[DYNAMIC_CONTEXT_QUERY]",
-          "threshold": 0.15,
-          "limit": 25
-        },
-        "timeRange": null,
-        "resultContext": "use_sql_context_for_semantic_search",
-        "dependencies": ["sq1"]
-      }]
-    }
-    }
-  ],
-  "confidence": 0.8,
-  "reasoning": "Strategy explanation with context awareness",
-  "useAllEntries": boolean,
-  "userTimezone": "${userTimezone}",
-  "sqlValidationEnabled": true
-}
-
-**MANDATORY QUALITY CHECKS:**
-✓ All SQL queries use exact patterns from examples above
-✓ timeRange preserved across ALL analysisSteps when applicable
-✓ JSONB queries use jsonb_each() not json_object_keys()
-✓ Proper column/table quoting with spaces
-✓ Timezone-aware date operations
-✓ EVERY time reference in user query MUST have calculated timeRange with actual ISO timestamps
-✓ NO null timeRange when user mentions any temporal phrases
-✓ ALL timestamps MUST include proper timezone offset for "${userTimezone}"
-
-**FINAL VALIDATION - TIME RANGE REQUIREMENTS:**
-- If user mentions "today", "yesterday", "this week", "last week", "recently", "lately", "past few days", "last N days/weeks/months" → timeRange is MANDATORY
-- Calculate actual start/end timestamps, don't use placeholders
-- Use proper timezone offset for "${userTimezone}"
-- Both SQL and vector search steps MUST include the same timeRange when time is mentioned`;
-
     console.log(`[Gemini Query Planner] Calling Google Vertex AI Gemini 2.5 Flash model`);
+
+    // Get Google API key from environment
+    const googleApiKey = Deno.env.get('GOOGLE_API');
+    if (!googleApiKey) {
+      throw new Error('Google API key not configured');
+    }
+
+    // Use the Generative Language API endpoint (consistent with other Gemini functions)
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`;
+
+    const requestBody = {
+      contents: [
+        {
+          parts: [
+            {
 
     // Get Google API key from environment
     const googleApiKey = Deno.env.get('GOOGLE_API');
