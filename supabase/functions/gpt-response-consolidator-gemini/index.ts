@@ -457,12 +457,12 @@ Respond in JSON format:
   "response": "Your comprehensive response synthesizing the research data with your warm, insightful personality"
 }`;
 
-    console.log(`[CONSOLIDATION GEMINI] ${consolidationId}: Calling Gemini API with model gemini-2.0-flash-exp`);
+    console.log(`[CONSOLIDATION GEMINI] ${consolidationId}: Calling Gemini API with model gemini-2.5-flash-lite`);
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent', {
+    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent', {
       method: 'POST',
       headers: {
         'x-goog-api-key': googleApiKey,
@@ -477,8 +477,7 @@ Respond in JSON format:
           }
         ],
         generationConfig: {
-          maxOutputTokens: 2000,
-          temperature: 0.7
+          maxOutputTokens: 2000
         }
       }),
       signal: controller.signal
@@ -522,7 +521,7 @@ Respond in JSON format:
           totalResults: analysisSummary.length,
           userStatusMessage: statusMsg,
           timestamp: new Date().toISOString(),
-          modelUsed: 'gemini-2.0-flash-exp',
+          modelUsed: 'gemini-2.5-flash-lite',
           processingSuccess: true,
           hasProcessedSummaries: analysisSummary.some((item: any) => item.executionSummary),
           processedSummaries: analysisSummary.filter((item: any) => item.executionSummary).length,
@@ -566,7 +565,7 @@ Respond in JSON format:
       analysisMetadata: {
         consolidationId,
         totalSubQuestions: analysisSummary.length,
-        modelUsed: 'gemini-2.0-flash-exp',
+        modelUsed: 'gemini-2.5-flash-lite',
         hasJournalEntries,
         journalEntriesCount: journalEntries.length,
         dataSourcesUsed: {

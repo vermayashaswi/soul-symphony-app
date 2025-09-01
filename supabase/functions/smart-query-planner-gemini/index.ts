@@ -881,7 +881,7 @@ Every query plan MUST include a final vector search step that:
     }
 
     // Use the Generative Language API endpoint (consistent with other Gemini functions)
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent`;
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`;
 
     const requestBody = {
       contents: [
@@ -895,7 +895,6 @@ Every query plan MUST include a final vector search step that:
       ],
       generationConfig: {
         maxOutputTokens: 2500,
-        temperature: 0.1,
         responseMimeType: "application/json"
       }
     };

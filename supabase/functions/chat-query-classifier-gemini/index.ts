@@ -174,7 +174,7 @@ Latest user message: "${message}"${contextString}`;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent', {
+    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent', {
       method: 'POST',
       headers: {
         'x-goog-api-key': apiKey,
@@ -189,8 +189,7 @@ Latest user message: "${message}"${contextString}`;
           }
         ],
         generationConfig: {
-          maxOutputTokens: 600,
-          temperature: 0.1
+          maxOutputTokens: 600
         }
       }),
       signal: controller.signal

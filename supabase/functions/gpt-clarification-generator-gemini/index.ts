@@ -106,7 +106,7 @@ Your response should be a JSON object with this structure:
 
 TONE and RESPONSE GUIDELINES: Direct when required, insightful, naturally warm, witty when appropriate, and focused on actually helping. No excessive sentiment or spiritual language. Restrict your response between 20-40 words. Try being as brief as possible but expand if need be!`;
 
-    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-thinking-exp:generateContent', {
+    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent', {
         method: 'POST',
         headers: {
           'x-goog-api-key': googleApiKey,
@@ -121,8 +121,7 @@ TONE and RESPONSE GUIDELINES: Direct when required, insightful, naturally warm, 
             }
           ],
           generationConfig: {
-            maxOutputTokens: 800,
-            temperature: 0.7
+            maxOutputTokens: 800
           }
         }),
     });

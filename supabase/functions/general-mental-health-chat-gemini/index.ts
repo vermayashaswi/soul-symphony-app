@@ -143,7 +143,7 @@ Please respond as Ruh with empathy, wit, and emotional intelligence.`;
     const maxAttempts = 3;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-thinking-exp:generateContent', {
+        const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent', {
           method: 'POST',
           headers: {
             'x-goog-api-key': googleApiKey,
@@ -156,8 +156,7 @@ Please respond as Ruh with empathy, wit, and emotional intelligence.`;
               }
             ],
             generationConfig: {
-              maxOutputTokens: 800,
-              temperature: 0.7
+              maxOutputTokens: 800
             }
           }),
         });
