@@ -4,7 +4,7 @@ import { AppFeatureFlag } from "../types/featureFlags";
 
 /**
  * Custom hook to easily check if a feature flag is enabled.
- * Example: const { isEnabled, loading } = useFeatureFlag("smartChatV2");
+ * Example: const { isEnabled, loading } = useFeatureFlag("premiumMessaging");
  */
 export const useFeatureFlag = (flag: AppFeatureFlag) => {
   const { isEnabled, loading, error, refetch } = useFeatureFlagsContext();

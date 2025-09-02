@@ -13,7 +13,6 @@ type FeatureFlagsContextValue = {
 };
 
 const defaultFlags: FeatureFlags = {
-  smartChatV2: false,
   premiumMessaging: false,
   emotionCalendar: false,
   insightsV2: false,

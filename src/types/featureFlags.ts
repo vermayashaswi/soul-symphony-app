@@ -1,6 +1,5 @@
 
 export type AppFeatureFlag =
-  | "smartChatV2"
   | "premiumMessaging"
   | "emotionCalendar"
   | "insightsV2"
