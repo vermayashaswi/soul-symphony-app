@@ -638,90 +638,34 @@ Final JSON Format: Return a single, valid JSON object that adheres to the struct
 
 Confidence & Reasoning: Include confidence and reasoning fields to explain the chosen strategy.
 
-**RESPONSE FORMAT (MUST be valid JSON):**
-
-**PARAMETER EXPLANATIONS:**
-- **queryType**: Categories user intent for routing optimization - "journal_specific" for personal data queries, "general_inquiry" for broad exploration, "mental_health" for wellness-focused analysis
-- **strategy**: Overall execution approach - "intelligent_sub_query" breaks complex queries into parts, "comprehensive_hybrid" combines SQL+vector search, "vector_mandatory" for semantic-only searches
-- **userStatusMessage**: Brief user-facing status text shown during processing (e.g., "Analyzing your emotional patterns...")
-- **subQuestions**: Array of analysis steps that break down the user's query into executable parts
-- **id**: Unique identifier for each sub-question, used for dependency tracking and result forwarding
-- **question**: The specific analytical question being answered
-- **purpose**: Explanation of why this sub-question is needed for the overall analysis
-- **searchStrategy**: Execution method - "sql_primary" for database analysis, "hybrid_parallel" for combined approaches
-- **executionStage**: Controls processing order - stage 1 runs first (typically SQL analysis), stage 2 uses stage 1 results
-- **dependencies**: Array of sub-question IDs that must complete before this one can execute
-- **resultForwarding**: Specifies how results pass to downstream steps - "emotion_data_for_ranking" passes emotion scores, "theme_data_for_context" passes thematic analysis, "journal_entries_for_consolidator" passes actual content
-- **executionMode**: "parallel" for simultaneous execution, "sequential" for ordered processing
-- **analysisSteps**: Individual query operations within each sub-question
-- **step**: Sequential step number within the analysis
-- **description**: What this analytical step accomplishes
-- **queryType**: Type of operation - "sql_analysis" for database queries, "vector_search" for semantic search
-- **sqlQueryType**: Specific SQL operation type - "analysis" for statistical operations, "aggregation" for summary data
-- **sqlQuery**: Complete PostgreSQL query using exact patterns and schema
-- **vectorSearch**: Semantic search parameters with query, threshold, and limit
-- **timeRange**: Temporal filtering with calculated ISO timestamps and timezone info
-- **resultContext**: How this step's results should be used - "use_sql_context_for_semantic_search" means use SQL results to enhance vector search
-- **confidence**: Query planner's confidence in the strategy (0.0-1.0)
-- **reasoning**: Explanation of why this strategy was chosen based on user context
-- **useAllEntries**: Boolean indicating if all user entries should be considered
-- **userTimezone**: User's timezone for accurate temporal calculations
-- **sqlValidationEnabled**: Whether to validate SQL queries before execution
+User Status: Provide a userStatusMessage for user feedback.
 
 {
   "queryType": "journal_specific|general_inquiry|mental_health",
   "strategy": "intelligent_sub_query|comprehensive_hybrid|vector_mandatory",
-  "userStatusMessage": "Brief status for user",
+  "userStatusMessage": "...",
   "subQuestions": [
     {
       "id": "sq1",
-      "question": "Specific sub-question",
-      "purpose": "Why this question is needed",
+      "question": "...",
+      "purpose": "...",
       "searchStrategy": "sql_primary|hybrid_parallel",
       "executionStage": 1,
       "dependencies": [],
-      "resultForwarding": "emotion_data_for_ranking|theme_data_for_context|null",
-      "executionMode": "parallel",
-      "analysisSteps": [
-        {
-          "step": 1,
-          "description": "What this step does",
-          "queryType": "sql_analysis",
-          "sqlQueryType": "analysis",
-          "sqlQuery": "COMPLETE PostgreSQL query using EXACT patterns above",
-          "vectorSearch": null,
-          "timeRange": {"start": "[CALCULATED ISO TIMESTAMP WITH TIMEZONE]", "end": "[CALCULATED ISO TIMESTAMP WITH TIMEZONE]", "timezone": "${userTimezone}"} or null,
-          "resultContext": null,
-          "dependencies": []
-        }
-      ]
+      "analysisSteps": [{...}]
     },
     {
       "id": "final_content_retrieval",
-      "question": "Retrieve actual journal entries that match the analysis",
-      "purpose": "Provide specific journal content to support and illustrate the statistical findings",
+      "question": "...",
+      "purpose": "...",
       "searchStrategy": "vector_mandatory",
       "executionStage": 2,
       "dependencies": ["sq1"],
-      "resultForwarding": "journal_entries_for_consolidator",
-      "executionMode": "sequential",
-      "analysisSteps": [{
-        "step": 1,
-        "description": "Vector search for journal entries matching user's semantic query with context from SQL results",
-        "queryType": "vector_search",
-        "vectorSearch": {
-          "query": "[DYNAMIC_CONTEXT_QUERY]",
-          "threshold": 0.15,
-          "limit": 25
-        },
-        "timeRange": null,
-        "resultContext": "use_sql_context_for_semantic_search",
-        "dependencies": ["sq1"]
-      }]
+      "analysisSteps": [{...}]
     }
   ],
   "confidence": 0.8,
-  "reasoning": "Strategy explanation with context awareness",
+  "reasoning": "...",
   "useAllEntries": boolean,
   "userTimezone": "${userTimezone}",
   "sqlValidationEnabled": true
