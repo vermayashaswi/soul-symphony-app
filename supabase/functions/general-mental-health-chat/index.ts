@@ -2,22 +2,29 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
 };
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, {
+      headers: corsHeaders
+    });
   }
 
   try {
     const { message, conversationContext = [], userTimezone = 'UTC' } = await req.json();
 
     if (!message) {
-      return new Response(
-        JSON.stringify({ error: 'Message is required' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-      );
+      return new Response(JSON.stringify({
+        error: 'Message is required'
+      }), {
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        },
+        status: 400
+      });
     }
 
     console.log(`[General Mental Health Gemini] Processing: "${message}" (timezone: ${userTimezone})`);
@@ -58,10 +65,15 @@ serve(async (req) => {
 
     const googleApiKey = Deno.env.get('GOOGLE_API');
     if (!googleApiKey) {
-      return new Response(
-        JSON.stringify({ error: 'Google API key not configured' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-      );
+      return new Response(JSON.stringify({
+        error: 'Google API key not configured'
+      }), {
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        },
+        status: 500
+      });
     }
 
     // Build conversation with new persona
@@ -124,9 +136,7 @@ MUST HAVE/DO: ALWAYS BE AWARE OF THE CONVERSATION HISTORY TO UNDERSTAND WHAT THE
     // Format conversation context for Gemini (corrected format)
     let conversationHistory = '';
     if (conversationContext.length > 0) {
-      conversationHistory = conversationContext.slice(-6).map((msg) => 
-        `${msg.role === 'assistant' ? 'Assistant' : 'User'}: ${msg.content}`
-      ).join('\n');
+      conversationHistory = conversationContext.slice(-6).map((msg) => `${msg.role === 'assistant' ? 'Assistant' : 'User'}: ${msg.content}`).join('\n');
     }
 
     const fullPrompt = `${systemMessage}
@@ -137,7 +147,7 @@ Current User Message: ${message}
 Please respond as Ruh with empathy, wit, and emotional intelligence.`;
 
     // Try Gemini with lightweight retries and graceful fallback
-    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     let content = '';
     const maxAttempts = 3;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -146,7 +156,7 @@ Please respond as Ruh with empathy, wit, and emotional intelligence.`;
           method: 'POST',
           headers: {
             'x-goog-api-key': googleApiKey,
-            'Content-Type': 'application/json',
+            'Content-Type': 'application/json'
           },
           body: JSON.stringify({
             contents: [
@@ -161,7 +171,7 @@ Please respond as Ruh with empathy, wit, and emotional intelligence.`;
             generationConfig: {
               maxOutputTokens: 800
             }
-          }),
+          })
         });
 
         if (!response.ok) {
@@ -187,26 +197,40 @@ Please respond as Ruh with empathy, wit, and emotional intelligence.`;
     if (!content) {
       console.warn('[General Mental Health Gemini] Using graceful fallback after Gemini failure');
       const fallback = "Hey, I'm here with you. *Even if tech is being moody right now*, I'm still listening. **What's been most on your mind or heart today?** If it helps, try finishing this: *\"Lately, I've been feeling… because…\"* 💛";
-      return new Response(
-        JSON.stringify({ response: fallback, fallbackUsed: true }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({
+        response: fallback,
+        fallbackUsed: true
+      }), {
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        }
+      });
     }
-    
+
     console.log(`[General Mental Health Gemini] Generated response`);
 
-    return new Response(
-      JSON.stringify({ response: content }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return new Response(JSON.stringify({
+      response: content
+    }), {
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json'
+      }
+    });
 
   } catch (error) {
     console.error('[General Mental Health Gemini] Error:', error);
     // Graceful 200 fallback so callers don't fail on non-2xx
     const fallback = "I'm here with you. Let's keep it simple: **what's feeling heaviest right now** or **what would you like support with today?** 💙";
-    return new Response(
-      JSON.stringify({ response: fallback, fallbackUsed: true }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return new Response(JSON.stringify({
+      response: fallback,
+      fallbackUsed: true
+    }), {
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json'
+      }
+    });
   }
 });
