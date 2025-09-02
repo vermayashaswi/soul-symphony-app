@@ -602,8 +602,8 @@ Vector Search Functions:
 **MANDATORY SQL PATTERNS (Use EXACTLY as shown):**
 
 Emotion Analysis Queries:
-```sql
--- Aggregate emotion analysis
+\`\`\`sql
+/* Aggregate emotion analysis */
 SELECT 
   emotion_key as emotion,
   ROUND(AVG(emotion_value::decimal), 2) as avg_score,
@@ -615,35 +615,35 @@ WHERE user_id = auth.uid()
 GROUP BY emotion_key
 ORDER BY avg_score DESC, entry_count DESC;
 
--- Time-filtered emotion analysis  
+/* Time-filtered emotion analysis */
 SELECT emotion_key as emotion, ROUND(AVG(emotion_value::decimal), 2) as avg_score
 FROM "Journal Entries", jsonb_each_text(emotions) as emotion_data(emotion_key, emotion_value)
 WHERE user_id = auth.uid() 
   AND created_at >= '[START_TIME]' AND created_at <= '[END_TIME]'
   AND emotion_value::decimal > 0.3
 GROUP BY emotion_key ORDER BY avg_score DESC;
-```
+\`\`\`
 
 Sentiment Analysis Queries:
-```sql
--- Average sentiment over time
+\`\`\`sql
+/* Average sentiment over time */
 SELECT ROUND(AVG(sentiment), 2) as avg_sentiment, COUNT(*) as total_entries
 FROM "Journal Entries" 
 WHERE user_id = auth.uid()
   AND created_at >= '[START_TIME]' AND created_at <= '[END_TIME]';
 
--- Sentiment trends by time period
+/* Sentiment trends by time period */
 SELECT DATE_TRUNC('week', created_at) as week_start,
   ROUND(AVG(sentiment), 2) as avg_sentiment,
   COUNT(*) as entry_count
 FROM "Journal Entries"
 WHERE user_id = auth.uid() AND created_at >= '[START_TIME]'
 GROUP BY week_start ORDER BY week_start;
-```
+\`\`\`
 
 Theme Analysis Queries:
-```sql
--- Theme frequency analysis
+\`\`\`sql
+/* Theme frequency analysis */
 SELECT unnest(master_themes) as theme, COUNT(*) as frequency
 FROM "Journal Entries" 
 WHERE user_id = auth.uid()
@@ -651,38 +651,38 @@ WHERE user_id = auth.uid()
 GROUP BY theme 
 ORDER BY frequency DESC;
 
--- Themes with emotion correlation
+/* Themes with emotion correlation */
 SELECT unnest(master_themes) as theme,
   ROUND(AVG(sentiment), 2) as avg_sentiment,
   COUNT(*) as entry_count
 FROM "Journal Entries"
 WHERE user_id = auth.uid() AND master_themes IS NOT NULL
 GROUP BY theme ORDER BY avg_sentiment DESC;
-```
+\`\`\`
 
 Entry Filtering Queries:
-```sql
--- Count entries in time period
+\`\`\`sql
+/* Count entries in time period */
 SELECT COUNT(*) as total_entries
 FROM "Journal Entries" 
 WHERE user_id = auth.uid()
   AND created_at >= '[START_TIME]' AND created_at <= '[END_TIME]';
 
--- Filter entries by theme
+/* Filter entries by theme */
 SELECT id, "refined text" as content, created_at, master_themes, emotions, sentiment
 FROM "Journal Entries"
 WHERE user_id = auth.uid()
   AND '[THEME]' = ANY(master_themes)
 ORDER BY created_at DESC LIMIT 10;
 
--- Filter entries by emotion threshold
+/* Filter entries by emotion threshold */
 SELECT id, "refined text" as content, created_at, emotions
 FROM "Journal Entries" 
 WHERE user_id = auth.uid()
   AND emotions->'[EMOTION]' IS NOT NULL 
   AND (emotions->>'[EMOTION]')::decimal >= [THRESHOLD]
 ORDER BY created_at DESC;
-```
+\`\`\`
 
 **CRITICAL VALIDATION RULES:**
 ❌ INVALID: user_id = '[UUID]' (Direct UUID strings not allowed)
@@ -747,6 +747,8 @@ Personal Growth Tracking:
 2. Fallback 1: Vector-only with broad semantic search
 3. Fallback 2: SQL-only with basic pattern matching
 4. Emergency: Simple content retrieval with minimal filters
+
+**PARAMETER EXPLANATIONS:**
 
 {
   "queryType": "journal_specific|general_inquiry|mental_health",
