@@ -753,14 +753,27 @@ async function executeSubQuestion(
             }
           }
         } catch (vectorError) {
-          console.error(`[${requestId}] Vector search error:`, vectorError);
+          console.error(`[${requestId}] VECTOR SEARCH STEP FAILED:`, {
+            error: vectorError,
+            message: vectorError.message,
+            step: step,
+            vectorSearchParams: step.vectorSearch,
+            timeRange: step.timeRange,
+            hasSqlContext: !!sqlContext
+          });
           subResults.executionResults.vectorExecutionDetails.executionError = vectorError.message;
           subResults.executionResults.vectorExecutionDetails.fallbackUsed = true;
           
-          // Fallback to basic SQL if vector fails
-          const fallbackResults = await executeBasicSQLQuery(userId, supabaseClient, requestId);
-          if (fallbackResults && Array.isArray(fallbackResults)) {
-            subResults.executionResults.sqlResults.push(...fallbackResults);
+          // PHASE 2 FIX: Enhanced fallback to basic SQL if vector fails - ensure SQL results still reach consolidator
+          console.log(`[${requestId}] Vector search failed, attempting fallback SQL query to preserve data flow`);
+          try {
+            const fallbackResults = await executeBasicSQLQuery(userId, supabaseClient, requestId);
+            if (fallbackResults && Array.isArray(fallbackResults)) {
+              subResults.executionResults.sqlResults.push(...fallbackResults);
+              console.log(`[${requestId}] Fallback SQL query succeeded, added ${fallbackResults.length} results to preserve data flow`);
+            }
+          } catch (fallbackError) {
+            console.error(`[${requestId}] Fallback SQL query also failed:`, fallbackError);
           }
         }
       }
@@ -828,15 +841,25 @@ async function executeVectorSearch(
       }
     }
     
-    // Generate embedding for the search query
+    // PHASE 2 FIX: Generate embedding for the search query with error handling
+    console.log(`[${requestId}] Generating embedding for vector search query: "${enhancedQuery}"`);
     const embedding = await generateEmbedding(enhancedQuery);
     
     let vectorResults;
     
-    // Try with time range from sqlContext or step-level timeRange
+    // PHASE 2 FIX: Try with time range from sqlContext or step-level timeRange
     const effectiveTimeRange = (sqlContext?.timeRange) || timeRange;
     if (effectiveTimeRange && (effectiveTimeRange.start || effectiveTimeRange.end)) {
       console.log(`[${requestId}] Vector search with inherited time range: ${effectiveTimeRange.start} to ${effectiveTimeRange.end}`);
+      console.log(`[${requestId}] Calling match_journal_entries_with_date with:`, {
+        embedding_length: embedding.length,
+        threshold: Math.max(0.12, (vectorSearch.threshold || 0.2) - 0.05),
+        limit: Math.min(30, (vectorSearch.limit || 12) + 10),
+        user_id_prefix: userId?.substring(0, 8),
+        start_date: effectiveTimeRange.start,
+        end_date: effectiveTimeRange.end
+      });
+      
       const { data, error } = await supabaseClient.rpc('match_journal_entries_with_date', {
         query_embedding: embedding,
         match_threshold: Math.max(0.12, (vectorSearch.threshold || 0.2) - 0.05),
@@ -847,14 +870,32 @@ async function executeVectorSearch(
       });
 
       if (error) {
-        console.error(`[${requestId}] Time-filtered vector search error:`, error);
+        console.error(`[${requestId}] VECTOR DATABASE FUNCTION ERROR - Time-filtered vector search error:`, {
+          error: error,
+          function_name: 'match_journal_entries_with_date',
+          parameters: {
+            embedding_length: embedding.length,
+            threshold: Math.max(0.12, (vectorSearch.threshold || 0.2) - 0.05),
+            limit: Math.min(30, (vectorSearch.limit || 12) + 10),
+            user_id_prefix: userId?.substring(0, 8),
+            time_range: effectiveTimeRange
+          }
+        });
         throw error;
       }
       
       vectorResults = data;
+      console.log(`[${requestId}] Time-filtered vector search returned ${vectorResults?.length || 0} results`);
     } else {
       // Basic vector search without time constraints
       console.log(`[${requestId}] Vector search without time constraints`);
+      console.log(`[${requestId}] Calling match_journal_entries with:`, {
+        embedding_length: embedding.length,
+        threshold: vectorSearch.threshold || 0.3,
+        limit: vectorSearch.limit || 15,
+        user_id_prefix: userId?.substring(0, 8)
+      });
+      
       const { data, error } = await supabaseClient.rpc('match_journal_entries', {
         query_embedding: embedding,
         match_threshold: vectorSearch.threshold || 0.3,
@@ -863,19 +904,41 @@ async function executeVectorSearch(
       });
 
       if (error) {
-        console.error(`[${requestId}] Basic vector search error:`, error);
+        console.error(`[${requestId}] VECTOR DATABASE FUNCTION ERROR - Basic vector search error:`, {
+          error: error,
+          function_name: 'match_journal_entries',
+          parameters: {
+            embedding_length: embedding.length,
+            threshold: vectorSearch.threshold || 0.3,
+            limit: vectorSearch.limit || 15,
+            user_id_prefix: userId?.substring(0, 8)
+          }
+        });
         throw error;
       }
       
       vectorResults = data;
+      console.log(`[${requestId}] Basic vector search returned ${vectorResults?.length || 0} results`);
     }
 
     console.log(`[${requestId}] Vector search successful, found ${vectorResults?.length || 0} results`);
     return vectorResults || [];
 
   } catch (error) {
-    console.error(`[${requestId}] Error in vector search:`, error);
-    throw error;
+    console.error(`[${requestId}] VECTOR SEARCH FAILURE - Error in vector search:`, error);
+    console.error(`[${requestId}] Vector search context:`, {
+      enhancedQuery,
+      originalQuery: vectorSearch.query,
+      timeRange: effectiveTimeRange,
+      threshold: vectorSearch.threshold,
+      limit: vectorSearch.limit,
+      userId: userId?.substring(0, 8) + '...',
+      embeddingGenerated: !!embedding
+    });
+    
+    // PHASE 2 FIX: Don't throw - return empty results to allow SQL results to proceed
+    console.warn(`[${requestId}] Returning empty vector results due to error, SQL analysis can still proceed`);
+    return [];
   }
 }
 
@@ -1053,27 +1116,49 @@ function getEmotionFamily(emotion: string): string[] {
 async function generateEmbedding(text: string): Promise<number[]> {
   const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
   if (!openaiApiKey) {
+    console.error('EMBEDDING GENERATION FAILED: OpenAI API key not configured');
     throw new Error('OpenAI API key not configured');
   }
 
-  const response = await fetch('https://api.openai.com/v1/embeddings', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${openaiApiKey}`,
-    },
-    body: JSON.stringify({
-      model: 'text-embedding-3-small', // Use same model as journal embeddings
-      input: text,
-    }),
-  });
+  console.log(`EMBEDDING GENERATION: Generating embedding for text: "${text.substring(0, 100)}..."`);
 
-  if (!response.ok) {
-    throw new Error(`OpenAI API error: ${response.status}`);
+  try {
+    const response = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${openaiApiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'text-embedding-3-small', // Use same model as journal embeddings
+        input: text,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`EMBEDDING GENERATION FAILED: OpenAI API error: ${response.status} - ${errorText}`);
+      throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    const embedding = data.data[0].embedding;
+    
+    if (!embedding || !Array.isArray(embedding) || embedding.length !== 1536) {
+      console.error('EMBEDDING GENERATION FAILED: Invalid embedding format:', { 
+        hasEmbedding: !!embedding, 
+        isArray: Array.isArray(embedding), 
+        length: embedding?.length 
+      });
+      throw new Error('Invalid embedding format received from OpenAI API');
+    }
+    
+    console.log(`EMBEDDING GENERATION SUCCESS: Generated ${embedding.length}-dimensional embedding`);
+    return embedding;
+  } catch (error) {
+    console.error('EMBEDDING GENERATION ERROR:', error);
+    throw error;
   }
-
-  const data = await response.json();
-  return data.data[0].embedding;
 }
 
 /**

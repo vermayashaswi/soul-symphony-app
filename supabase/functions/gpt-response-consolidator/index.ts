@@ -113,7 +113,7 @@ serve(async (req) => {
       timestamp: new Date().toISOString()
     });
 
-    // Enhanced data validation - check for empty research results
+    // PHASE 1 FIX: Enhanced data validation - check for completely empty research results
     if (!researchResults || researchResults.length === 0) {
       console.error(`[${consolidationId}] No research results provided to consolidator`);
       return new Response(JSON.stringify({
@@ -130,21 +130,43 @@ serve(async (req) => {
       });
     }
 
+    // PHASE 1 FIX: Check for successful SQL analysis even if vector search failed
+    let hasSqlAnalysis = false;
+    let hasVectorResults = false;
+
     // Initialize variables at function scope to avoid scoping issues
     let hasJournalEntries = false;
     let journalEntries: any[] = [];
 
-    // Data integrity validation - check for processed research results
+    // PHASE 1 FIX: Enhanced data integrity validation - check for processed research results AND SQL analysis
     if (researchResults && researchResults.length > 0) {
+      // Check for SQL analysis results
+      hasSqlAnalysis = researchResults.some((r: any) => {
+        const hasAnalysis = r?.executionSummary?.analysis && Object.keys(r.executionSummary.analysis).length > 0;
+        const hasSqlCount = r?.executionSummary?.count > 0;
+        const hasSqlResults = r?.executionResults?.sqlResults && r.executionResults.sqlResults.length > 0;
+        return hasAnalysis || hasSqlCount || hasSqlResults;
+      });
+
+      // Check for vector search results
+      hasVectorResults = researchResults.some((r: any) => 
+        (r?.executionResults?.vectorResults && r.executionResults.vectorResults.length > 0) ||
+        (r?.executionSummary?.resultType === 'journal_content_retrieval' && r.executionSummary?.count > 0)
+      );
+      
       console.log(`[RESEARCH DATA VALIDATION GEMINI] ${consolidationId}:`, {
         totalResults: researchResults.length,
+        hasSqlAnalysis,
+        hasVectorResults,
         resultTypes: researchResults.map((r: any, i: number) => ({
           index: i,
           question: r?.subQuestion?.question?.substring(0, 50) || 'unknown',
           hasExecutionSummary: !!r?.executionSummary,
           summaryType: r?.executionSummary?.resultType || 'unknown',
           summaryDataType: r?.executionSummary?.dataType || 'unknown',
-          hasError: !!r?.executionResults?.error || !!r?.error
+          hasError: !!r?.executionResults?.error || !!r?.error,
+          hasSqlData: !!(r?.executionSummary?.analysis || r?.executionResults?.sqlResults),
+          hasVectorData: !!(r?.executionResults?.vectorResults)
         }))
       });
       
@@ -167,9 +189,9 @@ serve(async (req) => {
         dataStructureType: hasProcessedSummaries ? 'processed_summaries' : 'raw_results'
       });
 
-      // Enhanced validation for empty analysis objects
-      if (!hasProcessedSummaries && !hasRawResults) {
-        console.warn(`[${consolidationId}] No processed summaries or raw results found despite research execution`);
+      // PHASE 1 FIX: Only respond with "couldn't find entries" when BOTH SQL and vector search completely failed
+      if (!hasProcessedSummaries && !hasRawResults && !hasSqlAnalysis && !hasVectorResults) {
+        console.warn(`[${consolidationId}] No processed summaries, raw results, SQL analysis, or vector results found despite research execution`);
         return new Response(JSON.stringify({
           success: true,
           response: "I searched through your journal entries but couldn't find specific content that matches your question. This might be because you haven't written about this topic yet, or the topic might be phrased differently in your entries. Could you try asking about it in a different way?",
@@ -182,6 +204,15 @@ serve(async (req) => {
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
+      }
+
+      // PHASE 1 FIX: Log when we have partial results (SQL succeeded but vector failed, or vice versa)
+      if (hasSqlAnalysis && !hasVectorResults) {
+        console.log(`[${consolidationId}] SQL analysis succeeded but vector search failed - proceeding with SQL-only analysis`);
+      } else if (!hasSqlAnalysis && hasVectorResults) {
+        console.log(`[${consolidationId}] Vector search succeeded but SQL analysis failed - proceeding with vector-only analysis`);
+      } else if (hasSqlAnalysis && hasVectorResults) {
+        console.log(`[${consolidationId}] Both SQL analysis and vector search succeeded - proceeding with full analysis`);
       }
       
       // PHASE 1 FIX: Extract and prominently feature journal entries
