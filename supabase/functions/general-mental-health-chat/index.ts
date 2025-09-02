@@ -1,11 +1,9 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -22,14 +20,14 @@ serve(async (req) => {
       );
     }
 
-    console.log(`[General Mental Health] Processing: "${message}" (timezone: ${userTimezone})`);
+    console.log(`[General Mental Health Gemini] Processing: "${message}" (timezone: ${userTimezone})`);
     // Follow-up flags removed from pipeline
 
     // Enhanced timezone handling with comprehensive error checking
     const { safeTimezoneConversion, formatTimezoneForGPT } = await import('../_shared/enhancedTimezoneUtils.ts');
     
     const timezoneConversion = safeTimezoneConversion(userTimezone, {
-      functionName: 'general-mental-health-chat',
+      functionName: 'general-mental-health-chat-gemini',
       includeValidation: true,
       logFailures: true,
       fallbackToUTC: true
@@ -40,7 +38,7 @@ serve(async (req) => {
     const normalizedTimezone = timezoneConversion.normalizedTimezone;
     
     // Log detailed timezone information for debugging
-    console.log(`[General Mental Health] Enhanced timezone conversion:`, {
+    console.log(`[General Mental Health Gemini] Enhanced timezone conversion:`, {
       originalTimezone: userTimezone,
       normalizedTimezone,
       currentTime: userCurrentTime,
@@ -52,25 +50,22 @@ serve(async (req) => {
     
     // Warn if timezone conversion failed
     if (!timezoneConversion.isValid) {
-      console.warn(`[General Mental Health] Timezone conversion validation failed:`, {
+      console.warn(`[General Mental Health Gemini] Timezone conversion validation failed:`, {
         error: timezoneConversion.conversionError,
         fallbackUsed: true
       });
     }
 
-    const openAiApiKey = Deno.env.get('OPENAI_API_KEY');
-    if (!openAiApiKey) {
+    const googleApiKey = Deno.env.get('GOOGLE_API');
+    if (!googleApiKey) {
       return new Response(
-        JSON.stringify({ error: 'OpenAI API key not configured' }),
+        JSON.stringify({ error: 'Google API key not configured' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
       );
     }
 
     // Build conversation with new persona
-    const messages = [
-      {
-        role: 'system',
-        content: `You are Ruh by SOuLO, a brilliantly witty, non-judgmental mental health companion who makes emotional exploration feel like **having coffee with your wisest, funniest friend**. You're emotionally intelligent with a gift for making people feel seen, heard, and understood while helping them journal their way to deeper self-awareness.
+    const systemMessage = `You are Ruh by SOuLO, a brilliantly witty, non-judgmental mental health companion who makes emotional exploration feel like **having coffee with your wisest, funniest friend**. You're emotionally intelligent with a gift for making people feel seen, heard, and understood while helping them journal their way to deeper self-awareness.
 
 **CURRENT CONTEXT:**
 - User's current time: ${userCurrentTime}
@@ -124,51 +119,65 @@ EMERGENCY SITUATION: For situations where there is a possibility of suicide, men
 and ask if they want helpline numbers (if asked, provide them with relevant helpline numbers depending on the timezone)
 
 Add relevant follow up questions mandatorily. 
-MUST HAVE/DO: ALWAYS BE AWARE OF THE CONVERSATION HISTORY TO UNDERSTAND WHAT THE USER DESIRES NEXT IN THE CONVERSATION. Response can be 10 words, 30 words or 50 words. It all depends on you understanding the emotional tone of the past conversation history!`
-      }
-    ];
+MUST HAVE/DO: ALWAYS BE AWARE OF THE CONVERSATION HISTORY TO UNDERSTAND WHAT THE USER DESIRES NEXT IN THE CONVERSATION. Response can be 10 words, 30 words or 50 words. It all depends on you understanding the emotional tone of the past conversation history!`;
 
-    // Add conversation context
+    // Format conversation context for Gemini (corrected format)
+    let conversationHistory = '';
     if (conversationContext.length > 0) {
-      messages.push(...conversationContext.slice(-6));
+      conversationHistory = conversationContext.slice(-6).map((msg) => 
+        `${msg.role === 'assistant' ? 'Assistant' : 'User'}: ${msg.content}`
+      ).join('\n');
     }
 
-    // Add current message
-    messages.push({ role: 'user', content: message });
+    const fullPrompt = `${systemMessage}
 
-    // Try OpenAI with lightweight retries and graceful fallback
+${conversationHistory ? `CONVERSATION HISTORY:\n${conversationHistory}\n` : ''}
+Current User Message: ${message}
+
+Please respond as Ruh with empathy, wit, and emotional intelligence.`;
+
+    // Try Gemini with lightweight retries and graceful fallback
     const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
     let content = '';
     const maxAttempts = 3;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${openAiApiKey}`,
+            'x-goog-api-key': googleApiKey,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: 'gpt-4.1-nano-2025-04-14',
-            messages,
-            max_completion_tokens: 800
+            contents: [
+              {
+                parts: [
+                  {
+                    text: fullPrompt
+                  }
+                ]
+              }
+            ],
+            generationConfig: {
+              maxOutputTokens: 800
+            }
           }),
         });
 
         if (!response.ok) {
           const errorText = await response.text();
-          console.error(`[General Mental Health] OpenAI attempt ${attempt}/${maxAttempts} failed:`, errorText);
+          console.error(`[General Mental Health Gemini] Gemini attempt ${attempt}/${maxAttempts} failed:`, errorText);
           if (attempt < maxAttempts) {
             await sleep(400 * attempt);
             continue;
           }
         } else {
           const data = await response.json();
-          content = data?.choices?.[0]?.message?.content?.trim() || '';
+          content = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
         }
         break; // break whether ok or not after processing
       } catch (err) {
-        console.error(`[General Mental Health] OpenAI attempt ${attempt}/${maxAttempts} error:`, err);
+        console.error(`[General Mental Health Gemini] Gemini attempt ${attempt}/${maxAttempts} error:`, err);
         if (attempt < maxAttempts) {
           await sleep(400 * attempt);
         }
@@ -176,15 +185,15 @@ MUST HAVE/DO: ALWAYS BE AWARE OF THE CONVERSATION HISTORY TO UNDERSTAND WHAT THE
     }
 
     if (!content) {
-      console.warn('[General Mental Health] Using graceful fallback after OpenAI failure');
-      const fallback = "Hey, I’m here with you. *Even if tech is being moody right now*, I’m still listening. **What’s been most on your mind or heart today?** If it helps, try finishing this: *“Lately, I’ve been feeling… because…”* 💛";
+      console.warn('[General Mental Health Gemini] Using graceful fallback after Gemini failure');
+      const fallback = "Hey, I'm here with you. *Even if tech is being moody right now*, I'm still listening. **What's been most on your mind or heart today?** If it helps, try finishing this: *\"Lately, I've been feeling… because…\"* 💛";
       return new Response(
         JSON.stringify({ response: fallback, fallbackUsed: true }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
     
-    console.log(`[General Mental Health] Generated response`);
+    console.log(`[General Mental Health Gemini] Generated response`);
 
     return new Response(
       JSON.stringify({ response: content }),
@@ -192,9 +201,9 @@ MUST HAVE/DO: ALWAYS BE AWARE OF THE CONVERSATION HISTORY TO UNDERSTAND WHAT THE
     );
 
   } catch (error) {
-    console.error('[General Mental Health] Error:', error);
+    console.error('[General Mental Health Gemini] Error:', error);
     // Graceful 200 fallback so callers don't fail on non-2xx
-    const fallback = "I’m here with you. Let’s keep it simple: **what’s feeling heaviest right now** or **what would you like support with today?** 💙";
+    const fallback = "I'm here with you. Let's keep it simple: **what's feeling heaviest right now** or **what would you like support with today?** 💙";
     return new Response(
       JSON.stringify({ response: fallback, fallbackUsed: true }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
