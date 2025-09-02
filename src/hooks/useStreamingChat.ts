@@ -271,22 +271,43 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     });
   }, [threadId, updateThreadState]);
 
-  // Generate simple fallback messages - no dynamic generation since classification is done by backend
+  // Generate streaming messages with userStatusMessage support
   const generateStreamingMessages = useCallback(async (
     message: string, 
-    targetThreadId?: string
+    targetThreadId?: string,
+    userStatusMessage?: string | null
   ) => {
     const activeThreadId = targetThreadId || threadId;
     if (!activeThreadId) return;
 
-    // Always use simple fallback since we don't know category yet
-    updateThreadState(activeThreadId, {
-      useThreeDotFallback: true,
-      dynamicMessages: [],
-      translatedDynamicMessages: [],
-      currentMessageIndex: 0
-    });
-  }, [threadId, updateThreadState]);
+    // Check if we have a userStatusMessage from the query planner
+    if (userStatusMessage && userStatusMessage.trim()) {
+      console.log(`[useStreamingChat] Using userStatusMessage for dynamic content: ${userStatusMessage}`);
+      
+      // Create dynamic messages array from the userStatusMessage
+      const dynamicMessages = [userStatusMessage];
+      const translatedMessages = await Promise.all(
+        dynamicMessages.map(msg => translate(msg))
+      );
+
+      updateThreadState(activeThreadId, {
+        useThreeDotFallback: false,
+        dynamicMessages,
+        translatedDynamicMessages: translatedMessages,
+        currentMessageIndex: 0,
+        queryCategory: 'JOURNAL_SPECIFIC', // Set category for proper message rotation
+        processingStartTime: Date.now()
+      });
+    } else {
+      // Fallback to simple three-dot animation
+      updateThreadState(activeThreadId, {
+        useThreeDotFallback: true,
+        dynamicMessages: [],
+        translatedDynamicMessages: [],
+        currentMessageIndex: 0
+      });
+    }
+  }, [threadId, updateThreadState, translate]);
 
   // Automatic retry function for failed messages
   const retryLastMessage = useCallback(async (targetThreadId?: string) => {
@@ -571,6 +592,15 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
           return;
         }
         throw new Error(error?.message || 'Request failed');
+      }
+
+      // Extract userStatusMessage for dynamic streaming and update messages
+      const userStatusMessage = data?.userStatusMessage;
+      
+      // Update streaming messages with userStatusMessage if available
+      if (userStatusMessage && userStatusMessage.trim()) {
+        console.log(`[useStreamingChat] Updating streaming messages with userStatusMessage: ${userStatusMessage}`);
+        await generateStreamingMessages(message, targetThreadId, userStatusMessage);
       }
 
       const text = data?.response ?? data?.data ?? data?.message ?? (typeof data === 'string' ? data : null);

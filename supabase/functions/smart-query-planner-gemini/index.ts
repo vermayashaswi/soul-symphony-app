@@ -542,7 +542,15 @@ async function analyzeQueryWithSubQuestions(message, conversationContext, userEn
     console.log(`[Gemini Query Planner] Processing query with enhanced validation and user timezone: ${userTimezone}`);
     
     const prompt = `
-CRITICAL: Your response must be optimized for efficiency while maintaining accuracy. Keep your output under 5000 tokens maximum. Be concise in reasoning without compromising query plan quality or PostgreSQL query accuracy.
+CRITICAL: Your response must be optimized for efficiency while maintaining accuracy. Keep your output under 3000 tokens maximum. Be concise in reasoning without compromising query plan quality or PostgreSQL query accuracy.
+
+REASONING CONSTRAINTS:
+- Minimize internal reasoning and thinking processes
+- Focus ONLY on generating the required JSON output
+- Avoid verbose explanations or step-by-step reasoning
+- Do NOT generate extensive internal thought processes
+- Keep reasoning field under 100 words
+- Be direct and concise in all text outputs
 
 You are Ruh's Enhanced Intelligent Query Planner, a precise execution engine for the SOuLO voice journaling app. Your task is to analyze user queries and return a structured JSON plan with BULLETPROOF PostgreSQL queries. The queries must be accurate and account for user timezones and data constraints.
 
@@ -749,7 +757,7 @@ Confidence & Reasoning: Include confidence and reasoning fields to explain the c
         }
       ],
       generationConfig: {
-        maxOutputTokens: 5000,
+        maxOutputTokens: 3000,
         responseMimeType: "application/json",
         responseSchema: {
           type: "object",
@@ -861,7 +869,44 @@ Confidence & Reasoning: Include confidence and reasoning fields to explain the c
     if (finishReason === 'MAX_TOKENS') {
       console.error(`[Gemini Query Planner] MAX_TOKENS reached - response incomplete due to token limit`);
       console.error(`[Gemini Query Planner] Token usage:`, data.usageMetadata);
-      throw new Error('Gemini response incomplete due to token limit (MAX_TOKENS)');
+      
+      // Use enhanced fallback when token limit is reached
+      console.log(`[Gemini Query Planner] Using enhanced fallback due to token limit`);
+      return {
+        queryType: "journal_specific",
+        strategy: "comprehensive_hybrid", 
+        userStatusMessage: "Analyzing your journal entries with enhanced patterns...",
+        subQuestions: [{
+          id: "sq1",
+          question: "Find relevant journal entries using enhanced search",
+          purpose: "Retrieve entries with improved PostgreSQL patterns",
+          searchStrategy: "hybrid_parallel",
+          executionStage: 1,
+          dependencies: [],
+          resultForwarding: null,
+          executionMode: "parallel",
+          analysisSteps: [{
+            step: 1,
+            description: "Enhanced search with proper SQL patterns",
+            queryType: "hybrid_search",
+            sqlQueryType: "filtering",
+            sqlQuery: 'SELECT * FROM "Journal Entries" WHERE user_id = auth.uid() ORDER BY created_at DESC LIMIT 25',
+            vectorSearch: {
+              query: `${message} personal thoughts feelings journal entries`,
+              threshold: 0.3,
+              limit: 15
+            },
+            timeRange: null,
+            resultContext: null,
+            dependencies: []
+          }]
+        }],
+        confidence: 0.6,
+        reasoning: "Enhanced fallback plan due to token limit",
+        useAllEntries: false,
+        userTimezone,
+        sqlValidationEnabled: true
+      };
     }
 
     let queryPlan;
