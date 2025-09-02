@@ -946,10 +946,10 @@ Personal Growth Tracking:
       
       // Use enhanced fallback when token limit is reached
       console.log(`[Gemini Query Planner] Using enhanced fallback due to token limit`);
-      return {
+      const tokenLimitFallback = {
         queryType: "journal_specific",
         strategy: "comprehensive_hybrid", 
-        userStatusMessage: "Analyzing your journal entries with enhanced patterns...",
+        userStatusMessage: `Analyzing your ${message.toLowerCase().includes('emotion') ? 'emotions' : 'journal entries'}...`,
         subQuestions: [{
           id: "sq1",
           question: "Find relevant journal entries using enhanced search",
@@ -981,6 +981,9 @@ Personal Growth Tracking:
         userTimezone,
         sqlValidationEnabled: true
       };
+      
+      console.log(`[Gemini Query Planner] TOKEN_LIMIT userStatusMessage: "${tokenLimitFallback.userStatusMessage}"`);
+      return tokenLimitFallback;
     }
 
     let queryPlan;
@@ -996,7 +999,22 @@ Personal Growth Tracking:
       
       queryPlan = JSON.parse(generatedText);
       
+      // CRITICAL DEBUG LOGGING: Verify userStatusMessage generation
+      console.log(`[Gemini Query Planner] CRITICAL: userStatusMessage debug:`, {
+        hasUserStatusMessage: !!queryPlan.userStatusMessage,
+        userStatusMessage: queryPlan.userStatusMessage,
+        queryPlanKeys: Object.keys(queryPlan),
+        generatedTextLength: generatedText.length
+      });
+      
+      // VALIDATION AND FALLBACK: Ensure userStatusMessage exists
+      if (!queryPlan.userStatusMessage || queryPlan.userStatusMessage.trim() === '') {
+        console.warn(`[Gemini Query Planner] MISSING userStatusMessage - adding fallback`);
+        queryPlan.userStatusMessage = `Analyzing your ${message.toLowerCase().includes('emotion') ? 'emotions' : 'journal entries'}...`;
+      }
+      
       console.log(`[Gemini Query Planner] Enhanced query plan generated with ${queryPlan.subQuestions?.length || 0} sub-questions`);
+      console.log(`[Gemini Query Planner] FINAL userStatusMessage: "${queryPlan.userStatusMessage}"`);
     } catch (parseError) {
       console.error(`[Gemini Query Planner] JSON parsing error:`, parseError);
       console.error(`[Gemini Query Planner] Raw response:`, JSON.stringify(data, null, 2));
@@ -1008,11 +1026,11 @@ Personal Growth Tracking:
   } catch (error) {
     console.error(`[Gemini Query Planner] Error in enhanced query analysis:`, error);
     
-    // Enhanced fallback with better SQL patterns
-    return {
+    // CRITICAL FALLBACK: Enhanced fallback with guaranteed userStatusMessage
+    const fallbackPlan = {
       queryType: "journal_specific",
       strategy: "comprehensive_hybrid", 
-      userStatusMessage: "Analyzing your journal entries with enhanced patterns...",
+      userStatusMessage: `Analyzing your ${message.toLowerCase().includes('emotion') ? 'emotions' : 'journal entries'}...`,
       subQuestions: [{
         id: "sq1",
         question: "Find relevant journal entries using enhanced search",
@@ -1044,6 +1062,9 @@ Personal Growth Tracking:
       userTimezone,
       sqlValidationEnabled: true
     };
+    
+    console.log(`[Gemini Query Planner] FALLBACK userStatusMessage: "${fallbackPlan.userStatusMessage}"`);
+    return fallbackPlan;
   }
 }
 
@@ -1541,6 +1562,8 @@ serve(async (req) => {
 
     if (!execute) {
       // Return just the plan without execution
+      console.log(`[${requestId}] PLAN-ONLY userStatusMessage: "${analysisResult.userStatusMessage}"`);
+      
       return new Response(JSON.stringify({
         queryPlan: analysisResult,
         timestamp: new Date().toISOString(),
@@ -1553,6 +1576,10 @@ serve(async (req) => {
 
     // Execute the plan and return results
     const executionResult = await executePlan(analysisResult, userId, supabaseClient, requestId, userTimezone);
+    
+    // CRITICAL DEBUG: Log final response structure for userStatusMessage tracking
+    console.log(`[${requestId}] FINAL RESPONSE userStatusMessage: "${analysisResult.userStatusMessage}"`);
+    console.log(`[${requestId}] Response structure keys:`, Object.keys({ queryPlan: analysisResult, executionResult }));
     
     return new Response(JSON.stringify({
       queryPlan: analysisResult,

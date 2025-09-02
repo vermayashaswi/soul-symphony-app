@@ -610,11 +610,14 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
       // CRITICAL FIX: Enhanced userStatusMessage extraction for both GPT and Gemini flows
       const userStatusMessage = data?.userStatusMessage;
       
-      console.log(`[useStreamingChat] userStatusMessage extraction debug:`, {
+      console.log(`[useStreamingChat] CRITICAL DEBUG - userStatusMessage extraction:`, {
         hasUserStatusMessage: data?.hasUserStatusMessage,
         userStatusMessage: data?.userStatusMessage,
         dataKeys: Object.keys(data || {}),
-        correlationId
+        dataStructure: data,
+        correlationId,
+        threadId: targetThreadId,
+        messageType: 'chat-with-rag response'
       });
       
       // Update streaming messages with userStatusMessage if available
