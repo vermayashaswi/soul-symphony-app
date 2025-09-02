@@ -5,8 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 export enum QueryCategory {
   JOURNAL_SPECIFIC = 'JOURNAL_SPECIFIC',
   JOURNAL_SPECIFIC_NEEDS_CLARIFICATION = 'JOURNAL_SPECIFIC_NEEDS_CLARIFICATION',
-  GENERAL_MENTAL_HEALTH = 'GENERAL_MENTAL_HEALTH', 
-  UNRELATED = 'UNRELATED'
+  GENERAL_MENTAL_HEALTH = 'GENERAL_MENTAL_HEALTH'
 }
 
 interface MessageClassification {

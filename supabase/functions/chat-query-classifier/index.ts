@@ -111,8 +111,6 @@ Your classification determines which specialized system handles the user's reque
 
 • **JOURNAL_SPECIFIC_NEEDS_CLARIFICATION** → Intelligent clarification system that asks targeted follow-up questions to transform vague requests into analyzable queries for the journal analysis engine.
 
-• **UNRELATED** → Polite refusal system that redirects users back to mental health topics.
-
 **💬 CONVERSATIONAL FLUIDITY PRIORITY:**
 You are the gatekeeper for creating a BRILLIANT, FLUID conversation like with the world's best mental health therapist. Your classification must:
 - Maintain natural conversation flow
@@ -151,10 +149,6 @@ BEFORE classifying, you MUST:
 - "Help me" (unclear what kind of help)
 - "How am I doing?" (needs specificity)
 
-**UNRELATED**: Topics completely outside mental health and wellbeing
-- Sports, politics, science facts, entertainment
-- Questions unrelated to emotional or mental wellbeing
-
 **🎯 CONVERSATION FLOW GUIDELINES:**
 - If the assistant just gave general advice and user asks follow-up questions → GENERAL_MENTAL_HEALTH
 - If conversation is about general mental health concepts → GENERAL_MENTAL_HEALTH  
@@ -166,7 +160,7 @@ BEFORE classifying, you MUST:
 
 Output strictly a single JSON object (no code fences, no extra text) with this schema:
 {
-	  "category": "JOURNAL_SPECIFIC" | "JOURNAL_SPECIFIC_NEEDS_CLARIFICATION" | "GENERAL_MENTAL_HEALTH" | "UNRELATED",
+	  "category": "JOURNAL_SPECIFIC" | "JOURNAL_SPECIFIC_NEEDS_CLARIFICATION" | "GENERAL_MENTAL_HEALTH",
 }
 
 Latest user message: "${message}"${contextString}`;
@@ -230,7 +224,7 @@ Latest user message: "${message}"${contextString}`;
     const result = JSON.parse(jsonString);
     
     // Validate the response
-    if (!result.category || !['JOURNAL_SPECIFIC', 'JOURNAL_SPECIFIC_NEEDS_CLARIFICATION', 'GENERAL_MENTAL_HEALTH', 'UNRELATED'].includes(result.category)) {
+    if (!result.category || !['JOURNAL_SPECIFIC', 'JOURNAL_SPECIFIC_NEEDS_CLARIFICATION', 'GENERAL_MENTAL_HEALTH'].includes(result.category)) {
       throw new Error('Invalid category in Gemini response');
     }
 

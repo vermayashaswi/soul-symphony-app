@@ -428,49 +428,6 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
 
-    } else if (classification.category === 'UNRELATED') {
-      // Handle unrelated queries with witty rejection messages
-      console.log(`[chat-with-rag] EXECUTING: UNRELATED pipeline - witty rejection`);
-      
-      // Array of witty rejection responses
-      const unrelatedResponses = [
-        "Haha, you caught me! I'm basically a one-trick pony, but it's a really GOOD trick! 🐴✨ Think of me as your personal feelings detective, journal whisperer, and emotional GPS all rolled into one. I can't help with that question, but I'd love to hear what's been stirring in your world today! 🌍💫",
-        "Whoops! Looks like you've found the edge of my brain! 🤯 I'm like that friend who's AMAZING at deep 2am conversations about life but terrible at trivia night. I live for your thoughts, feelings, journal entries, and all things emotional wellbeing - that's where I absolutely shine! ✨ What's your heart been up to lately? 💛",
-        "Oops! You just wandered into my 'does not compute' zone! 🤖💫 I'm basically a specialist who speaks fluent emotion and journal-ese, but that question is outside my wheelhouse. How about we dive into something I'm actually brilliant at - like exploring what's been on your mind recently? 🧠✨",
-        "Plot twist! You stumbled upon the one thing I can't chat about! 😄 I'm like a really passionate therapist friend who only knows how to talk about feelings, patterns, and personal growth. But hey, that's not so bad, right? What's been weighing on your heart lately? 💭💙"
-      ];
-      
-      // Randomly select a response
-      const selectedResponse = unrelatedResponses[Math.floor(Math.random() * unrelatedResponses.length)];
-      
-      // Update the assistant message with the rejection response
-      if (assistantMessageId) {
-        try {
-          await supabaseClient
-            .from('chat_messages')
-            .update({
-              content: selectedResponse
-            })
-            .eq('id', assistantMessageId);
-          console.log(`[chat-with-rag] Updated assistant message ${assistantMessageId} with unrelated response`);
-        } catch (updateError) {
-          console.error('[chat-with-rag] Error updating assistant message:', updateError);
-        }
-      }
-
-      return new Response(JSON.stringify({
-        response: selectedResponse,
-        userStatusMessage: "Politely redirecting with humor",
-        assistantMessageId: assistantMessageId,
-        metadata: {
-          classification: classification,
-          strategy: 'unrelated_rejection',
-          userTimezone: userTimezone
-        }
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-
     } else {
       // Handle unexpected classification categories with fallback
       console.log(`[chat-with-rag] UNKNOWN CLASSIFICATION: ${classification.category} - using fallback response`);
