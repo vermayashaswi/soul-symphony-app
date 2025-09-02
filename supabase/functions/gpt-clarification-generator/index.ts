@@ -1,13 +1,12 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
 };
 
-const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+const googleApiKey = Deno.env.get('GOOGLE_API');
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -21,7 +20,7 @@ serve(async (req) => {
       userProfile
     } = await req.json();
     
-    console.log('GPT Clarification Generator called with:', { 
+    console.log('GPT Clarification Generator Gemini called with:', { 
       userMessage: userMessage?.substring(0, 100),
       contextCount: conversationContext?.length || 0
     });
@@ -87,17 +86,17 @@ RESPONSE APPROACH EXAMPLES:
 3. **Direct Insight**: "That feeling you mentioned - when did it actually start showing up?"
 4. **Cutting Through**: "Let's get specific - what exactly happened that's got you thinking about this?"
 5. **Practical Curiosity**: "Before we dive deeper, help me understand what you're hoping to figure out here."
-6. **Trivia King**: "Here are some common reasons why people experiece bloating and fatigue...  "
+6. **Trivia King**: "Here are some common reasons why people experience bloating and fatigue...  "
 
 MANDATORY FORMATTING REQUIREMENTS:
 - Use **bold** for key insights and important points
 - Use *italics* sparingly for emotional reflections
-- Minimal emoji use - only when it genuinely adds value
+- Use emojis 
 - **MANDATORY**: End with one focused follow-up question that moves the conversation forward
 
-**Critical:** Use the conversation history to understand what they actually need - don't overthink it. Be direct, helpful, and naturally conversational.Make a point to answer a user's question apart from ONLY clarifying (if the query demands it). A user might not have just mind related but body, soul and general curiosities as well before he wants to dive into his OWN patterns
+**Critical:** Use the conversation history to understand what they actually need - don't overthink it. Be direct, helpful, and naturally conversational. Make a point to answer a user's question apart from ONLY clarifying (if the query demands it). A user might not have just mind related but body, soul and general curiosities as well before he wants to dive into his OWN patterns
 
-Keep responses concise and actionable. Match their energy but guide toward clarity. However, use bold words, italics, compulsory emojis wherever necessary in resposne
+Keep responses concise and actionable. Match their energy but guide toward clarity. However, use bold words, italics, compulsory emojis wherever necessary in response
 
 Your response should be a JSON object with this structure:
 {
@@ -107,24 +106,30 @@ Your response should be a JSON object with this structure:
 
 TONE and RESPONSE GUIDELINES: Direct when required, insightful, naturally warm, witty when appropriate, and focused on actually helping. No excessive sentiment or spiritual language. Restrict your response between 20-40 words. Try being as brief as possible but expand if need be!`;
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${openAIApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gpt-4.1-nano-2025-04-14',
-          messages: [
-            { role: 'system', content: 'You are Ruh, the soul-centered wellness companion by SOuLO. You combine ancient wisdom with modern psychology to help people connect with their deepest truth and inner knowing.' },
-            { role: 'user', content: clarificationPrompt }
-          ],
-          max_completion_tokens: 800
-        }),
+    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent', {
+      method: 'POST',
+      headers: {
+        'x-goog-api-key': googleApiKey,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              {
+                text: clarificationPrompt
+              }
+            ]
+          }
+        ],
+        generationConfig: {
+          maxOutputTokens: 800
+        }
+      })
     });
 
     const data = await response.json();
-    const rawContent = data?.choices?.[0]?.message?.content || '';
+    const rawContent = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
     let responseText = rawContent;
     let userStatusMessage: string | null = null;
@@ -159,7 +164,7 @@ TONE and RESPONSE GUIDELINES: Direct when required, insightful, naturally warm, 
     });
 
   } catch (error) {
-    console.error('Error in GPT Clarification Generator:', error);
+    console.error('Error in GPT Clarification Generator Gemini:', error);
     return new Response(JSON.stringify({ 
       success: false, 
       error: error.message 
