@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 /**
- * CONVERSATIONAL GPT-powered message classifier focusing on natural flow
+ * CONVERSATIONAL Gemini-powered message classifier focusing on natural flow
  */
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -28,29 +28,29 @@ serve(async (req) => {
   }
 
   try {
-    console.log(`[Query Classifier] Analyzing message: "${message}"`);
+    console.log(`[Query Classifier Gemini] Analyzing message: "${message}"`);
 
-    // Get OpenAI API key
-    const openAiApiKey = Deno.env.get('OPENAI_API_KEY');
-    if (!openAiApiKey) {
-      console.error('[Query Classifier] OPENAI_API_KEY missing - cannot classify via GPT');
+    // Get Google API key
+    const googleApiKey = Deno.env.get('GOOGLE_API');
+    if (!googleApiKey) {
+      console.error('[Query Classifier Gemini] GOOGLE_API missing - cannot classify via Gemini');
       return new Response(
-        JSON.stringify({ error: 'OPENAI_API_KEY not configured for chat-query-classifier' }),
+        JSON.stringify({ error: 'GOOGLE_API not configured for chat-query-classifier' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
       );
     }
 
-    // Use GPT for natural conversation flow classification
-    const classification = await gptClassifyMessage(message, conversationContext, openAiApiKey);
+    // Use Gemini for natural conversation flow classification
+    const classification = await geminiClassifyMessage(message, conversationContext, googleApiKey);
 
-    console.log(`[Query Classifier] Result: ${classification.category}`);
+    console.log(`[Query Classifier Gemini] Result: ${classification.category}`);
 
     return new Response(
       JSON.stringify(classification),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
-    console.error('[Query Classifier] Error:', error);
+    console.error('[Query Classifier Gemini] Error:', error);
 
     return new Response(
       JSON.stringify({ error: 'Classification failed', details: String((error).message || error) }),
@@ -60,9 +60,9 @@ serve(async (req) => {
 });
 
 /**
- * GPT-powered classification with conversational flow prioritization
+ * Gemini-powered classification with conversational flow prioritization
  */
-async function gptClassifyMessage(
+async function geminiClassifyMessage(
   message, 
   conversationContext, 
   apiKey
@@ -175,20 +175,25 @@ Latest user message: "${message}"${contextString}`;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
+        'x-goog-api-key': apiKey,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4.1-mini-2025-04-14',
-        messages: [
-          { role: 'system', content: 'You are a strict JSON classifier. Respond with a single JSON object only that matches the provided schema. No code fences, no commentary.' },
-          { role: 'user', content: classificationPrompt }
+        contents: [
+          {
+            parts: [
+              {
+                text: `You are a strict JSON classifier. Respond with a single JSON object only that matches the provided schema. No code fences, no commentary.\n\n${classificationPrompt}`
+              }
+            ]
+          }
         ],
-        response_format: { type: 'json_object' },
-        max_completion_tokens: 600
+        generationConfig: {
+          maxOutputTokens: 600
+        }
       }),
       signal: controller.signal
     });
@@ -196,17 +201,17 @@ Latest user message: "${message}"${contextString}`;
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.status}`);
+      throw new Error(`Gemini API error: ${response.status}`);
     }
 
     const data = await response.json();
-    const content = data?.choices?.[0]?.message?.content?.trim() || '';
+    const content = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
 
     if (!content) {
-      throw new Error('Empty OpenAI response');
+      throw new Error('Empty Gemini response');
     }
 
-    console.log(`[Query Classifier] GPT Response: ${content}`);
+    console.log(`[Query Classifier Gemini] Gemini Response: ${content}`);
 
     // Helper to extract JSON from possible fenced or prefixed content
     const extractJsonObject = (text) => {
@@ -226,7 +231,7 @@ Latest user message: "${message}"${contextString}`;
     
     // Validate the response
     if (!result.category || !['JOURNAL_SPECIFIC', 'JOURNAL_SPECIFIC_NEEDS_CLARIFICATION', 'GENERAL_MENTAL_HEALTH', 'UNRELATED'].includes(result.category)) {
-      throw new Error('Invalid category in GPT response');
+      throw new Error('Invalid category in Gemini response');
     }
 
     return {
@@ -234,7 +239,7 @@ Latest user message: "${message}"${contextString}`;
     };
 
   } catch (error) {
-    console.error('[Query Classifier] GPT classification failed:', error);
+    console.error('[Query Classifier Gemini] Gemini classification failed:', error);
     throw error;
   }
 }
