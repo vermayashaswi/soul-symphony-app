@@ -14,6 +14,23 @@ function stripCodeFences(s: string): string {
   try { return s.replace(/```(?:json)?/gi, '').trim(); } catch { return s; }
 }
 
+// Truncation detection utility
+function detectTruncation(response: string): boolean {
+  if (!response || response.trim().length === 0) return true;
+  
+  // Check for incomplete JSON structure
+  const trimmed = response.trim();
+  if (trimmed.startsWith('{') && !trimmed.endsWith('}')) return true;
+  
+  // Check for incomplete sentences (ends with comma, incomplete word)
+  if (trimmed.endsWith(',') || trimmed.endsWith('"') || trimmed.match(/\w+$/)) return true;
+  
+  // Check if response is suspiciously short for complex prompts
+  if (trimmed.length < 100) return true;
+  
+  return false;
+}
+
 function extractFirstJsonObjectString(s: string): string | null {
   const start = s.indexOf('{');
   if (start === -1) return null;
@@ -459,7 +476,10 @@ serve(async (req) => {
           .join('\n')
       : 'No previous conversation context available.';
 
-    const consolidationPrompt = `🚨 CRITICAL FORMATTING REQUIREMENT: YOU MUST USE MARKDOWN FORMATTING 🚨
+    const consolidationPrompt = `🚨 CRITICAL TOKEN EFFICIENCY REQUIREMENT 🚨
+CRITICAL: Limit internal reasoning tokens to maximize response content. Keep total token usage under 3000 while maintaining accuracy. Prioritize response content over excessive reasoning. Be concise but comprehensive.
+
+🚨 CRITICAL FORMATTING REQUIREMENT: YOU MUST USE MARKDOWN FORMATTING 🚨
 
 You are Ruh by SOuLO, a brilliantly witty, non-judgmental mental health companion who makes emotional exploration feel like **having coffee with your wisest, funniest friend**. You're emotionally intelligent with a gift for making people feel seen, heard, and understood while helping them journal their way to deeper self-awareness.
 
@@ -642,7 +662,10 @@ Similarity: ${entry.similarity || 'N/A'}`;
                 }
               ],
               generationConfig: {
-                maxOutputTokens: 2000
+                maxOutputTokens: 3000,
+                temperature: 0.7,
+                topP: 0.9,
+                candidateCount: 1
               }
             }),
             signal: controller.signal
@@ -653,6 +676,44 @@ Similarity: ${entry.similarity || 'N/A'}`;
         if (response.ok) {
           const data = await response.json();
           rawResponse = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+          
+          // Check for truncation first
+          const isTruncated = detectTruncation(rawResponse);
+          
+          if (isTruncated && apiRetryCount === 0) {
+            console.warn(`[${consolidationId}] Response appears truncated, triggering 8000-token fallback`);
+            apiRetryCount++;
+            
+            // Retry with 8000 tokens and simplified prompt
+            const simplifiedPrompt = consolidationPrompt.replace(
+              'Keep total token usage under 3000 while maintaining accuracy',
+              'Keep total token usage under 8000. Prioritize complete responses'
+            );
+            
+            response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent', {
+              method: 'POST',
+              headers: {
+                'x-goog-api-key': googleApiKey,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: simplifiedPrompt }] }],
+                generationConfig: {
+                  maxOutputTokens: 8000,
+                  temperature: 0.7,
+                  topP: 0.9,
+                  candidateCount: 1
+                }
+              }),
+              signal: controller.signal
+            });
+            
+            if (response.ok) {
+              const fallbackData = await response.json();
+              rawResponse = fallbackData?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+              console.log(`[${consolidationId}] Fallback attempt completed, response length: ${rawResponse.length}`);
+            }
+          }
           
           // Validate response length and content
           if (rawResponse.trim().length > 50 && rawResponse.includes('"response"')) {
