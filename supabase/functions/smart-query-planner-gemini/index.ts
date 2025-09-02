@@ -567,6 +567,7 @@ CONVERSATION CONTEXT: ${last.length > 0 ? last.map((m)=>`${m.role || m.sender}: 
 - BE CONCISE: Minimize internal reasoning to save tokens
 - FOCUS: Generate direct JSON output without extensive analysis
 - EFFICIENCY: Use maximum 2-3 sub-questions for most queries
+- TOKEN LIMIT: Keep total response under 5000 tokens
 
 **Schema (Essential Only):**
 Table: "Journal Entries" 
@@ -688,7 +689,7 @@ Table: "Journal Entries"
         }
       ],
       generationConfig: {
-        maxOutputTokens: 2000,
+        maxOutputTokens: 8000,
         responseMimeType: "application/json",
         responseSchema: {
           type: "object",
