@@ -150,8 +150,8 @@ const AppDownloadPage = () => {
               transition={{ duration: 0.5 }}
             >
               <img 
-                src="/lovable-uploads/5b18686b-4a3c-4341-a072-479db470ac1d.png" 
-                alt="SOULo Voice Journaling" 
+                src="/soulo-mascot.png" 
+                alt="SOULo Purple Mascot" 
                 className="w-full h-auto"
               />
             </motion.div>
