@@ -610,7 +610,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
       // CRITICAL FIX: Enhanced userStatusMessage extraction for both GPT and Gemini flows
       const userStatusMessage = data?.userStatusMessage;
       
-      console.log(`[useStreamingChat] CRITICAL DEBUG - userStatusMessage extraction:`, {
+      console.log(`[useStreamingChat] CRITICAL DEBUG - userStatusMessage extraction for correlation ${correlationId}:`, {
         hasUserStatusMessage: data?.hasUserStatusMessage,
         userStatusMessage: data?.userStatusMessage,
         dataKeys: Object.keys(data || {}),

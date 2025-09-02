@@ -246,17 +246,22 @@ export default function MobileChatInterface({
 
               const alreadyExists = (recent || []).some(m => (m as any).sender === 'assistant' && (m as any).content?.trim() === response.trim());
               if (!alreadyExists) {
-                 // Enhanced persistence with proper database interaction
+               // Enhanced persistence with upsert and idempotency like SmartChatInterface
                  try {
                    const correlationId = requestId || `assistant-${originThreadId}-${Date.now()}`;
+                   const idempotencyKey = `assistant-${user.id}-${originThreadId}-${Date.now()}-${Math.random().toString(36).substring(2)}`;
 
-                   const { data: savedMsg, error: saveError } = await supabase.from('chat_messages').insert({
+                   const { data: savedMsg, error: saveError } = await supabase.from('chat_messages').upsert({
                      thread_id: originThreadId,
                      content: response,
                      sender: 'assistant',
                      role: 'assistant',
                      request_correlation_id: correlationId,
-                     analysis_data: analysis || null
+                     analysis_data: analysis || null,
+                     idempotency_key: idempotencyKey
+                   }, {
+                     onConflict: 'idempotency_key',
+                     ignoreDuplicates: true
                    }).select().single();
                    
                    if (saveError) {
@@ -807,16 +812,30 @@ export default function MobileChatInterface({
     // Scroll to bottom after adding user message
     setTimeout(scrollToBottom, 100);
 
-    // PHASE 3: Async user message saving (non-blocking)
+    // PHASE 3: Async user message saving with idempotency (non-blocking)
     const saveUserMessageAsync = async () => {
       try {
         debugLog.addEvent("Message Sending", `[Mobile] Saving user message to database for thread: ${currentThreadId}`, "info");
+        
+        // Generate SHA-256 based idempotency key like SmartChatInterface
+        const crypto = window.crypto || (window as any).msCrypto;
+        const encoder = new TextEncoder();
+        const data = encoder.encode(`${message}_${user.id}_${currentThreadId}_${Date.now()}`);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        const idempotencyKey = `user-${user.id}-${currentThreadId}-${hashHex.substring(0, 16)}`;
         
         const savedUserMessage = await saveMessage(
           currentThreadId, 
           message, 
           'user', 
-          user.id
+          user.id,
+          null, // references
+          undefined, // hasNumericResult
+          false, // isInteractive
+          undefined, // interactiveOptions
+          idempotencyKey // CRITICAL: Pass idempotency key for duplicate prevention
         );
         
         if (!savedUserMessage) {

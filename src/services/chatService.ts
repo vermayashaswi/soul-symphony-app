@@ -15,6 +15,7 @@ interface ChatResponse {
   hasNumericResult?: boolean;
   isInteractive?: boolean;
   interactiveOptions?: any[];
+  userStatusMessage?: string; // CRITICAL: Add userStatusMessage for dynamic streaming
 }
 
 // Initialize optimization managers (singleton pattern for performance)
@@ -413,7 +414,8 @@ export async function processChatMessage(
         },
         classification: classificationMetadata
       },
-      hasNumericResult: ragResponse.data.hasNumericResult
+      hasNumericResult: ragResponse.data.hasNumericResult,
+      userStatusMessage: userStatusMessage // CRITICAL: Return userStatusMessage for dynamic streaming
     };
 
   } catch (error) {
