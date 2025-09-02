@@ -598,24 +598,50 @@ async function intelligentResultCombination(
   return combinedArray.slice(0, 15); // Return top 15 results
 }
 
-async function generateEmbedding(text: string, openaiApiKey: string): Promise<number[]> {
-  const response = await fetch('https://api.openai.com/v1/embeddings', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${openaiApiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'text-embedding-3-small',
-      input: text,
-      encoding_format: 'float'
-    }),
-  });
-  
-  if (!response.ok) {
-    throw new Error(`OpenAI API error: ${response.status}`);
+/**
+ * Generate an embedding vector for a text string using OpenAI API
+ * Uses the same parameters as the journal entry embedding generation
+ */
+async function generateEmbedding(text: string, apiKey: string): Promise<number[]> {
+  try {
+    console.log('[SearchOrchestrator] Generating embedding for text length:', text.length);
+    
+    const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'text-embedding-3-small',
+        input: text.substring(0, 8000), // Limit input to prevent API errors
+        encoding_format: 'float'
+      }),
+    });
+
+    if (!embeddingResponse.ok) {
+      const error = await embeddingResponse.text();
+      console.error('[SearchOrchestrator] Failed to generate embedding:', error);
+      throw new Error(`Could not generate embedding: ${embeddingResponse.status} - ${error}`);
+    }
+
+    const embeddingData = await embeddingResponse.json();
+    if (!embeddingData.data || embeddingData.data.length === 0) {
+      throw new Error('Empty embedding data received from OpenAI');
+    }
+
+    const embedding = embeddingData.data[0].embedding;
+    
+    // Validate embedding dimensions (should be 1536 for text-embedding-3-small)
+    if (!Array.isArray(embedding) || embedding.length !== 1536) {
+      throw new Error(`Invalid embedding dimensions: expected 1536, got ${embedding?.length}`);
+    }
+    
+    console.log('[SearchOrchestrator] Successfully generated embedding with dimensions:', embedding.length);
+    
+    return embedding;
+  } catch (error) {
+    console.error('[SearchOrchestrator] Error generating embedding:', error);
+    throw error;
   }
-  
-  const data = await response.json();
-  return data.data[0].embedding;
 }
