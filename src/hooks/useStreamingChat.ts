@@ -163,32 +163,20 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
         }
 
         try {
-          const category = (body as any)?.category || threadState.queryCategory;
           let result: { data: any; error: any };
 
-          if (category === 'JOURNAL_SPECIFIC') {
-            result = (await supabase.functions.invoke('chat-with-rag', { body })) as { data: any; error: any };
-          } else if (category === 'GENERAL_MENTAL_HEALTH') {
-            const timeoutMs = 20000 + i * 5000;
-            const timeoutPromise = new Promise((_, rej) =>
-              setTimeout(() => rej(new Error('Request timed out')), timeoutMs)
-            );
+          console.log(`[useStreamingChat] Invoking chat-with-rag for orchestration`);
 
-            result = (await Promise.race([
-              supabase.functions.invoke('general-mental-health-chat', { body }),
-              timeoutPromise,
-            ])) as { data: any; error: any };
-          } else {
-            const timeoutMs = 20000 + i * 5000;
-            const timeoutPromise = new Promise((_, rej) =>
-              setTimeout(() => rej(new Error('Request timed out')), timeoutMs)
-            );
+          // ALL messages go through chat-with-rag for unified orchestration
+          const timeoutMs = 20000 + i * 5000;
+          const timeoutPromise = new Promise((_, rej) =>
+            setTimeout(() => rej(new Error('Request timed out')), timeoutMs)
+          );
 
-            result = (await Promise.race([
-              supabase.functions.invoke('general-mental-health-chat', { body }),
-              timeoutPromise,
-            ])) as { data: any; error: any };
-          }
+          result = (await Promise.race([
+            supabase.functions.invoke('chat-with-rag', { body }),
+            timeoutPromise,
+          ])) as { data: any; error: any };
           
           if ((result as any)?.error) {
             lastErr = (result as any).error;
@@ -283,78 +271,22 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     });
   }, [threadId, updateThreadState]);
 
-  // Generate streaming messages based on category
+  // Generate simple fallback messages - no dynamic generation since classification is done by backend
   const generateStreamingMessages = useCallback(async (
     message: string, 
-    category: string, 
-    conversationContext?: any[], 
-    userProfile?: any,
     targetThreadId?: string
   ) => {
     const activeThreadId = targetThreadId || threadId;
     if (!activeThreadId) return;
 
-    // Only generate dynamic messages for journal-specific queries
-    if (category !== 'JOURNAL_SPECIFIC') {
-      updateThreadState(activeThreadId, {
-        useThreeDotFallback: true,
-        dynamicMessages: [],
-        currentMessageIndex: 0
-      });
-      return;
-    }
-
-    try {
-      const { data, error } = await supabase.functions.invoke('generate-streaming-messages', {
-        body: {
-          userMessage: message,
-          category,
-          conversationContext,
-          userProfile
-        }
-      });
-
-      if (error) throw error;
-
-      if (data.shouldUseFallback || !data.messages || data.messages.length === 0) {
-        updateThreadState(activeThreadId, {
-          useThreeDotFallback: true,
-          dynamicMessages: [],
-          translatedDynamicMessages: []
-        });
-      } else {
-        // Pre-translate all messages
-        const translatedMessages = await Promise.all(
-          data.messages.map(async (message: string) => {
-            if (currentLanguage === 'en') {
-              return message;
-            }
-            try {
-              const translated = await translate(message, 'en', undefined, true);
-              return translated || message;
-            } catch (error) {
-              console.error('[useStreamingChat] Error translating message:', error);
-              return message;
-            }
-          })
-        );
-
-        updateThreadState(activeThreadId, {
-          useThreeDotFallback: false,
-          dynamicMessages: data.messages,
-          translatedDynamicMessages: translatedMessages,
-          currentMessageIndex: 0
-        });
-      }
-    } catch (error) {
-      console.error('[useStreamingChat] Error generating streaming messages:', error);
-      updateThreadState(activeThreadId!, {
-        useThreeDotFallback: true,
-        dynamicMessages: [],
-        translatedDynamicMessages: []
-      });
-    }
-  }, [threadId, updateThreadState, translate, currentLanguage]);
+    // Always use simple fallback since we don't know category yet
+    updateThreadState(activeThreadId, {
+      useThreeDotFallback: true,
+      dynamicMessages: [],
+      translatedDynamicMessages: [],
+      currentMessageIndex: 0
+    });
+  }, [threadId, updateThreadState]);
 
   // Automatic retry function for failed messages
   const retryLastMessage = useCallback(async (targetThreadId?: string) => {
@@ -379,10 +311,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
 
     try {
       await generateStreamingMessages(
-        threadState.lastFailedMessage.message, 
-        'GENERAL_MENTAL_HEALTH', 
-        threadState.lastFailedMessage.conversationContext, 
-        threadState.lastFailedMessage.userProfile,
+        threadState.lastFailedMessage.message,
         activeThreadId
       );
 
@@ -606,30 +535,13 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
       console.error('[useStreamingChat] Error fetching user timezone:', error);
     }
 
-    // Classify message
-    let messageCategory = 'GENERAL_MENTAL_HEALTH';
-    try {
-      const { data: classificationData, error: classificationError } = await supabase.functions.invoke('chat-query-classifier', {
-        body: {
-          message,
-          conversationContext: conversationContext || []
-        }
-      });
-      
-      if (!classificationError && classificationData?.category) {
-        messageCategory = classificationData.category;
-        console.log(`[useStreamingChat] Message classified as: ${messageCategory} for thread: ${targetThreadId}`);
-      }
-    } catch (error) {
-      console.error('[useStreamingChat] Classification failed, using fallback:', error);
-    }
-
-    updateThreadState(targetThreadId, { queryCategory: messageCategory });
-
-    await generateStreamingMessages(message, messageCategory, conversationContext, userProfile, targetThreadId);
+    // NO FRONTEND CLASSIFICATION - Let chat-with-rag be the sole orchestrator
+    console.log(`[useStreamingChat] Sending message to chat-with-rag for classification and orchestration`);
     
-    const estimatedTime = messageCategory === 'JOURNAL_SPECIFIC' ? 65000 : 10000;
-    updateThreadState(targetThreadId, { expectedProcessingTime: estimatedTime });
+    updateThreadState(targetThreadId, { 
+      queryCategory: 'unknown', // Will be determined by backend
+      expectedProcessingTime: 45000 // Default estimate, backend will adjust if needed
+    });
 
     try {
       const { data, error } = await invokeWithBackoff({
@@ -640,7 +552,6 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
         userProfile: { ...userProfile, timezone: userTimezone },
         streamingMode: false,
         requestId,
-        category: messageCategory,
         userTimezone,
       }, { attempts: 3, baseDelay: 900 }, targetThreadId);
       
