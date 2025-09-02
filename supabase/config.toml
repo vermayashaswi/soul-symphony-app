@@ -88,8 +88,6 @@ verify_jwt = true
 [functions.gpt-clarification-generator]
 verify_jwt = true
 
-[functions.test-vector-fix]
-verify_jwt = false
 
 [functions.send-fcm-notification]
 verify_jwt = true
