@@ -118,6 +118,9 @@ serve(async (req) => {
     const messageId = raw.messageId;
     const threadId = raw.threadId;
     
+    // Extract country from userProfile for cultural context
+    const userCountry = userProfile?.country || 'DEFAULT';
+    
     // Generate unique consolidation ID for tracking
     const consolidationId = `cons_gemini_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
@@ -535,9 +538,11 @@ You're processing complex *family dynamics* while maintaining strong emotional i
     **USER CONTEXT:**
     - ${timezoneFormat.currentTimeText}
     - User's Timezone: ${timezoneFormat.timezoneText}
+    - User's Country: ${userCountry !== 'DEFAULT' ? userCountry : 'Not specified'}
     - All time references should be in the user's local timezone (${userTimezone}), not UTC
     - When discussing time periods like "first half vs second half of day", reference the user's local time
     - NEVER mention "UTC" in your response - use the user's local timezone context instead
+    - Consider cultural context when relevant (without stereotyping)
     - Timezone Status: ${timezoneConversion.isValid ? 'Validated' : 'Using fallback due to conversion issues'}
     
     **CRITICAL DATE & TIME CONTEXT:**

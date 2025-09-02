@@ -38,6 +38,44 @@ serve(async (req) => {
       userTimezone = 'UTC'
     } = await req.json();
 
+    // Fetch complete user profile including country if not provided
+    let completeUserProfile = userProfile;
+    if (!completeUserProfile || !completeUserProfile.country) {
+      try {
+        const { data: profileData, error: profileError } = await supabaseClient
+          .from('profiles')
+          .select('timezone, country, display_name')
+          .eq('id', userId)
+          .single();
+        
+        if (!profileError && profileData) {
+          completeUserProfile = {
+            timezone: profileData.timezone || userTimezone,
+            country: profileData.country || 'DEFAULT',
+            displayName: profileData.display_name,
+            ...userProfile
+          };
+          console.log(`[chat-with-rag] Fetched user profile: timezone=${completeUserProfile.timezone}, country=${completeUserProfile.country}`);
+        } else {
+          completeUserProfile = {
+            timezone: userTimezone,
+            country: 'DEFAULT',
+            displayName: null,
+            ...userProfile
+          };
+          console.log('[chat-with-rag] Using default profile data due to error:', profileError);
+        }
+      } catch (fetchError) {
+        console.error('[chat-with-rag] Error fetching user profile:', fetchError);
+        completeUserProfile = {
+          timezone: userTimezone,
+          country: 'DEFAULT',
+          displayName: null,
+          ...userProfile
+        };
+      }
+    }
+
     console.log(`[chat-with-rag] Processing query: "${message}" for user: ${userId} (threadId: ${threadId}, messageId: ${messageId})`);
     
     // Generate correlation ID for this request
@@ -163,7 +201,7 @@ serve(async (req) => {
           conversationContext,
           threadId,
           messageId,
-          userTimezone // Pass user timezone to planner
+          userProfile: completeUserProfile // Pass complete user profile including country
         }
       });
 
@@ -198,7 +236,7 @@ serve(async (req) => {
           userMessage: message,
           researchResults: executionResult || [], // Processed results from smart query planner
           conversationContext: conversationContext,
-          userProfile: { ...userProfile, timezone: normalizedTimezone },
+          userProfile: { ...completeUserProfile, timezone: normalizedTimezone },
           streamingMode: false,
           messageId: assistantMessageId, // Use the assistant message ID we created
           threadId: threadId,
@@ -310,7 +348,7 @@ serve(async (req) => {
         body: {
           message: message,
           conversationContext: conversationContext,
-          userTimezone: userTimezone  // Pass validated timezone
+          userProfile: completeUserProfile  // Pass complete user profile including country
         }
       });
 
@@ -353,7 +391,7 @@ serve(async (req) => {
         body: {
           userMessage: message,
           conversationContext: conversationContext,
-          userProfile: userProfile
+          userProfile: completeUserProfile
         }
       });
 

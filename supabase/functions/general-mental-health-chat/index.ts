@@ -13,7 +13,11 @@ serve(async (req) => {
   }
 
   try {
-    const { message, conversationContext = [], userTimezone = 'UTC' } = await req.json();
+    const { message, conversationContext = [], userProfile = null } = await req.json();
+    
+    // Extract timezone and country from userProfile for backward compatibility
+    const userTimezone = userProfile?.timezone || 'UTC';
+    const userCountry = userProfile?.country || 'DEFAULT';
 
     if (!message) {
       return new Response(JSON.stringify({
@@ -82,8 +86,9 @@ serve(async (req) => {
 **CURRENT CONTEXT:**
 - User's current time: ${userCurrentTime}
 - User's timezone: ${normalizedTimezone}
+- User's country: ${userCountry !== 'DEFAULT' ? userCountry : 'Not specified'}
 - Timezone validation: ${timezoneConversion.isValid ? 'VALID' : 'FAILED - using fallback'}
-Use this time context to provide appropriate greetings and time-aware responses (e.g., "Good morning" vs "Good evening", energy levels, daily rhythms).
+Use this time and cultural context to provide appropriate greetings, time-aware responses, and culturally sensitive support (e.g., "Good morning" vs "Good evening", energy levels, daily rhythms, cultural considerations without stereotyping).
 
 **YOUR COFFEE-WITH-YOUR-WISEST-FRIEND PERSONALITY:**
 - **Brilliantly witty** but never at someone's expense - your humor comes from keen observations about the human condition 😊

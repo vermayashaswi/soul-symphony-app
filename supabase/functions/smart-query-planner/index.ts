@@ -1164,7 +1164,7 @@ async function generateEmbedding(text: string): Promise<number[]> {
 /**
  * Simplified Query Planning - No hardcoded patterns, just pure OpenAI execution
  */
-async function analyzeQueryWithSubQuestions(message, conversationContext, userEntryCount, isFollowUp = false, supabaseClient, userTimezone = 'UTC') {
+async function analyzeQueryWithSubQuestions(message, conversationContext, userEntryCount, isFollowUp = false, supabaseClient, userTimezone = 'UTC', userCountry = 'DEFAULT') {
   try {
     // Enhanced conversation context processing with proper role mapping and ordering
     const last = Array.isArray(conversationContext) ? 
@@ -1203,6 +1203,7 @@ This query planner is responsible for creating sophisticated multi-stage analyti
 **INPUT CONTEXT:**
 USER QUERY: "${message}"
 USER TIMEZONE: "${userTimezone}"
+USER COUNTRY: "${userCountry !== 'DEFAULT' ? userCountry : 'Not specified'}"
 CURRENT TIME: ${new Date().toISOString()} (Use this for calculating time ranges and temporal offsets)
 CONVERSATION CONTEXT: ${last.length > 0 ? last.map((m)=>`${m.role || m.sender}: ${m.content || 'N/A'}`).join('\n  ') : 'None'}
 TOKEN LIMIT: Keep total response under 5000 tokens
@@ -1826,7 +1827,11 @@ serve(async (req) => {
       }
     );
 
-    const { message, userId, execute = true, conversationContext = [], threadId, messageId, isFollowUp = false, userTimezone = 'UTC' } = await req.json();
+    const { message, userId, execute = true, conversationContext = [], threadId, messageId, isFollowUp = false, userProfile = null } = await req.json();
+    
+    // Extract timezone and country from userProfile for backward compatibility
+    const userTimezone = userProfile?.timezone || 'UTC';
+    const userCountry = userProfile?.country || 'DEFAULT';
 
     const requestId = `planner_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
     
@@ -1840,7 +1845,8 @@ serve(async (req) => {
   messageId: ${messageId},
   isFollowUp: ${isFollowUp},
   
-  userTimezone: "${userTimezone}"
+  userTimezone: "${userTimezone}",
+  userCountry: "${userCountry}"
 }`);
 
     // Validate userId format
@@ -1858,7 +1864,7 @@ serve(async (req) => {
     console.log(`[${requestId}] User has ${userEntryCount} journal entries`);
 
     // Generate comprehensive analysis plan with enhanced SQL generation
-    const analysisResult = await analyzeQueryWithSubQuestions(message, conversationContext, userEntryCount, isFollowUp, supabaseClient, userTimezone);
+    const analysisResult = await analyzeQueryWithSubQuestions(message, conversationContext, userEntryCount, isFollowUp, supabaseClient, userTimezone, userCountry);
 
     if (!execute) {
       // Return just the plan without execution

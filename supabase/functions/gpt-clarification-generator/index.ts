@@ -50,7 +50,8 @@ ${processedContext.map((m) => `  [Message ${m.messageOrder}] ${m.role}: ${m.cont
   'No prior context - This is the start of the conversation'}
 
 USER PROFILE:
-- Timezone: ${userProfile?.timezone || 'Unknown'}
+- Timezone: ${userTimezone}
+- Country: ${userCountry !== 'DEFAULT' ? userCountry : 'Unknown'}
 - Premium User: ${userProfile?.is_premium ? 'Yes' : 'No'}
 - Journal Entries: ${userProfile?.journalEntryCount || 'Unknown count'}
 
