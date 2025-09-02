@@ -563,88 +563,19 @@ CURRENT TIME: ${new Date().toISOString()} (Use this to calculate time ranges and
 
 CONVERSATION CONTEXT: ${last.length > 0 ? last.map((m)=>`${m.role || m.sender}: ${m.content || 'N/A'}`).join('\n  ') : 'None'}
 
-Database Schema & Query Rules
-Table: "Journal Entries"
+**INSTRUCTIONS:** 
+- BE CONCISE: Minimize internal reasoning to save tokens
+- FOCUS: Generate direct JSON output without extensive analysis
+- EFFICIENCY: Use maximum 2-3 sub-questions for most queries
 
-id (bigint)
+**Schema (Essential Only):**
+Table: "Journal Entries" 
+- user_id (MANDATORY: auth.uid()), "refined text", emotions (jsonb), master_themes (text[]), created_at
+- Vector: match_journal_entries_with_date() for time queries
 
-user_id (uuid, MANDATORY: entries.user_id = auth.uid())
+**Strategy:** Create 2-3 focused sub-questions. Final step MUST be final_content_retrieval.
 
-"refined text" (text, ALWAYS use quotes)
-
-sentiment (real, CRITICAL: ::numeric casting for math)
-
-emotions (jsonb, use jsonb_each())
-
-Fixed values only: "amusement","anger","anticipation","anxiety","awe","boredom","compassion","concern","confidence","confusion","contentment","curiosity","depression","disappointment","disgust","embarrassment","empathy","Enthusiasm","envy","excitement","fear","frustration","gratitude","guilt","hate","hope","hurt","interest","jealousy","joy","loneliness","love","nostalgia","optimism","overwhelm","pessimism","pride","regret","relief","remorse","sadness","satisfaction","serenity","shame","surprise","trust".
-
-master_themes (text[], use unnest())
-
-Fixed values only: "Self & Identity", "Body & Health", "Mental Health", "Romantic Relationships", "Family", "Friendships & Social Circle", "Career & Workplace", "Money & Finances", "Education & Learning", "Habits & Routines", "Sleep & Rest", "Creativity & Hobbies", "Spirituality & Beliefs", "Technology & Social Media", "Environment & Living Space", "Time & Productivity", "Travel & Movement", "Loss & Grief", "Purpose & Fulfillment", "Conflict & Trauma", "Celebration & Achievement".
-
-entities (jsonb)
-
-created_at (timestamptz, MANDATORY for temporal analysis)
-
-duration (numeric)
-
-themeemotion (jsonb)
-
-themes (text[])
-
-SQL Patterns: Use the exact patterns for Emotion, Sentiment, Theme, and Time-Filtered analysis provided in the original prompt.
-
-Table: "journal_embeddings"
-
-journal_entry_id (bigint, Foreign Key)
-
-embedding (vector)
-
-Vector Search Functions (use ONLY these):
-
-match_journal_entries(...)
-
-match_journal_entries_with_date(...) (MANDATORY for time-based search)
-
-match_journal_entries_by_emotion(...)
-
-match_journal_entries_by_entity_emotion(...)
-
-Threshold/Limit: 0.12-0.18 / 20-30 for time-constrained vector searches.
-
-Timezone & Date Instructions (CRITICAL)
-For any temporal reference (e.g., "today", "last week"), you MUST calculate exact ISO timestamps with timezone offsets (+XX:XX) and include a timeRange object.
-
-Timezone Offset Calculation: Use the appropriate offset for "${userTimezone}" (e.g., +05:30 for Asia/Kolkata, -08:00 for US/Pacific).
-
-Example: For "last 7 days" in the user's timezone, the timeRange object must contain start and end timestamps with the correct timezone offset, e.g., 2025-08-26T00:00:00+05:30 to 2025-09-02T23:59:59+05:30.
-
-Constraint: A timeRange object is MANDATORY for every temporal query, and it must contain actual calculated ISO timestamps with offsets, not placeholders.
-
-Sub-Question Generation & Execution Plan
-STEP 1: Analyze the User Query.
-Examine the USER QUERY and CONVERSATION CONTEXT to determine the user's primary "ASK." The "ASK" is the detailed, specific question that your plan must answer. Identify any temporal references (e.g., "this week," "last month") and incorporate them into the "ASK."
-
-STEP 2: Plan Your Strategy.
-Your JSON response will be executed by our RAG pipeline. This system processes each sub-question sequentially or in parallel based on your specified execution strategy.
-
-SQL queries will be run against our PostgreSQL database to extract journal entries, emotions, and patterns.
-
-Vector searches will be performed on journal embeddings for semantic analysis.
-
-Results from each sub-question will be passed forward to dependent sub-questions as context, enabling complex multi-step analysis where later queries can use insights from earlier ones.
-
-Once all sub-questions are executed, the collected data (including emotion scores, journal content, themes, and patterns) will be aggregated and sent to a final synthesis prompt that generates the personalized response to the user.
-
-STEP 3: Generate Sub-Questions.
-Based on the "ASK," create at least two or more sub-questions. Each sub-question must have a clear purpose and a detailed analysis plan. The final step MUST be final_content_retrieval. This step ensures that all upstream analysis filters and prepares a subset of entries for a final vector search, providing the most relevant content for the downstream consolidator function to reference.
-
-JSON Response Plan
-Generate at least two sub-questions. The final step MUST be final_content_retrieval to perform a vector search on filtered entries.
-
-Final JSON Format: Return a single, valid JSON object that adheres to the structure provided in the original prompt. All SQL and vector search steps should include a timeRange object when a time-based query is performed.
-
-Confidence & Reasoning: Include confidence and reasoning fields to explain the chosen strategy.
+**Timezone:** Calculate exact timestamps for temporal queries in ${userTimezone}
 
 **RESPONSE FORMAT (MUST be valid JSON):**
 
@@ -757,7 +688,7 @@ Confidence & Reasoning: Include confidence and reasoning fields to explain the c
         }
       ],
       generationConfig: {
-        maxOutputTokens: 3000,
+        maxOutputTokens: 2000,
         responseMimeType: "application/json",
         responseSchema: {
           type: "object",

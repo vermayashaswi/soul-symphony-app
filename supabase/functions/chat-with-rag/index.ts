@@ -243,6 +243,9 @@ serve(async (req) => {
       let finalResponse;
       let userStatusMessage;
       
+      // Extract userStatusMessage from query planner (for dynamic streaming)
+      userStatusMessage = queryPlan?.userStatusMessage || null;
+      
       console.log("[chat-with-rag] Consolidation response structure:", {
         hasData: !!consolidationResponse.data,
         dataKeys: consolidationResponse.data ? Object.keys(consolidationResponse.data) : [],
@@ -256,24 +259,21 @@ serve(async (req) => {
           try {
             const parsedData = JSON.parse(consolidationResponse.data);
             finalResponse = parsedData.response || consolidationResponse.data;
-            userStatusMessage = parsedData.userStatusMessage;
+            // Don't override userStatusMessage from query planner
           } catch {
             // If parsing fails, use the string directly
             finalResponse = consolidationResponse.data;
-            userStatusMessage = null;
           }
         } else if (consolidationResponse.data.response) {
           // If data is an object with response field
           finalResponse = consolidationResponse.data.response;
-          userStatusMessage = consolidationResponse.data.userStatusMessage;
+          // Don't override userStatusMessage from query planner
         } else {
           // Fallback to the entire data object as string
           finalResponse = JSON.stringify(consolidationResponse.data);
-          userStatusMessage = null;
         }
       } else {
         finalResponse = "I apologize, but I encountered an issue processing your request.";
-        userStatusMessage = null;
       }
 
       console.log("[chat-with-rag] Extracted response:", {
