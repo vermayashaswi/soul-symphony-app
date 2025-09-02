@@ -96,11 +96,15 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
 
   const maxRetryAttempts = 2;
 
-  // Create message fingerprint to prevent duplicates
+  // Create message fingerprint to prevent duplicates with stronger hash
   const createMessageFingerprint = useCallback((message: string, threadId: string, userId: string, timestamp: number) => {
     const normalizedMessage = message.trim().toLowerCase();
-    const timeWindow = Math.floor(timestamp / 3000); // 3-second window
-    return `${userId}_${threadId}_${normalizedMessage.substring(0, 50)}_${timeWindow}`;
+    const timeWindow = Math.floor(timestamp / 5000); // 5-second window for better deduplication
+    const messageHash = normalizedMessage.split('').reduce((a, b) => {
+      a = ((a << 5) - a) + b.charCodeAt(0);
+      return a & a;
+    }, 0);
+    return `${userId}_${threadId}_${messageHash}_${timeWindow}`;
   }, []);
 
   // Update local state when thread changes
@@ -208,9 +212,13 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     
     const threadState = getThreadState(activeThreadId);
 
-    // Correlate final/error messages to active request
+    // Correlate final/error messages to active request - prevent duplicate responses
     if ((message.type === 'final_response' || message.type === 'error') && message.requestId && threadState.activeRequestId && message.requestId !== threadState.activeRequestId) {
-      console.warn('[useStreamingChat] Ignoring message due to requestId mismatch', { incoming: message.requestId, active: threadState.activeRequestId });
+      console.warn('[useStreamingChat] Ignoring stale message due to requestId mismatch', { 
+        incoming: message.requestId, 
+        active: threadState.activeRequestId,
+        messageType: message.type 
+      });
       return;
     }
 
@@ -490,17 +498,18 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
   ) => {
     const threadState = getThreadState(targetThreadId);
     
-    // Check for duplicate requests
+    // Check for duplicate requests with enhanced detection
     const currentTime = Date.now();
     const messageFingerprint = createMessageFingerprint(message, targetThreadId, userId, currentTime);
     
-    if (threadState.isStreaming || threadState.activeRequestId) {
-      console.warn(`[useStreamingChat] Already streaming for thread ${targetThreadId}, ignoring new request`);
+    if (threadState.isStreaming && threadState.activeRequestId) {
+      console.warn(`[useStreamingChat] Already streaming for thread ${targetThreadId} (requestId: ${threadState.activeRequestId}), ignoring new request`);
       return;
     }
 
-    if (threadState.lastMessageFingerprint === messageFingerprint) {
-      console.warn(`[useStreamingChat] Duplicate message detected for thread ${targetThreadId}, ignoring`);
+    if (threadState.lastMessageFingerprint === messageFingerprint && 
+        currentTime - (threadState.processingStartTime || 0) < 10000) {
+      console.warn(`[useStreamingChat] Duplicate message detected for thread ${targetThreadId} (fingerprint: ${messageFingerprint}), ignoring`);
       return;
     }
 
@@ -599,8 +608,11 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
       
       // Update streaming messages with userStatusMessage if available
       if (userStatusMessage && userStatusMessage.trim()) {
-        console.log(`[useStreamingChat] Updating streaming messages with userStatusMessage: ${userStatusMessage}`);
+        console.log(`[useStreamingChat] Found userStatusMessage from backend: ${userStatusMessage}`);
         await generateStreamingMessages(message, targetThreadId, userStatusMessage);
+      } else {
+        console.log(`[useStreamingChat] No userStatusMessage found in response - falling back to basic animation`);
+        await generateStreamingMessages(message, targetThreadId, null);
       }
 
       const text = data?.response ?? data?.data ?? data?.message ?? (typeof data === 'string' ? data : null);

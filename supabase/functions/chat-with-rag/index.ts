@@ -245,6 +245,7 @@ serve(async (req) => {
       
       // Extract userStatusMessage from query planner (for dynamic streaming)
       userStatusMessage = queryPlan?.userStatusMessage || null;
+      console.log("[chat-with-rag] Extracted userStatusMessage from query planner:", userStatusMessage);
       
       console.log("[chat-with-rag] Consolidation response structure:", {
         hasData: !!consolidationResponse.data,
@@ -278,7 +279,8 @@ serve(async (req) => {
 
       console.log("[chat-with-rag] Extracted response:", {
         responseLength: finalResponse?.length || 0,
-        hasStatusMessage: !!userStatusMessage
+        hasStatusMessage: !!userStatusMessage,
+        userStatusMessage: userStatusMessage
       });
 
       // Update the assistant message with the final response and analysis data
@@ -310,6 +312,13 @@ serve(async (req) => {
           console.error('[chat-with-rag] Error updating assistant message:', updateError);
         }
       }
+
+      console.log("[chat-with-rag] Final response structure being returned:", {
+        hasResponse: !!finalResponse,
+        hasUserStatusMessage: !!userStatusMessage,
+        userStatusMessage: userStatusMessage,
+        assistantMessageId: assistantMessageId
+      });
 
       return new Response(JSON.stringify({
         response: finalResponse,
