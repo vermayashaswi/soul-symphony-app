@@ -15,7 +15,6 @@ interface ChatResponse {
   hasNumericResult?: boolean;
   isInteractive?: boolean;
   interactiveOptions?: any[];
-  userStatusMessage?: string; // CRITICAL: Add userStatusMessage for dynamic streaming
 }
 
 // Initialize optimization managers (singleton pattern for performance)
@@ -34,18 +33,6 @@ export async function processChatMessage(
   
   try {
     console.log('[ChatService] Processing message with RAG optimizations:', message);
-    
-    // Get smart chat switch setting once for the entire function
-    const { data: featureFlags } = await supabase
-      .from('feature_flags')
-      .select('name, is_enabled')
-      .eq('name', 'smartChatSwitch');
-
-    const useGemini = featureFlags?.[0]?.is_enabled === true;
-    const classifierFunction = useGemini ? 'chat-query-classifier-gemini' : 'chat-query-classifier';
-    const plannerFunction = useGemini ? 'smart-query-planner-gemini' : 'smart-query-planner';
-    
-    console.log(`[ChatService] Using Gemini models: ${useGemini} (classifier: ${classifierFunction}, planner: ${plannerFunction})`);
     
     // PHASE 2: Initialize conversation state persistence
     const conversationPersistence = new ConversationStatePersistence(threadId, userId);
@@ -129,7 +116,7 @@ export async function processChatMessage(
       contextSample: conversationContext.slice(-2).map(m => `${m.role}: ${m.content.slice(0, 30)}`)
     });
     
-    const { data: classificationData, error: classificationError } = await supabase.functions.invoke(classifierFunction, {
+    const { data: classificationData, error: classificationError } = await supabase.functions.invoke('chat-query-classifier', {
       body: { 
         message, 
         conversationContext, // Now includes proper role mapping and ordering
@@ -254,10 +241,8 @@ export async function processChatMessage(
       userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
     }
 
-    console.log(`[ChatService] Using ${plannerFunction} for query planning`);
-
     // Get intelligent query plan with enhanced database-aware dual-search requirements
-    const queryPlanResponse = await supabase.functions.invoke(plannerFunction, {
+    const queryPlanResponse = await supabase.functions.invoke('smart-query-planner', {
       body: {
         message,
         userId,
@@ -276,12 +261,7 @@ export async function processChatMessage(
       throw new Error(`Query planner error: ${queryPlanResponse.error.message}`);
     }
 
-    // CRITICAL FIX: Extract queryPlan correctly from Gemini response structure
-    const queryPlan = queryPlanResponse.data?.queryPlan || queryPlanResponse.data || {};
-    
-    // Extract userStatusMessage for dynamic streaming (CRITICAL FOR GEMINI FLOW)
-    const userStatusMessage = queryPlan.userStatusMessage || 'Processing your request...';
-    console.log(`[ChatService] Extracted userStatusMessage: "${userStatusMessage}" from ${useGemini ? 'Gemini' : 'GPT'} planner`);
+    const queryPlan = queryPlanResponse.data?.queryPlan || {};
     
     // Log database-aware dual-search enforcement
     if (queryPlan.searchConfidence <= 0.9) {
@@ -306,7 +286,6 @@ export async function processChatMessage(
         threadId,
         conversationContext,
         queryPlan,
-        userStatusMessage, // CRITICAL: Pass userStatusMessage to chat-with-rag
         useAllEntries: queryPlan.useAllEntries || false,
         hasPersonalPronouns: queryPlan.hasPersonalPronouns || false,
         hasExplicitTimeReference: queryPlan.hasExplicitTimeReference || false,
@@ -414,8 +393,7 @@ export async function processChatMessage(
         },
         classification: classificationMetadata
       },
-      hasNumericResult: ragResponse.data.hasNumericResult,
-      userStatusMessage: userStatusMessage // CRITICAL: Return userStatusMessage for dynamic streaming
+      hasNumericResult: ragResponse.data.hasNumericResult
     };
 
   } catch (error) {
@@ -449,20 +427,9 @@ async function handleGeneralQuestion(message: string, conversationContext: any[]
     userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
   }
   
-  // Get smart chat switch setting for Gemini routing
-  const { data: featureFlags } = await supabase
-    .from('feature_flags')
-    .select('name, is_enabled')
-    .eq('name', 'smartChatSwitch');
-
-  const useGemini = featureFlags?.[0]?.is_enabled === true;
-  const mentalHealthFunction = useGemini ? 'general-mental-health-chat-gemini' : 'general-mental-health-chat';
-  
-  console.log(`[ChatService] Using ${mentalHealthFunction} for general mental health chat`);
-  
   try {
     // PHASE 1: Pass conversation context and timezone to general chat for better follow-ups
-    const { data, error } = await supabase.functions.invoke(mentalHealthFunction, {
+    const { data, error } = await supabase.functions.invoke('general-mental-health-chat', {
       body: { 
         message,
         conversationContext: conversationContext.slice(-3), // Last 3 messages for context
