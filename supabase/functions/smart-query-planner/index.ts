@@ -1096,7 +1096,31 @@ async function analyzeQueryWithSubQuestions(message, conversationContext, userEn
     
     console.log(`[Query Planner] Processing query with enhanced validation and user timezone: ${userTimezone}`);
     
-    const prompt = `You are Ruh's Enhanced Intelligent Query Planner - a precise execution engine for a voice journaling app called SOuLO. Your job is to analyze user queries and return structured JSON plans with BULLETPROOF PostgreSQL queries.
+    const prompt = `CRITICAL: Your response must be optimized for efficiency while maintaining high accuracy. Be concise in reasoning without compromising query plan quality or PostgreSQL query accuracy.
+
+REASONING CONSTRAINTS:
+- Minimize internal reasoning and thinking processes
+- Focus ONLY on generating the required JSON output
+- Avoid verbose explanations or step-by-step reasoning
+- Do NOT generate extensive internal thought processes
+
+You are Ruh's Enhanced Intelligent Query Planner for the SOuLO voice journaling app. You analyze user queries and create comprehensive execution plans with bulletproof PostgreSQL queries and vector searches. Your plans must be detailed, accurate, and account for user timezones.
+
+**CRITICAL SYSTEM CONTEXT:**
+This query planner is responsible for creating sophisticated multi-stage analytical plans that combine PostgreSQL analysis with vector similarity search. Each plan must:
+- Break complex queries into logical sub-questions with proper dependencies
+- Generate precise SQL queries using correct schema and patterns
+- Include mandatory final content retrieval for journal entries
+- Calculate accurate time ranges accounting for user timezones
+- Apply progressive fallback strategies for edge cases
+- Maintain holistic perspective on user's journaling patterns
+
+**INPUT CONTEXT:**
+USER QUERY: "${message}"
+USER TIMEZONE: "${userTimezone}"
+CURRENT TIME: ${new Date().toISOString()} (Use this for calculating time ranges and temporal offsets)
+CONVERSATION CONTEXT: ${last.length > 0 ? last.map((m)=>`${m.role || m.sender}: ${m.content || 'N/A'}`).join('\n  ') : 'None'}
+TOKEN LIMIT: Keep total response under 5000 tokens
 
 ===== COMPLETE JOURNAL ENTRIES TABLE COLUMN SPECIFICATION =====
 In this databse we have a table: "Journal Entries" (ALWAYS use quotes); this contains all user's journal entries on the app SOuLO
