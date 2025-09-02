@@ -729,97 +729,17 @@ Similarity: ${entry.similarity || 'N/A'}`;
       });
     }
     
-    // Parse the JSON response since the prompt expects structured output
-    let consolidatedResponse = rawResponse.trim();
-    let userStatusMessage = null;
+    // Parse the JSON response using the existing sanitization function
+    const sanitizedOutput = sanitizeConsolidatorOutput(rawResponse);
+    let consolidatedResponse = sanitizedOutput.responseText || rawResponse.trim();
+    let userStatusMessage = sanitizedOutput.statusMsg || null;
     
-    try {
-      // Try to parse as JSON since the prompt expects structured output
-      const responseObj = JSON.parse(rawResponse);
-      consolidatedResponse = responseObj.response || rawResponse;
-      
-      // Normalize the response content to handle escaped characters
-      if (consolidatedResponse && typeof consolidatedResponse === 'string') {
-        consolidatedResponse = consolidatedResponse
-          .replace(/\\n\\n/g, '\n\n')
-          .replace(/\\n/g, '\n')
-          .replace(/\\(\*|_|\[|\]|\(|\)|#)/g, '$1');
-      }
-      
-      userStatusMessage = responseObj.userStatusMessage || null;
-      
-      console.log(`[CONSOLIDATION SUCCESS GEMINI] ${consolidationId}:`, {
-        responseLength: consolidatedResponse?.length || 0,
-        hasStatusMessage: !!userStatusMessage,
-        responsePreview: consolidatedResponse?.substring(0, 150) || 'empty'
-      });
-    } catch (parseError) {
-      console.error(`[CONSOLIDATOR GEMINI] Failed to parse expected JSON response:`, parseError);
-      console.error(`[CONSOLIDATOR GEMINI] Raw response:`, rawResponse);
-      
-      // Enhanced fallback: Try to extract content from malformed JSON
-      try {
-        // Multiple extraction strategies for malformed JSON
-        let extractedResponse = null;
-        let extractedStatus = null;
-        
-        // Strategy 1: Simple quoted field extraction
-        const responseMatch = rawResponse.match(/"response"\s*:\s*"([^"]+)"/);
-        const userStatusMatch = rawResponse.match(/"userStatusMessage"\s*:\s*"([^"]+)"/);
-        
-        if (responseMatch) {
-          extractedResponse = responseMatch[1];
-          extractedStatus = userStatusMatch ? userStatusMatch[1] : null;
-        } else {
-          // Strategy 2: Extract multi-line response content (handles escaped quotes)
-          const multiLineResponseMatch = rawResponse.match(/"response"\s*:\s*"((?:[^"\\]|\\.)*)"/s);
-          const multiLineStatusMatch = rawResponse.match(/"userStatusMessage"\s*:\s*"((?:[^"\\]|\\.)*)"/s);
-          
-          if (multiLineResponseMatch) {
-            extractedResponse = multiLineResponseMatch[1]
-              .replace(/\\"/g, '"')
-              .replace(/\\n\\n/g, '\n\n')
-              .replace(/\\n/g, '\n')
-              .replace(/\\(\*|_|\[|\]|\(|\)|#)/g, '$1');
-            extractedStatus = multiLineStatusMatch ? multiLineStatusMatch[1].replace(/\\"/g, '"') : null;
-          } else {
-            // Strategy 3: Extract everything between response field markers
-            const responseContentMatch = rawResponse.match(/"response"\s*:\s*"([^"]*(?:\\.[^"]*)*)"/);
-            if (responseContentMatch) {
-              extractedResponse = responseContentMatch[1]
-                .replace(/\\"/g, '"')
-                .replace(/\\n\\n/g, '\n\n')
-                .replace(/\\n/g, '\n')
-                .replace(/\\(\*|_|\[|\]|\(|\)|#)/g, '$1');
-            }
-          }
-        }
-        
-        if (extractedResponse) {
-          consolidatedResponse = extractedResponse;
-          userStatusMessage = extractedStatus;
-          console.log(`[CONSOLIDATOR GEMINI] Extracted from malformed JSON:`, {
-            responseLength: consolidatedResponse?.length || 0,
-            hasStatusMessage: !!userStatusMessage,
-            extractionStrategy: responseMatch ? 'simple' : 'multi-line'
-          });
-        } else {
-          // Final fallback to plain text
-          consolidatedResponse = rawResponse.trim();
-          userStatusMessage = null;
-        }
-      } catch (extractError) {
-        // Final fallback to plain text
-        consolidatedResponse = rawResponse.trim();
-        userStatusMessage = null;
-      }
-      
-      console.log(`[CONSOLIDATION SUCCESS GEMINI] ${consolidationId}:`, {
-        responseLength: consolidatedResponse?.length || 0,
-        responsePreview: consolidatedResponse?.substring(0, 150) || 'empty',
-        fallbackMode: true
-      });
-    }
+    console.log(`[CONSOLIDATION SUCCESS GEMINI] ${consolidationId}:`, {
+      responseLength: consolidatedResponse?.length || 0,
+      hasStatusMessage: !!userStatusMessage,
+      responsePreview: consolidatedResponse?.substring(0, 150) || 'empty',
+      fallbackMode: !sanitizedOutput.isValidJSON
+    });
 
     // Store analysis data in chat_messages if messageId provided
     if (messageId) {
