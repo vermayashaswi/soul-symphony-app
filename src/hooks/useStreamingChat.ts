@@ -574,6 +574,9 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     });
 
     try {
+      // Add correlation ID for request tracking and duplicate prevention
+      const correlationId = `${targetThreadId}_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+      
       const { data, error } = await invokeWithBackoff({
         message,
         userId,
@@ -583,6 +586,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
         streamingMode: false,
         requestId,
         userTimezone,
+        correlationId // Add for debugging duplicate responses
       }, { attempts: 3, baseDelay: 900 }, targetThreadId);
       
       // Check if request is still active
@@ -603,8 +607,15 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
         throw new Error(error?.message || 'Request failed');
       }
 
-      // Extract userStatusMessage for dynamic streaming and update messages
+      // CRITICAL FIX: Enhanced userStatusMessage extraction for both GPT and Gemini flows
       const userStatusMessage = data?.userStatusMessage;
+      
+      console.log(`[useStreamingChat] userStatusMessage extraction debug:`, {
+        hasUserStatusMessage: data?.hasUserStatusMessage,
+        userStatusMessage: data?.userStatusMessage,
+        dataKeys: Object.keys(data || {}),
+        correlationId
+      });
       
       // Update streaming messages with userStatusMessage if available
       if (userStatusMessage && userStatusMessage.trim()) {

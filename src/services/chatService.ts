@@ -275,7 +275,12 @@ export async function processChatMessage(
       throw new Error(`Query planner error: ${queryPlanResponse.error.message}`);
     }
 
-    const queryPlan = queryPlanResponse.data?.queryPlan || {};
+    // CRITICAL FIX: Extract queryPlan correctly from Gemini response structure
+    const queryPlan = queryPlanResponse.data?.queryPlan || queryPlanResponse.data || {};
+    
+    // Extract userStatusMessage for dynamic streaming (CRITICAL FOR GEMINI FLOW)
+    const userStatusMessage = queryPlan.userStatusMessage || 'Processing your request...';
+    console.log(`[ChatService] Extracted userStatusMessage: "${userStatusMessage}" from ${useGemini ? 'Gemini' : 'GPT'} planner`);
     
     // Log database-aware dual-search enforcement
     if (queryPlan.searchConfidence <= 0.9) {
@@ -300,6 +305,7 @@ export async function processChatMessage(
         threadId,
         conversationContext,
         queryPlan,
+        userStatusMessage, // CRITICAL: Pass userStatusMessage to chat-with-rag
         useAllEntries: queryPlan.useAllEntries || false,
         hasPersonalPronouns: queryPlan.hasPersonalPronouns || false,
         hasExplicitTimeReference: queryPlan.hasExplicitTimeReference || false,

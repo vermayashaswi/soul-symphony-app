@@ -35,7 +35,9 @@ serve(async (req) => {
       messageId = null,
       conversationContext = [],
       userProfile = null,
-      userTimezone = 'UTC'
+      userTimezone = 'UTC',
+      userStatusMessage: passedUserStatusMessage, // CRITICAL: Extract from chatService
+      correlationId
     } = await req.json();
 
     console.log(`[chat-with-rag] Processing query: "${message}" for user: ${userId} (threadId: ${threadId}, messageId: ${messageId})`);
@@ -243,9 +245,20 @@ serve(async (req) => {
       let finalResponse;
       let userStatusMessage;
       
-      // Extract userStatusMessage from query planner (for dynamic streaming)
-      userStatusMessage = queryPlan?.userStatusMessage || null;
+      // CRITICAL FIX: Extract userStatusMessage from multiple sources (for dynamic streaming)
+      userStatusMessage = passedUserStatusMessage || 
+                         queryPlan?.userStatusMessage || 
+                         queryPlanResponse.data?.userStatusMessage || 
+                         queryPlanResponse.data?.queryPlan?.userStatusMessage || 
+                         'Analyzing your query...';
       console.log("[chat-with-rag] Extracted userStatusMessage from query planner:", userStatusMessage);
+      console.log("[chat-with-rag] userStatusMessage sources:", {
+        passedFromChatService: passedUserStatusMessage,
+        fromQueryPlan: queryPlan?.userStatusMessage,
+        fromQueryPlannerData: queryPlanResponse.data?.userStatusMessage,
+        fromQueryPlannerQueryPlan: queryPlanResponse.data?.queryPlan?.userStatusMessage,
+        finalUserStatusMessage: userStatusMessage
+      });
       
       console.log("[chat-with-rag] Consolidation response structure:", {
         hasData: !!consolidationResponse.data,
@@ -323,6 +336,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({
         response: finalResponse,
         userStatusMessage: userStatusMessage,
+        hasUserStatusMessage: true, // CRITICAL: Flag for frontend extraction
         assistantMessageId: assistantMessageId, // Include the assistant message ID in response
         metadata: {
           classification: classification,
