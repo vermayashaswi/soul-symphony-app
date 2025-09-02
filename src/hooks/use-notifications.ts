@@ -112,60 +112,9 @@ export const useNotifications = () => {
                 });
               }
               
-              // Immediate update for bell icon
+              // Reload for new notifications only - no debounce needed for bell updates
               loadNotificationsStable();
               loadUnreadCountStable();
-            }
-          }
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'user_app_notifications',
-            filter: `user_id=eq.${userId}`
-          },
-          (payload) => {
-            console.log('[useNotifications] Real-time notification update:', payload);
-            // Only process if user is still the same and component is mounted
-            if (currentUserIdRef.current === userId && isMountedRef.current) {
-              const updatedNotification = payload.new as AppNotification;
-              
-              // Immediate optimistic update to local state
-              setNotifications(prev => 
-                prev.map(notification => 
-                  notification.id === updatedNotification.id 
-                    ? updatedNotification
-                    : notification
-                ).filter(n => !n.dismissed_at) // Remove dismissed notifications immediately
-              );
-              
-              // Immediate unread count update with validation
-              const wasUnread = !payload.old?.read_at && updatedNotification.read_at;
-              const wasRead = payload.old?.read_at && !updatedNotification.read_at;
-              const wasDismissed = !payload.old?.dismissed_at && updatedNotification.dismissed_at;
-              
-              if (wasUnread || wasDismissed) {
-                setUnreadCount(prev => Math.max(0, prev - 1));
-              } else if (wasRead) {
-                setUnreadCount(prev => prev + 1);
-              }
-              
-              // Validate unread count consistency
-              setTimeout(() => {
-                if (isMountedRef.current && currentUserIdRef.current === userId) {
-                  setUnreadCount(prev => {
-                    const currentNotifications = notifications.filter(n => !n.read_at && !n.dismissed_at);
-                    const actualCount = currentNotifications.length;
-                    if (Math.abs(prev - actualCount) > 1) {
-                      console.log('[useNotifications] Count validation - correcting from', prev, 'to', actualCount);
-                      return actualCount;
-                    }
-                    return prev;
-                  });
-                }
-              }, 100);
             }
           }
         )
@@ -419,7 +368,12 @@ export const useNotifications = () => {
         throw error;
       }
 
-      // No delayed consistency check needed - real-time updates handle this
+      // Debounced consistency check
+      setTimeout(() => {
+        if (isMountedRef.current && currentUserIdRef.current === userId) {
+          loadUnreadCountStable();
+        }
+      }, 500);
     } catch (error: any) {
       console.error('[useNotifications] Error marking notification as read:', error);
       
@@ -467,7 +421,12 @@ export const useNotifications = () => {
         throw error;
       }
 
-      // No delayed consistency check needed - real-time updates handle this
+      // Debounced consistency check
+      setTimeout(() => {
+        if (isMountedRef.current && currentUserIdRef.current === userId) {
+          loadUnreadCountStable();
+        }
+      }, 500);
     } catch (error: any) {
       console.error('[useNotifications] Error marking notification as unread:', error);
       
@@ -575,7 +534,13 @@ export const useNotifications = () => {
         throw error;
       }
 
-      // No delayed consistency check needed - real-time updates handle this
+      // Immediate consistency check
+      setTimeout(() => {
+        if (isMountedRef.current && currentUserIdRef.current === userId) {
+          loadNotificationsStable();
+          loadUnreadCountStable();
+        }
+      }, 100);
     } catch (error: any) {
       console.error('[useNotifications] Error marking all notifications as read:', error);
       
