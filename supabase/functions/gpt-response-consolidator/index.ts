@@ -581,7 +581,7 @@ Similarity: ${entry.similarity || 'N/A'}`;
     - CRITICAL: Remember that you are talking to a normal user. Don't use words like "semantic search", "vector analysis", "sql data", "userID" etc.
     - Do not include trailing explanations or extra fields`;
 
-    console.log(`[CONSOLIDATION GEMINI] ${consolidationId}: Calling Gemini API with model gemini-2.5-flash-lite`);
+    console.log(`[CONSOLIDATION GEMINI] ${consolidationId}: Calling Gemini API with model gemini-2.5-flash`);
 
     // Enhanced Gemini API call with better error handling and retry mechanism
     let response;
@@ -594,7 +594,7 @@ Similarity: ${entry.similarity || 'N/A'}`;
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-        response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent', {
+        response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent', {
             method: 'POST',
             headers: {
               'x-goog-api-key': googleApiKey,
@@ -815,7 +815,7 @@ Similarity: ${entry.similarity || 'N/A'}`;
           totalResults: researchResults.length,
           userStatusMessage,
           timestamp: new Date().toISOString(),
-          modelUsed: 'gemini-2.5-flash-lite',
+          modelUsed: 'gemini-2.5-flash',
           processingSuccess: true,
           hasProcessedSummaries: researchResults.some((r: any) => !!r?.executionSummary),
           processedSummaries: researchResults.map((r: any) => r?.executionSummary).filter(Boolean),
