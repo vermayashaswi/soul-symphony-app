@@ -7,7 +7,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+const googleApiKey = Deno.env.get('GOOGLE_API');
 
 // JSON sanitization utilities for consolidator
 function stripCodeFences(s: string): string {
@@ -53,7 +53,7 @@ function sanitizeConsolidatorOutput(raw: string): { responseText: string; status
   const meta: Record<string, any> = { hadCodeFence: /```/i.test(raw || '') };
   try {
     if (!raw) {
-      console.error('[CONSOLIDATOR] Empty response from OpenAI API');
+      console.error('[CONSOLIDATOR GEMINI] Empty response from Gemini API');
       return { responseText: 'I ran into a formatting issue preparing your insights. Let\'s try again.', statusMsg: null, meta };
     }
     let s = stripCodeFences(raw);
@@ -70,7 +70,7 @@ function sanitizeConsolidatorOutput(raw: string): { responseText: string; status
             parsed = JSON.parse(jsonStr);
             meta.parsedExtracted = true;
           } catch {
-            console.error('[CONSOLIDATOR] Failed to parse extracted JSON:', jsonStr);
+            console.error('[CONSOLIDATOR GEMINI] Failed to parse extracted JSON:', jsonStr);
           }
         }
       }
@@ -81,7 +81,7 @@ function sanitizeConsolidatorOutput(raw: string): { responseText: string; status
     }
     return { responseText: s, statusMsg: null, meta };
   } catch (e) {
-    console.error('[CONSOLIDATOR] Sanitization error:', e);
+    console.error('[CONSOLIDATOR GEMINI] Sanitization error:', e);
     return { responseText: raw, statusMsg: null, meta };
   }
 }
@@ -102,9 +102,9 @@ serve(async (req) => {
     const threadId = raw.threadId;
     
     // Generate unique consolidation ID for tracking
-    const consolidationId = `cons_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const consolidationId = `cons_gemini_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
-    console.log(`[CONSOLIDATION START] ${consolidationId}:`, { 
+    console.log(`[CONSOLIDATION START GEMINI] ${consolidationId}:`, { 
       userMessage: userMessage?.substring(0, 100),
       researchResultsCount: researchResults?.length || 0,
       contextCount: conversationContext?.length || 0,
@@ -136,7 +136,7 @@ serve(async (req) => {
 
     // Data integrity validation - check for processed research results
     if (researchResults && researchResults.length > 0) {
-      console.log(`[RESEARCH DATA VALIDATION] ${consolidationId}:`, {
+      console.log(`[RESEARCH DATA VALIDATION GEMINI] ${consolidationId}:`, {
         totalResults: researchResults.length,
         resultTypes: researchResults.map((r: any, i: number) => ({
           index: i,
@@ -159,7 +159,7 @@ serve(async (req) => {
         (r?.executionSummary?.resultType === 'journal_content_retrieval' && r.executionSummary?.count > 0)
       );
         
-      console.log(`[DATA SUMMARY] ${consolidationId}:`, {
+      console.log(`[DATA SUMMARY GEMINI] ${consolidationId}:`, {
         hasProcessedSummaries,
         hasRawResults,
         hasJournalEntries, // PHASE 4 FIX: Log journal entries availability
@@ -217,14 +217,14 @@ serve(async (req) => {
         return [...vectorEntries, ...sampleEntries];
       }).filter(entry => entry.content && entry.content.length > 0);
 
-      console.log(`[${consolidationId}] Extracted ${journalEntries.length} journal entries for GPT integration`);
+      console.log(`[${consolidationId}] Extracted ${journalEntries.length} journal entries for Gemini integration`);
       
       // PHASE 4 FIX: Enhanced validation and logging for journal entries
       if (!hasJournalEntries) {
         console.warn(`[${consolidationId}] No journal entries found from mandatory vector search - responses may lack specific examples`);
       } else {
         const entryCount = journalEntries?.length || 0;
-        console.log(`[${consolidationId}] Successfully extracted ${entryCount} journal entries for GPT integration`);
+        console.log(`[${consolidationId}] Successfully extracted ${entryCount} journal entries for Gemini integration`);
         
         if (entryCount > 0) {
           const entriesWithContent = journalEntries.filter((e: any) => e.content && e.content.length > 50);
@@ -331,10 +331,10 @@ serve(async (req) => {
     
     const timezoneFormat = formatTimezoneForGPT(rawUserTimezone, {
       includeUTCOffset: true,
-      functionName: 'gpt-response-consolidator'
+      functionName: 'gpt-response-consolidator-gemini'
     });
     
-    console.log(`[CONSOLIDATOR] ${consolidationId} timezone info:`, {
+    console.log(`[CONSOLIDATOR GEMINI] ${consolidationId} timezone info:`, {
       rawTimezone: rawUserTimezone,
       normalizedTimezone: timezoneConversion.normalizedTimezone,
       currentTime: timezoneConversion.currentTime,
@@ -581,9 +581,9 @@ Similarity: ${entry.similarity || 'N/A'}`;
     - CRITICAL: Remember that you are talking to a normal user. Don't use words like "semantic search", "vector analysis", "sql data", "userID" etc.
     - Do not include trailing explanations or extra fields`;
 
-    console.log(`[CONSOLIDATION] ${consolidationId}: Calling OpenAI API with model gpt-4.1-nano-2025-04-14`);
+    console.log(`[CONSOLIDATION GEMINI] ${consolidationId}: Calling Gemini API with model gemini-2.5-flash-lite`);
 
-    // Enhanced OpenAI API call with better error handling and retry mechanism
+    // Enhanced Gemini API call with better error handling and retry mechanism
     let response;
     let rawResponse = '';
     let apiRetryCount = 0;
@@ -591,26 +591,37 @@ Similarity: ${entry.similarity || 'N/A'}`;
     
     while (apiRetryCount <= maxRetries) {
       try {
-        response = await fetch('https://api.openai.com/v1/chat/completions', {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+        response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent', {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${openAIApiKey}`,
+              'x-goog-api-key': googleApiKey,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              model: 'gpt-4.1-nano-2025-04-14',
-              messages: [
-                { role: 'system', content: 'You are Ruh by SOuLO, a warm and insightful wellness coach. You MUST return a valid JSON object with exactly two fields: "userStatusMessage" (exactly 5 words) and "response" (your complete analysis). NO other format is acceptable.' },
-                { role: 'user', content: consolidationPrompt }
+              contents: [
+                {
+                  parts: [
+                    {
+                      text: consolidationPrompt
+                    }
+                  ]
+                }
               ],
-              max_completion_tokens: 1500,
-              temperature: 0.7 // Add temperature for consistency
+              generationConfig: {
+                maxOutputTokens: 2000
+              }
             }),
+            signal: controller.signal
         });
+        
+        clearTimeout(timeoutId);
         
         if (response.ok) {
           const data = await response.json();
-          rawResponse = data?.choices?.[0]?.message?.content || '';
+          rawResponse = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
           
           // Validate response length and content
           if (rawResponse.trim().length > 50 && rawResponse.includes('"response"')) {
@@ -633,10 +644,10 @@ Similarity: ${entry.similarity || 'N/A'}`;
       }
     }
 
-    // Enhanced error handling for OpenAI API responses
+    // Enhanced error handling for Gemini API responses
     if (!response.ok) {
       const errText = await response.text();
-      console.error(`[${consolidationId}] OpenAI API error:`, {
+      console.error(`[${consolidationId}] Gemini API error:`, {
         status: response.status,
         statusText: response.statusText,
         errorBody: errText,
@@ -662,12 +673,12 @@ Similarity: ${entry.similarity || 'N/A'}`;
       });
     }
     
-    console.log(`[${consolidationId}] OpenAI raw response length:`, rawResponse.length);
-    console.log(`[${consolidationId}] OpenAI raw response preview:`, rawResponse.substring(0, 200));
+    console.log(`[${consolidationId}] Gemini raw response length:`, rawResponse.length);
+    console.log(`[${consolidationId}] Gemini raw response preview:`, rawResponse.substring(0, 200));
     
     // Enhanced validation for empty responses
     if (!rawResponse || rawResponse.trim().length === 0) {
-      console.error(`[${consolidationId}] Empty response from OpenAI API despite successful HTTP status`);
+      console.error(`[${consolidationId}] Empty response from Gemini API despite successful HTTP status`);
       const fallbackText = "I processed your request but encountered an issue generating the response. Could you try rephrasing your question?";
       return new Response(JSON.stringify({
         success: true,
@@ -706,14 +717,14 @@ Similarity: ${entry.similarity || 'N/A'}`;
       
       userStatusMessage = responseObj.userStatusMessage || null;
       
-      console.log(`[CONSOLIDATION SUCCESS] ${consolidationId}:`, {
+      console.log(`[CONSOLIDATION SUCCESS GEMINI] ${consolidationId}:`, {
         responseLength: consolidatedResponse?.length || 0,
         hasStatusMessage: !!userStatusMessage,
         responsePreview: consolidatedResponse?.substring(0, 150) || 'empty'
       });
     } catch (parseError) {
-      console.error(`[CONSOLIDATOR] Failed to parse expected JSON response:`, parseError);
-      console.error(`[CONSOLIDATOR] Raw response:`, rawResponse);
+      console.error(`[CONSOLIDATOR GEMINI] Failed to parse expected JSON response:`, parseError);
+      console.error(`[CONSOLIDATOR GEMINI] Raw response:`, rawResponse);
       
       // Enhanced fallback: Try to extract content from malformed JSON
       try {
@@ -756,7 +767,7 @@ Similarity: ${entry.similarity || 'N/A'}`;
         if (extractedResponse) {
           consolidatedResponse = extractedResponse;
           userStatusMessage = extractedStatus;
-          console.log(`[CONSOLIDATOR] Extracted from malformed JSON:`, {
+          console.log(`[CONSOLIDATOR GEMINI] Extracted from malformed JSON:`, {
             responseLength: consolidatedResponse?.length || 0,
             hasStatusMessage: !!userStatusMessage,
             extractionStrategy: responseMatch ? 'simple' : 'multi-line'
@@ -772,7 +783,7 @@ Similarity: ${entry.similarity || 'N/A'}`;
         userStatusMessage = null;
       }
       
-      console.log(`[CONSOLIDATION SUCCESS] ${consolidationId}:`, {
+      console.log(`[CONSOLIDATION SUCCESS GEMINI] ${consolidationId}:`, {
         responseLength: consolidatedResponse?.length || 0,
         responsePreview: consolidatedResponse?.substring(0, 150) || 'empty',
         fallbackMode: true
@@ -804,7 +815,7 @@ Similarity: ${entry.similarity || 'N/A'}`;
           totalResults: researchResults.length,
           userStatusMessage,
           timestamp: new Date().toISOString(),
-          modelUsed: 'gpt-4.1-nano-2025-04-14',
+          modelUsed: 'gemini-2.5-flash-lite',
           processingSuccess: true,
           hasProcessedSummaries: researchResults.some((r: any) => !!r?.executionSummary),
           processedSummaries: researchResults.map((r: any) => r?.executionSummary).filter(Boolean),
@@ -893,7 +904,7 @@ Similarity: ${entry.similarity || 'N/A'}`;
     });
 
   } catch (error) {
-    console.error('Error in GPT Response Consolidator:', error);
+    console.error('Error in GPT Response Consolidator (Gemini):', error);
     return new Response(JSON.stringify({ 
       success: false, 
       error: error.message,
