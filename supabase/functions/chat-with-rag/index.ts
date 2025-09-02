@@ -39,35 +39,10 @@ serve(async (req) => {
     } = await req.json();
 
     console.log(`[chat-with-rag] Processing query: "${message}" for user: ${userId} (threadId: ${threadId}, messageId: ${messageId})`);
-    console.log(`[chat-with-rag] SOLE ORCHESTRATOR - Will classify and route message`);
     
     // Generate correlation ID for this request
     const requestCorrelationId = crypto.randomUUID();
     console.log(`[chat-with-rag] Generated correlation ID: ${requestCorrelationId}`);
-    
-    // Get smart chat switch setting for dynamic function routing
-    let useGemini = false;
-    try {
-      const { data: featureFlags } = await supabaseClient
-        .from('feature_flags')
-        .select('name, is_enabled')
-        .eq('name', 'smartChatSwitch');
-      
-      useGemini = featureFlags?.[0]?.is_enabled === true;
-      console.log(`[chat-with-rag] Smart chat switch enabled: ${useGemini}`);
-    } catch (error) {
-      console.warn('[chat-with-rag] Error fetching feature flag, defaulting to GPT:', error);
-      useGemini = false;
-    }
-    
-    // Dynamic function names based on feature flag
-    const classifierFunction = useGemini ? 'chat-query-classifier-gemini' : 'chat-query-classifier';
-    const consolidatorFunction = useGemini ? 'gpt-response-consolidator-gemini' : 'gpt-response-consolidator';
-    const mentalHealthFunction = useGemini ? 'general-mental-health-chat-gemini' : 'general-mental-health-chat';
-    const clarificationFunction = useGemini ? 'gpt-clarification-generator-gemini' : 'gpt-clarification-generator';
-    const plannerFunction = useGemini ? 'smart-query-planner-gemini' : 'smart-query-planner';
-    
-    console.log(`[chat-with-rag] Using functions: classifier=${classifierFunction}, planner=${plannerFunction}, consolidator=${consolidatorFunction}, mentalHealth=${mentalHealthFunction}, clarification=${clarificationFunction}`);
     
     // Update user message with correlation ID to track RAG pipeline execution
     if (messageId) {
@@ -99,17 +74,17 @@ serve(async (req) => {
       issues: timezoneDebug.validation.issues
     });
 
-    // Step 1: ONLY Source of Classification - Always call classifier function
-    console.log("[chat-with-rag] Step 1: Query Classification - SOLE ORCHESTRATOR");
+    // Step 1: Query Classification with retry logic
+    console.log("[chat-with-rag] Step 1: Query Classification");
     
     const maxRetries = 3;
-    let lastError = null;
     let classification = null;
+    let lastError = null;
     
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      console.log(`[chat-with-rag] Classification attempt ${attempt}/${maxRetries} using ${classifierFunction}`);
+      console.log(`[chat-with-rag] Classification attempt ${attempt}/${maxRetries}`);
       
-      const classificationResponse = await supabaseClient.functions.invoke(classifierFunction, {
+      const classificationResponse = await supabaseClient.functions.invoke('chat-query-classifier', {
         body: { message, conversationContext }
       });
       
@@ -140,7 +115,6 @@ serve(async (req) => {
     }
 
     console.log(`[chat-with-rag] Query classified as: ${classification.category} (confidence: ${classification.confidence})`);
-    console.log(`[chat-with-rag] Classification reasoning: ${classification.reasoning}`);
 
     // Enhanced classification override for debugging
     if (req.headers.get('x-classification-hint')) {
@@ -182,7 +156,7 @@ serve(async (req) => {
       console.log("[chat-with-rag] EXECUTING: JOURNAL_SPECIFIC pipeline - full RAG processing");
       
       // Step 2: Enhanced Query Planning with timezone support
-      const queryPlanResponse = await supabaseClient.functions.invoke(plannerFunction, {
+      const queryPlanResponse = await supabaseClient.functions.invoke('smart-query-planner', {
         body: { 
           message, 
           userId, 
@@ -219,7 +193,7 @@ serve(async (req) => {
         } : null
       });
       
-      const consolidationResponse = await supabaseClient.functions.invoke(consolidatorFunction, {
+      const consolidationResponse = await supabaseClient.functions.invoke('gpt-response-consolidator', {
         body: {
           userMessage: message,
           researchResults: executionResult || [], // Processed results from smart query planner
@@ -332,7 +306,7 @@ serve(async (req) => {
       // Handle general mental health queries using dedicated function
       console.log(`[chat-with-rag] EXECUTING: GENERAL_MENTAL_HEALTH pipeline - general mental health chat`);
       
-      const generalResponse = await supabaseClient.functions.invoke(mentalHealthFunction, {
+      const generalResponse = await supabaseClient.functions.invoke('general-mental-health-chat', {
         body: {
           message: message,
           conversationContext: conversationContext,
@@ -346,13 +320,11 @@ serve(async (req) => {
 
       // Update the assistant message with the mental health response
       if (assistantMessageId && generalResponse.data) {
-        const responseContent = generalResponse.data.response || generalResponse.data;
         try {
           await supabaseClient
             .from('chat_messages')
             .update({
-              content: responseContent,
-              is_processing: false
+              content: generalResponse.data.response
             })
             .eq('id', assistantMessageId);
           console.log(`[chat-with-rag] Updated assistant message ${assistantMessageId} with mental health response`);
@@ -362,7 +334,7 @@ serve(async (req) => {
       }
 
       return new Response(JSON.stringify({
-        response: generalResponse.data.response || generalResponse.data,
+        response: generalResponse.data,
         assistantMessageId: assistantMessageId,
         metadata: {
           classification: classification,
@@ -377,7 +349,7 @@ serve(async (req) => {
       // Handle queries that need clarification
       console.log(`[chat-with-rag] EXECUTING: JOURNAL_SPECIFIC_NEEDS_CLARIFICATION pipeline - clarification request`);
       
-      const clarificationResponse = await supabaseClient.functions.invoke(clarificationFunction, {
+      const clarificationResponse = await supabaseClient.functions.invoke('gpt-clarification-generator', {
         body: {
           userMessage: message,
           conversationContext: conversationContext,

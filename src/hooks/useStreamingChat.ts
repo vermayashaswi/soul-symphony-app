@@ -140,25 +140,77 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
 
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-  // GEMINI FLOW ONLY - Backend invocation
-  const invokeWithBackoff = useCallback(async (
-    body: Record<string, any>,
-    options?: { attempts?: number; baseDelay?: number },
-    targetThreadId?: string
-  ): Promise<{ data: any; error: any }> => {
-    console.log('[useStreamingChat] GEMINI FLOW - Invoking chat-with-rag');
-    
-    // GEMINI FLOW ONLY - Always use chat-with-rag
-    return await supabase.functions.invoke('chat-with-rag', {
-      body: {
-        message: body.message,
-        userId: body.userId,
-        conversationContext: body.conversationContext,
-        threadId: body.threadId || targetThreadId,
-        userTimezone: body.userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone
+  // Backoff wrapper for supabase.functions.invoke with abort support
+  const invokeWithBackoff = useCallback(
+    async (
+      body: Record<string, any>,
+      options?: { attempts?: number; baseDelay?: number },
+      targetThreadId?: string
+    ): Promise<{ data: any; error: any }> => {
+      if (!targetThreadId) {
+        throw new Error('Missing target thread');
       }
-    });
-  }, []);
+
+      const attempts = options?.attempts ?? 3;
+      const baseDelay = options?.baseDelay ?? 900;
+      const threadState = getThreadState(targetThreadId);
+
+      let lastErr: any = null;
+      for (let i = 0; i < attempts; i++) {
+        // Check abort signal
+        if (threadState.abortController?.signal.aborted) {
+          throw new Error('Operation aborted');
+        }
+
+        try {
+          const category = (body as any)?.category || threadState.queryCategory;
+          let result: { data: any; error: any };
+
+          if (category === 'JOURNAL_SPECIFIC') {
+            result = (await supabase.functions.invoke('chat-with-rag', { body })) as { data: any; error: any };
+          } else if (category === 'GENERAL_MENTAL_HEALTH') {
+            const timeoutMs = 20000 + i * 5000;
+            const timeoutPromise = new Promise((_, rej) =>
+              setTimeout(() => rej(new Error('Request timed out')), timeoutMs)
+            );
+
+            result = (await Promise.race([
+              supabase.functions.invoke('general-mental-health-chat', { body }),
+              timeoutPromise,
+            ])) as { data: any; error: any };
+          } else {
+            const timeoutMs = 20000 + i * 5000;
+            const timeoutPromise = new Promise((_, rej) =>
+              setTimeout(() => rej(new Error('Request timed out')), timeoutMs)
+            );
+
+            result = (await Promise.race([
+              supabase.functions.invoke('general-mental-health-chat', { body }),
+              timeoutPromise,
+            ])) as { data: any; error: any };
+          }
+          
+          if ((result as any)?.error) {
+            lastErr = (result as any).error;
+            if (isEdgeFunctionError(lastErr) || isNetworkError(lastErr)) {
+              // retryable
+            } else {
+              return result;
+            }
+          } else {
+            return result;
+          }
+        } catch (e) {
+          lastErr = e;
+        }
+        
+        const delay = Math.min(6000, baseDelay * Math.pow(2, i)) + Math.floor(Math.random() * 250);
+        await sleep(delay);
+      }
+      return { data: null, error: lastErr || new Error('Unknown error') };
+    },
+    [isEdgeFunctionError, isNetworkError, getThreadState]
+  );
 
   const addStreamingMessage = useCallback((message: StreamingMessage, targetThreadId?: string) => {
     const activeThreadId = targetThreadId || threadId;
@@ -231,30 +283,78 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     });
   }, [threadId, updateThreadState]);
 
-  // GEMINI FLOW ONLY - No frontend dynamic messages, use backend userStatusMessage
+  // Generate streaming messages based on category
   const generateStreamingMessages = useCallback(async (
     message: string, 
-    targetThreadId?: string,
-    queryCategory?: string
+    category: string, 
+    conversationContext?: any[], 
+    userProfile?: any,
+    targetThreadId?: string
   ) => {
     const activeThreadId = targetThreadId || threadId;
     if (!activeThreadId) return;
 
-    console.log('[useStreamingChat] GEMINI FLOW - Using backend userStatusMessage, no frontend generation');
-    
-    // GEMINI FLOW: No frontend dynamic messages - backend userStatusMessage will drive display
-    updateThreadState(activeThreadId, {
-      useThreeDotFallback: true, // Use three-dot animation until backend provides userStatusMessage
-      dynamicMessages: [], // No frontend messages
-      translatedDynamicMessages: [],
-      currentMessageIndex: 0,
-      queryCategory: queryCategory || 'unknown',
-      expectedProcessingTime: 45000,
-      processingStartTime: Date.now()
-    });
-    
-    console.log('[useStreamingChat] GEMINI FLOW - Backend userStatusMessage will drive display');
-  }, [threadId, updateThreadState]);
+    // Only generate dynamic messages for journal-specific queries
+    if (category !== 'JOURNAL_SPECIFIC') {
+      updateThreadState(activeThreadId, {
+        useThreeDotFallback: true,
+        dynamicMessages: [],
+        currentMessageIndex: 0
+      });
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-streaming-messages', {
+        body: {
+          userMessage: message,
+          category,
+          conversationContext,
+          userProfile
+        }
+      });
+
+      if (error) throw error;
+
+      if (data.shouldUseFallback || !data.messages || data.messages.length === 0) {
+        updateThreadState(activeThreadId, {
+          useThreeDotFallback: true,
+          dynamicMessages: [],
+          translatedDynamicMessages: []
+        });
+      } else {
+        // Pre-translate all messages
+        const translatedMessages = await Promise.all(
+          data.messages.map(async (message: string) => {
+            if (currentLanguage === 'en') {
+              return message;
+            }
+            try {
+              const translated = await translate(message, 'en', undefined, true);
+              return translated || message;
+            } catch (error) {
+              console.error('[useStreamingChat] Error translating message:', error);
+              return message;
+            }
+          })
+        );
+
+        updateThreadState(activeThreadId, {
+          useThreeDotFallback: false,
+          dynamicMessages: data.messages,
+          translatedDynamicMessages: translatedMessages,
+          currentMessageIndex: 0
+        });
+      }
+    } catch (error) {
+      console.error('[useStreamingChat] Error generating streaming messages:', error);
+      updateThreadState(activeThreadId!, {
+        useThreeDotFallback: true,
+        dynamicMessages: [],
+        translatedDynamicMessages: []
+      });
+    }
+  }, [threadId, updateThreadState, translate, currentLanguage]);
 
   // Automatic retry function for failed messages
   const retryLastMessage = useCallback(async (targetThreadId?: string) => {
@@ -279,7 +379,10 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
 
     try {
       await generateStreamingMessages(
-        threadState.lastFailedMessage.message,
+        threadState.lastFailedMessage.message, 
+        'GENERAL_MENTAL_HEALTH', 
+        threadState.lastFailedMessage.conversationContext, 
+        threadState.lastFailedMessage.userProfile,
         activeThreadId
       );
 
@@ -503,24 +606,30 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
       console.error('[useStreamingChat] Error fetching user timezone:', error);
     }
 
-    // Enhanced message generation with dynamic categorization
-    console.log(`[useStreamingChat] Generating streaming messages and preparing for processing`);
-    
-    // Pre-classify message for better UX (will be validated by backend)
-    let preliminaryCategory = 'GENERAL_MENTAL_HEALTH';
-    if (/\b(journal|entry|entries|feeling|emotion|mood|confident|anxiety|stress|top emotions|last week)\b/i.test(message)) {
-      preliminaryCategory = 'JOURNAL_SPECIFIC';
+    // Classify message
+    let messageCategory = 'GENERAL_MENTAL_HEALTH';
+    try {
+      const { data: classificationData, error: classificationError } = await supabase.functions.invoke('chat-query-classifier', {
+        body: {
+          message,
+          conversationContext: conversationContext || []
+        }
+      });
+      
+      if (!classificationError && classificationData?.category) {
+        messageCategory = classificationData.category;
+        console.log(`[useStreamingChat] Message classified as: ${messageCategory} for thread: ${targetThreadId}`);
+      }
+    } catch (error) {
+      console.error('[useStreamingChat] Classification failed, using fallback:', error);
     }
+
+    updateThreadState(targetThreadId, { queryCategory: messageCategory });
+
+    await generateStreamingMessages(message, messageCategory, conversationContext, userProfile, targetThreadId);
     
-    // Setup messages based on flow type
-    await generateStreamingMessages(message, targetThreadId, preliminaryCategory);
-    
-    console.log(`[useStreamingChat] Pre-classified as ${preliminaryCategory}, messages setup complete`);
-    
-    updateThreadState(targetThreadId, { 
-      queryCategory: preliminaryCategory,
-      expectedProcessingTime: preliminaryCategory === 'JOURNAL_SPECIFIC' ? 45000 : 30000
-    });
+    const estimatedTime = messageCategory === 'JOURNAL_SPECIFIC' ? 65000 : 10000;
+    updateThreadState(targetThreadId, { expectedProcessingTime: estimatedTime });
 
     try {
       const { data, error } = await invokeWithBackoff({
@@ -531,6 +640,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
         userProfile: { ...userProfile, timezone: userTimezone },
         streamingMode: false,
         requestId,
+        category: messageCategory,
         userTimezone,
       }, { attempts: 3, baseDelay: 900 }, targetThreadId);
       
@@ -552,27 +662,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
         throw new Error(error?.message || 'Request failed');
       }
 
-      // Extract response and userStatusMessage for unified handling across both flows
       const text = data?.response ?? data?.data ?? data?.message ?? (typeof data === 'string' ? data : null);
-      const userStatusMessage = data?.userStatusMessage;
-      
-      console.log(`[useStreamingChat] Response received:`, {
-        hasResponse: !!text,
-        hasUserStatusMessage: !!userStatusMessage,
-        responseLength: text?.length
-      });
-
-      // CRITICAL FOR GEMINI FLOW: If we have userStatusMessage from backend, update display
-      if (userStatusMessage) {
-        updateThreadState(targetThreadId, {
-          dynamicMessages: [userStatusMessage],
-          translatedDynamicMessages: [userStatusMessage],
-          currentMessageIndex: 0,
-          useThreeDotFallback: false
-        });
-        console.log(`[useStreamingChat] Updated display with backend userStatusMessage: "${userStatusMessage}"`);
-      }
-
       if (text) {
         addStreamingMessage({
           type: 'final_response',
