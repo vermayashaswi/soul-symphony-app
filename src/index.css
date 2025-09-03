@@ -100,17 +100,6 @@
   body {
     @apply bg-background text-foreground;
   }
-  
-  /* Prevent flicker during initialization */
-  body.app-initializing * {
-    transform: none !important;
-    transition: none !important;
-  }
-  
-  body.app-ready * {
-    transition: transform 0.2s ease-out, opacity 0.2s ease-out;
-  }
-  
   /* Apply theme color to all page headers */
   h1, h2, h3 {
     @apply text-theme-color;
