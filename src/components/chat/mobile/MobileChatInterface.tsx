@@ -850,25 +850,39 @@ export default function MobileChatInterface({
         content: msg.content
       }));
       
-      // Fetch user profile with entry count for mobile interface
+      // Fetch user profile with ONLY approved fields using secure service
+      const { getChatUserProfile, ensureUserProfileExists } = await import('@/services/chat/profileService');
+      
       let userProfile: any = { journalEntryCount: 0 };
       try {
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('entry_count, timezone, display_name, full_name')
-          .eq('id', user.id)
-          .single();
-        
-        if (!profileError && profile) {
-          userProfile = {
-            journalEntryCount: profile.entry_count || 0,
-            timezone: profile.timezone,
-            displayName: profile.display_name,
-            fullName: profile.full_name
-          };
+        // First ensure profile exists (important for users with 0 entries)
+        const profileExists = await ensureUserProfileExists(user.id);
+        if (!profileExists) {
+          console.error('[MobileChatInterface] Could not ensure profile exists for user:', user.id);
+          toast({
+            title: "Profile Error",
+            description: "Could not access your profile. Please refresh the page.",
+            variant: "destructive"
+          });
+          return;
         }
+        
+        const profileData = await getChatUserProfile(user.id);
+        userProfile = profileData;
+        
+        console.log('[MobileChatInterface] Profile data fetched:', { 
+          userId: profileData.id, 
+          entryCount: profileData.journalEntryCount,
+          hasProfile: true 
+        });
       } catch (error) {
-        console.warn('[MobileChatInterface] Failed to fetch user profile:', error);
+        console.error('[MobileChatInterface] Failed to fetch user profile:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load user profile. Please try again.",
+          variant: "destructive"
+        });
+        return; // Don't proceed without profile data
       }
 
       await startStreamingChat(

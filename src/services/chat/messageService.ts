@@ -28,6 +28,18 @@ export const createChatMessage = async (
       .eq('user_id', userId)
       .maybeSingle(); // Use maybeSingle to handle non-existent threads gracefully
 
+    // Check authentication status
+    const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
+    if (authError || !currentUser) {
+      console.error('[createChatMessage] Authentication error:', authError);
+      return null;
+    }
+
+    if (currentUser.id !== userId) {
+      console.error('[createChatMessage] User ID mismatch:', { provided: userId, authenticated: currentUser.id });
+      return null;
+    }
+
     if (threadError) {
       console.error('[createChatMessage] Database error during thread verification:', {
         threadId,
@@ -272,6 +284,25 @@ export const saveMessage = async (
     return null;
   }
 
+  // Enhanced validation for users with 0 journal entries
+  try {
+    console.log('[saveMessage] Validating user profile and authentication...');
+    
+    // Ensure user profile exists (critical for users with 0 entries)
+    const { ensureUserProfileExists } = await import('./profileService');
+    const profileExists = await ensureUserProfileExists(userId);
+    
+    if (!profileExists) {
+      console.error('[saveMessage] Profile validation failed for user:', userId);
+      throw new Error('User profile not found or could not be created');
+    }
+    
+    console.log('[saveMessage] Profile validation successful for user:', userId);
+  } catch (profileError) {
+    console.error('[saveMessage] Profile validation error:', profileError);
+    // Continue with save attempt, but log the issue
+  }
+
   // Generate idempotency key if not provided
   const finalIdempotencyKey = idempotencyKey || generateIdempotencyKey(content, sender, threadId, userId);
 
@@ -310,7 +341,24 @@ export const saveMessage = async (
       request_correlation_id: (result as any).request_correlation_id
     });
   } else {
-    console.error('[saveMessage] Failed to save message');
+    console.error('[saveMessage] Failed to save message - will provide user feedback');
+    
+    // Enhanced error reporting for debugging users with 0 entries
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id, entry_count')
+        .eq('id', userId)
+        .single();
+      
+      console.error('[saveMessage] User profile check:', {
+        userId,
+        profileExists: !!profile,
+        entryCount: profile?.entry_count || 0
+      });
+    } catch (profileCheckError) {
+      console.error('[saveMessage] Profile check failed:', profileCheckError);
+    }
   }
   
   return result;

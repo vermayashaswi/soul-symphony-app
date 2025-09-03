@@ -691,7 +691,9 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       // Route ALL queries to chat-with-rag (restored original design)
       debugLog.addEvent("Routing", "Using chat-with-rag for all queries with streaming", "info");
       
-      // Fetch user profile with entry count
+      // Fetch user profile with ONLY approved fields using secure service
+      const { getChatUserProfile } = await import('@/services/chat/profileService');
+      
       let userProfile: any = {
         useAllEntries: queryClassification.useAllEntries || false,
         hasPersonalPronouns: message.toLowerCase().includes('i ') || message.toLowerCase().includes('my '),
@@ -701,24 +703,15 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       };
 
       try {
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('entry_count, timezone, display_name, full_name')
-          .eq('id', effectiveUserId)
-          .single();
-        
-        if (!profileError && profile) {
-          userProfile = {
-            ...userProfile,
-            journalEntryCount: profile.entry_count || 0,
-            timezone: profile.timezone,
-            displayName: profile.display_name,
-            fullName: profile.full_name
-          };
-          debugLog.addEvent("Profile Data", `User has ${profile.entry_count || 0} journal entries`, "info");
-        }
+        const profileData = await getChatUserProfile(effectiveUserId);
+        userProfile = {
+          ...userProfile,
+          ...profileData
+        };
+        debugLog.addEvent("Profile Data", `User has ${profileData.journalEntryCount || 0} journal entries`, "info");
       } catch (error) {
-        console.warn('[SmartChatInterface] Failed to fetch user profile:', error);
+        console.error('[SmartChatInterface] Failed to fetch user profile:', error);
+        debugLog.addEvent("Profile Data", `Profile fetch exception: ${error}`, "error");
       }
       
       // Start streaming chat for all queries

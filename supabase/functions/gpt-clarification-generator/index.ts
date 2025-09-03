@@ -52,7 +52,7 @@ ${processedContext.map((m) => `  [Message ${m.messageOrder}] ${m.role}: ${m.cont
 USER PROFILE:
 - Timezone: ${userTimezone}
 - Country: ${userCountry !== 'DEFAULT' ? userCountry : 'Unknown'}
-- Premium User: ${userProfile?.is_premium ? 'Yes' : 'No'}
+- Display Name: ${userProfile?.displayName || 'Not set'}
 - Journal Entries: ${userProfile?.journalEntryCount || 'Unknown count'}
 
 **CRITICAL DATE & TIME CONTEXT:**

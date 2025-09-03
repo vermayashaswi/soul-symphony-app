@@ -44,43 +44,20 @@ serve(async (req) => {
     
     console.log(`[chat-with-rag] Processing message for user with ${userProfile?.journalEntryCount || 0} journal entries`);
 
-    // Fetch complete user profile including country if not provided
-    let completeUserProfile = userProfile || {};
-    if (!completeUserProfile.country) {
-      try {
-        const { data: profileData, error: profileError } = await supabaseClient
-          .from('profiles')
-          .select('timezone, country, display_name')
-          .eq('id', userId)
-          .single();
-        
-        if (!profileError && profileData) {
-          completeUserProfile = {
-            timezone: profileData.timezone || userTimezone,
-            country: profileData.country || 'DEFAULT',
-            displayName: profileData.display_name,
-            ...userProfile
-          };
-          console.log(`[chat-with-rag] Fetched user profile: timezone=${completeUserProfile.timezone}, country=${completeUserProfile.country}`);
-        } else {
-          completeUserProfile = {
-            timezone: userTimezone,
-            country: 'DEFAULT',
-            displayName: null,
-            ...userProfile
-          };
-          console.log('[chat-with-rag] Using default profile data due to error:', profileError);
-        }
-      } catch (fetchError) {
-        console.error('[chat-with-rag] Error fetching user profile:', fetchError);
-        completeUserProfile = {
-          timezone: userTimezone,
-          country: 'DEFAULT',
-          displayName: null,
-          ...userProfile
-        };
-      }
-    }
+    // Use only approved user profile fields (no additional fetching from database)
+    let completeUserProfile = {
+      id: userProfile?.id || userId,
+      fullName: userProfile?.fullName || null,
+      displayName: userProfile?.displayName || null,
+      timezone: userProfile?.timezone || userTimezone,
+      country: userProfile?.country || 'DEFAULT',
+      journalEntryCount: userProfile?.journalEntryCount || 0,
+      reminderSettings: userProfile?.reminderSettings || {},
+      notificationPreferences: userProfile?.notificationPreferences || {},
+      createdAt: userProfile?.createdAt || new Date().toISOString()
+    };
+    
+    console.log(`[chat-with-rag] Using approved profile fields only: entryCount=${completeUserProfile.journalEntryCount}, timezone=${completeUserProfile.timezone}, country=${completeUserProfile.country}`);
 
     console.log(`[chat-with-rag] Processing query: "${message}" for user: ${userId} (threadId: ${threadId}, messageId: ${messageId})`);
     
