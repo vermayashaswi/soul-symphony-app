@@ -162,7 +162,7 @@ BEFORE classifying, you MUST:
 
 **📋 CLASSIFICATION CATEGORIES:**
 
-**JOURNAL_SPECIFIC**: Personal analysis requests that need the user's journal data
+**JOURNAL_SPECIFIC**: Personal analysis requests that need the user's journal data (Never classify as JOURNAL_SPECIFIC if user's entry count is 0)
 - "How have I been feeling lately?"
 - "Analyze my stress patterns"
 - "What triggers my anxiety based on my entries?"
