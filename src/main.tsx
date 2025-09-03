@@ -16,10 +16,6 @@ import { periodicSyncService } from './services/periodicSyncService'
 import { fcmNotificationService as pushNotificationService } from './services/fcmNotificationService'
 import { mobileErrorHandler } from './services/mobileErrorHandler'
 import { mobileOptimizationService } from './services/mobileOptimizationService'
-import { nativeAppInitService } from './services/nativeAppInitService'
-import { nativeIntegrationService } from './services/nativeIntegrationService'
-import { preloadCriticalImages } from './utils/imagePreloader'
-import { LoadingScreen } from './components/LoadingScreen'
 
 // Enhanced Font Loading System
 const initializeFontSystem = async () => {
@@ -191,145 +187,46 @@ const initializePWA = async () => {
   }
 };
 
-// Consolidated initialization with loading state management
-let appInitialized = false;
-let initializationPromise: Promise<void> | null = null;
-
-const initializeApp = async (): Promise<void> => {
-  if (appInitialized) return;
-  if (initializationPromise) return initializationPromise;
-
-  initializationPromise = (async () => {
-    try {
-      console.log('[App] Starting consolidated initialization...');
-      
-      // Run all initialization tasks in parallel for better performance
-      await Promise.all([
-        // Core system initialization
-        initializeFontSystem(),
-        mobileOptimizationService.initialize(),
-        
-        // Native app services (runs conditionally)
-        (async () => {
-          await nativeIntegrationService.initialize();
-          if (nativeIntegrationService.isRunningNatively()) {
-            await nativeAppInitService.initialize();
-            console.log('[App] Native services initialized');
-          } else {
-            // Initialize PWA only for web
-            await initializePWA();
-            console.log('[App] PWA services initialized');
-          }
-        })(),
-        
-        // UI optimizations
-        (async () => {
-          fixViewportHeight();
-          preloadCriticalImages();
-          
-          // Platform detection
-          if (/iPad|iPhone|iPod/.test(navigator.userAgent) || 
-              (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
-            document.documentElement.classList.add('ios-device');
-          }
-          
-          if (/Android/.test(navigator.userAgent)) {
-            document.documentElement.classList.add('android-device');
-          }
-        })()
-      ]);
-      
-      // Clean up any malformed paths
-      const currentPath = window.location.pathname;
-      if (currentPath.includes('https://') || currentPath.includes('soulo.online')) {
-        window.history.replaceState(null, '', '/');
-      }
-      
-      document.body.classList.add('app-initialized');
-      appInitialized = true;
-      
-      console.log('[App] Consolidated initialization complete');
-    } catch (error) {
-      console.error('[App] Initialization failed:', error);
-      mobileErrorHandler.handleError({
-        type: 'crash',
-        message: `App initialization failed: ${error}`
-      });
-      throw error;
+// Initialize systems
+const initializeApp = async () => {
+  try {
+    // Initialize font system first
+    await initializeFontSystem();
+    
+    // Initialize viewport fix
+    fixViewportHeight();
+    
+    // Initialize mobile optimizations early
+    await mobileOptimizationService.initialize();
+    
+    // Initialize PWA features
+    await initializePWA();
+    
+    // Detect iOS and set a class on the HTML element
+    if (/iPad|iPhone|iPod/.test(navigator.userAgent) || 
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
+      document.documentElement.classList.add('ios-device');
     }
-  })();
-  
-  return initializationPromise;
+    
+    // Detect Android and set a class
+    if (/Android/.test(navigator.userAgent)) {
+      document.documentElement.classList.add('android-device');
+    }
+    
+    console.log('[App] Initialization complete');
+  } catch (error) {
+    console.error('[App] Initialization failed:', error);
+    mobileErrorHandler.handleError({
+      type: 'crash',
+      message: `App initialization failed: ${error}`
+    });
+  }
 };
 
-// Simplified initialization-aware App component
-const InitializedApp: React.FC = () => {
-  const [isInitialized, setIsInitialized] = React.useState(appInitialized);
-  const [initError, setInitError] = React.useState<string | null>(null);
-  
-  React.useEffect(() => {
-    if (appInitialized) {
-      setIsInitialized(true);
-      return;
-    }
+// Start initialization
+initializeApp();
 
-    initializeApp()
-      .then(() => setIsInitialized(true))
-      .catch((error) => {
-        console.error('[InitializedApp] Initialization error:', error);
-        setInitError(error.toString());
-      });
-  }, []);
-  
-  if (initError) {
-    return (
-      <div style={{ 
-        minHeight: '100vh', 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center',
-        padding: '24px',
-        fontFamily: 'Inter, sans-serif'
-      }}>
-        <div style={{ 
-          display: 'flex', 
-          flexDirection: 'column', 
-          alignItems: 'center', 
-          gap: '16px', 
-          textAlign: 'center', 
-          maxWidth: '400px' 
-        }}>
-          <div style={{ fontSize: '32px' }}>⚠️</div>
-          <h2 style={{ fontSize: '20px', fontWeight: '600', color: '#dc2626' }}>Initialization Failed</h2>
-          <p style={{ color: '#6b7280' }}>
-            The app failed to initialize. Please refresh to try again.
-          </p>
-          <button 
-            onClick={() => window.location.reload()}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: '#3b82f6',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer'
-            }}
-          >
-            Refresh Page
-          </button>
-        </div>
-      </div>
-    );
-  }
-  
-  if (!isInitialized) {
-    return <LoadingScreen status="Initializing..." />;
-  }
-  
-  return <App />;
-};
-
-// Simple error boundary for theme provider issues
+// Error boundary specifically for theme provider issues
 interface ThemeErrorBoundaryState {
   hasError: boolean;
 }
@@ -345,58 +242,56 @@ class ThemeErrorBoundary extends React.Component<ThemeErrorBoundaryProps, ThemeE
   }
 
   static getDerivedStateFromError(error: any): ThemeErrorBoundaryState | null {
-    // Only catch theme provider errors
+    // Check if this is the specific theme provider error
     if (error?.message?.includes('useTheme must be used within a ThemeProvider')) {
-      console.error('[ThemeErrorBoundary] Theme provider error detected:', error);
+      console.warn('[ThemeErrorBoundary] Caught theme provider error, attempting recovery');
       return { hasError: true };
     }
     return null;
   }
 
   componentDidCatch(error: any, errorInfo: any) {
-    console.error('[ThemeErrorBoundary] Theme error:', error, errorInfo);
+    if (error?.message?.includes('useTheme must be used within a ThemeProvider')) {
+      console.error('[ThemeErrorBoundary] Theme provider error caught:', error, errorInfo);
+      // Force a re-render after a short delay to allow providers to initialize
+      setTimeout(() => {
+        this.setState({ hasError: false });
+      }, 100);
+    }
   }
 
   render() {
     if (this.state.hasError) {
-      // Simple fallback without recovery loop
+      // Return a minimal loading state while providers initialize
       return React.createElement('div', { 
         style: { 
           display: 'flex', 
           alignItems: 'center', 
           justifyContent: 'center', 
           height: '100vh',
-          fontFamily: 'Inter, sans-serif',
-          backgroundColor: '#ffffff',
-          color: '#000000'
+          fontFamily: 'Inter, sans-serif'
         } 
-      }, 'Theme initialization failed. Please refresh the page.');
+      }, 'Loading...');
     }
 
     return this.props.children;
   }
 }
 
-// Conditionally use StrictMode based on environment
-const isProduction = import.meta.env.PROD;
-const AppWithStrictMode = isProduction ? 
-  ({ children }: { children: React.ReactNode }) => <>{children}</> : 
-  React.StrictMode;
-
 ReactDOM.createRoot(document.getElementById('root')!).render(
-  <AppWithStrictMode>
+  <React.StrictMode>
     <ThemeErrorBoundary>
       <BrowserRouter>
         <ContextReadinessProvider>
           <ThemeProvider>
             <TranslationProvider>
               <AuthProvider>
-                <InitializedApp />
+                <App />
               </AuthProvider>
             </TranslationProvider>
           </ThemeProvider>
         </ContextReadinessProvider>
       </BrowserRouter>
     </ThemeErrorBoundary>
-  </AppWithStrictMode>,
+  </React.StrictMode>,
 )
