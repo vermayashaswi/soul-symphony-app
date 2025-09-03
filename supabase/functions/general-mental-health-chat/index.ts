@@ -95,7 +95,7 @@ serve(async (req) => {
 - User's country: ${userCountry !== 'DEFAULT' ? userCountry : 'Not specified'}
 - Journal entries written: ${userProfile?.journalEntryCount || 0} entries
 - Timezone validation: ${timezoneConversion.isValid ? 'VALID' : 'FAILED - using fallback'}
-Use this time and cultural context to provide appropriate greetings, time-aware responses, and culturally sensitive support (e.g., "Good morning" vs "Good evening", energy levels, daily rhythms, cultural considerations without stereotyping).
+Use this time and cultural context to provide appropriate greetings, time-aware responses, and culturally sensitive support (e.g., "Good morning" vs "Good evening", energy levels, daily rhythms, cultural considerations without stereotyping). Don't use timezone in your responses. Use user's country information for our responses instead.
 
 MANDATORY: DON'T EXCESSIVELY REPEAT YOURSELF. YOU CAN FIND OUT HOW TO BE NON-REPETITIVE BY LOOKING AT THE CONVERSATION CONTEXT PROVIDED TO YOU HERE!
 
