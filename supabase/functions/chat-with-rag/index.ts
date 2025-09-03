@@ -397,7 +397,8 @@ Once you have some journal entries, I'll be able to provide personalized insight
           await supabaseClient
             .from('chat_messages')
             .update({
-              content: generalResponse.data.response
+              content: generalResponse.data.response,
+              is_processing: false
             })
             .eq('id', assistantMessageId);
           console.log(`[chat-with-rag] Updated assistant message ${assistantMessageId} with mental health response`);
@@ -440,7 +441,8 @@ Once you have some journal entries, I'll be able to provide personalized insight
           await supabaseClient
             .from('chat_messages')
             .update({
-              content: clarificationResponse.data.response
+              content: clarificationResponse.data.response,
+              is_processing: false
             })
             .eq('id', assistantMessageId);
           console.log(`[chat-with-rag] Updated assistant message ${assistantMessageId} with clarification response`);
