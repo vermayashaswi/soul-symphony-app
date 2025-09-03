@@ -8,6 +8,166 @@ const corsHeaders = {
 
 const googleApiKey = Deno.env.get('GOOGLE_API');
 
+// Robust parsing utilities (copied from gpt-response-consolidator)
+function stripCodeFences(s: string): string {
+  return s.replace(/^```[a-zA-Z]*\n?/gm, '').replace(/^```\s*$/gm, '');
+}
+
+function extractFirstJsonObjectString(s: string): string | null {
+  const stripped = stripCodeFences(s.trim());
+  
+  // Find first opening brace
+  const openBraceIndex = stripped.indexOf('{');
+  if (openBraceIndex === -1) return null;
+  
+  let braceCount = 0;
+  let inString = false;
+  let escaped = false;
+  
+  for (let i = openBraceIndex; i < stripped.length; i++) {
+    const char = stripped[i];
+    
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    
+    if (char === '\\') {
+      escaped = true;
+      continue;
+    }
+    
+    if (char === '"' && !escaped) {
+      inString = !inString;
+      continue;
+    }
+    
+    if (!inString) {
+      if (char === '{') {
+        braceCount++;
+      } else if (char === '}') {
+        braceCount--;
+        if (braceCount === 0) {
+          return stripped.substring(openBraceIndex, i + 1);
+        }
+      }
+    }
+  }
+  
+  return null;
+}
+
+function normalizeKeys(obj: any): any {
+  if (obj === null || typeof obj !== 'object' || Array.isArray(obj)) {
+    return obj;
+  }
+  
+  const normalized: any = {};
+  for (const key in obj) {
+    if (obj.hasOwnProperty(key)) {
+      const lowerKey = key.toLowerCase();
+      normalized[lowerKey] = normalizeKeys(obj[key]);
+    }
+  }
+  return normalized;
+}
+
+function coalesceResponseFields(obj: any, raw: string): { response: string; userStatusMessage: string | null } {
+  // Normalize all keys to lowercase for flexible matching
+  const normalized = normalizeKeys(obj);
+  
+  // Try various field names for response content
+  let response = normalized.response || normalized.content || normalized.text || normalized.message || '';
+  
+  // Try various field names for status
+  let userStatusMessage = normalized.userstatusmessage || normalized.userstatus || normalized.status || normalized.statusmessage || null;
+  
+  // If no response found, use raw text as fallback
+  if (!response || typeof response !== 'string') {
+    response = raw;
+  }
+  
+  // Ensure userStatusMessage is string or null
+  if (userStatusMessage && typeof userStatusMessage !== 'string') {
+    userStatusMessage = String(userStatusMessage);
+  }
+  
+  return { response: response.trim(), userStatusMessage };
+}
+
+function sanitizeOutput(raw: string): { response: string; userStatusMessage: string | null } {
+  console.log('[Clarification Parser] Attempting to parse response:', raw.substring(0, 200) + '...');
+  
+  // Step 1: Try direct JSON parse
+  try {
+    const directParsed = JSON.parse(raw);
+    if (directParsed && typeof directParsed === 'object') {
+      console.log('[Clarification Parser] Direct JSON parse successful');
+      return coalesceResponseFields(directParsed, raw);
+    }
+  } catch (e) {
+    console.log('[Clarification Parser] Direct JSON parse failed:', e.message);
+  }
+  
+  // Step 2: Try to extract JSON object from mixed content
+  const jsonString = extractFirstJsonObjectString(raw);
+  if (jsonString) {
+    try {
+      const extractedParsed = JSON.parse(jsonString);
+      if (extractedParsed && typeof extractedParsed === 'object') {
+        console.log('[Clarification Parser] JSON extraction successful');
+        return coalesceResponseFields(extractedParsed, raw);
+      }
+    } catch (e) {
+      console.log('[Clarification Parser] Extracted JSON parse failed:', e.message);
+    }
+  }
+  
+  // Step 3: Regex fallback with improved handling
+  console.log('[Clarification Parser] Using regex fallback');
+  let response = raw;
+  let userStatusMessage: string | null = null;
+  
+  // Try to extract response field using regex (more robust)
+  const responseMatch = raw.match(/"response"\s*:\s*"((?:[^"\\]|\\.)*)"/s);
+  if (responseMatch) {
+    response = responseMatch[1]
+      .replace(/\\"/g, '"')
+      .replace(/\\n/g, '\n')
+      .replace(/\\t/g, '\t')
+      .replace(/\\\\/g, '\\');
+  }
+  
+  // Try to extract userStatusMessage using regex
+  const statusMatch = raw.match(/"userStatusMessage"\s*:\s*"((?:[^"\\]|\\.)*)"/s);
+  if (statusMatch) {
+    userStatusMessage = statusMatch[1]
+      .replace(/\\"/g, '"')
+      .replace(/\\n/g, '\n')
+      .replace(/\\t/g, '\t')
+      .replace(/\\\\/g, '\\');
+  }
+  
+  // Clean up response if no specific field was found
+  if (!responseMatch) {
+    response = raw
+      .replace(/^\s*\{?\s*/, '') // Remove leading brace
+      .replace(/\s*\}?\s*$/, '') // Remove trailing brace
+      .replace(/^"[^"]*":\s*"?/, '') // Remove field names
+      .replace(/"?\s*,?\s*"[^"]*":\s*"[^"]*"?$/, '') // Remove trailing fields
+      .replace(/\\"/g, '"')
+      .replace(/\\n/g, '\n')
+      .trim();
+  }
+  
+  console.log('[Clarification Parser] Final parsed result:', { 
+    responseLength: response.length, 
+    hasStatus: !!userStatusMessage 
+  });
+  
+  return { response: response.trim(), userStatusMessage };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -114,11 +274,21 @@ MANDATORY FORMATTING REQUIREMENTS:
 
 Keep responses concise and actionable. Match their energy but guide toward clarity. However, use bold words, italics, compulsory emojis wherever necessary in response
 
-Your response should be a JSON object with this structure:
+**CRITICAL JSON FORMATTING REQUIREMENTS:**
+Your response MUST be a valid JSON object with this EXACT structure. Do NOT include any text before or after the JSON:
+
 {
   "userStatusMessage": "exactly 5 words describing your clarification approach (e.g., 'Getting to the real question' or 'Clarifying what you need')",
   "response": "your focused clarification response with one clear follow-up question"
 }
+
+**JSON FORMATTING RULES:**
+- Start response with { and end with }
+- Use double quotes around all field names and string values
+- Do NOT use single quotes or unescaped quotes inside strings
+- Replace any internal quotes with contractions (e.g., "can't" instead of "can not")
+- Do NOT include markdown code fences or any text outside the JSON object
+- Ensure all special characters are properly escaped
 
 **CRITICAL ANTI-HALLUCINATION RULES:**
 🚫 **NEVER** claim to "remember" or "recall" information not explicitly provided in the conversation context
@@ -156,28 +326,8 @@ TONE and RESPONSE GUIDELINES: Direct when required, insightful, naturally warm, 
     const data = await response.json();
     const rawContent = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
-    let responseText = rawContent;
-    let userStatusMessage: string | null = null;
-
-    // Try to parse as JSON first
-    try {
-      const parsed = JSON.parse(rawContent);
-      if (parsed && typeof parsed === 'object') {
-        responseText = typeof parsed.response === 'string' && parsed.response.trim() ? parsed.response : rawContent;
-        userStatusMessage = typeof parsed.userStatusMessage === 'string' ? parsed.userStatusMessage : null;
-      }
-    } catch (_) {
-      // Fallback: regex extraction
-      const respMatch = rawContent.match(/\"response\"\s*:\s*\"([\s\S]*?)\"/m);
-      if (respMatch) {
-        responseText = respMatch[1].replace(/\\\"/g, '\"');
-      } else {
-        // Remove any userStatusMessage lines if present
-        responseText = rawContent.replace(/^\s*\"?userStatusMessage\"?\s*:\s*.*$/gmi, '').trim();
-      }
-      const statusMatch = rawContent.match(/\"userStatusMessage\"\s*:\s*\"([^\"]{0,100})\"/m);
-      if (statusMatch) userStatusMessage = statusMatch[1];
-    }
+    // Use robust parsing logic to handle all edge cases
+    const { response: responseText, userStatusMessage } = sanitizeOutput(rawContent);
 
     return new Response(JSON.stringify({
       success: true,
