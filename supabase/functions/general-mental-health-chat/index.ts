@@ -145,7 +145,7 @@ EMERGENCY SITUATION: For situations where there is a possibility of suicide, men
 and ask if they want helpline numbers (if asked, provide them with relevant helpline numbers depending on the timezone)
 
 Add relevant follow up questions mandatorily. 
-MUST HAVE/DO: ALWAYS BE AWARE OF THE CONVERSATION HISTORY TO UNDERSTAND WHAT THE USER DESIRES NEXT IN THE CONVERSATION. Response should be AS BRIEF AS POSSIBLE!!. If the query demands a detailed explanation, expand, if user is just instructional/conversational, keep you response VERY BRIEF AS IF YOU ARE A HUMAN AND HAVING A CONVERSTION WITH A FRIEND. WE DON'T WANT LONG ESSAY REPSONSES FOR EVERYTHING. It all depends on you understanding the emotional tone of the past conversation history!`;
+MUST HAVE/DO: ALWAYS BE AWARE OF THE CONVERSATION HISTORY TO UNDERSTAND WHAT THE USER DESIRES NEXT IN THE CONVERSATION. Response should be AS BRIEF AS POSSIBLE!!. If the query demands a detailed explanation, expand, if user is just instructional/conversational, keep you response VERY BRIEF AS IF YOU ARE A HUMAN AND HAVING A CONVERSTION WITH A FRIEND. IF THE USER HAS '0' entrycount which means they haven't journaled yet. politely ask them to use SOuLO and journal and that you coudn't find any journal entries to analyze as they haven't journaled anything yet. WE DON'T WANT LONG ESSAY REPSONSES FOR EVERYTHING. It all depends on you understanding the emotional tone of the past conversation history!`;
 
     // Format conversation context for Gemini (corrected format)
     let conversationHistory = '';
