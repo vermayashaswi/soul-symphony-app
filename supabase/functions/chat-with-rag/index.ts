@@ -186,49 +186,12 @@ serve(async (req) => {
       console.log(`[chat-with-rag] User has ${hasJournalEntries ? journalCount.length : 0} journal entries`);
       
       if (!hasJournalEntries) {
-        // User has no journal entries - provide helpful onboarding response
-        console.log("[chat-with-rag] No journal entries found - providing onboarding guidance");
+        console.log("[chat-with-rag] No journal entries found - routing to general mental health chat");
+        // Route to general mental health function which will intelligently handle journal prompting
+        classification.category = 'GENERAL_MENTAL_HEALTH';
+      } else {
         
-        const onboardingResponse = `I'd love to help you explore insights from your journal, but I notice you haven't created any journal entries yet! 📝
-
-To get the most out of our conversation, try:
-• Creating your first journal entry by sharing your thoughts, feelings, or experiences
-• Writing about your day, goals, or anything on your mind
-• Recording an audio journal entry if you prefer speaking
-
-Once you have some journal entries, I'll be able to provide personalized insights, patterns, and helpful analysis based on your unique journey. What would you like to journal about today?`;
-
-        // Update the assistant message with onboarding response
-        if (assistantMessageId) {
-          try {
-            await supabaseClient
-              .from('chat_messages')
-              .update({
-                content: onboardingResponse,
-                is_processing: false
-              })
-              .eq('id', assistantMessageId);
-            console.log(`[chat-with-rag] Updated assistant message ${assistantMessageId} with onboarding response`);
-          } catch (updateError) {
-            console.error('[chat-with-rag] Error updating assistant message:', updateError);
-          }
-        }
-
-        return new Response(JSON.stringify({
-          response: onboardingResponse,
-          assistantMessageId: assistantMessageId,
-          metadata: {
-            classification: classification,
-            strategy: 'onboarding_guidance',
-            userTimezone: userTimezone,
-            hasJournalEntries: false
-          }
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-      
-      // Step 2: Enhanced Query Planning with timezone support
+        // Step 2: Enhanced Query Planning with timezone support
       const queryPlanResponse = await supabaseClient.functions.invoke('smart-query-planner', {
         body: { 
           message, 
@@ -374,6 +337,8 @@ Once you have some journal entries, I'll be able to provide personalized insight
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
+      
+      } // End of else block for hasJournalEntries
 
     } else if (classification.category === 'GENERAL_MENTAL_HEALTH') {
       // Handle general mental health queries using dedicated function
