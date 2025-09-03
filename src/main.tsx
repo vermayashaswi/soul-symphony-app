@@ -262,33 +262,60 @@ const initializeApp = async (): Promise<void> => {
   return initializationPromise;
 };
 
-// Create initialization-aware App component
+// Simplified initialization-aware App component
 const InitializedApp: React.FC = () => {
   const [isInitialized, setIsInitialized] = React.useState(appInitialized);
   const [initError, setInitError] = React.useState<string | null>(null);
   
   React.useEffect(() => {
-    if (!appInitialized) {
-      initializeApp()
-        .then(() => setIsInitialized(true))
-        .catch((error) => setInitError(error.toString()));
+    if (appInitialized) {
+      setIsInitialized(true);
+      return;
     }
+
+    initializeApp()
+      .then(() => setIsInitialized(true))
+      .catch((error) => {
+        console.error('[InitializedApp] Initialization error:', error);
+        setInitError(error.toString());
+      });
   }, []);
   
   if (initError) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-6">
-        <div className="flex flex-col items-center space-y-4 text-center max-w-md">
-          <div className="text-4xl">⚠️</div>
-          <h2 className="text-xl font-semibold text-red-600">Initialization Failed</h2>
-          <p className="text-muted-foreground">
-            The app failed to initialize properly. This usually happens due to network issues or device compatibility.
+      <div style={{ 
+        minHeight: '100vh', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        padding: '24px',
+        fontFamily: 'Inter, sans-serif'
+      }}>
+        <div style={{ 
+          display: 'flex', 
+          flexDirection: 'column', 
+          alignItems: 'center', 
+          gap: '16px', 
+          textAlign: 'center', 
+          maxWidth: '400px' 
+        }}>
+          <div style={{ fontSize: '32px' }}>⚠️</div>
+          <h2 style={{ fontSize: '20px', fontWeight: '600', color: '#dc2626' }}>Initialization Failed</h2>
+          <p style={{ color: '#6b7280' }}>
+            The app failed to initialize. Please refresh to try again.
           </p>
           <button 
             onClick={() => window.location.reload()}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded-md"
+            style={{
+              padding: '8px 16px',
+              backgroundColor: '#3b82f6',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer'
+            }}
           >
-            Retry
+            Refresh Page
           </button>
         </div>
       </div>
@@ -296,13 +323,13 @@ const InitializedApp: React.FC = () => {
   }
   
   if (!isInitialized) {
-    return <LoadingScreen status="Initializing app..." />;
+    return <LoadingScreen status="Initializing..." />;
   }
   
   return <App />;
 };
 
-// Error boundary specifically for theme provider issues
+// Simple error boundary for theme provider issues
 interface ThemeErrorBoundaryState {
   hasError: boolean;
 }
@@ -318,36 +345,32 @@ class ThemeErrorBoundary extends React.Component<ThemeErrorBoundaryProps, ThemeE
   }
 
   static getDerivedStateFromError(error: any): ThemeErrorBoundaryState | null {
-    // Check if this is the specific theme provider error
+    // Only catch theme provider errors
     if (error?.message?.includes('useTheme must be used within a ThemeProvider')) {
-      console.warn('[ThemeErrorBoundary] Caught theme provider error, attempting recovery');
+      console.error('[ThemeErrorBoundary] Theme provider error detected:', error);
       return { hasError: true };
     }
     return null;
   }
 
   componentDidCatch(error: any, errorInfo: any) {
-    if (error?.message?.includes('useTheme must be used within a ThemeProvider')) {
-      console.error('[ThemeErrorBoundary] Theme provider error caught:', error, errorInfo);
-      // Force a re-render after a short delay to allow providers to initialize
-      setTimeout(() => {
-        this.setState({ hasError: false });
-      }, 100);
-    }
+    console.error('[ThemeErrorBoundary] Theme error:', error, errorInfo);
   }
 
   render() {
     if (this.state.hasError) {
-      // Return a minimal loading state while providers initialize
+      // Simple fallback without recovery loop
       return React.createElement('div', { 
         style: { 
           display: 'flex', 
           alignItems: 'center', 
           justifyContent: 'center', 
           height: '100vh',
-          fontFamily: 'Inter, sans-serif'
+          fontFamily: 'Inter, sans-serif',
+          backgroundColor: '#ffffff',
+          color: '#000000'
         } 
-      }, 'Loading...');
+      }, 'Theme initialization failed. Please refresh the page.');
     }
 
     return this.props.children;
