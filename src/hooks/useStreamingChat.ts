@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { showEdgeFunctionRetryToast } from '@/utils/toast-messages';
 import { useTranslation } from '@/contexts/TranslationContext';
+import { useChatErrorHandler } from './useChatErrorHandler';
 
 export interface StreamingMessage {
   type: 'user_message' | 'backend_task' | 'progress' | 'final_response' | 'error';
@@ -69,6 +70,7 @@ const threadStates = new Map<string, ThreadStreamingState>();
 
 export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStreamingChatProps = {}) => {
   const { translate, currentLanguage } = useTranslation();
+  const { handleError } = useChatErrorHandler();
 
   // Get or create thread-specific state
   const getThreadState = useCallback((id: string): ThreadStreamingState => {
@@ -200,12 +202,26 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
           } else {
             return result;
           }
-        } catch (e) {
-          lastErr = e;
-        }
+      } catch (e) {
+        lastErr = e;
         
+        // Check for specific error types and handle accordingly
+        const errorMessage = e?.message || e?.toString() || '';
+        
+        // For RLS or authentication errors, don't retry
+        if (errorMessage.includes('violates row-level security') || 
+            errorMessage.includes('authentication') ||
+            errorMessage.includes('unauthorized')) {
+          console.error('[useStreamingChat] Authentication/RLS error, not retrying:', e);
+          return { data: null, error: e };
+        }
+      }
+      
+      // Only delay if we have more attempts left
+      if (i < attempts - 1) {
         const delay = Math.min(6000, baseDelay * Math.pow(2, i)) + Math.floor(Math.random() * 250);
         await sleep(delay);
+      }
       }
       return { data: null, error: lastErr || new Error('Unknown error') };
     },
@@ -250,8 +266,9 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
         updates.activeRequestId = null;
         
         if (threadState.abortController) {
-          threadState.abortController = null;
+          threadState.abortController.abort();
         }
+        updates.abortController = null;
         
         onFinalResponse?.(message.response || '', message.analysis, activeThreadId, message.requestId || null);
         break;
@@ -259,17 +276,24 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
         updates.isStreaming = false;
         updates.showBackendAnimation = false;
         updates.activeRequestId = null;
+        updates.isRetrying = false;
+        updates.retryAttempts = 0;
+        updates.lastFailedMessage = null;
         
         if (threadState.abortController) {
-          threadState.abortController = null;
+          threadState.abortController.abort();
         }
+        updates.abortController = null;
         
-        onError?.(message.error || 'Unknown error occurred');
+        // Handle error with improved error handling
+        const errorMessage = message.error || 'Unknown error occurred';
+        handleError(new Error(errorMessage));
+        onError?.(errorMessage);
         break;
     }
 
     updateThreadState(activeThreadId, updates);
-  }, [threadId, getThreadState, updateThreadState, onFinalResponse, onError]);
+  }, [threadId, getThreadState, updateThreadState, onFinalResponse, onError, handleError]);
 
   // Reset retry state when starting new conversation
   const resetRetryState = useCallback((targetThreadId?: string) => {
@@ -507,24 +531,28 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
       return;
     }
     
-    const graceMs = 45000;
-    const budget = (state.expectedProcessingTime ?? 60000) + graceMs;
+    const graceMs = 30000; // Reduced from 45000
+    const budget = (state.expectedProcessingTime ?? 45000) + graceMs; // Reduced default from 60000
     const startedAt = state.processingStartTime ?? Date.now();
-    const remaining = Math.max(5000, budget - (Date.now() - startedAt));
+    const remaining = Math.max(3000, budget - (Date.now() - startedAt)); // Reduced minimum from 5000
     
     const timer = setTimeout(() => {
       if (threadId && getThreadState(threadId).isStreaming) {
         console.warn(`[useStreamingChat] Safety guard triggered for thread: ${threadId}`);
+        
+        // Force cleanup of streaming state
+        updateThreadState(threadId, {
+          isStreaming: false,
+          showBackendAnimation: false,
+          activeRequestId: null,
+          isRetrying: false
+        });
+        
         addStreamingMessage({
           type: 'error',
-          error: 'Connection seems unstable. Please retry.',
+          error: 'Request timed out. Please try again.',
           timestamp: Date.now()
         }, threadId);
-        
-        const currentState = getThreadState(threadId);
-        if (currentState.lastFailedMessage) {
-          updateThreadState(threadId, { lastFailedMessage: currentState.lastFailedMessage });
-        }
       }
     }, remaining);
     

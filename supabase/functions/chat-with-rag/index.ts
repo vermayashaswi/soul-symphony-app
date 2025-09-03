@@ -193,6 +193,58 @@ serve(async (req) => {
     if (classification.category === 'JOURNAL_SPECIFIC') {
       console.log("[chat-with-rag] EXECUTING: JOURNAL_SPECIFIC pipeline - full RAG processing");
       
+      // Check if user has any journal entries first
+      const { data: journalCount, error: countError } = await supabaseClient
+        .from('Journal Entries')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', userId);
+      
+      const hasJournalEntries = !countError && journalCount && journalCount.length > 0;
+      console.log(`[chat-with-rag] User has ${hasJournalEntries ? journalCount.length : 0} journal entries`);
+      
+      if (!hasJournalEntries) {
+        // User has no journal entries - provide helpful onboarding response
+        console.log("[chat-with-rag] No journal entries found - providing onboarding guidance");
+        
+        const onboardingResponse = `I'd love to help you explore insights from your journal, but I notice you haven't created any journal entries yet! 📝
+
+To get the most out of our conversation, try:
+• Creating your first journal entry by sharing your thoughts, feelings, or experiences
+• Writing about your day, goals, or anything on your mind
+• Recording an audio journal entry if you prefer speaking
+
+Once you have some journal entries, I'll be able to provide personalized insights, patterns, and helpful analysis based on your unique journey. What would you like to journal about today?`;
+
+        // Update the assistant message with onboarding response
+        if (assistantMessageId) {
+          try {
+            await supabaseClient
+              .from('chat_messages')
+              .update({
+                content: onboardingResponse,
+                is_processing: false
+              })
+              .eq('id', assistantMessageId);
+            console.log(`[chat-with-rag] Updated assistant message ${assistantMessageId} with onboarding response`);
+          } catch (updateError) {
+            console.error('[chat-with-rag] Error updating assistant message:', updateError);
+          }
+        }
+
+        return new Response(JSON.stringify({
+          response: onboardingResponse,
+          assistantMessageId: assistantMessageId,
+          metadata: {
+            classification: classification,
+            strategy: 'onboarding_guidance',
+            userTimezone: userTimezone,
+            hasJournalEntries: false
+          }
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
       // Step 2: Enhanced Query Planning with timezone support
       const queryPlanResponse = await supabaseClient.functions.invoke('smart-query-planner', {
         body: { 
