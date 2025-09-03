@@ -634,13 +634,14 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
       console.error('[useStreamingChat] Error fetching user timezone:', error);
     }
 
-    // Classify message
+    // Classify message with userProfile
     let messageCategory = 'GENERAL_MENTAL_HEALTH';
     try {
       const { data: classificationData, error: classificationError } = await supabase.functions.invoke('chat-query-classifier', {
         body: {
           message,
-          conversationContext: conversationContext || []
+          conversationContext: conversationContext || [],
+          userProfile: userProfile || {}
         }
       });
       

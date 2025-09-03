@@ -850,12 +850,33 @@ export default function MobileChatInterface({
         content: msg.content
       }));
       
+      // Fetch user profile with entry count for mobile interface
+      let userProfile: any = { journalEntryCount: 0 };
+      try {
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('entry_count, timezone, display_name, full_name')
+          .eq('id', user.id)
+          .single();
+        
+        if (!profileError && profile) {
+          userProfile = {
+            journalEntryCount: profile.entry_count || 0,
+            timezone: profile.timezone,
+            displayName: profile.display_name,
+            fullName: profile.full_name
+          };
+        }
+      } catch (error) {
+        console.warn('[MobileChatInterface] Failed to fetch user profile:', error);
+      }
+
       await startStreamingChat(
         message,
         user.id,
         currentThreadId,
         conversationContext,
-        {}
+        userProfile
       );
 
       // PHASE 5: Background operations (don't block streaming)

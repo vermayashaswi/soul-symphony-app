@@ -19,6 +19,7 @@ serve(async (req) => {
   const body = await req.json().catch(() => null);
   const message = body?.message;
   const conversationContext = Array.isArray(body?.conversationContext) ? body.conversationContext : [];
+  const userProfile = body?.userProfile || {};
 
   if (!message) {
     return new Response(
@@ -41,7 +42,7 @@ serve(async (req) => {
     }
 
     // Use Gemini for natural conversation flow classification
-    const classification = await geminiClassifyMessage(message, conversationContext, googleApiKey);
+    const classification = await geminiClassifyMessage(message, conversationContext, userProfile, googleApiKey);
 
     console.log(`[Query Classifier Gemini] Result: ${classification.category}`);
 
@@ -65,6 +66,7 @@ serve(async (req) => {
 async function geminiClassifyMessage(
   message, 
   conversationContext, 
+  userProfile,
   apiKey
 ) {
   
@@ -75,6 +77,31 @@ async function geminiClassifyMessage(
     return {
       category: 'GENERAL_MENTAL_HEALTH'
     };
+  }
+
+  // Check for zero journal entries and journal-specific classification
+  const journalEntryCount = userProfile?.journalEntryCount || 0;
+  console.log(`[Query Classifier] User has ${journalEntryCount} journal entries`);
+
+  // For users with no journal entries who ask journal-specific questions
+  if (journalEntryCount === 0) {
+    // Quick check if this looks like a journal analysis request
+    const journalSpecificPatterns = [
+      /\b(analyze|analysis|insights?|patterns?|trends?)\b.*\b(my|me|i)\b/i,
+      /\b(how (have|am) i|what.*my|my.*entries?|my.*journal)\b/i,
+      /\b(rate|score|assess|evaluate).*\b(my|me|i)\b/i,
+      /\b(my (mood|emotion|feeling|stress|anxiety|depression))/i
+    ];
+
+    const looksLikeJournalSpecific = journalSpecificPatterns.some(pattern => pattern.test(trimmed));
+    
+    if (looksLikeJournalSpecific) {
+      return {
+        category: 'GENERAL_MENTAL_HEALTH',
+        response: "I'd love to analyze your journal entries, but it looks like you haven't created any yet! Start by writing your first journal entry, then I can provide personalized insights about your patterns and emotions.",
+        skipPipeline: true
+      };
+    }
   }
 
   // Enhanced conversation context processing - last 10 messages with proper ordering

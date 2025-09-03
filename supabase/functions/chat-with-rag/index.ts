@@ -28,19 +28,25 @@ serve(async (req) => {
       }
     );
 
+    // Parse request body
+    const body = await req.json();
     const { 
       message, 
       userId, 
       threadId = null, 
       messageId = null,
       conversationContext = [],
-      userProfile = null,
+      userProfile = {},
+      requestId,
+      category,
       userTimezone = 'UTC'
-    } = await req.json();
+    } = body;
+    
+    console.log(`[chat-with-rag] Processing message for user with ${userProfile?.journalEntryCount || 0} journal entries`);
 
     // Fetch complete user profile including country if not provided
-    let completeUserProfile = userProfile;
-    if (!completeUserProfile || !completeUserProfile.country) {
+    let completeUserProfile = userProfile || {};
+    if (!completeUserProfile.country) {
       try {
         const { data: profileData, error: profileError } = await supabaseClient
           .from('profiles')

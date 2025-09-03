@@ -691,18 +691,43 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       // Route ALL queries to chat-with-rag (restored original design)
       debugLog.addEvent("Routing", "Using chat-with-rag for all queries with streaming", "info");
       
+      // Fetch user profile with entry count
+      let userProfile: any = {
+        useAllEntries: queryClassification.useAllEntries || false,
+        hasPersonalPronouns: message.toLowerCase().includes('i ') || message.toLowerCase().includes('my '),
+        hasExplicitTimeReference: /\b(last week|yesterday|this week|last month|today|recently|lately)\b/i.test(message),
+        threadMetadata: {},
+        journalEntryCount: 0
+      };
+
+      try {
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('entry_count, timezone, display_name, full_name')
+          .eq('id', effectiveUserId)
+          .single();
+        
+        if (!profileError && profile) {
+          userProfile = {
+            ...userProfile,
+            journalEntryCount: profile.entry_count || 0,
+            timezone: profile.timezone,
+            displayName: profile.display_name,
+            fullName: profile.full_name
+          };
+          debugLog.addEvent("Profile Data", `User has ${profile.entry_count || 0} journal entries`, "info");
+        }
+      } catch (error) {
+        console.warn('[SmartChatInterface] Failed to fetch user profile:', error);
+      }
+      
       // Start streaming chat for all queries
       await startStreamingChat(
         message,
         effectiveUserId,
         threadId,
         conversationContext,
-        {
-          useAllEntries: queryClassification.useAllEntries || false,
-          hasPersonalPronouns: message.toLowerCase().includes('i ') || message.toLowerCase().includes('my '),
-          hasExplicitTimeReference: /\b(last week|yesterday|this week|last month|today|recently|lately)\b/i.test(message),
-          threadMetadata: {}
-        }
+        userProfile
       );
       
       // Streaming owns the lifecycle - NO manual state clearing needed
