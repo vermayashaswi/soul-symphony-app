@@ -168,10 +168,10 @@ export function TranslatableMarkdown({
   // Add context-specific adjustments - must always be calculated
   let contextualStyles: React.CSSProperties = {};
   if (enableFontScaling && scalingContext === 'compact') {
+    // Remove truncation styles that were causing message cut-off
+    // Keep compact scaling for font sizing but allow full content display
     contextualStyles = {
       ...contextualStyles,
-      overflow: 'hidden',
-      textOverflow: 'ellipsis',
     };
   }
 
