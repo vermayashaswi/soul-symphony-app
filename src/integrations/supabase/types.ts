@@ -1368,6 +1368,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      sync_all_user_entry_counts: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       sync_reminder_settings_to_notifications: {
         Args: { p_user_id: string }
         Returns: Json
@@ -1399,6 +1403,15 @@ export type Database = {
       validate_thread_ownership: {
         Args: { p_thread_id: string; p_user_id: string }
         Returns: boolean
+      }
+      verify_entry_count_integrity: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          actual_count: number
+          is_synced: boolean
+          profile_count: number
+          user_id: string
+        }[]
       }
       verify_vector_operations: {
         Args: Record<PropertyKey, never>
