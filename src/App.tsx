@@ -19,6 +19,7 @@ import { SessionTrackingProvider } from './contexts/SessionTrackingContext';
 import { nativeAppInitService } from './services/nativeAppInitService';
 import { mobileErrorHandler } from './services/mobileErrorHandler';
 import PullToRefresh from './components/system/PullToRefresh';
+import { AnimationReadinessProvider } from '@/contexts/AnimationReadinessProvider';
 
 const App: React.FC = () => {
   const [isInitialized, setIsInitialized] = useState(false);
@@ -153,21 +154,23 @@ const App: React.FC = () => {
   return (
     <ErrorBoundary onError={handleAppError}>
       <AuthErrorBoundary>
-        <FeatureFlagsProvider>
-          <SubscriptionProvider>
-            <TutorialProvider>
-              <MusicPlayerProvider>
-                <JournalProcessingInitializer />
-              <PullToRefresh>
-                <AppRoutes />
-                <TutorialOverlay />
-                <Toaster />
-                <SonnerToaster position="top-right" />
-              </PullToRefresh>
-              </MusicPlayerProvider>
-            </TutorialProvider>
-          </SubscriptionProvider>
-        </FeatureFlagsProvider>
+        <AnimationReadinessProvider>
+          <FeatureFlagsProvider>
+            <SubscriptionProvider>
+              <TutorialProvider>
+                <MusicPlayerProvider>
+                  <JournalProcessingInitializer />
+                <PullToRefresh>
+                  <AppRoutes />
+                  <TutorialOverlay />
+                  <Toaster />
+                  <SonnerToaster position="top-right" />
+                </PullToRefresh>
+                </MusicPlayerProvider>
+              </TutorialProvider>
+            </SubscriptionProvider>
+          </FeatureFlagsProvider>
+        </AnimationReadinessProvider>
       </AuthErrorBoundary>
     </ErrorBoundary>
   );

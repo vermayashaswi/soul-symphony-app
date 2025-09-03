@@ -1,8 +1,9 @@
 
 import React, { useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { useTheme } from '@/hooks/use-theme';
-import { useAnimationCenter } from '@/utils/arrow-positioning';
+import { useStableAnimationCenter } from '@/hooks/useStableAnimationCenter';
+import { useStableThemeColors } from '@/hooks/useStableThemeColors';
+import { useAnimationReadiness } from '@/contexts/AnimationReadinessProvider';
 
 interface EnergyAnimationProps {
   className?: string;
@@ -16,84 +17,47 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
   bottomNavOffset = false
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  // Defensive hook usage to prevent runtime errors during app initialization
-  let colorTheme = 'Default';
-  let customColor = '#3b82f6';
+  const { isReady } = useAnimationReadiness();
   
-  try {
-    const themeData = useTheme();
-    colorTheme = themeData.colorTheme;
-    customColor = themeData.customColor || '#3b82f6';
-  } catch (error) {
-    // ThemeProvider not ready, using defaults
-  }
-  
-  // Determine the base color to use based on the user's selected theme
-  const getThemeColors = () => {
-    switch(colorTheme) {
-      case 'Calm':
-        return {
-          main: 'rgba(139,92,246,0.6)',
-          secondary: 'rgba(124,58,237,0.4)',
-          tertiary: 'rgba(109,40,217,0.2)',
-          pulse: 'rgba(139,92,246,0.8)',
-          light: 'rgba(186,230,253,0.5)'
-        };
-      case 'Energy':
-        return {
-          main: 'rgba(245,158,11,0.6)',
-          secondary: 'rgba(234,88,12,0.4)',
-          tertiary: 'rgba(194,65,12,0.2)',
-          pulse: 'rgba(245,158,11,0.8)',
-          light: 'rgba(254,240,138,0.5)'
-        };
-      case 'Soothing':
-        return {
-          main: 'rgba(255,222,226,0.6)',
-          secondary: 'rgba(248,180,184,0.4)',
-          tertiary: 'rgba(244,114,182,0.2)',
-          pulse: 'rgba(244,114,182,0.8)',
-          light: 'rgba(253,242,248,0.5)'
-        };
-      case 'Focus':
-        return {
-          main: 'rgba(16,185,129,0.6)',
-          secondary: 'rgba(5,150,105,0.4)',
-          tertiary: 'rgba(6,95,70,0.2)',
-          pulse: 'rgba(16,185,129,0.8)',
-          light: 'rgba(209,250,229,0.5)'
-        };
-      case 'Custom':
-        // For custom color, we need to convert hex to rgba
-        const hexToRgba = (hex: string, alpha: number): string => {
-          const r = parseInt(hex.slice(1, 3), 16);
-          const g = parseInt(hex.slice(3, 5), 16);
-          const b = parseInt(hex.slice(5, 7), 16);
-          return `rgba(${r},${g},${b},${alpha})`;
-        };
+  // Use stable hooks that prevent flickering during initialization
+  const colors = useStableThemeColors();
+  const animationCenter = useStableAnimationCenter(bottomNavOffset, 1.07);
+
+  // Show static placeholder during initialization to prevent flickering
+  if (!isReady) {
+    return (
+      <div 
+        ref={containerRef}
+        className={`absolute ${fullScreen ? 'fixed inset-0' : 'w-full h-full'} 
+                   ${bottomNavOffset ? 'bottom-16' : 'bottom-0'} 
+                   left-0 right-0 ${bottomNavOffset ? 'top-0' : 'top-0'} overflow-hidden opacity-70 z-0 ${className}`}
+        style={{ pointerEvents: 'none' }}
+      >
+        {/* Static center glow during initialization */}
+        <div 
+          className="absolute z-10"
+          style={{
+            left: animationCenter.x,
+            top: animationCenter.y,
+            transform: 'translate(-50%, -50%)'
+          }}
+        >
+          <div 
+            className="w-32 h-32 rounded-full blur-3xl opacity-50 transition-opacity duration-500"
+            style={{ backgroundColor: colors.pulse }}
+          />
+        </div>
         
-        return {
-          main: hexToRgba(customColor, 0.6),
-          secondary: hexToRgba(customColor, 0.4),
-          tertiary: hexToRgba(customColor, 0.2),
-          pulse: hexToRgba(customColor, 0.8),
-          light: 'rgba(255,255,255,0.5)' // Default light for custom
-        };
-      default: // Default case - including the 'Default' theme which is blue
-        return {
-          main: 'rgba(59,130,246,0.6)',
-          secondary: 'rgba(37,99,235,0.4)',
-          tertiary: 'rgba(29,78,216,0.2)',
-          pulse: 'rgba(59,130,246,0.8)',
-          light: 'rgba(219,234,254,0.5)'
-        };
-    }
-  };
-  
-  const colors = getThemeColors();
-  
-  // Use consistent positioning with arrow button (1.07 offset) - aligned with JournalNavigationButton
-  const animationCenter = useAnimationCenter(bottomNavOffset, 1.07);
+        {/* Static background gradients */}
+        <div 
+          className="absolute inset-0 transition-opacity duration-500"
+          style={{ 
+            background: `linear-gradient(to bottom right, ${colors.main}10, ${colors.secondary}10, ${colors.tertiary}10)`
+          }}
+        />
+      </div>
+    );
+  }
   
   return (
     <div 
@@ -119,8 +83,8 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-20 h-20 rounded-full bg-white blur-md opacity-80"></div>
       </div>
       
-      {/* Expanded radiating pulses with staggered transitions */}
-      {[...Array(15)].map((_, index) => (
+      {/* Reduced radiating pulses for better performance */}
+      {[...Array(8)].map((_, index) => (
         <motion.div
           key={index}
           className="absolute rounded-full"
@@ -167,8 +131,8 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
         }}
       ></div>
       
-      {/* Additional smaller, faster pulses with improved timing */}
-      {[...Array(24)].map((_, index) => (
+      {/* Reduced smaller pulses for better performance */}
+      {[...Array(12)].map((_, index) => (
         <motion.div
           key={`small-${index}`}
           className="absolute rounded-full"
@@ -201,8 +165,8 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
         />
       ))}
       
-      {/* Ultra-small particles with random paths for added fluidity */}
-      {[...Array(40)].map((_, index) => (
+      {/* Reduced particles for better performance */}
+      {[...Array(20)].map((_, index) => (
         <motion.div
           key={`particle-${index}`}
           className="absolute rounded-full bg-white/80"
