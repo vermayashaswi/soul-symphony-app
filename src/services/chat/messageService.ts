@@ -256,7 +256,7 @@ const generateIdempotencyKey = (content: string, sender: 'user' | 'assistant', t
   return `${sender}_${threadId}_${userId || 'anon'}_${contentHash}_${timestamp}`;
 };
 
-// Updated saveMessage function with correct signature and idempotency support
+// Updated saveMessage function with comprehensive error handling and retry logic
 export const saveMessage = async (
   threadId: string, 
   content: string, 
@@ -270,37 +270,73 @@ export const saveMessage = async (
   analysisData?: any,
   correlationId?: string
 ) => {
+  const requestId = correlationId || `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  
   console.log('[saveMessage] Starting message save:', {
     threadId,
     sender,
     userId,
     contentLength: content.length,
     hasIdempotencyKey: !!idempotencyKey,
-    hasCorrelationId: !!correlationId
+    requestId
   });
 
   if (!userId) {
     console.error('[saveMessage] User ID is required for saveMessage');
-    return null;
+    throw new Error('Authentication required - user ID missing');
   }
 
-  // Enhanced validation for users with 0 journal entries
-  try {
-    console.log('[saveMessage] Validating user profile and authentication...');
-    
-    // Ensure user profile exists (critical for users with 0 entries)
-    const { ensureUserProfileExists } = await import('./profileService');
-    const profileExists = await ensureUserProfileExists(userId);
-    
-    if (!profileExists) {
-      console.error('[saveMessage] Profile validation failed for user:', userId);
-      throw new Error('User profile not found or could not be created');
+  // Enhanced profile validation with retry mechanism
+  let retryCount = 0;
+  const maxRetries = 2;
+  
+  while (retryCount <= maxRetries) {
+    try {
+      console.log(`[saveMessage] Attempt ${retryCount + 1}/${maxRetries + 1} - Validating user authentication and profile...`);
+      
+      // Critical: Ensure user profile exists BEFORE attempting message save
+      const { ensureUserProfileExists, getChatUserProfile } = await import('./profileService');
+      
+      // Step 1: Ensure profile exists
+      const profileExists = await ensureUserProfileExists(userId);
+      if (!profileExists) {
+        throw new Error('Failed to create or validate user profile');
+      }
+      
+      // Step 2: Verify authentication state
+      const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
+      if (authError || !currentUser || currentUser.id !== userId) {
+        console.error('[saveMessage] Authentication verification failed:', {
+          authError,
+          currentUserId: currentUser?.id,
+          requestedUserId: userId
+        });
+        throw new Error('Authentication state invalid');
+      }
+      
+      // Step 3: Get and validate user profile data
+      const userProfile = await getChatUserProfile(userId);
+      console.log('[saveMessage] Profile validation successful:', {
+        userId: userProfile.id,
+        entryCount: userProfile.journalEntryCount,
+        hasTimezone: !!userProfile.timezone,
+        requestId
+      });
+      
+      break; // Success, exit retry loop
+      
+    } catch (profileError) {
+      retryCount++;
+      console.error(`[saveMessage] Profile validation attempt ${retryCount} failed:`, profileError);
+      
+      if (retryCount > maxRetries) {
+        console.error('[saveMessage] All profile validation attempts failed');
+        throw new Error(`Profile validation failed after ${maxRetries + 1} attempts: ${profileError.message}`);
+      }
+      
+      // Wait before retry
+      await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
     }
-    
-    console.log('[saveMessage] Profile validation successful for user:', userId);
-  } catch (profileError) {
-    console.error('[saveMessage] Profile validation error:', profileError);
-    // Continue with save attempt, but log the issue
   }
 
   // Generate idempotency key if not provided
@@ -331,33 +367,80 @@ export const saveMessage = async (
   if (analysisData) additionalData.analysis_data = analysisData;
   if (correlationId) (additionalData as any).request_correlation_id = correlationId;
 
-  console.log('[saveMessage] Processed data, calling createChatMessage with idempotency key:', finalIdempotencyKey);
-  const result = await createChatMessage(threadId, processedContent, sender, userId, additionalData);
+  console.log('[saveMessage] Processed data, calling createChatMessage with enhanced error handling');
   
-  if (result) {
-    console.log('[saveMessage] Message saved successfully:', {
-      id: result.id,
-      idempotency_key: result.idempotency_key,
-      request_correlation_id: (result as any).request_correlation_id
-    });
-  } else {
-    console.error('[saveMessage] Failed to save message - will provide user feedback');
-    
-    // Enhanced error reporting for debugging users with 0 entries
+  // Enhanced message saving with retry mechanism
+  let saveRetryCount = 0;
+  const maxSaveRetries = 2;
+  let result = null;
+  
+  while (saveRetryCount <= maxSaveRetries) {
     try {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('id, entry_count')
-        .eq('id', userId)
-        .single();
+      console.log(`[saveMessage] Message save attempt ${saveRetryCount + 1}/${maxSaveRetries + 1}, requestId: ${requestId}`);
       
-      console.error('[saveMessage] User profile check:', {
-        userId,
-        profileExists: !!profile,
-        entryCount: profile?.entry_count || 0
-      });
-    } catch (profileCheckError) {
-      console.error('[saveMessage] Profile check failed:', profileCheckError);
+      result = await createChatMessage(threadId, processedContent, sender, userId, additionalData);
+      
+      if (result) {
+        console.log('[saveMessage] Message saved successfully:', {
+          id: result.id,
+          idempotency_key: result.idempotency_key,
+          request_correlation_id: requestId,
+          attempt: saveRetryCount + 1
+        });
+        break; // Success, exit retry loop
+      } else {
+        throw new Error('createChatMessage returned null');
+      }
+      
+    } catch (saveError) {
+      saveRetryCount++;
+      console.error(`[saveMessage] Save attempt ${saveRetryCount} failed:`, saveError);
+      
+      // Enhanced error analysis
+      const errorMessage = saveError?.message || saveError?.toString() || 'Unknown error';
+      
+      // Don't retry for certain error types
+      if (errorMessage.includes('row-level security') || 
+          errorMessage.includes('authentication') ||
+          errorMessage.includes('foreign key') ||
+          saveRetryCount > maxSaveRetries) {
+        
+        // Final diagnostic information
+        try {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('id, entry_count, created_at')
+            .eq('id', userId)
+            .single();
+          
+          const { data: thread } = await supabase
+            .from('chat_threads')
+            .select('id, user_id, created_at')
+            .eq('id', threadId)
+            .eq('user_id', userId)
+            .single();
+          
+          console.error('[saveMessage] Final diagnostic data:', {
+            userId,
+            threadId,
+            requestId,
+            profileExists: !!profile,
+            entryCount: profile?.entry_count || 0,
+            threadExists: !!thread,
+            threadUserId: thread?.user_id,
+            errorType: errorMessage.includes('row-level security') ? 'RLS_VIOLATION' : 
+                      errorMessage.includes('authentication') ? 'AUTH_ERROR' : 'OTHER',
+            attempts: saveRetryCount
+          });
+        } catch (diagnosticError) {
+          console.error('[saveMessage] Diagnostic check failed:', diagnosticError);
+        }
+        
+        throw new Error(`Message save failed after ${saveRetryCount} attempts: ${errorMessage}`);
+      }
+      
+      // Wait before retry
+      await new Promise(resolve => setTimeout(resolve, 500 * saveRetryCount));
     }
   }
   

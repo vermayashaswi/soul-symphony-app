@@ -568,6 +568,28 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
   ) => {
     const threadState = getThreadState(targetThreadId);
     
+    // Enhanced debugging for users with 0 entries
+    if (userProfile?.journalEntryCount === 0) {
+      console.log('[useStreamingChat] Processing chat for user with 0 journal entries:', {
+        userId,
+        threadId: targetThreadId,
+        profileData: userProfile
+      });
+      
+      // Run diagnostic check
+      try {
+        const { diagnoseChatMessageSave } = await import('@/services/chat/debugService');
+        const diagnostic = await diagnoseChatMessageSave(userId, targetThreadId);
+        console.log('[useStreamingChat] Pre-chat diagnostic for 0-entry user:', diagnostic);
+        
+        if (!diagnostic.profileExists || diagnostic.authState !== 'valid' || !diagnostic.threadExists) {
+          console.error('[useStreamingChat] Critical issue detected for 0-entry user:', diagnostic);
+        }
+      } catch (debugError) {
+        console.warn('[useStreamingChat] Debug diagnostic failed:', debugError);
+      }
+    }
+    
     // Check for duplicate requests
     const currentTime = Date.now();
     const messageFingerprint = createMessageFingerprint(message, targetThreadId, userId, currentTime);
