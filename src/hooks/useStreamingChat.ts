@@ -576,14 +576,18 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
         profileData: userProfile
       });
       
-      // Run diagnostic check
+      // Quick diagnostic check for common issues with 0-entry users
       try {
-        const { diagnoseChatMessageSave } = await import('@/services/chat/debugService');
-        const diagnostic = await diagnoseChatMessageSave(userId, targetThreadId);
-        console.log('[useStreamingChat] Pre-chat diagnostic for 0-entry user:', diagnostic);
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        console.log('[useStreamingChat] 0-entry user diagnostic:', {
+          authValid: !authError && user?.id === userId,
+          hasProfile: !!userProfile?.id,
+          threadId: targetThreadId,
+          entryCount: userProfile?.journalEntryCount
+        });
         
-        if (!diagnostic.profileExists || diagnostic.authState !== 'valid' || !diagnostic.threadExists) {
-          console.error('[useStreamingChat] Critical issue detected for 0-entry user:', diagnostic);
+        if (authError || !user || user.id !== userId) {
+          console.error('[useStreamingChat] Authentication issue for 0-entry user:', { authError, userId });
         }
       } catch (debugError) {
         console.warn('[useStreamingChat] Debug diagnostic failed:', debugError);
