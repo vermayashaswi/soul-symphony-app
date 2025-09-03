@@ -475,7 +475,8 @@ Once you have some journal entries, I'll be able to provide personalized insight
           await supabaseClient
             .from('chat_messages')
             .update({
-              content: fallbackResponse
+              content: fallbackResponse,
+              is_processing: false
             })
             .eq('id', assistantMessageId);
           console.log(`[chat-with-rag] Updated assistant message ${assistantMessageId} with fallback response`);

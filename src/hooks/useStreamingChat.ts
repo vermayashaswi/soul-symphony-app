@@ -168,29 +168,17 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
           const category = (body as any)?.category || threadState.queryCategory;
           let result: { data: any; error: any };
 
-          if (category === 'JOURNAL_SPECIFIC') {
-            result = (await supabase.functions.invoke('chat-with-rag', { body })) as { data: any; error: any };
-          } else if (category === 'GENERAL_MENTAL_HEALTH') {
-            const timeoutMs = 20000 + i * 5000;
-            const timeoutPromise = new Promise((_, rej) =>
-              setTimeout(() => rej(new Error('Request timed out')), timeoutMs)
-            );
+          // Route ALL queries through the main chat-with-rag orchestrator
+          // This ensures proper message persistence and orchestration for all query types
+          const timeoutMs = category === 'JOURNAL_SPECIFIC' ? 65000 : 25000; // Longer timeout for complex queries
+          const timeoutPromise = new Promise((_, rej) =>
+            setTimeout(() => rej(new Error('Request timed out')), timeoutMs + i * 5000)
+          );
 
-            result = (await Promise.race([
-              supabase.functions.invoke('general-mental-health-chat', { body }),
-              timeoutPromise,
-            ])) as { data: any; error: any };
-          } else {
-            const timeoutMs = 20000 + i * 5000;
-            const timeoutPromise = new Promise((_, rej) =>
-              setTimeout(() => rej(new Error('Request timed out')), timeoutMs)
-            );
-
-            result = (await Promise.race([
-              supabase.functions.invoke('general-mental-health-chat', { body }),
-              timeoutPromise,
-            ])) as { data: any; error: any };
-          }
+          result = (await Promise.race([
+            supabase.functions.invoke('chat-with-rag', { body }),
+            timeoutPromise,
+          ])) as { data: any; error: any };
           
           if ((result as any)?.error) {
             lastErr = (result as any).error;
