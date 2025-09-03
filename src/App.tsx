@@ -18,24 +18,16 @@ import { FeatureFlagsProvider } from "./contexts/FeatureFlagsContext";
 import { SessionTrackingProvider } from './contexts/SessionTrackingContext';
 import { nativeAppInitService } from './services/nativeAppInitService';
 import { mobileErrorHandler } from './services/mobileErrorHandler';
-import { mobileOptimizationService } from './services/mobileOptimizationService';
-import { nativeIntegrationService } from './services/nativeIntegrationService';
 import PullToRefresh from './components/system/PullToRefresh';
-
-import { useAppInitialization } from './hooks/useAppInitialization';
-import { logger } from './utils/logger';
 
 const App: React.FC = () => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [initializationError, setInitializationError] = useState<string | null>(null);
-  const appInitialization = useAppInitialization();
 
   useEffect(() => {
-    const appLogger = logger.createLogger('App');
-    
     const initializeApp = async () => {
       try {
-        appLogger.info('Starting streamlined app initialization');
+        console.log('[App] Starting app initialization...');
         
         // Clean up any malformed paths
         const currentPath = window.location.pathname;
@@ -62,16 +54,16 @@ const App: React.FC = () => {
         // Initialize native app service only if not already done
         if (!nativeAppInitService.isNativeAppInitialized()) {
           try {
-            appLogger.debug('Initializing native app service');
+            console.log('[App] Initializing native app service');
             const nativeInitSuccess = await nativeAppInitService.initialize();
             
             if (nativeInitSuccess) {
-              appLogger.info('Native app initialization completed successfully');
+              console.log('[App] Native app initialization completed successfully');
             } else {
-              appLogger.warn('Native app initialization failed, continuing with web fallback');
+              console.warn('[App] Native app initialization failed, continuing with web fallback');
             }
           } catch (error) {
-            appLogger.warn('Native app initialization error', error);
+            console.warn('[App] Native app initialization error', error);
             mobileErrorHandler.handleError({
               type: 'capacitor',
               message: `Native app init failed: ${error}`
@@ -81,16 +73,15 @@ const App: React.FC = () => {
         
         // Preload critical images (non-blocking)
         preloadCriticalImages().catch(error => {
-          appLogger.warn('Failed to preload some images', error);
+          console.warn('[App] Failed to preload some images', error);
         });
 
-        // Set initialized immediately since main initialization is done
-        appLogger.info('App initialization completed');
+        console.log('[App] App initialization completed');
         setIsInitialized(true);
 
       } catch (error) {
-        appLogger.error('Critical initialization error', error);
-        setInitializationError(error.toString());
+        console.error('[App] Critical initialization error', error);
+        setInitializationError(error instanceof Error ? error.message : 'Initialization failed');
         mobileErrorHandler.handleError({
           type: 'crash',
           message: `App initialization failed: ${error}`
@@ -98,15 +89,11 @@ const App: React.FC = () => {
       }
     };
 
-    // Wait for app initialization hook to complete first
-    if (appInitialization.isInitialized) {
-      initializeApp();
-    }
-  }, [appInitialization.isInitialized]);
+    initializeApp();
+  }, []);
 
   const handleAppError = (error: Error, errorInfo: any) => {
-    const appLogger = logger.createLogger('App');
-    appLogger.error('Application-level error', error, { errorInfo });
+    console.error('[App] Application-level error', error, errorInfo);
     
     // Use mobile error handler for consistent error tracking
     mobileErrorHandler.handleError({
@@ -115,19 +102,6 @@ const App: React.FC = () => {
       stack: error.stack,
       timestamp: Date.now()
     });
-
-    // Log critical app errors for debugging
-    const errorData = {
-      message: error.message,
-      stack: error.stack,
-      componentStack: errorInfo.componentStack,
-      timestamp: new Date().toISOString(),
-      userAgent: navigator.userAgent,
-      url: window.location.href,
-      isNative: nativeAppInitService.isNativeAppInitialized()
-    };
-    
-    appLogger.error('Detailed error context', undefined, errorData);
 
     // Show user-friendly error notification
     toast.error('Something went wrong. The app will try to recover automatically.');
@@ -153,22 +127,24 @@ const App: React.FC = () => {
           </details>
           <div className="flex flex-col space-y-2 w-full">
             <button 
-              onClick={() => {
-                setInitializationError(null);
-                setIsInitialized(false);
-                window.location.reload();
-              }}
+              onClick={() => window.location.reload()}
               className="px-4 py-2 bg-primary text-primary-foreground rounded-md"
             >
-              Retry Initialization
-            </button>
-            <button 
-              onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-gray-600 text-white rounded-md"
-            >
-              Force Refresh
+              Retry
             </button>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show loading screen while initializing
+  if (!isInitialized) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          <p className="text-sm text-muted-foreground">Loading...</p>
         </div>
       </div>
     );
@@ -183,7 +159,7 @@ const App: React.FC = () => {
               <MusicPlayerProvider>
                 <JournalProcessingInitializer />
               <PullToRefresh>
-                <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
+                <AppRoutes />
                 <TutorialOverlay />
                 <Toaster />
                 <SonnerToaster position="top-right" />

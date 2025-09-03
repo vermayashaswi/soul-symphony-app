@@ -205,7 +205,7 @@ const initializePWA = async () => {
 // Initialize systems with coordination
 const initializeApp = async () => {
   try {
-    console.log('[App] Starting coordinated initialization...');
+    console.log('[Main] Starting coordinated initialization...');
     
     // Set initial loading state to prevent premature rendering
     document.body.classList.add('app-initializing');
@@ -254,9 +254,9 @@ const initializeApp = async () => {
       detail: { timestamp: Date.now() } 
     }));
     
-    console.log('[App] Coordinated initialization complete');
+    console.log('[Main] Coordinated initialization complete');
   } catch (error) {
-    console.error('[App] Initialization failed:', error);
+    console.error('[Main] Initialization failed:', error);
     // Clean up states even on error
     document.body.classList.remove('app-initializing');
     (window as any).__SOULO_APP_INITIALIZED__ = true;
