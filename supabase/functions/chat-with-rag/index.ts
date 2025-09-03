@@ -407,8 +407,12 @@ Once you have some journal entries, I'll be able to provide personalized insight
         }
       }
 
+      // Extract the actual response text from the nested response object
+      const responseText = generalResponse.data.response || generalResponse.data;
+      console.log(`[chat-with-rag] Extracted response text: ${typeof responseText === 'string' ? responseText.substring(0, 100) : 'Not a string'}`);
+
       return new Response(JSON.stringify({
-        response: generalResponse.data,
+        response: responseText,
         assistantMessageId: assistantMessageId,
         metadata: {
           classification: classification,
@@ -435,13 +439,17 @@ Once you have some journal entries, I'll be able to provide personalized insight
         throw new Error(`Clarification generation failed: ${clarificationResponse.error.message}`);
       }
 
+      // Extract the actual response text for clarification
+      const clarificationText = clarificationResponse.data.response || clarificationResponse.data;
+      console.log(`[chat-with-rag] Extracted clarification text: ${typeof clarificationText === 'string' ? clarificationText.substring(0, 100) : 'Not a string'}`);
+
       // Update the assistant message with the clarification response
-      if (assistantMessageId && clarificationResponse.data.response) {
+      if (assistantMessageId && clarificationText) {
         try {
           await supabaseClient
             .from('chat_messages')
             .update({
-              content: clarificationResponse.data.response,
+              content: clarificationText,
               is_processing: false
             })
             .eq('id', assistantMessageId);
@@ -452,7 +460,7 @@ Once you have some journal entries, I'll be able to provide personalized insight
       }
 
       return new Response(JSON.stringify({
-        response: clarificationResponse.data.response,
+        response: clarificationText,
         userStatusMessage: clarificationResponse.data.userStatusMessage,
         assistantMessageId: assistantMessageId,
         metadata: {
