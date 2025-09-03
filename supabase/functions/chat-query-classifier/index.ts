@@ -129,6 +129,11 @@ The user is interacting with a sophisticated mental health chatbot that has acce
 - Timestamps and contextual metadata
 - Behavioral and mood patterns over time
 
+**USER PROFILE:**
+- Journal entries written: ${userProfile?.journalEntryCount || 0} entries
+- Timezone: ${userProfile?.timezone || 'UTC'}
+- Country: ${userProfile?.country || 'Unknown'}
+
 **🎯 DOWNSTREAM PROCESSING (Critical for Classification):**
 Your classification determines which specialized system handles the user's request:
 

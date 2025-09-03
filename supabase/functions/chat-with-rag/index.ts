@@ -106,7 +106,7 @@ serve(async (req) => {
       console.log(`[chat-with-rag] Classification attempt ${attempt}/${maxRetries}`);
       
       const classificationResponse = await supabaseClient.functions.invoke('chat-query-classifier', {
-        body: { message, conversationContext }
+        body: { message, conversationContext, userProfile: completeUserProfile }
       });
       
       if (!classificationResponse.error && classificationResponse.data) {

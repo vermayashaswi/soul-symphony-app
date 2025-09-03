@@ -104,6 +104,7 @@ async function generateIntelligentQueryPlan(
 
 USER QUERY: "${message}"
 USER TIMEZONE: "${userProfile.timezone || 'UTC'}"
+USER PROFILE: Journal entries written: ${userProfile?.journalEntryCount || 0} entries
 CURRENT DATE: ${new Date().toISOString().split('T')[0]} (YYYY-MM-DD format)
 CURRENT YEAR: ${new Date().getFullYear()}
 CURRENT TIME: ${new Date().toLocaleString('en-US', {

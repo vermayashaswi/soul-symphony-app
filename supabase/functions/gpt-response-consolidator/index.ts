@@ -539,6 +539,7 @@ You're processing complex *family dynamics* while maintaining strong emotional i
     - ${timezoneFormat.currentTimeText}
     - User's Timezone: ${timezoneFormat.timezoneText}
     - User's Country: ${userCountry !== 'DEFAULT' ? userCountry : 'Not specified'}
+    - Journal entries written: ${userProfile?.journalEntryCount || 0} entries
     - All time references should be in the user's local timezone (${userTimezone}), not UTC
     - When discussing time periods like "first half vs second half of day", reference the user's local time
     - NEVER mention "UTC" in your response - use the user's local timezone context instead

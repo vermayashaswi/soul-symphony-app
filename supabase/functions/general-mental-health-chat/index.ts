@@ -87,6 +87,7 @@ serve(async (req) => {
 - User's current time: ${userCurrentTime}
 - User's timezone: ${normalizedTimezone}
 - User's country: ${userCountry !== 'DEFAULT' ? userCountry : 'Not specified'}
+- Journal entries written: ${userProfile?.journalEntryCount || 0} entries
 - Timezone validation: ${timezoneConversion.isValid ? 'VALID' : 'FAILED - using fallback'}
 Use this time and cultural context to provide appropriate greetings, time-aware responses, and culturally sensitive support (e.g., "Good morning" vs "Good evening", energy levels, daily rhythms, cultural considerations without stereotyping).
 

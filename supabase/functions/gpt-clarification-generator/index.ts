@@ -50,10 +50,10 @@ ${processedContext.map((m) => `  [Message ${m.messageOrder}] ${m.role}: ${m.cont
   'No prior context - This is the start of the conversation'}
 
 USER PROFILE:
-- Timezone: ${userTimezone}
-- Country: ${userCountry !== 'DEFAULT' ? userCountry : 'Unknown'}
+- Timezone: ${userProfile?.timezone || 'UTC'}
+- Country: ${userProfile?.country || 'Unknown'}
 - Display Name: ${userProfile?.displayName || 'Not set'}
-- Journal Entries: ${userProfile?.journalEntryCount || 'Unknown count'}
+- Journal entries written: ${userProfile?.journalEntryCount || 0} entries
 
 **CRITICAL DATE & TIME CONTEXT:**
 CURRENT DATE: ${new Date().toISOString().split('T')[0]} (YYYY-MM-DD format)
