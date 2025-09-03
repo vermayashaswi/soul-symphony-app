@@ -185,36 +185,23 @@ serve(async (req) => {
       contextCount: conversationContext?.length || 0
     });
 
+    // Import Gemini conversation utilities
+    const { createLegacyContextString, logConversationContext } = await import('../_shared/geminiConversationUtils.ts');
+    
+    // Log conversation context for debugging
+    logConversationContext(conversationContext, 'gpt-clarification-generator');
+    
+    // Create context string using shared utility
+    const contextString = conversationContext.length > 0 
+      ? createLegacyContextString(conversationContext, 10)
+      : 'No prior context - This is the start of the conversation';
+
     const clarificationPrompt = `You are Ruh by SOuLO, a direct, witty mental health companion who combines emotional intelligence with sharp insight. The user has asked a vague personal question that needs clarification to provide meaningful support.
 
 USER QUESTION: "${userMessage}"
 
 CONVERSATION CONTEXT:
-${(() => {
-  if (!conversationContext || conversationContext.length === 0) {
-    return 'No prior context - This is the start of the conversation';
-  }
-  
-  // Process conversation context inline (matching createLegacyContextString functionality)
-  const recentMessages = conversationContext
-    .slice(-10)
-    .sort((a, b) => {
-      const dateA = new Date(a.created_at || a.timestamp || 0).getTime();
-      const dateB = new Date(b.created_at || b.timestamp || 0).getTime();
-      return dateA - dateB;
-    });
-
-  const contextString = recentMessages
-    .map((msg, index) => {
-      const role = msg.sender === 'user' ? 'user' : 'assistant';
-      const messageOrder = index + 1;
-      const timestamp = msg.created_at ? new Date(msg.created_at).toLocaleString() : '';
-      return `[Message ${messageOrder}] ${role.toUpperCase()}: ${msg.content}${timestamp ? ` (${timestamp})` : ''}`;
-    })
-    .join('\n');
-
-  return `Last ${recentMessages.length} messages (chronological order):\n${contextString}`;
-})()}
+${contextString}
 
 USER PROFILE:
 - Timezone: ${userProfile?.timezone || 'UTC'}

@@ -151,7 +151,7 @@ When users request direct help, structure responses as:
 - **Closure:** Always respond in a way the user desires based on conversation history provided. **CRITICAL**: If someone says "Thank you, you've been helpful" - respond warmly but briefly, matching their closure energy!
 
 **CONVERSATION HISTORY INTEGRATION:**
-Look at the past conversation history provided and accordingly frame your response, cleverly setting the emotional tone that's been running through up until now. Let this guide your approach completely.
+The conversation history is provided in the structured format separately. Use it to understand the ongoing emotional tone and conversation flow to respond appropriately.
 
 **CRITICAL ANTI-HALLUCINATION RULES:**
 🚫 **NEVER** claim to "remember" or "recall" information from previous sessions not in the provided conversation context
@@ -172,18 +172,13 @@ and ask if they want helpline numbers (if asked, provide them with relevant help
 
 `;
 
-    // Format conversation context for Gemini (corrected format)
-    let conversationHistory = '';
-    if (conversationContext.length > 0) {
-      conversationHistory = conversationContext.slice(-6).map((msg) => `${msg.role === 'assistant' ? 'Assistant' : 'User'}: ${msg.content}`).join('\n');
-    }
-
-    const fullPrompt = `${systemMessage}
-
-${conversationHistory ? `CONVERSATION HISTORY:\n${conversationHistory}\n` : ''}
-Current User Message: ${message}
-
-Please respond as Ruh with empathy, wit, and emotional intelligence.`;
+    // Build structured contents for Gemini API using shared utilities
+    const geminiContents = buildGeminiContents(
+      message,
+      conversationContext,
+      systemMessage,
+      { maxMessages: 6, includeSystemMessage: true }
+    );
 
     // Try Gemini with lightweight retries and graceful fallback
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -198,15 +193,7 @@ Please respond as Ruh with empathy, wit, and emotional intelligence.`;
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  {
-                    text: fullPrompt
-                  }
-                ]
-              }
-            ],
+            contents: geminiContents,
             generationConfig: {
               maxOutputTokens: 800
             }

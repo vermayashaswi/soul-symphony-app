@@ -477,10 +477,7 @@ serve(async (req) => {
     // Log conversation context for debugging
     logConversationContext(conversationContext, 'gpt-response-consolidator', consolidationId);
 
-    // Format conversation context (last 8 messages) - legacy format for system prompt
-    const conversationContextText = conversationContext && conversationContext.length > 0 
-      ? createLegacyContextString(conversationContext, 8)
-      : 'No previous conversation context available.';
+    // Note: Conversation context is handled by buildGeminiContents in structured format
 
     const consolidationPrompt = `🚨 CRITICAL TOKEN EFFICIENCY REQUIREMENT 🚨
 CRITICAL: Limit internal reasoning tokens to maximize response content. Keep total token usage under 3000 while maintaining accuracy. Prioritize response content over excessive reasoning. Be concise but comprehensive.
@@ -557,8 +554,8 @@ You're processing complex *family dynamics* while maintaining strong emotional i
     - For "current month": Use ${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')} as the current month reference
     - For "last month": Calculate previous month using current year unless explicitly stated otherwise
     
-    **CONVERSATION CONTEXT (Last 8 Messages):**
-    ${conversationContextText}
+    **CONVERSATION CONTEXT:** 
+    The conversation history is provided in the structured format separately. Use it to understand the ongoing conversation flow and user's expectations.
     
     **USER QUESTION:** "${userMessage}"
     
