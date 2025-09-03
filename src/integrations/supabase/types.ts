@@ -868,6 +868,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: number
       }
+      cleanup_stuck_processing_messages: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       close_user_session: {
         Args: { p_session_id: string; p_user_id: string }
         Returns: boolean
