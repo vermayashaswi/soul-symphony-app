@@ -104,20 +104,35 @@ const initializeFontSystem = async () => {
 
 // iOS Viewport Height Fix - addresses the iOS Safari issue with viewport height
 const fixViewportHeight = () => {
+  let isInitializing = true;
+  
   // Set CSS variable for viewport height that updates on resize
   const setVhProperty = () => {
     const vh = window.innerHeight * 0.01;
     document.documentElement.style.setProperty('--vh', `${vh}px`);
+    
+    // Mark as ready after first set
+    if (isInitializing) {
+      isInitializing = false;
+      (window as any).__SOULO_VIEWPORT_READY__ = true;
+    }
   };
   
   // Initial set
   setVhProperty();
   
+  // Debounced resize handler
+  let resizeTimeout: NodeJS.Timeout;
+  const debouncedResize = () => {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(setVhProperty, 50);
+  };
+  
   // Update on resize and orientation change
-  window.addEventListener('resize', setVhProperty);
+  window.addEventListener('resize', debouncedResize);
   window.addEventListener('orientationchange', () => {
-    // Slight delay to ensure viewport has updated after orientation change
-    setTimeout(setVhProperty, 100);
+    // Reduced delay for faster response
+    setTimeout(setVhProperty, 50);
   });
   
   // Special handling for iOS keyboard appearance
@@ -129,17 +144,17 @@ const fixViewportHeight = () => {
     inputs.forEach(input => {
       input.addEventListener('focus', () => {
         document.body.classList.add('keyboard-visible');
-        // Force reflow to ensure transition works
+        // Optimized for faster response
         setTimeout(() => {
           window.scrollTo(0, 0);
           setVhProperty();
-        }, 50);
+        }, 25);
       });
       
       input.addEventListener('blur', () => {
         document.body.classList.remove('keyboard-visible');
-        // Small delay to ensure UI updates after keyboard hides
-        setTimeout(setVhProperty, 50);
+        // Faster UI updates
+        setTimeout(setVhProperty, 25);
       });
     });
   }
@@ -187,35 +202,65 @@ const initializePWA = async () => {
   }
 };
 
-// Initialize systems
+// Initialize systems with coordination
 const initializeApp = async () => {
   try {
-    // Initialize font system first
-    await initializeFontSystem();
+    console.log('[App] Starting coordinated initialization...');
     
-    // Initialize viewport fix
-    fixViewportHeight();
+    // Set initial loading state to prevent premature rendering
+    document.body.classList.add('app-initializing');
     
-    // Initialize mobile optimizations early
-    await mobileOptimizationService.initialize();
+    // Initialize all core systems in parallel
+    await Promise.all([
+      initializeFontSystem(),
+      (async () => {
+        fixViewportHeight();
+        // Wait for viewport to be ready
+        await new Promise(resolve => {
+          if ((window as any).__SOULO_VIEWPORT_READY__) resolve(true);
+          else {
+            const checkReady = () => {
+              if ((window as any).__SOULO_VIEWPORT_READY__) {
+                resolve(true);
+              } else {
+                setTimeout(checkReady, 10);
+              }
+            };
+            checkReady();
+          }
+        });
+      })(),
+      mobileOptimizationService.initialize(),
+      initializePWA()
+    ]);
     
-    // Initialize PWA features
-    await initializePWA();
-    
-    // Detect iOS and set a class on the HTML element
+    // Platform detection (synchronous)
     if (/iPad|iPhone|iPod/.test(navigator.userAgent) || 
         (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
       document.documentElement.classList.add('ios-device');
     }
     
-    // Detect Android and set a class
     if (/Android/.test(navigator.userAgent)) {
       document.documentElement.classList.add('android-device');
     }
     
-    console.log('[App] Initialization complete');
+    // Mark app as fully initialized
+    (window as any).__SOULO_APP_INITIALIZED__ = true;
+    document.body.classList.remove('app-initializing');
+    document.body.classList.add('app-ready');
+    
+    // Dispatch ready event for components to listen to
+    window.dispatchEvent(new CustomEvent('appInitialized', { 
+      detail: { timestamp: Date.now() } 
+    }));
+    
+    console.log('[App] Coordinated initialization complete');
   } catch (error) {
     console.error('[App] Initialization failed:', error);
+    // Clean up states even on error
+    document.body.classList.remove('app-initializing');
+    (window as any).__SOULO_APP_INITIALIZED__ = true;
+    
     mobileErrorHandler.handleError({
       type: 'crash',
       message: `App initialization failed: ${error}`

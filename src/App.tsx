@@ -33,83 +33,60 @@ const App: React.FC = () => {
   useEffect(() => {
     const appLogger = logger.createLogger('App');
     
-    
     const initializeApp = async () => {
       try {
-        appLogger.info('Starting app initialization');
+        appLogger.info('Starting streamlined app initialization');
         
         // Clean up any malformed paths
         const currentPath = window.location.pathname;
-        
-        // Fix incorrectly formatted URLs that have domains or external references in the path
         if (currentPath.includes('https://') || currentPath.includes('soulo.online')) {
           window.history.replaceState(null, '', '/');
         }
         
-        // Apply a CSS class to the document body for theme-specific overrides
-        document.body.classList.add('app-initialized');
-        
-        // Initialize mobile optimization service first
-        try {
-          appLogger.debug('Initializing mobile optimization service');
-          await mobileOptimizationService.initialize();
-          appLogger.debug('Mobile optimization service initialized');
-        } catch (error) {
-          appLogger.warn('Mobile optimization failed', error);
-          mobileErrorHandler.handleError({
-            type: 'unknown',
-            message: `Mobile optimization failed: ${error}`
-          });
-        }
-        
-        // Initialize native app using the new service
-        try {
-          appLogger.debug('Initializing native app service');
-          const nativeInitSuccess = await nativeAppInitService.initialize();
-          
-          if (nativeInitSuccess) {
-            appLogger.info('Native app initialization completed successfully');
-            
-            // Get initialization status for debugging
-            const initStatus = await nativeAppInitService.getInitializationStatus();
-            appLogger.debug('Native app initialization status', { initStatus });
-            
-            // If we're in a native environment, ensure proper routing
-            if (initStatus.nativeEnvironment) {
-              appLogger.info('Native environment confirmed - app will route to app interface');
-            }
-            
+        // Wait for main.tsx initialization to complete
+        await new Promise(resolve => {
+          if ((window as any).__SOULO_APP_INITIALIZED__) {
+            resolve(true);
           } else {
-            appLogger.warn('Native app initialization failed, continuing with web fallback');
+            const checkReady = () => {
+              if ((window as any).__SOULO_APP_INITIALIZED__) {
+                resolve(true);
+              } else {
+                setTimeout(checkReady, 10);
+              }
+            };
+            checkReady();
           }
-        } catch (error) {
-          appLogger.warn('Native app initialization error', error);
-          mobileErrorHandler.handleError({
-            type: 'capacitor',
-            message: `Native app init failed: ${error}`
-          });
+        });
+        
+        // Initialize native app service only if not already done
+        if (!nativeAppInitService.isNativeAppInitialized()) {
+          try {
+            appLogger.debug('Initializing native app service');
+            const nativeInitSuccess = await nativeAppInitService.initialize();
+            
+            if (nativeInitSuccess) {
+              appLogger.info('Native app initialization completed successfully');
+            } else {
+              appLogger.warn('Native app initialization failed, continuing with web fallback');
+            }
+          } catch (error) {
+            appLogger.warn('Native app initialization error', error);
+            mobileErrorHandler.handleError({
+              type: 'capacitor',
+              message: `Native app init failed: ${error}`
+            });
+          }
         }
         
-        // Preload critical images including the chat avatar
-        try {
-          appLogger.debug('Preloading critical images');
-          preloadCriticalImages();
-        } catch (error) {
+        // Preload critical images (non-blocking)
+        preloadCriticalImages().catch(error => {
           appLogger.warn('Failed to preload some images', error);
-          // Non-critical error, continue app initialization
-        }
+        });
 
-        // Mark app as initialized after a brief delay to ensure smooth startup
-        // Shorter delay for native apps to hide splash screen faster
-        const isNativeApp = nativeAppInitService.isNativeAppInitialized();
-        const initDelay = isNativeApp ? 200 : 500;
-        
-        appLogger.debug('Setting initialization delay', { initDelay, isNativeApp });
-        
-        setTimeout(() => {
-          appLogger.info('App initialization completed');
-          setIsInitialized(true);
-        }, initDelay);
+        // Set initialized immediately since main initialization is done
+        appLogger.info('App initialization completed');
+        setIsInitialized(true);
 
       } catch (error) {
         appLogger.error('Critical initialization error', error);
@@ -121,8 +98,11 @@ const App: React.FC = () => {
       }
     };
 
-    initializeApp();
-  }, []);
+    // Wait for app initialization hook to complete first
+    if (appInitialization.isInitialized) {
+      initializeApp();
+    }
+  }, [appInitialization.isInitialized]);
 
   const handleAppError = (error: Error, errorInfo: any) => {
     const appLogger = logger.createLogger('App');

@@ -69,9 +69,14 @@ export function getScaledFontSize(baseFontSize: number, languageCode: string): n
 export function getLanguageFontCSS(languageCode: string): React.CSSProperties {
   const config = getLanguageFontConfig(languageCode);
   
+  // Check if app is fully initialized to prevent flicker
+  const isAppReady = (window as any).__SOULO_FONTS_READY__ && 
+                     (window as any).__SOULO_APP_INITIALIZED__;
+  
   const styles: React.CSSProperties = {
-    transform: `scale(${config.scale})`,
+    transform: isAppReady ? `scale(${config.scale})` : 'scale(1)',
     transformOrigin: 'left center',
+    transition: isAppReady ? 'transform 0.2s ease-out' : 'none',
   };
   
   if (config.lineHeightAdjustment) {
@@ -91,11 +96,19 @@ export function getLanguageFontCSS(languageCode: string): React.CSSProperties {
 export function getLanguageFontClasses(languageCode: string): string {
   const config = getLanguageFontConfig(languageCode);
   
+  // Check if app is fully initialized to prevent flicker
+  const isAppReady = (window as any).__SOULO_FONTS_READY__ && 
+                     (window as any).__SOULO_APP_INITIALIZED__;
+  
+  if (!isAppReady) {
+    return 'origin-left transition-none';
+  }
+  
   // Create CSS custom properties for the scaling
   const scaleClass = `scale-[${config.scale}]`;
   const originClass = 'origin-left';
   
-  return `${scaleClass} ${originClass}`;
+  return `${scaleClass} ${originClass} transition-transform duration-200 ease-out`;
 }
 
 /**
