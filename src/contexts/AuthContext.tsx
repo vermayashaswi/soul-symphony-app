@@ -683,6 +683,8 @@ const location = useLocation();
     resetPassword,
     updateUserProfile,
     ensureProfileExists,
+    profileCreationInProgress,
+    profileCreationComplete,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

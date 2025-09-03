@@ -29,7 +29,7 @@ export interface SubscriptionContextType {
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
 
 export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { user } = useAuth();
+  const { user, profileCreationInProgress, profileCreationComplete } = useAuth();
   const [tier, setTier] = useState<SubscriptionTier>('free');
   const [status, setStatus] = useState<SubscriptionStatus>('unknown');
   const [isLoading, setIsLoading] = useState(true);
@@ -37,6 +37,7 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
   const [hasInitialLoadCompleted, setHasInitialLoadCompleted] = useState(false);
   const [trialEndDate, setTrialEndDate] = useState<Date | null>(null);
   const [isTrialEligible, setIsTrialEligible] = useState(false);
+  const [isNewUser, setIsNewUser] = useState(false);
 
   const fetchSubscriptionData = async (): Promise<void> => {
     if (!user) {
@@ -47,8 +48,47 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
       setHasInitialLoadCompleted(true);
       setTrialEndDate(null);
       setIsTrialEligible(false);
+      setIsNewUser(false);
       return;
     }
+
+    // Check if this is a new user (profile creation in progress)
+    if (profileCreationInProgress || (profileCreationComplete && !hasInitialLoadCompleted)) {
+      console.log('[SubscriptionContext] New user detected - setting hardcoded trial values');
+      
+      // Set hardcoded trial values for new users (14-day trial)
+      const trialEnd = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000); // 14 days from now
+      
+      setTier('premium');
+      setStatus('trial');
+      setTrialEndDate(trialEnd);
+      setIsTrialEligible(true);
+      setIsNewUser(true);
+      setIsLoading(false);
+      setError(null);
+      setHasInitialLoadCompleted(true);
+      
+      console.log('[SubscriptionContext] Hardcoded trial values set for new user:', {
+        tier: 'premium',
+        status: 'trial',
+        trialEndDate: trialEnd,
+        isTrialActive: true
+      });
+      
+      // Sync with database after a delay to ensure trigger has completed
+      setTimeout(() => {
+        console.log('[SubscriptionContext] Syncing with database after hardcoded values...');
+        fetchActualSubscriptionData();
+      }, 3000);
+      
+      return;
+    }
+
+    await fetchActualSubscriptionData();
+  };
+
+  const fetchActualSubscriptionData = async (): Promise<void> => {
+    if (!user) return;
 
     try {
       setIsLoading(true);
@@ -172,22 +212,27 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
     await fetchSubscriptionData();
   };
 
-  // Fetch subscription data when user changes
+  // Fetch subscription data when user changes or profile creation status changes
   useEffect(() => {
     if (user) {
-      // Add small delay to allow trial setup trigger to complete
-      const timer = setTimeout(() => {
+      // For new users, fetch immediately to set hardcoded values
+      if (profileCreationInProgress || (profileCreationComplete && !hasInitialLoadCompleted)) {
         fetchSubscriptionData();
-      }, 500);
+      } else {
+        // For existing users, add small delay to allow any updates to complete
+        const timer = setTimeout(() => {
+          fetchSubscriptionData();
+        }, 500);
+        
+        return () => clearTimeout(timer);
+      }
       
       // Reset error handler when user changes
       subscriptionErrorHandler.reset();
-      
-      return () => clearTimeout(timer);
     } else {
       fetchSubscriptionData();
     }
-  }, [user]);
+  }, [user, profileCreationInProgress, profileCreationComplete]);
 
   // Computed properties with proper trial logic
   const isPremium = tier === 'premium';

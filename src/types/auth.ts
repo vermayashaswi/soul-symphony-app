@@ -14,4 +14,6 @@ export type AuthContextType = {
   resetPassword: (email: string) => Promise<void>;
   updateUserProfile: (metadata: Record<string, any>) => Promise<boolean>;
   ensureProfileExists: () => Promise<boolean>;
+  profileCreationInProgress: boolean;
+  profileCreationComplete: boolean;
 };
