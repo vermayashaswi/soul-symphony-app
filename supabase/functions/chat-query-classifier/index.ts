@@ -104,19 +104,15 @@ async function geminiClassifyMessage(
     }
   }
 
-  // Enhanced conversation context processing - last 10 messages with proper ordering
+  // Import Gemini conversation utilities
+  const { buildGeminiContents, logConversationContext, createLegacyContextString } = await import('../_shared/geminiConversationUtils.ts');
+
+  // Log conversation context for debugging
+  logConversationContext(conversationContext, 'chat-query-classifier');
+
+  // Create context string for system prompt (legacy format for reference)
   const contextString = conversationContext.length > 0 
-    ? `\n\nCONVERSATION CONTEXT (Last ${Math.min(conversationContext.length, 10)} messages, chronological order):\n${
-        conversationContext
-          .slice(-10) // Expand to last 10 messages
-          .map((msg, index) => {
-            // Standardize role mapping with proper sender field handling
-            const role = msg.sender === 'user' ? 'user' : (msg.sender === 'assistant' ? 'assistant' : (msg.role || 'user'));
-            const messageOrder = index + 1;
-            const timestamp = msg.created_at ? new Date(msg.created_at).toLocaleString() : '';
-            return `[Message ${messageOrder}] ${role.toUpperCase()}: ${msg.content}${timestamp ? ` (${timestamp})` : ''}`;
-          }).join('\n')
-      }`
+    ? `\n\nCONVERSATION CONTEXT: ${createLegacyContextString(conversationContext, 10)}`
     : '\n\nCONVERSATION CONTEXT:\nNo prior context - this is the first message in the conversation';
 
   const classificationPrompt = `You are the chat conversation query classifier for SOuLO's mental health chatbot "Ruh". 
@@ -208,15 +204,12 @@ Latest user message: "${message}"${contextString}`;
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              {
-                text: `You are a strict JSON classifier. Respond with a single JSON object only that matches the provided schema. No code fences, no commentary.\n\n${classificationPrompt}`
-              }
-            ]
-          }
-        ],
+        contents: buildGeminiContents(
+          `You are a strict JSON classifier. Respond with a single JSON object only that matches the provided schema. No code fences, no commentary.\n\n${classificationPrompt}\n\nLatest user message: "${message}"`,
+          conversationContext,
+          undefined, // No separate system message since it's embedded in the classifier prompt
+          { maxMessages: 10, includeSystemMessage: false }
+        ),
         generationConfig: {
           maxOutputTokens: 600
         }

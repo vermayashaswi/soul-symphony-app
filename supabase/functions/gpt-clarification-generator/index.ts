@@ -30,24 +30,31 @@ serve(async (req) => {
 USER QUESTION: "${userMessage}"
 
 CONVERSATION CONTEXT:
-${conversationContext ? 
-  (() => {
-    // Enhanced conversation context processing with proper role mapping and ordering
-    const processedContext = conversationContext
-      .slice(-10) // Expand to last 10 messages for richer context
-      .sort((a, b) => new Date(a.created_at || a.timestamp || 0) - new Date(b.created_at || b.timestamp || 0)) // Chronological order (oldest to newest)
-      .map((msg, index) => ({
-        role: msg.sender === 'assistant' ? 'assistant' : 'user', // Standardize role mapping using sender field
-        content: msg.content || msg.content,
-        messageOrder: index + 1,
-        timestamp: msg.created_at || msg.timestamp,
-        id: msg.id
-      }));
-    
-    return `${processedContext.length} messages in conversation (chronological order, oldest to newest):
-${processedContext.map((m) => `  [Message ${m.messageOrder}] ${m.role}: ${m.content}`).join('\n')}`;
-  })() : 
-  'No prior context - This is the start of the conversation'}
+${(() => {
+  if (!conversationContext || conversationContext.length === 0) {
+    return 'No prior context - This is the start of the conversation';
+  }
+  
+  // Process conversation context inline (matching createLegacyContextString functionality)
+  const recentMessages = conversationContext
+    .slice(-10)
+    .sort((a, b) => {
+      const dateA = new Date(a.created_at || a.timestamp || 0).getTime();
+      const dateB = new Date(b.created_at || b.timestamp || 0).getTime();
+      return dateA - dateB;
+    });
+
+  const contextString = recentMessages
+    .map((msg, index) => {
+      const role = msg.sender === 'user' ? 'user' : 'assistant';
+      const messageOrder = index + 1;
+      const timestamp = msg.created_at ? new Date(msg.created_at).toLocaleString() : '';
+      return `[Message ${messageOrder}] ${role.toUpperCase()}: ${msg.content}${timestamp ? ` (${timestamp})` : ''}`;
+    })
+    .join('\n');
+
+  return `Last ${recentMessages.length} messages (chronological order):\n${contextString}`;
+})()}
 
 USER PROFILE:
 - Timezone: ${userProfile?.timezone || 'UTC'}

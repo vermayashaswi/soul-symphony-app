@@ -471,12 +471,15 @@ serve(async (req) => {
       }
     };
 
-    // Format conversation context (last 8 messages)
+    // Import Gemini conversation utilities
+    const { buildGeminiContents, logConversationContext, createLegacyContextString } = await import('../_shared/geminiConversationUtils.ts');
+
+    // Log conversation context for debugging
+    logConversationContext(conversationContext, 'gpt-response-consolidator', consolidationId);
+
+    // Format conversation context (last 8 messages) - legacy format for system prompt
     const conversationContextText = conversationContext && conversationContext.length > 0 
-      ? conversationContext
-          .slice(-8) // Get last 8 messages
-          .map((msg: any, index: number) => `${msg.role}: ${msg.content}`)
-          .join('\n')
+      ? createLegacyContextString(conversationContext, 8)
       : 'No previous conversation context available.';
 
     const consolidationPrompt = `🚨 CRITICAL TOKEN EFFICIENCY REQUIREMENT 🚨
@@ -656,15 +659,12 @@ Similarity: ${entry.similarity || 'N/A'}`;
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              contents: [
-                {
-                  parts: [
-                    {
-                      text: consolidationPrompt
-                    }
-                  ]
-                }
-              ],
+              contents: buildGeminiContents(
+                consolidationPrompt,
+                conversationContext,
+                undefined, // System message embedded in consolidationPrompt
+                { maxMessages: 8, includeSystemMessage: false }
+              ),
               generationConfig: {
                 maxOutputTokens: 3000,
                 temperature: 0.7,
@@ -701,7 +701,12 @@ Similarity: ${entry.similarity || 'N/A'}`;
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
-                contents: [{ parts: [{ text: simplifiedPrompt }] }],
+                contents: buildGeminiContents(
+                  simplifiedPrompt,
+                  conversationContext,
+                  undefined,
+                  { maxMessages: 8, includeSystemMessage: false }
+                ),
                 generationConfig: {
                   maxOutputTokens: 8000,
                   temperature: 0.7,
