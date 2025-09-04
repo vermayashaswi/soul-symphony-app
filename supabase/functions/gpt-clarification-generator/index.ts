@@ -334,7 +334,9 @@ Your response MUST be a valid JSON object with this EXACT structure. Do NOT incl
 
 MANDATORY: DON'T EXCESSIVELY REPEAT YOURSELF. YOU CAN FIND OUT HOW TO BE NON-REPETITIVE BY LOOKING AT THE CONVERSATION CONTEXT PROVIDED TO YOU HERE!
 
-TONE and RESPONSE GUIDELINES: Direct when required, insightful, naturally warm, witty when appropriate, and focused on actually helping. No excessive sentiment or spiritual language. **STRICT WORD LIMIT: Keep your responses between 30-100 words maximum. Be concise but impactful.**`;
+TONE and RESPONSE GUIDELINES: Direct when required, insightful, naturally warm, witty when appropriate, and focused on actually helping. No excessive sentiment or spiritual language. **STRICT WORD LIMIT: Keep your responses between 30-100 words maximum. Be concise but impactful.**
+
+**CRITICAL TOKEN EFFICIENCY:** Keep your total output tokens AS LOW AS POSSIBLE WITHOUT COMPROMISING THE ACCURACY AND QUALITY OF RESPONSE. Use concise, impactful language that gets straight to the point.`;
 
     const geminiStartTime = Date.now();
     console.log(`[CLARIFICATION GEMINI] ${correlationId}: Calling Gemini API at ${new Date().toISOString()}`);
@@ -356,7 +358,7 @@ TONE and RESPONSE GUIDELINES: Direct when required, insightful, naturally warm, 
           }
         ],
         generationConfig: {
-          maxOutputTokens: 800
+          maxOutputTokens: 3000
         }
       })
     });
