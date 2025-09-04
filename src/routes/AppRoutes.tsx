@@ -26,6 +26,7 @@ import { AppSessionProvider } from '@/components/session/AppSessionProvider';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOnboarding } from '@/hooks/use-onboarding';
 import { useSessionValidation } from '@/hooks/useSessionValidation';
+import { useAppInitializationContext } from '@/contexts/AppInitializationContext';
 import { nativeIntegrationService } from '@/services/nativeIntegrationService';
 import NativeAuthDiagnostics from '@/pages/NativeAuthDiagnostics';
 
@@ -33,6 +34,7 @@ const AppRoutes = () => {
   const { user } = useAuth();
   const { onboardingComplete } = useOnboarding();
   const { session: validatedSession, isValid: hasValidSession, isLoading: sessionLoading } = useSessionValidation();
+  const { voiceOnboardingCompleted } = useAppInitializationContext();
 
   // Enhanced app root redirect with session validation
   const AppRootRedirect = () => {
@@ -57,9 +59,12 @@ const AppRoutes = () => {
       // ENHANCED: For native apps, prioritize validated session over user context
       console.log('[AppRoutes] Native environment detected, checking session validation');
       
-      // If we have a validated session, go directly to home
+      // If we have a validated session, check voice onboarding
       if (hasValidSession && validatedSession) {
-        console.log('[AppRoutes] Native app with validated session, redirecting to home');
+        console.log('[AppRoutes] Native app with validated session, checking voice onboarding');
+        if (!voiceOnboardingCompleted) {
+          return <Navigate to="/app/voice-onboarding" replace />;
+        }
         return <Navigate to="/app/home" replace />;
       }
       
@@ -69,8 +74,11 @@ const AppRoutes = () => {
         return <Navigate to="/app/onboarding" replace />;
       }
 
-      // If user exists but session validation is still loading, go to home anyway
-      console.log('[AppRoutes] Native app user authenticated, redirecting to home');
+      // If user exists but session validation is still loading, check voice onboarding
+      console.log('[AppRoutes] Native app user authenticated, checking voice onboarding');
+      if (!voiceOnboardingCompleted) {
+        return <Navigate to="/app/voice-onboarding" replace />;
+      }
       return <Navigate to="/app/home" replace />;
     }
 
@@ -95,7 +103,10 @@ const AppRoutes = () => {
       return <Navigate to="/app/onboarding" replace />;
     }
 
-    // If user is authenticated, go to last in-app path when available
+    // If user is authenticated, check voice onboarding first
+    if (!voiceOnboardingCompleted) {
+      return <Navigate to="/app/voice-onboarding" replace />;
+    }
     return <Navigate to={lastAppPath && lastAppPath.startsWith('/app/') ? lastAppPath : '/app/home'} replace />;
   };
 
@@ -111,7 +122,10 @@ const AppRoutes = () => {
       
       // Prioritize validated session for immediate routing
       if (hasValidSession && validatedSession) {
-        console.log('[AppRoutes] Native app with validated session, redirecting to home');
+        console.log('[AppRoutes] Native app with validated session, checking voice onboarding');
+        if (!voiceOnboardingCompleted) {
+          return <Navigate to="/app/voice-onboarding" replace />;
+        }
         return <Navigate to="/app/home" replace />;
       }
       
@@ -120,8 +134,11 @@ const AppRoutes = () => {
         return <Navigate to="/app/onboarding" replace />;
       }
 
-      // If user exists, go to home
-      console.log('[AppRoutes] Native app user ready, redirecting to home');
+      // If user exists, check voice onboarding
+      console.log('[AppRoutes] Native app user ready, checking voice onboarding');
+      if (!voiceOnboardingCompleted) {
+        return <Navigate to="/app/voice-onboarding" replace />;
+      }
       return <Navigate to="/app/home" replace />;
     }
 
@@ -129,6 +146,9 @@ const AppRoutes = () => {
     console.log('[AppRoutes] Web environment at root');
     const lastAppPath = (() => { try { return localStorage.getItem('lastAppPath'); } catch { return null; } })();
     if (user || validatedSession) {
+      if (!voiceOnboardingCompleted) {
+        return <Navigate to="/app/voice-onboarding" replace />;
+      }
       return <Navigate to={lastAppPath && lastAppPath.startsWith('/app/') ? lastAppPath : '/app/home'} replace />;
     }
     return <Index />;
