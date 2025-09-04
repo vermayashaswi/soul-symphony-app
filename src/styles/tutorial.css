@@ -22,13 +22,11 @@
   overflow: hidden !important;
 }
 
-/* Enhanced body style when tutorial is active - stronger scroll prevention */
+/* Enhanced body style when tutorial is active - prevent scrolling without breaking positioning */
 body.tutorial-active {
   overflow: hidden !important;
   touch-action: none !important;
-  position: fixed !important;
-  width: 100% !important;
-  height: 100% !important;
+  position: relative !important;
 }
 
 /* Tutorial step container - GLOBAL styling for all screen sizes */

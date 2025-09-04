@@ -598,7 +598,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   };
   
-  // Enhanced reset tutorial function
+  // Enhanced reset tutorial function with comprehensive CSS cleanup
   const resetTutorial = async () => {
     if (!user) return;
     
@@ -632,10 +632,14 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       navigationManager.forceReset();
       highlightingManager.reset();
       
+      // Perform comprehensive CSS cleanup before navigation
+      console.log('[TutorialContext] Performing comprehensive CSS cleanup before tutorial restart');
+      performComprehensiveCleanup();
+      
       // Force navigation to app home to restart tutorial
       console.log('[TutorialContext] Navigating to app home to restart tutorial');
       
-      // Use setTimeout to ensure state is updated before navigation
+      // Use setTimeout to ensure CSS cleanup completes before navigation
       setTimeout(() => {
         navigate('/app/home', { replace: true });
         
@@ -644,7 +648,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
           console.log('[TutorialContext] Starting tutorial after reset');
           startTutorial();
         }, 200);
-      }, 100);
+      }, 150); // Slightly longer delay to ensure cleanup completes
       
     } catch (error) {
       console.error('[TutorialContext] Error resetting tutorial:', error);
