@@ -65,20 +65,57 @@ export function getAnimationCenterStyles(
 }
 
 /**
+ * Detects if the app is currently in tutorial mode
+ */
+function isTutorialActive(): boolean {
+  return typeof document !== 'undefined' && 
+         document.body.classList.contains('tutorial-active');
+}
+
+/**
  * Hook to get animation center position with window resize handling
+ * Adapts positioning based on tutorial mode to handle different coordinate systems
  */
 export function useAnimationCenter(bottomNavOffset: boolean = true, verticalOffset: number = 1.0): CircleCenter {
-  const [center, setCenter] = React.useState<CircleCenter>(() => 
-    getAnimationCenter(window.innerWidth, window.innerHeight, bottomNavOffset, verticalOffset)
-  );
+  const [center, setCenter] = React.useState<CircleCenter>(() => {
+    if (isTutorialActive()) {
+      // In tutorial mode, use percentage-based center (50%, 50% relative to container)
+      return { x: 50, y: 50 };
+    }
+    return getAnimationCenter(window.innerWidth, window.innerHeight, bottomNavOffset, verticalOffset);
+  });
 
   React.useEffect(() => {
     const updateCenter = () => {
-      setCenter(getAnimationCenter(window.innerWidth, window.innerHeight, bottomNavOffset, verticalOffset));
+      if (isTutorialActive()) {
+        // In tutorial mode, use percentage-based center
+        setCenter({ x: 50, y: 50 });
+      } else {
+        // Normal mode, use viewport coordinates
+        setCenter(getAnimationCenter(window.innerWidth, window.innerHeight, bottomNavOffset, verticalOffset));
+      }
     };
 
+    // Update center on resize
     window.addEventListener('resize', updateCenter);
-    return () => window.removeEventListener('resize', updateCenter);
+    
+    // Also listen for tutorial state changes (when tutorial-active class is added/removed)
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+          updateCenter();
+        }
+      });
+    });
+    
+    if (typeof document !== 'undefined') {
+      observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    }
+
+    return () => {
+      window.removeEventListener('resize', updateCenter);
+      observer.disconnect();
+    };
   }, [bottomNavOffset, verticalOffset]);
 
   return center;
