@@ -47,11 +47,8 @@ const ButtonStateManager: React.FC<ButtonStateManagerProps> = ({
         buttonStyleEl.style.zIndex = "10000";
       }
       
-      if (glowDiv) {
-        const glowElement = glowDiv as HTMLElement;
-        glowElement.style.filter = "drop-shadow(0 0 25px var(--color-theme))";
-        glowElement.style.opacity = "0.95";
-      }
+      // Skip glow effects during tutorial steps 1 & 2 to avoid visual interference
+      // Glow effects will be restored when tutorial exits
 
       // Ensure container has proper z-index for tutorial (positioning handled by parent)
       containerEl.style.zIndex = '10000';
