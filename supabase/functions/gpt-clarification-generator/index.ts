@@ -180,7 +180,7 @@ serve(async (req) => {
       userProfile
     } = await req.json();
     
-    console.log('GPT Clarification Generator Gemini called with:', { 
+    console.log('[gpt-clarification-generator] Processing request:', { 
       userMessage: userMessage?.substring(0, 100),
       contextCount: conversationContext?.length || 0
     });
@@ -353,8 +353,57 @@ TONE and RESPONSE GUIDELINES: Direct when required, insightful, naturally warm, 
     const data = await response.json();
     const rawContent = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
+    // Log the complete raw response from Gemini for debugging
+    console.log('[gpt-clarification-generator] Full Gemini API response:', {
+      status: response.status,
+      statusText: response.statusText,
+      hasData: !!data,
+      candidatesLength: data?.candidates?.length || 0,
+      rawContentLength: rawContent.length,
+      rawContentPreview: rawContent.substring(0, 500),
+      fullRawContent: rawContent
+    });
+
+    // Check if we got an empty response
+    if (!rawContent || rawContent.trim().length === 0) {
+      console.error('[gpt-clarification-generator] Empty response from Gemini API');
+      const fallbackResponse = {
+        response: "I'd love to help clarify your question. Could you share a bit more detail about what you're looking for?",
+        userStatusMessage: "Need more specific details"
+      };
+      
+      return new Response(JSON.stringify({
+        success: true,
+        response: fallbackResponse.response,
+        userStatusMessage: fallbackResponse.userStatusMessage,
+        type: 'clarification',
+        fallback: true
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // Use robust parsing logic to handle all edge cases
     const { response: responseText, userStatusMessage } = sanitizeOutput(rawContent);
+
+    // Validate final response to prevent empty responses
+    if (!responseText || responseText.trim().length === 0) {
+      console.error('[gpt-clarification-generator] Parser returned empty response, using fallback');
+      const fallbackResponse = {
+        response: "I'd love to help clarify your question. Could you share a bit more detail about what you're looking for?",
+        userStatusMessage: "Clarification needed"
+      };
+      
+      return new Response(JSON.stringify({
+        success: true,
+        response: fallbackResponse.response,
+        userStatusMessage: fallbackResponse.userStatusMessage,
+        type: 'clarification',
+        fallback: true
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     return new Response(JSON.stringify({
       success: true,
