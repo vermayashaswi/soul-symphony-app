@@ -262,18 +262,28 @@ export type Database = {
       }
       profiles: {
         Row: {
+          age: number | null
           avatar_url: string | null
           country: string | null
           created_at: string
+          dislikes: string[] | null
           display_name: string | null
           email: string | null
           entry_count: number | null
           full_name: string | null
+          gender: string | null
+          hobbies: string[] | null
           id: string
+          interests: string[] | null
           is_premium: boolean | null
           journal_focus_areas: string[] | null
+          likes: string[] | null
           notification_preferences: Json | null
           onboarding_completed: boolean | null
+          others: string | null
+          place: string | null
+          profession: string | null
+          profile_onboarding_completed: boolean | null
           reminder_settings: Json | null
           revenuecat_entitlements: Json | null
           subscription_status: string | null
@@ -285,18 +295,28 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          age?: number | null
           avatar_url?: string | null
           country?: string | null
           created_at?: string
+          dislikes?: string[] | null
           display_name?: string | null
           email?: string | null
           entry_count?: number | null
           full_name?: string | null
+          gender?: string | null
+          hobbies?: string[] | null
           id: string
+          interests?: string[] | null
           is_premium?: boolean | null
           journal_focus_areas?: string[] | null
+          likes?: string[] | null
           notification_preferences?: Json | null
           onboarding_completed?: boolean | null
+          others?: string | null
+          place?: string | null
+          profession?: string | null
+          profile_onboarding_completed?: boolean | null
           reminder_settings?: Json | null
           revenuecat_entitlements?: Json | null
           subscription_status?: string | null
@@ -308,18 +328,28 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          age?: number | null
           avatar_url?: string | null
           country?: string | null
           created_at?: string
+          dislikes?: string[] | null
           display_name?: string | null
           email?: string | null
           entry_count?: number | null
           full_name?: string | null
+          gender?: string | null
+          hobbies?: string[] | null
           id?: string
+          interests?: string[] | null
           is_premium?: boolean | null
           journal_focus_areas?: string[] | null
+          likes?: string[] | null
           notification_preferences?: Json | null
           onboarding_completed?: boolean | null
+          others?: string | null
+          place?: string | null
+          profession?: string | null
+          profile_onboarding_completed?: boolean | null
           reminder_settings?: Json | null
           revenuecat_entitlements?: Json | null
           subscription_status?: string | null
