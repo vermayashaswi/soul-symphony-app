@@ -139,10 +139,7 @@ export const normalizeContent = (content: string): string => {
   // Convert single literal \n to actual newlines
   normalized = normalized.replace(/\\n/g, '\n');
   
-  // Unescape other common markdown characters
-  normalized = normalized.replace(/\\(\*|_|\[|\]|\(|\)|#)/g, '$1');
-  
-  // Remove any leading/trailing whitespace
+  // Remove any leading/trailing whitespace but preserve markdown formatting
   normalized = normalized.trim();
   
   return normalized;
