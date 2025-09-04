@@ -295,7 +295,7 @@ serve(async (req) => {
       if (assistantMessageId && finalResponse) {
         try {
           const updateData = {
-            content: JSON.stringify({ response: finalResponse, userStatusMessage }),
+            content: finalResponse,
             is_processing: false,
             // Store analysis data from consolidator if available
             analysis_data: consolidationResponse.data?.analysisMetadata || null,
@@ -362,7 +362,7 @@ serve(async (req) => {
           await supabaseClient
             .from('chat_messages')
             .update({
-              content: JSON.stringify(generalResponse.data),
+              content: generalResponse.data.response,
               is_processing: false
             })
             .eq('id', assistantMessageId);
@@ -414,7 +414,7 @@ serve(async (req) => {
           await supabaseClient
             .from('chat_messages')
             .update({
-              content: JSON.stringify(clarificationResponse.data),
+              content: clarificationText,
               is_processing: false
             })
             .eq('id', assistantMessageId);

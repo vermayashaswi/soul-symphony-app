@@ -180,6 +180,8 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({
             <TranslatableMarkdown 
               className="text-sm leading-relaxed break-words" 
               forceTranslate={true}
+              enableFontScaling={true}
+              scalingContext="compact"
             >
               {formattedContent}
             </TranslatableMarkdown>
