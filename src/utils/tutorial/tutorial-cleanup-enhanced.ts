@@ -113,58 +113,28 @@ const cleanupBodyElement = () => {
   console.log('[TutorialCleanup] Running specific element cleanup', { currentStepId });
   
   try {
-    // Clean up arrow button specifically with defensive checks
-    // IMPORTANT: Skip arrow button position reset if we're coming from step 1 to preserve energy animation
+    // Clean up arrow button - only remove tutorial-specific styles, preserve positioning
     const arrowButton = document.querySelector('.journal-arrow-button');
     if (arrowButton instanceof HTMLElement) {
-      if (currentStepId === 1) {
-        console.log('[TutorialCleanup] Skipping arrow button position reset for step 1 to preserve energy animation');
-        
-        // Only clean tutorial-specific styles, preserve positioning for energy animation
-        const buttonElement = arrowButton.querySelector('button');
-        if (buttonElement instanceof HTMLElement) {
-          const gentleStylesReset = ['boxShadow', 'animation', 'border', 'backgroundColor', 'color', 'textShadow', 'outline'];
-          gentleStylesReset.forEach(style => {
-            try {
-              buttonElement.style[style as any] = '';
-            } catch (error) {
-              // Silently ignore errors for button element cleanup
-            }
-          });
-        }
-      } else {
-        console.log('[TutorialCleanup] Resetting arrow button position (not step 1)');
-        
-        // Reset to default centered position for other steps
-        const arrowStyles = {
-          position: 'fixed',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          zIndex: '40',
-          margin: '0',
-          padding: '0'
-        };
-        
-        Object.entries(arrowStyles).forEach(([prop, value]) => {
+      console.log('[TutorialCleanup] Cleaning arrow button tutorial styles while preserving positioning');
+      
+      // Only clean tutorial-specific visual styles, never touch positioning
+      const buttonElement = arrowButton.querySelector('button');
+      if (buttonElement instanceof HTMLElement) {
+        const tutorialOnlyStyles = ['boxShadow', 'border', 'backgroundColor', 'color', 'textShadow', 'outline'];
+        tutorialOnlyStyles.forEach(style => {
           try {
-            arrowButton.style[prop as any] = value;
+            buttonElement.style[style as any] = '';
           } catch (error) {
-            console.warn(`[TutorialCleanup] Could not set arrow button style ${prop}:`, error);
+            // Silently ignore errors for button element cleanup
           }
         });
-        
-        const buttonElement = arrowButton.querySelector('button');
-        if (buttonElement instanceof HTMLElement) {
-          TUTORIAL_STYLE_PROPERTIES.forEach(style => {
-            try {
-              buttonElement.style[style as any] = '';
-            } catch (error) {
-              // Silently ignore errors for button element cleanup
-            }
-          });
-        }
       }
+      
+      // Remove tutorial classes from arrow button container
+      TUTORIAL_CLASSES.forEach(className => {
+        arrowButton.classList.remove(className);
+      });
     }
     
     // Clean up tab buttons with improved selector targeting
