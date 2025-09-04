@@ -113,10 +113,6 @@ body.tutorial-active {
 
 /* Step 2: Arrow button styling - GLOBAL enhanced visibility */
 .journal-arrow-button.tutorial-target {
-  position: fixed !important;
-  top: 50% !important;
-  left: 50% !important;
-  transform: translate(-50%, -50%) !important;
   z-index: 10000 !important;
   visibility: visible !important;
   opacity: 1 !important;
