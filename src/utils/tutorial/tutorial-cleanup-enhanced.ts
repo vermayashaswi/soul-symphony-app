@@ -15,13 +15,55 @@ export const TUTORIAL_CLASSES = [
   'tutorial-record-entry-button' // Added new class
 ];
 
-export const TUTORIAL_STYLE_PROPERTIES = [
-  'boxShadow', 'animation', 'border', 'transform', 'zIndex', 
-  'position', 'visibility', 'opacity', 'backgroundColor', 
-  'color', 'textShadow', 'top', 'left', 'right', 'bottom', 
-  'margin', 'padding', 'display', 'backgroundImage', 'borderRadius',
-  'outline', 'backdropFilter', 'filter', 'cursor', 'pointerEvents'
+// Style properties that should only be cleared from tutorial elements
+const TUTORIAL_ONLY_STYLE_PROPERTIES = [
+  'boxShadow', 'animation', 'border', 'backgroundColor', 
+  'color', 'textShadow', 'backgroundImage', 'borderRadius',
+  'outline', 'backdropFilter', 'filter', 'cursor'
 ];
+
+// Critical positioning properties - only clear from tutorial elements, never from protected ones
+const POSITIONING_STYLE_PROPERTIES = [
+  'position', 'top', 'left', 'right', 'bottom', 'zIndex', 'transform', 
+  'visibility', 'opacity', 'margin', 'padding', 'display', 'pointerEvents'
+];
+
+// All tutorial style properties combined
+export const TUTORIAL_STYLE_PROPERTIES = [...TUTORIAL_ONLY_STYLE_PROPERTIES, ...POSITIONING_STYLE_PROPERTIES];
+
+// Protected element selectors that should never have positioning cleared
+const PROTECTED_ELEMENT_SELECTORS = [
+  '[data-protected-positioning="true"]',
+  '[data-component-type="energy-animation"]',
+  '[data-component-type="navigation-button"]',
+  '.journal-arrow-button'
+];
+
+/**
+ * Checks if an element is protected from positioning cleanup
+ */
+function isProtectedElement(element: HTMLElement): boolean {
+  // Check for protected data attributes
+  if (element.hasAttribute('data-protected-positioning')) {
+    return true;
+  }
+  
+  // Check for protected component types
+  if (element.hasAttribute('data-component-type')) {
+    const componentType = element.getAttribute('data-component-type');
+    if (['energy-animation', 'navigation-button'].includes(componentType || '')) {
+      return true;
+    }
+  }
+  
+  // Check for protected classes or if element is within protected container
+  if (element.classList.contains('journal-arrow-button') || 
+      element.closest('[data-protected-positioning="true"]')) {
+    return true;
+  }
+  
+  return false;
+}
 
 export const performComprehensiveCleanup = (currentStepId?: number) => {
   console.log('[TutorialCleanup] Starting comprehensive cleanup', { currentStepId });
@@ -34,16 +76,28 @@ export const performComprehensiveCleanup = (currentStepId?: number) => {
     );
     
     console.log(`[TutorialCleanup] Found ${allTutorialElements.length} elements with tutorial classes`);
+    let protectedElements = 0;
     
     allTutorialElements.forEach(el => {
       if (el instanceof HTMLElement) {
-        // Remove all tutorial classes
+        const isProtected = isProtectedElement(el);
+        
+        if (isProtected) {
+          protectedElements++;
+          console.log('[TutorialCleanup] Protecting element:', {
+            tagName: el.tagName,
+            className: el.className,
+            componentType: el.getAttribute('data-component-type')
+          });
+        }
+        
+        // Remove all tutorial classes (safe for all elements)
         TUTORIAL_CLASSES.forEach(className => {
           el.classList.remove(className);
         });
         
-        // Reset all inline styles - with error handling
-        TUTORIAL_STYLE_PROPERTIES.forEach(style => {
+        // Reset tutorial-only styles (safe for all elements)
+        TUTORIAL_ONLY_STYLE_PROPERTIES.forEach(style => {
           try {
             el.style[style as any] = '';
           } catch (error) {
@@ -51,24 +105,52 @@ export const performComprehensiveCleanup = (currentStepId?: number) => {
           }
         });
         
-        // Clean child elements
+        // Only reset positioning styles for non-protected elements
+        if (!isProtected) {
+          POSITIONING_STYLE_PROPERTIES.forEach(style => {
+            try {
+              el.style[style as any] = '';
+            } catch (error) {
+              console.warn(`[TutorialCleanup] Could not reset positioning style ${style}:`, error);
+            }
+          });
+        }
+        
+        // Clean child elements with protection check
         const children = el.querySelectorAll('*');
         children.forEach(child => {
           if (child instanceof HTMLElement) {
+            const childIsProtected = isProtectedElement(child);
+            
             TUTORIAL_CLASSES.forEach(className => {
               child.classList.remove(className);
             });
-            TUTORIAL_STYLE_PROPERTIES.forEach(style => {
+            
+            // Reset tutorial-only styles for all children
+            TUTORIAL_ONLY_STYLE_PROPERTIES.forEach(style => {
               try {
                 child.style[style as any] = '';
               } catch (error) {
                 // Silently ignore style reset errors for child elements
               }
             });
+            
+            // Only reset positioning styles for non-protected children
+            if (!childIsProtected) {
+              POSITIONING_STYLE_PROPERTIES.forEach(style => {
+                try {
+                  child.style[style as any] = '';
+                } catch (error) {
+                  // Silently ignore style reset errors for child elements
+                }
+              });
+            }
           }
         });
       }
     });
+    
+    console.log(`[TutorialCleanup] Protected ${protectedElements} elements from positioning cleanup`);
     
     // Phase 2: Reset CSS custom properties
     const rootElement = document.documentElement;
@@ -379,20 +461,44 @@ export const performPreTutorialCleanup = () => {
     
     // Clean up all tutorial classes from all elements
     const allTutorialElements = document.querySelectorAll('*');
+    let protectedElements = 0;
+    
     allTutorialElements.forEach(el => {
       if (el instanceof HTMLElement) {
+        const isProtected = isProtectedElement(el);
+        
+        if (isProtected) {
+          protectedElements++;
+          console.log('[PreTutorialCleanup] Protecting element:', {
+            tagName: el.tagName,
+            className: el.className,
+            componentType: el.getAttribute('data-component-type')
+          });
+        }
+        
         TUTORIAL_CLASSES.forEach(className => {
           el.classList.remove(className);
         });
         
-        // Reset tutorial-specific inline styles that might interfere
-        TUTORIAL_STYLE_PROPERTIES.forEach(property => {
+        // Reset tutorial-only styles (safe for all elements)
+        TUTORIAL_ONLY_STYLE_PROPERTIES.forEach(property => {
           if (el.style.getPropertyValue(property)) {
             el.style.removeProperty(property);
           }
         });
+        
+        // Only reset positioning styles for non-protected elements
+        if (!isProtected) {
+          POSITIONING_STYLE_PROPERTIES.forEach(property => {
+            if (el.style.getPropertyValue(property)) {
+              el.style.removeProperty(property);
+            }
+          });
+        }
       }
     });
+    
+    console.log(`[PreTutorialCleanup] Protected ${protectedElements} elements from positioning cleanup`);
     
     // Clean body element thoroughly
     document.body.classList.remove('tutorial-active');
