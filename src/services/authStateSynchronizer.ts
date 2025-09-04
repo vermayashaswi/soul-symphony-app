@@ -38,31 +38,38 @@ class AuthStateSynchronizer {
     
     if (this.isSyncing && !options.forceSync && (now - this.lastSyncTime) < this.SYNC_DEBOUNCE_MS) {
       this.log('Sync already in progress or debounced, skipping');
-      return localStorage.getItem('onboardingComplete') === 'true';
+      // Default to false if no profile exists (for profile onboarding)
+      return false;
     }
 
     this.isSyncing = true;
     this.lastSyncTime = now;
 
     try {
-      this.log('Starting onboarding status sync', { userId, options });
+      this.log('Starting profile onboarding status sync', { userId, options });
 
       // Get status from database (authoritative source)
       const { data: profile, error } = await supabase
         .from('profiles')
-        .select('onboarding_completed, display_name')
+        .select('profile_onboarding_completed, display_name')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
       if (error) {
-        this.error('Database query failed, using localStorage fallback:', error);
-        return localStorage.getItem('onboardingComplete') === 'true';
+        this.error('Database query failed, defaulting to profile onboarding not completed:', error);
+        return false;
       }
 
-      const dbStatus = profile?.onboarding_completed || false;
-      const localStatus = localStorage.getItem('onboardingComplete') === 'true';
+      // If no profile exists, default to profile onboarding not completed
+      if (!profile) {
+        this.log('No profile found, defaulting to profile onboarding not completed');
+        return false;
+      }
 
-      this.log('Status comparison:', {
+      const dbStatus = profile?.profile_onboarding_completed || false;
+      const localStatus = localStorage.getItem('profileOnboardingComplete') === 'true';
+
+      this.log('Profile onboarding status comparison:', {
         database: dbStatus,
         localStorage: localStatus,
         displayName: profile?.display_name
@@ -70,12 +77,12 @@ class AuthStateSynchronizer {
 
       // If database and localStorage don't match, database wins
       if (dbStatus !== localStatus) {
-        this.log('Status mismatch detected, syncing localStorage with database', {
+        this.log('Profile onboarding status mismatch detected, syncing localStorage with database', {
           from: localStatus,
           to: dbStatus
         });
         
-        localStorage.setItem('onboardingComplete', dbStatus.toString());
+        localStorage.setItem('profileOnboardingComplete', dbStatus.toString());
         
         // Sync display name if available
         if (profile?.display_name) {
@@ -86,9 +93,9 @@ class AuthStateSynchronizer {
       return dbStatus;
 
     } catch (error) {
-      this.error('Sync failed with exception:', error);
-      // Fallback to localStorage in case of network issues
-      return localStorage.getItem('onboardingComplete') === 'true';
+      this.error('Profile onboarding sync failed with exception:', error);
+      // Default to profile onboarding not completed in case of any issues
+      return false;
     } finally {
       this.isSyncing = false;
     }
@@ -101,16 +108,26 @@ class AuthStateSynchronizer {
       // RLS policies ensure user can only access their own profile
       const { data: profile, error } = await supabase
         .from('profiles')
-        .select('display_name, onboarding_completed')
+        .select('display_name, profile_onboarding_completed, onboarding_completed')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
       if (error) {
         this.error('Failed to sync profile data:', error);
         return;
       }
 
-      // Sync onboarding status
+      if (!profile) {
+        this.log('No profile found during sync');
+        return;
+      }
+
+      // Sync profile onboarding status
+      if (profile.profile_onboarding_completed !== undefined) {
+        localStorage.setItem('profileOnboardingComplete', profile.profile_onboarding_completed.toString());
+      }
+
+      // Sync regular onboarding status
       if (profile.onboarding_completed !== undefined) {
         localStorage.setItem('onboardingComplete', profile.onboarding_completed.toString());
       }
@@ -154,6 +171,7 @@ class AuthStateSynchronizer {
             id: userId,
             email: userEmail,
             display_name: displayName,
+            profile_onboarding_completed: false, // New profiles need profile onboarding
             onboarding_completed: onboardingComplete,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
