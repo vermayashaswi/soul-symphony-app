@@ -274,6 +274,7 @@ export type Database = {
           journal_focus_areas: string[] | null
           notification_preferences: Json | null
           onboarding_completed: boolean | null
+          onboarding_data: Json | null
           reminder_settings: Json | null
           revenuecat_entitlements: Json | null
           subscription_status: string | null
@@ -283,6 +284,7 @@ export type Database = {
           tutorial_completed: string | null
           tutorial_step: number | null
           updated_at: string
+          voice_onboarding_completed: boolean | null
         }
         Insert: {
           avatar_url?: string | null
@@ -297,6 +299,7 @@ export type Database = {
           journal_focus_areas?: string[] | null
           notification_preferences?: Json | null
           onboarding_completed?: boolean | null
+          onboarding_data?: Json | null
           reminder_settings?: Json | null
           revenuecat_entitlements?: Json | null
           subscription_status?: string | null
@@ -306,6 +309,7 @@ export type Database = {
           tutorial_completed?: string | null
           tutorial_step?: number | null
           updated_at?: string
+          voice_onboarding_completed?: boolean | null
         }
         Update: {
           avatar_url?: string | null
@@ -320,6 +324,7 @@ export type Database = {
           journal_focus_areas?: string[] | null
           notification_preferences?: Json | null
           onboarding_completed?: boolean | null
+          onboarding_data?: Json | null
           reminder_settings?: Json | null
           revenuecat_entitlements?: Json | null
           subscription_status?: string | null
@@ -329,6 +334,7 @@ export type Database = {
           tutorial_completed?: string | null
           tutorial_step?: number | null
           updated_at?: string
+          voice_onboarding_completed?: boolean | null
         }
         Relationships: []
       }
