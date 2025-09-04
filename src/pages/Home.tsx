@@ -111,8 +111,8 @@ const Home = () => {
         height: '100%'
       }}
     >
-      {/* Background elements including animations */}
-      <BackgroundElements />
+      {/* Background elements including animations - hidden during tutorial steps 1 & 2 */}
+      {!isInWelcomeTutorialStep && !isInArrowTutorialStep && <BackgroundElements />}
 
       {/* Central navigation button - positioned in the center of the screen */}
       <JournalNavigationButton />
