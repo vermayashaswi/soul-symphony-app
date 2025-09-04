@@ -76,26 +76,59 @@ function sanitizeConsolidatorOutput(raw: string): { responseText: string; status
     let s = stripCodeFences(raw);
     meta.afterStripPrefix = s.slice(0, 60);
     let parsed: any = null;
+    
     if (s.trim().startsWith('{')) {
       try {
         parsed = JSON.parse(s);
         meta.parsedDirect = true;
-      } catch {
+        console.log(`[CONSOLIDATOR GEMINI] Direct JSON parse successful`);
+      } catch (directError) {
+        console.log(`[CONSOLIDATOR GEMINI] Direct JSON parse failed, trying extraction:`, directError.message);
         const jsonStr = extractFirstJsonObjectString(s);
         if (jsonStr) {
           try {
             parsed = JSON.parse(jsonStr);
             meta.parsedExtracted = true;
-          } catch {
-            console.error('[CONSOLIDATOR GEMINI] Failed to parse extracted JSON:', jsonStr);
+            console.log(`[CONSOLIDATOR GEMINI] Extracted JSON parse successful`);
+          } catch (extractError) {
+            console.error('[CONSOLIDATOR GEMINI] Failed to parse extracted JSON:', {
+              error: extractError.message,
+              jsonLength: jsonStr.length,
+              jsonPreview: jsonStr.substring(0, 200)
+            });
+            
+            // Try to recover response content even if JSON is malformed
+            const responseMatch = jsonStr.match(/"response"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+            const statusMatch = jsonStr.match(/"userStatusMessage"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+            
+            if (responseMatch) {
+              console.log(`[CONSOLIDATOR GEMINI] Recovered response from malformed JSON`);
+              const recoveredResponse = responseMatch[1]
+                .replace(/\\n/g, '\n')
+                .replace(/\\"/g, '"')
+                .replace(/\\\\/g, '\\')
+                .replace(/\\u0026/g, '&')
+                .replace(/\\u([0-9a-fA-F]{4})/g, (match, hex) => String.fromCharCode(parseInt(hex, 16)));
+              
+              const recoveredStatus = statusMatch ? statusMatch[1] : null;
+              
+              return { 
+                responseText: recoveredResponse, 
+                statusMsg: recoveredStatus, 
+                meta: { ...meta, recoveredFromMalformed: true }
+              };
+            }
           }
         }
       }
     }
+    
     if (parsed && typeof parsed === 'object') {
       const { responseText, statusMsg } = coalesceResponseFields(parsed, s);
       return { responseText, statusMsg, meta };
     }
+    
+    // Fallback: use the raw content
     return { responseText: s, statusMsg: null, meta };
   } catch (e) {
     console.error('[CONSOLIDATOR GEMINI] Sanitization error:', e);
