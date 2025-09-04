@@ -1,5 +1,4 @@
 import { nativeIntegrationService } from './nativeIntegrationService';
-import { authStateManager } from './authStateManager';
 import { Capacitor } from '@capacitor/core';
 
 export class NativeNavigationService {
@@ -182,11 +181,18 @@ export class NativeNavigationService {
    * Enhanced for reliable native app redirection
    */
   public handleAuthSuccess(): void {
-    console.log('[NativeNav] Handling authentication success - delegating to AuthStateManager');
+    console.log('[NativeNav] Handling authentication success');
     
-    // Use AuthStateManager to handle the complete authentication flow
-    // This ensures proper profile onboarding checks and routing
-    authStateManager.handleAuthSuccess();
+    if (nativeIntegrationService.isRunningNatively()) {
+      console.log('[NativeNav] Native app detected - using session-aware navigation');
+      
+      // Validate session before navigation
+      this.validateSessionAndNavigate('/app/home');
+    } else {
+      // For web, use standard navigation flow
+      console.log('[NativeNav] Web app detected - using standard navigation');
+      this.navigateToAuthenticatedHome();
+    }
   }
 
   /**
