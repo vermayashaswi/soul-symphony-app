@@ -140,10 +140,10 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
   // Special positioning for step 2 to move it to the very top so arrow button is visible
     if (step.id === 2) {
       return {
-        top: '10%',  // Moved to very top (from 35% to 10%)
+        top: '15%',
         left: '50%',
-        transform: 'translate(-50%, 0)', // Changed from -50% for y to avoid centering
-        position: 'absolute' as const // Changed from fixed to absolute to prevent viewport interference
+        transform: 'translate(-50%, 0)',
+        position: 'fixed' as const
       };
     }
     
@@ -211,7 +211,7 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
           border: '3px solid var(--color-theme)',
           boxShadow: '0 0 30px rgba(0, 0, 0, 0.7)'
         }),
-        zIndex: 27000, // Tutorial modal above overlay but below critical elements
+        zIndex: 30000,
         pointerEvents: 'auto'
       }}
       initial={{ opacity: 0, scale: 0.8 }}

@@ -448,7 +448,7 @@ const TutorialOverlay: React.FC = () => {
   const isLastStep = currentStep === totalSteps - 1;
 
   return (
-    <div className="fixed inset-0 pointer-events-auto" style={{ zIndex: 25000 }}>
+    <div className="fixed inset-0 pointer-events-auto">
       {/* Semi-transparent overlay */}
       <motion.div
         className="tutorial-overlay absolute inset-0"
