@@ -95,10 +95,6 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
   // Use consistent positioning with arrow button (1.07 offset) - aligned with JournalNavigationButton
   const animationCenter = useAnimationCenter(bottomNavOffset, 1.07);
   
-  // Detect if we're in tutorial mode to use appropriate positioning
-  const isTutorialMode = typeof document !== 'undefined' && 
-                         document.body.classList.contains('tutorial-active');
-  
   return (
     <div 
       ref={containerRef}
@@ -116,8 +112,8 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
       <div 
         className="absolute z-10"
         style={{
-          left: isTutorialMode ? '50%' : animationCenter.x,
-          top: isTutorialMode ? '50%' : animationCenter.y,
+          left: `${animationCenter.x}px`,
+          top: `${animationCenter.y}px`,
           transform: 'translate(-50%, -50%)'
         }}
       >
@@ -134,8 +130,8 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
           key={index}
           className="absolute rounded-full"
           style={{
-            left: isTutorialMode ? '50%' : animationCenter.x,
-            top: isTutorialMode ? '50%' : animationCenter.y,
+            left: `${animationCenter.x}px`,
+            top: `${animationCenter.y}px`,
             background: `radial-gradient(circle, ${colors.main} 0%, ${colors.secondary} 50%, ${colors.tertiary} 100%)`
           }}
           initial={{ 
@@ -182,8 +178,8 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
           key={`small-${index}`}
           className="absolute rounded-full"
           style={{
-            left: isTutorialMode ? '50%' : animationCenter.x,
-            top: isTutorialMode ? '50%' : animationCenter.y,
+            left: `${animationCenter.x}px`,
+            top: `${animationCenter.y}px`,
             background: `radial-gradient(circle, rgba(255,255,255,0.8) 0%, ${colors.light} 50%, ${colors.tertiary} 100%)`
           }}
           initial={{ 
@@ -219,8 +215,8 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
             key={`particle-${index}`}
             className="absolute rounded-full bg-white/80"
             style={{
-              left: isTutorialMode ? '50%' : animationCenter.x,
-              top: isTutorialMode ? '50%' : animationCenter.y
+              left: `${animationCenter.x}px`,
+              top: `${animationCenter.y}px`
             }}
             initial={{ 
               width: 3, 
