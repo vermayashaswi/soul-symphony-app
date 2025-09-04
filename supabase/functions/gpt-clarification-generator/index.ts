@@ -285,7 +285,9 @@ I sense there's *more depth* to explore here. Your question touches on:
 
 What **specific aspect** feels most important to explore first? 🤔"
 
-**FORMATTING REQUIREMENTS YOU MUST FOLLOW:**
+**FORMATTING REQUIREMENTS FOR "response" FIELD CONTENT ONLY:**
+(Note: These formatting rules apply ONLY to the content within the "response" field of your JSON output, NOT to the overall JSON structure)
+
 1. **Use ## or ### for main headers** (e.g., **Key Areas**, **What I'm Hearing**)
 2. **Use ** for bold emphasis** on important terms, emotions, key points
 3. **Use * for italics* on subtle emphasis and emotional reflections
