@@ -15,12 +15,22 @@ export const TUTORIAL_CLASSES = [
   'tutorial-record-entry-button' // Added new class
 ];
 
+// Styles that can be safely reset without affecting essential positioning
+export const VISUAL_ONLY_STYLES = [
+  'boxShadow', 'animation', 'border', 'backgroundColor', 
+  'color', 'textShadow', 'outline', 'backdropFilter', 'filter', 'cursor'
+];
+
+// Positioning styles that should NEVER be reset for critical elements (arrow button, energy animation)
+export const POSITIONING_STYLES = [
+  'position', 'top', 'left', 'right', 'bottom', 'transform', 'margin', 'padding'
+];
+
+// All tutorial styles for non-critical elements
 export const TUTORIAL_STYLE_PROPERTIES = [
-  'boxShadow', 'animation', 'border', 'transform', 'zIndex', 
-  'position', 'visibility', 'opacity', 'backgroundColor', 
-  'color', 'textShadow', 'top', 'left', 'right', 'bottom', 
-  'margin', 'padding', 'display', 'backgroundImage', 'borderRadius',
-  'outline', 'backdropFilter', 'filter', 'cursor', 'pointerEvents'
+  ...VISUAL_ONLY_STYLES,
+  ...POSITIONING_STYLES,
+  'zIndex', 'visibility', 'opacity', 'display', 'backgroundImage', 'borderRadius', 'pointerEvents'
 ];
 
 export const performComprehensiveCleanup = (currentStepId?: number) => {
@@ -42,14 +52,25 @@ export const performComprehensiveCleanup = (currentStepId?: number) => {
           el.classList.remove(className);
         });
         
-        // Reset all inline styles - with error handling
-        TUTORIAL_STYLE_PROPERTIES.forEach(style => {
+        // Check if this is a critical element that needs positioning preservation
+        const isCriticalElement = el.closest('.journal-arrow-button') || 
+                                 el.classList.contains('journal-arrow-button') ||
+                                 el.closest('[class*="energy-animation"]') ||
+                                 el.classList.contains('energy-animation');
+        
+        // Reset styles - preserve positioning for critical elements
+        const stylesToReset = isCriticalElement ? VISUAL_ONLY_STYLES : TUTORIAL_STYLE_PROPERTIES;
+        stylesToReset.forEach(style => {
           try {
             el.style[style as any] = '';
           } catch (error) {
             console.warn(`[TutorialCleanup] Could not reset style ${style}:`, error);
           }
         });
+        
+        if (isCriticalElement) {
+          console.log('[TutorialCleanup] Preserved positioning for critical element:', el.className);
+        }
         
         // Clean child elements
         const children = el.querySelectorAll('*');
@@ -58,7 +79,12 @@ export const performComprehensiveCleanup = (currentStepId?: number) => {
             TUTORIAL_CLASSES.forEach(className => {
               child.classList.remove(className);
             });
-            TUTORIAL_STYLE_PROPERTIES.forEach(style => {
+            // Check if child is part of critical element
+            const isChildOfCriticalElement = child.closest('.journal-arrow-button') || 
+                                           child.closest('[class*="energy-animation"]');
+            
+            const childStylesToReset = isChildOfCriticalElement ? VISUAL_ONLY_STYLES : TUTORIAL_STYLE_PROPERTIES;
+            childStylesToReset.forEach(style => {
               try {
                 child.style[style as any] = '';
               } catch (error) {
@@ -113,16 +139,20 @@ const cleanupBodyElement = () => {
   console.log('[TutorialCleanup] Running specific element cleanup', { currentStepId });
   
   try {
-    // Clean up arrow button - only remove tutorial-specific styles, preserve positioning
+    // Clean up arrow button - NEVER touch positioning, only visual effects
     const arrowButton = document.querySelector('.journal-arrow-button');
     if (arrowButton instanceof HTMLElement) {
-      console.log('[TutorialCleanup] Cleaning arrow button tutorial styles while preserving positioning');
+      console.log('[TutorialCleanup] Cleaning arrow button tutorial styles while PRESERVING ALL POSITIONING');
       
-      // Only clean tutorial-specific visual styles, never touch positioning
+      // Remove tutorial classes from arrow button container
+      TUTORIAL_CLASSES.forEach(className => {
+        arrowButton.classList.remove(className);
+      });
+      
+      // Only clean visual effects from button element, NEVER positioning
       const buttonElement = arrowButton.querySelector('button');
       if (buttonElement instanceof HTMLElement) {
-        const tutorialOnlyStyles = ['boxShadow', 'border', 'backgroundColor', 'color', 'textShadow', 'outline'];
-        tutorialOnlyStyles.forEach(style => {
+        VISUAL_ONLY_STYLES.forEach(style => {
           try {
             buttonElement.style[style as any] = '';
           } catch (error) {
@@ -131,11 +161,35 @@ const cleanupBodyElement = () => {
         });
       }
       
-      // Remove tutorial classes from arrow button container
-      TUTORIAL_CLASSES.forEach(className => {
-        arrowButton.classList.remove(className);
+      // Clean any child elements but preserve positioning
+      const childElements = arrowButton.querySelectorAll('*');
+      childElements.forEach(child => {
+        if (child instanceof HTMLElement) {
+          TUTORIAL_CLASSES.forEach(className => {
+            child.classList.remove(className);
+          });
+          VISUAL_ONLY_STYLES.forEach(style => {
+            try {
+              child.style[style as any] = '';
+            } catch (error) {
+              // Silently ignore errors
+            }
+          });
+        }
       });
     }
+    
+    // Clean up energy animation containers - preserve ALL styles
+    const energyAnimations = document.querySelectorAll('[class*="energy-animation"], .energy-animation');
+    energyAnimations.forEach(el => {
+      if (el instanceof HTMLElement) {
+        console.log('[TutorialCleanup] Preserving ALL styles for energy animation');
+        // Only remove tutorial classes, preserve ALL styles for energy animation
+        TUTORIAL_CLASSES.forEach(className => {
+          el.classList.remove(className);
+        });
+      }
+    });
     
     // Clean up tab buttons with improved selector targeting
     const tabSelectors = [
