@@ -63,7 +63,11 @@ serve(async (req) => {
     
     // Generate correlation ID for this request
     const requestCorrelationId = crypto.randomUUID();
-    console.log(`[chat-with-rag] Generated correlation ID: ${requestCorrelationId}`);
+    const orchestratorId = `orchestrator_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const orchestratorStartTime = Date.now();
+    
+    console.log(`[ORCHESTRATOR START] ${orchestratorId}: RAG pipeline starting at ${new Date().toISOString()}`);
+    console.log(`[ORCHESTRATOR] ${orchestratorId}: Generated correlation ID: ${requestCorrelationId}`);
     
     // Update user message with correlation ID to track RAG pipeline execution
     if (messageId) {
@@ -192,34 +196,43 @@ serve(async (req) => {
       } else {
         
         // Step 2: Enhanced Query Planning with timezone support
-      const queryPlanResponse = await supabaseClient.functions.invoke('smart-query-planner', {
-        body: { 
-          message, 
-          userId, 
-          conversationContext,
-          threadId,
-          messageId,
-          userProfile: completeUserProfile // Pass complete user profile including country
+        const plannerStartTime = Date.now();
+        console.log(`[ORCHESTRATOR] ${orchestratorId}: Calling smart-query-planner at ${new Date().toISOString()}`);
+        
+        const queryPlanResponse = await supabaseClient.functions.invoke('smart-query-planner', {
+          body: { 
+            message, 
+            userId, 
+            conversationContext,
+            threadId,
+            messageId,
+            userProfile: completeUserProfile // Pass complete user profile including country
+          }
+        });
+
+        const plannerTime = Date.now() - plannerStartTime;
+        console.log(`[ORCHESTRATOR] ${orchestratorId}: smart-query-planner completed in ${plannerTime}ms`);
+
+        if (queryPlanResponse.error) {
+          console.error(`[ORCHESTRATOR ERROR] ${orchestratorId}: Query planning failed:`, queryPlanResponse.error);
+          throw new Error(`Query planning failed: ${queryPlanResponse.error.message}`);
         }
-      });
 
-      if (queryPlanResponse.error) {
-        throw new Error(`Query planning failed: ${queryPlanResponse.error.message}`);
-      }
-
-      const queryPlan = queryPlanResponse.data.queryPlan;
-      const executionResult = queryPlanResponse.data.executionResult;
-      
-      console.log(`[chat-with-rag] Query plan strategy: ${queryPlan.strategy}, complexity: ${queryPlan.queryComplexity}`);
-      console.log(`[chat-with-rag] Execution result summary:`, {
-        resultCount: executionResult?.length || 0,
-        hasResults: !!executionResult && executionResult.length > 0
-      });
+        const queryPlan = queryPlanResponse.data.queryPlan;
+        const executionResult = queryPlanResponse.data.executionResult;
+        
+        console.log(`[ORCHESTRATOR] ${orchestratorId}: Query plan completed - strategy: ${queryPlan.strategy}, results: ${executionResult?.length || 0}`);
+        console.log(`[ORCHESTRATOR] ${orchestratorId}: Execution result summary:`, {
+          resultCount: executionResult?.length || 0,
+          hasResults: !!executionResult && executionResult.length > 0,
+          correlationId: queryPlanResponse.data.correlationId
+        });
 
 
       // Step 3: Generate consolidated response using gpt-response-consolidator
-      console.log("[chat-with-rag] Step 3: Calling gpt-response-consolidator");
-      console.log("[chat-with-rag] Execution result structure for consolidator:", {
+      const consolidatorStartTime = Date.now();
+      console.log(`[ORCHESTRATOR] ${orchestratorId}: Calling gpt-response-consolidator at ${new Date().toISOString()}`);
+      console.log(`[ORCHESTRATOR] ${orchestratorId}: Execution result structure for consolidator:`, {
         hasExecutionResult: !!executionResult,
         executionResultLength: executionResult?.length || 0,
         sampleResult: executionResult?.[0] ? {
@@ -242,12 +255,16 @@ serve(async (req) => {
         }
       });
 
+      const consolidatorTime = Date.now() - consolidatorStartTime;
+      console.log(`[ORCHESTRATOR] ${orchestratorId}: gpt-response-consolidator completed in ${consolidatorTime}ms`);
+
       if (consolidationResponse.error) {
-        console.error("[chat-with-rag] Consolidation error:", consolidationResponse.error);
+        console.error(`[ORCHESTRATOR ERROR] ${orchestratorId}: Consolidation failed:`, consolidationResponse.error);
         throw new Error(`Response consolidation failed: ${consolidationResponse.error.message}`);
       }
 
-      console.log("[chat-with-rag] Successfully completed RAG pipeline with consolidation");
+      const totalTime = Date.now() - orchestratorStartTime;
+      console.log(`[ORCHESTRATOR SUCCESS] ${orchestratorId}: RAG pipeline completed in ${totalTime}ms (planner: ${plannerTime}ms, consolidator: ${consolidatorTime}ms)`);
 
       // Parse consolidation response properly
       let finalResponse;
@@ -390,7 +407,8 @@ serve(async (req) => {
 
     } else if (classification.category === 'JOURNAL_SPECIFIC_NEEDS_CLARIFICATION') {
       // Handle queries that need clarification
-      console.log(`[chat-with-rag] EXECUTING: JOURNAL_SPECIFIC_NEEDS_CLARIFICATION pipeline - clarification request`);
+      const clarificationStartTime = Date.now();
+      console.log(`[ORCHESTRATOR] ${orchestratorId}: EXECUTING CLARIFICATION pipeline - calling gpt-clarification-generator at ${new Date().toISOString()}`);
       
       const clarificationResponse = await supabaseClient.functions.invoke('gpt-clarification-generator', {
         body: {
@@ -400,7 +418,11 @@ serve(async (req) => {
         }
       });
 
+      const clarificationTime = Date.now() - clarificationStartTime;
+      console.log(`[ORCHESTRATOR] ${orchestratorId}: gpt-clarification-generator completed in ${clarificationTime}ms`);
+
       if (clarificationResponse.error) {
+        console.error(`[ORCHESTRATOR ERROR] ${orchestratorId}: Clarification failed:`, clarificationResponse.error);
         throw new Error(`Clarification generation failed: ${clarificationResponse.error.message}`);
       }
 
@@ -475,11 +497,19 @@ serve(async (req) => {
     }
 
   } catch (error) {
-    console.error('[chat-with-rag] Error:', error);
+    const totalTime = Date.now() - (orchestratorStartTime || Date.now());
+    console.error(`[ORCHESTRATOR FAILURE] ${orchestratorId || 'unknown'}: Pipeline failed after ${totalTime}ms:`, {
+      error: error.message,
+      stack: error.stack,
+      timestamp: new Date().toISOString()
+    });
     
     return new Response(JSON.stringify({
       error: 'Failed to process query with RAG pipeline',
       details: error.message,
+      correlationId: orchestratorId,
+      functionName: 'chat-with-rag',
+      executionTimeMs: totalTime,
       fallbackResponse: "I apologize, but I'm having trouble processing your request right now. Please try rephrasing your question or try again later."
     }), {
       status: 500,

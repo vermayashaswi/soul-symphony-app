@@ -173,16 +173,24 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Generate correlation ID for tracking
+  const correlationId = `clarif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  const startTime = Date.now();
+
   try {
+    console.log(`[CLARIFICATION START] ${correlationId}: Function invoked at ${new Date().toISOString()}`);
+    
     const { 
       userMessage, 
       conversationContext,
       userProfile
     } = await req.json();
     
-    console.log('GPT Clarification Generator Gemini called with:', { 
+    console.log(`[CLARIFICATION INPUT] ${correlationId}:`, { 
       userMessage: userMessage?.substring(0, 100),
-      contextCount: conversationContext?.length || 0
+      contextCount: conversationContext?.length || 0,
+      hasProfile: !!userProfile,
+      profileTimezone: userProfile?.timezone || 'not-set'
     });
 
     // Import Gemini conversation utilities
@@ -196,6 +204,8 @@ serve(async (req) => {
       ? createLegacyContextString(conversationContext, 10)
       : 'No prior context - This is the start of the conversation';
 
+    console.log(`[CLARIFICATION PROCESSING] ${correlationId}: Building prompt and calling Gemini API`);
+    
     const clarificationPrompt = `You are Ruh by SOuLO, a direct, witty mental health companion who combines emotional intelligence with sharp insight. The user has asked a vague personal question that needs clarification to provide meaningful support.
 
 USER QUESTION: "${userMessage}"
@@ -326,6 +336,9 @@ MANDATORY: DON'T EXCESSIVELY REPEAT YOURSELF. YOU CAN FIND OUT HOW TO BE NON-REP
 
 TONE and RESPONSE GUIDELINES: Direct when required, insightful, naturally warm, witty when appropriate, and focused on actually helping. No excessive sentiment or spiritual language. **STRICT WORD LIMIT: Keep your responses between 30-100 words maximum. Be concise but impactful.**`;
 
+    const geminiStartTime = Date.now();
+    console.log(`[CLARIFICATION GEMINI] ${correlationId}: Calling Gemini API at ${new Date().toISOString()}`);
+    
     const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent', {
       method: 'POST',
       headers: {
@@ -348,11 +361,25 @@ TONE and RESPONSE GUIDELINES: Direct when required, insightful, naturally warm, 
       })
     });
 
+    const geminiTime = Date.now() - geminiStartTime;
+    console.log(`[CLARIFICATION GEMINI] ${correlationId}: API call completed in ${geminiTime}ms`);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[CLARIFICATION ERROR] ${correlationId}: Gemini API error ${response.status}: ${errorText}`);
+      throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
+    }
+
     const data = await response.json();
     const rawContent = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    
+    console.log(`[CLARIFICATION RESPONSE] ${correlationId}: Raw content length: ${rawContent.length}, has content: ${!!rawContent}`);
 
     // Use robust parsing logic to handle all edge cases
     const { response: responseText, userStatusMessage } = sanitizeOutput(rawContent);
+    
+    const totalTime = Date.now() - startTime;
+    console.log(`[CLARIFICATION SUCCESS] ${correlationId}: Function completed in ${totalTime}ms (Gemini: ${geminiTime}ms)`);
 
     return new Response(JSON.stringify({
       success: true,
@@ -364,10 +391,18 @@ TONE and RESPONSE GUIDELINES: Direct when required, insightful, naturally warm, 
     });
 
   } catch (error) {
-    console.error('Error in GPT Clarification Generator Gemini:', error);
+    const totalTime = Date.now() - startTime;
+    console.error(`[CLARIFICATION FAILURE] ${correlationId}: Function failed after ${totalTime}ms:`, {
+      error: error.message,
+      stack: error.stack,
+      timestamp: new Date().toISOString()
+    });
+    
     return new Response(JSON.stringify({ 
       success: false, 
-      error: error.message 
+      error: error.message,
+      correlationId,
+      functionName: 'gpt-clarification-generator'
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

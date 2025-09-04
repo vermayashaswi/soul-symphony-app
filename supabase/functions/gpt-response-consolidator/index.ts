@@ -108,7 +108,13 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Generate correlation ID for tracking
+  const correlationId = `consolidator_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  const startTime = Date.now();
+
   try {
+    console.log(`[CONSOLIDATOR START] ${correlationId}: Function invoked at ${new Date().toISOString()}`);
+    
     const raw = await req.json();
     const userMessage = raw.userMessage;
     const researchResults = raw.researchResults ?? raw.analysisResults ?? [];
@@ -124,12 +130,13 @@ serve(async (req) => {
     // Generate unique consolidation ID for tracking
     const consolidationId = `cons_gemini_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
-    console.log(`[CONSOLIDATION START GEMINI] ${consolidationId}:`, { 
+    console.log(`[CONSOLIDATOR INPUT] ${correlationId}:`, { 
       userMessage: userMessage?.substring(0, 100),
       researchResultsCount: researchResults?.length || 0,
       contextCount: conversationContext?.length || 0,
       streamingMode,
       messageId,
+      hasProfile: !!userProfile,
       timestamp: new Date().toISOString()
     });
 
@@ -922,10 +929,19 @@ Similarity: ${entry.similarity || 'N/A'}`;
     });
 
   } catch (error) {
-    console.error('Error in GPT Response Consolidator (Gemini):', error);
+    const totalTime = Date.now() - startTime;
+    console.error(`[CONSOLIDATOR FAILURE] ${correlationId}: Function failed after ${totalTime}ms:`, {
+      error: error.message,
+      stack: error.stack,
+      timestamp: new Date().toISOString(),
+      researchResultsCount: researchResults?.length || 0
+    });
+    
     return new Response(JSON.stringify({ 
       success: false, 
       error: error.message,
+      correlationId,
+      functionName: 'gpt-response-consolidator',
       fallbackResponse: "I encountered an unexpected error while processing your request. Please try again."
     }), {
       status: 500,

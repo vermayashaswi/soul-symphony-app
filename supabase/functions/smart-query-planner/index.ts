@@ -1812,6 +1812,12 @@ SQL Analysis: ["contentment", "love", "gratitude"] + timeRange: last month
 }
 
 serve(async (req) => {
+  // Generate correlation ID for tracking
+  const correlationId = `smart_planner_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  const startTime = Date.now();
+  
+  console.log(`[SMART PLANNER START] ${correlationId}: Function invoked at ${new Date().toISOString()}`);
+  
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -1835,19 +1841,18 @@ serve(async (req) => {
 
     const requestId = `planner_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
     
-    console.log(`[REQUEST START] ${requestId}: {
-  message: "${message}",
-  userId: "${userId}",
-  execute: ${execute},
-  timestamp: "${new Date().toISOString()}",
-  contextLength: ${conversationContext?.length || 0},
-  threadId: "${threadId}",
-  messageId: ${messageId},
-  isFollowUp: ${isFollowUp},
-  
-  userTimezone: "${userTimezone}",
-  userCountry: "${userCountry}"
-}`);
+    console.log(`[SMART PLANNER INPUT] ${correlationId}:`, {
+      message: message?.substring(0, 100),
+      userId: userId?.substring(0, 8) + '...',
+      execute,
+      contextLength: conversationContext?.length || 0,
+      threadId,
+      messageId,
+      isFollowUp,
+      userTimezone,
+      userCountry,
+      timestamp: new Date().toISOString()
+    });
 
     // Validate userId format
     if (!isValidUUID(userId)) {
@@ -1878,19 +1883,36 @@ serve(async (req) => {
     }
 
     // Execute the plan and return results
+    const executionStartTime = Date.now();
+    console.log(`[SMART PLANNER EXECUTION] ${correlationId}: Starting plan execution`);
+    
     const executionResult = await executePlan(analysisResult, userId, supabaseClient, requestId, userTimezone);
+    
+    const executionTime = Date.now() - executionStartTime;
+    const totalTime = Date.now() - startTime;
+    
+    console.log(`[SMART PLANNER SUCCESS] ${correlationId}: Execution completed in ${executionTime}ms, total time: ${totalTime}ms`);
     
     return new Response(JSON.stringify({
       queryPlan: analysisResult,
       executionResult,
       timestamp: new Date().toISOString(),
-      requestId
+      requestId,
+      correlationId,
+      executionTimeMs: totalTime
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
-    console.error('Error in smart query planner:', error);
+    const totalTime = Date.now() - startTime;
+    console.error(`[SMART PLANNER FAILURE] ${correlationId}: Function failed after ${totalTime}ms:`, {
+      error: error.message,
+      stack: error.stack,
+      timestamp: new Date().toISOString(),
+      requestId
+    });
+    
     return new Response(JSON.stringify({
       error: error.message,
       fallbackPlan: {
