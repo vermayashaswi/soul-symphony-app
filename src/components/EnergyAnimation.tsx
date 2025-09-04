@@ -98,10 +98,15 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
   return (
     <div 
       ref={containerRef}
-      className={`absolute ${fullScreen ? 'fixed inset-0' : 'w-full h-full'} 
-                 ${bottomNavOffset ? 'bottom-16' : 'bottom-0'} 
-                 left-0 right-0 ${bottomNavOffset ? 'top-0' : 'top-0'} overflow-hidden opacity-70 z-0 ${className}`}
-      style={{ pointerEvents: 'none' }} // Ensure the animation doesn't interfere with user interactions
+      className={`fixed inset-0 overflow-hidden opacity-70 z-0 ${className}`}
+      style={{ 
+        pointerEvents: 'none',
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0
+      }}
     >
       {/* Glowing center with enhanced blur */}
       <div 
