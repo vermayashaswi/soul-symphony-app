@@ -61,13 +61,13 @@ serve(async (req) => {
 
     console.log(`[chat-with-rag] Processing query: "${message}" for user: ${userId} (threadId: ${threadId}, messageId: ${messageId})`);
     
-    // Generate correlation ID for this request
-    const requestCorrelationId = crypto.randomUUID();
+    // Use correlation ID from request or generate new one
+    const requestCorrelationId = requestId || crypto.randomUUID();
     const orchestratorId = `orchestrator_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const orchestratorStartTime = Date.now();
     
     console.log(`[ORCHESTRATOR START] ${orchestratorId}: RAG pipeline starting at ${new Date().toISOString()}`);
-    console.log(`[ORCHESTRATOR] ${orchestratorId}: Generated correlation ID: ${requestCorrelationId}`);
+    console.log(`[ORCHESTRATOR] ${orchestratorId}: Using correlation ID: ${requestCorrelationId} (from request: ${!!requestId})`);
     
     // Update user message with correlation ID to track RAG pipeline execution
     if (messageId) {
@@ -178,37 +178,25 @@ serve(async (req) => {
     }
 
     if (classification.category === 'JOURNAL_SPECIFIC') {
-      console.log("[chat-with-rag] EXECUTING: JOURNAL_SPECIFIC pipeline - full RAG processing");
+      console.log(`[ORCHESTRATOR] ${orchestratorId}: EXECUTING: JOURNAL_SPECIFIC pipeline - full RAG processing`);
       
-      // Check if user has any journal entries first
-      const { data: journalCount, error: countError } = await supabaseClient
-        .from('Journal Entries')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', userId);
+      // Always proceed with journal-specific pipeline - smart-query-planner will handle no entries case
+      console.log(`[ORCHESTRATOR] ${orchestratorId}: Preserving JOURNAL_SPECIFIC classification - routing to smart-query-planner`);
+      // Step 2: Enhanced Query Planning with timezone support
+      const plannerStartTime = Date.now();
+      console.log(`[ORCHESTRATOR] ${orchestratorId}: Calling smart-query-planner at ${new Date().toISOString()}`);
       
-      const hasJournalEntries = !countError && journalCount && journalCount.length > 0;
-      console.log(`[chat-with-rag] User has ${hasJournalEntries ? journalCount.length : 0} journal entries`);
-      
-      if (!hasJournalEntries) {
-        console.log("[chat-with-rag] No journal entries found - routing to general mental health chat");
-        // Route to general mental health function which will intelligently handle journal prompting
-        classification.category = 'GENERAL_MENTAL_HEALTH';
-      } else {
-        
-        // Step 2: Enhanced Query Planning with timezone support
-        const plannerStartTime = Date.now();
-        console.log(`[ORCHESTRATOR] ${orchestratorId}: Calling smart-query-planner at ${new Date().toISOString()}`);
-        
-        const queryPlanResponse = await supabaseClient.functions.invoke('smart-query-planner', {
-          body: { 
-            message, 
-            userId, 
-            conversationContext,
-            threadId,
-            messageId,
-            userProfile: completeUserProfile // Pass complete user profile including country
-          }
-        });
+      const queryPlanResponse = await supabaseClient.functions.invoke('smart-query-planner', {
+        body: { 
+          message, 
+          userId, 
+          conversationContext,
+          threadId,
+          messageId,
+          requestCorrelationId,
+          userProfile: completeUserProfile // Pass complete user profile including country
+        }
+      });
 
         const plannerTime = Date.now() - plannerStartTime;
         console.log(`[ORCHESTRATOR] ${orchestratorId}: smart-query-planner completed in ${plannerTime}ms`);
@@ -251,6 +239,7 @@ serve(async (req) => {
           streamingMode: false,
           messageId: assistantMessageId, // Use the assistant message ID we created
           threadId: threadId,
+          requestCorrelationId,
           userTimezone: normalizedTimezone
         }
       });
@@ -354,8 +343,6 @@ serve(async (req) => {
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
-      
-      } // End of else block for hasJournalEntries
 
     } else if (classification.category === 'GENERAL_MENTAL_HEALTH') {
       // Handle general mental health queries using dedicated function
@@ -406,7 +393,7 @@ serve(async (req) => {
       });
 
     } else if (classification.category === 'JOURNAL_SPECIFIC_NEEDS_CLARIFICATION') {
-      // Handle queries that need clarification
+      // Handle queries that need clarification - always route regardless of journal entries
       const clarificationStartTime = Date.now();
       console.log(`[ORCHESTRATOR] ${orchestratorId}: EXECUTING CLARIFICATION pipeline - calling gpt-clarification-generator at ${new Date().toISOString()}`);
       
