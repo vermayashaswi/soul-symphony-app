@@ -38,11 +38,10 @@ export function getAnimationCenter(
   // Add additional offset for Capacitor native apps to account for status bar/navigation differences
   const capacitorOffset = isCapacitorNative() ? 15 : 0;
   
-  // Round to whole pixels to ensure perfect alignment between components
-  const x = Math.round(containerWidth / 2);
-  const y = Math.round((effectiveHeight / 2 - capacitorOffset) * verticalOffset);
-  
-  return { x, y };
+  return {
+    x: containerWidth / 2,
+    y: (effectiveHeight / 2 - capacitorOffset) * verticalOffset
+  };
 }
 
 /**
@@ -55,9 +54,6 @@ export function getAnimationCenterStyles(
   verticalOffset: number = 1.0
 ): React.CSSProperties {
   const center = getAnimationCenter(containerWidth, containerHeight, bottomNavOffset, verticalOffset);
-  
-  // Debug logging to ensure coordinates match between components
-  console.log('[getAnimationCenterStyles] Center coordinates:', center);
   
   return {
     position: 'fixed' as const,
@@ -82,15 +78,22 @@ function isTutorialActive(): boolean {
  */
 export function useAnimationCenter(bottomNavOffset: boolean = true, verticalOffset: number = 1.0): CircleCenter {
   const [center, setCenter] = React.useState<CircleCenter>(() => {
-    // Always use viewport pixel coordinates for consistency with getAnimationCenterStyles
+    if (isTutorialActive()) {
+      // In tutorial mode, use percentage-based center (50%, 50% relative to container)
+      return { x: 50, y: 50 };
+    }
     return getAnimationCenter(window.innerWidth, window.innerHeight, bottomNavOffset, verticalOffset);
   });
 
   React.useEffect(() => {
     const updateCenter = () => {
-      // Always use viewport pixel coordinates, regardless of tutorial mode
-      // This ensures consistency with getAnimationCenterStyles used by arrow button
-      setCenter(getAnimationCenter(window.innerWidth, window.innerHeight, bottomNavOffset, verticalOffset));
+      if (isTutorialActive()) {
+        // In tutorial mode, use percentage-based center
+        setCenter({ x: 50, y: 50 });
+      } else {
+        // Normal mode, use viewport coordinates
+        setCenter(getAnimationCenter(window.innerWidth, window.innerHeight, bottomNavOffset, verticalOffset));
+      }
     };
 
     // Update center on resize
