@@ -62,11 +62,6 @@ const AppRoutes = () => {
       // If we have a validated session, check voice onboarding
       if (hasValidSession && validatedSession) {
         console.log('[AppRoutes] Native app with validated session, checking voice onboarding');
-        // Wait for voice onboarding status to load
-        if (voiceOnboardingLoading || onboardingLoading) {
-          console.log('[AppRoutes] Waiting for onboarding status to load...');
-          return null; // Show loading or wait
-        }
         if (!voiceOnboardingCompleted) {
           console.log('[AppRoutes] Redirecting to voice onboarding');
           return <Navigate to="/app/voice-onboarding" replace />;
@@ -82,11 +77,6 @@ const AppRoutes = () => {
 
       // If user exists but session validation is still loading, check voice onboarding
       console.log('[AppRoutes] Native app user authenticated, checking voice onboarding');
-      // Wait for voice onboarding status to load
-      if (voiceOnboardingLoading || onboardingLoading) {
-        console.log('[AppRoutes] Waiting for onboarding status to load...');
-        return null; // Show loading or wait
-      }
       if (!voiceOnboardingCompleted) {
         console.log('[AppRoutes] Redirecting to voice onboarding');
         return <Navigate to="/app/voice-onboarding" replace />;
@@ -116,11 +106,6 @@ const AppRoutes = () => {
     }
 
     // If user is authenticated, check voice onboarding first
-    // Wait for voice onboarding status to load
-    if (voiceOnboardingLoading || onboardingLoading) {
-      console.log('[AppRoutes] Waiting for onboarding status to load...');
-      return null; // Show loading or wait
-    }
     if (!voiceOnboardingCompleted) {
       console.log('[AppRoutes] Redirecting to voice onboarding');
       return <Navigate to="/app/voice-onboarding" replace />;
@@ -141,11 +126,6 @@ const AppRoutes = () => {
       // Prioritize validated session for immediate routing
       if (hasValidSession && validatedSession) {
         console.log('[AppRoutes] Native app with validated session, checking voice onboarding');
-        // Wait for voice onboarding status to load
-        if (voiceOnboardingLoading || onboardingLoading) {
-          console.log('[AppRoutes] Waiting for onboarding status to load...');
-          return null; // Show loading or wait
-        }
         if (!voiceOnboardingCompleted) {
           console.log('[AppRoutes] Redirecting to voice onboarding');
           return <Navigate to="/app/voice-onboarding" replace />;
@@ -160,11 +140,6 @@ const AppRoutes = () => {
 
       // If user exists, check voice onboarding
       console.log('[AppRoutes] Native app user ready, checking voice onboarding');
-      // Wait for voice onboarding status to load
-      if (voiceOnboardingLoading || onboardingLoading) {
-        console.log('[AppRoutes] Waiting for onboarding status to load...');
-        return null; // Show loading or wait
-      }
       if (!voiceOnboardingCompleted) {
         console.log('[AppRoutes] Redirecting to voice onboarding');
         return <Navigate to="/app/voice-onboarding" replace />;
@@ -176,11 +151,6 @@ const AppRoutes = () => {
     console.log('[AppRoutes] Web environment at root');
     const lastAppPath = (() => { try { return localStorage.getItem('lastAppPath'); } catch { return null; } })();
     if (user || validatedSession) {
-      // Wait for voice onboarding status to load
-      if (voiceOnboardingLoading || onboardingLoading) {
-        console.log('[AppRoutes] Waiting for onboarding status to load...');
-        return null; // Show loading or wait
-      }
       if (!voiceOnboardingCompleted) {
         console.log('[AppRoutes] Redirecting to voice onboarding');
         return <Navigate to="/app/voice-onboarding" replace />;
