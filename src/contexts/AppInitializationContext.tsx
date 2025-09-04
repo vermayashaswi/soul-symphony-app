@@ -7,6 +7,8 @@ import { subscriptionErrorHandler } from '@/services/subscriptionErrorHandler';
 interface InitializationPhase {
   fonts: boolean;
   auth: boolean;
+  onboarding: boolean;
+  voiceOnboarding: boolean;
   appServices: boolean;
   subscription: boolean;
   contextProviders: boolean;
@@ -32,6 +34,9 @@ interface AppInitializationState {
     isTrialActive: boolean;
     daysRemainingInTrial: number;
   } | null;
+  // Onboarding status
+  onboardingCompleted: boolean;
+  voiceOnboardingCompleted: boolean;
 }
 
 interface AppInitializationContextType extends AppInitializationState {
@@ -45,10 +50,15 @@ export function AppInitializationProvider({ children }: { children: ReactNode })
   const [phases, setPhases] = useState<InitializationPhase>({
     fonts: false,
     auth: false,
+    onboarding: false,
+    voiceOnboarding: false,
     appServices: false,
     subscription: false,
     contextProviders: false
   });
+
+  const [onboardingCompleted, setOnboardingCompleted] = useState(false);
+  const [voiceOnboardingCompleted, setVoiceOnboardingCompleted] = useState(false);
 
   const [subscriptionData, setSubscriptionData] = useState<{
     tier: SubscriptionTier;
@@ -110,14 +120,55 @@ export function AppInitializationProvider({ children }: { children: ReactNode })
     }
   }, [appInit.isInitialized, appInit.error]);
 
-  // Monitor auth state
+  // Monitor auth state and onboarding status
   const { user, isLoading: authLoading, profileCreationInProgress, profileCreationComplete } = useAuth();
+  
   useEffect(() => {
     if (!authLoading) {
       markPhaseComplete('auth');
-      setCurrentPhase('Loading app services...');
+      setCurrentPhase('Checking onboarding...');
     }
   }, [authLoading]);
+
+  // Check onboarding status after auth is complete
+  useEffect(() => {
+    if (phases.auth && user) {
+      checkOnboardingStatus();
+    }
+  }, [phases.auth, user]);
+
+  const checkOnboardingStatus = async () => {
+    if (!user) return;
+
+    try {
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('onboarding_completed, voice_onboarding_completed')
+        .eq('id', user.id)
+        .single();
+
+      if (error) {
+        console.error('Error checking onboarding status:', error);
+        // Default to incomplete onboarding
+        setOnboardingCompleted(false);
+        setVoiceOnboardingCompleted(false);
+      } else {
+        setOnboardingCompleted(profile?.onboarding_completed || false);
+        setVoiceOnboardingCompleted(profile?.voice_onboarding_completed || false);
+      }
+
+      markPhaseComplete('onboarding');
+      markPhaseComplete('voiceOnboarding');
+      setCurrentPhase('Loading app services...');
+    } catch (error) {
+      console.error('Error checking onboarding:', error);
+      setOnboardingCompleted(false);
+      setVoiceOnboardingCompleted(false);
+      markPhaseComplete('onboarding');
+      markPhaseComplete('voiceOnboarding');
+      setCurrentPhase('Loading app services...');
+    }
+  };
 
   // Load subscription data after app services are ready
   useEffect(() => {
@@ -290,14 +341,14 @@ export function AppInitializationProvider({ children }: { children: ReactNode })
 
   // Mark context providers as ready after a brief delay to ensure all providers are mounted
   useEffect(() => {
-    if (phases.fonts && phases.auth && phases.appServices && phases.subscription) {
+    if (phases.fonts && phases.auth && phases.onboarding && phases.voiceOnboarding && phases.appServices && phases.subscription) {
       const timer = setTimeout(() => {
         markPhaseComplete('contextProviders');
         setCurrentPhase('Ready!');
       }, 100);
       return () => clearTimeout(timer);
     }
-  }, [phases.fonts, phases.auth, phases.appServices, phases.subscription]);
+  }, [phases.fonts, phases.auth, phases.onboarding, phases.voiceOnboarding, phases.appServices, phases.subscription]);
 
   const markPhaseComplete = (phase: keyof InitializationPhase) => {
     setPhases(prev => ({ ...prev, [phase]: true }));
@@ -307,11 +358,15 @@ export function AppInitializationProvider({ children }: { children: ReactNode })
     setPhases({
       fonts: false,
       auth: false,
+      onboarding: false,
+      voiceOnboarding: false,
       appServices: false,
       subscription: false,
       contextProviders: false
     });
     setSubscriptionData(null);
+    setOnboardingCompleted(false);
+    setVoiceOnboardingCompleted(false);
     setCurrentPhase('Initializing fonts...');
     setError(null);
   };
@@ -331,6 +386,8 @@ export function AppInitializationProvider({ children }: { children: ReactNode })
     currentPhase,
     error,
     subscriptionData,
+    onboardingCompleted,
+    voiceOnboardingCompleted,
     markPhaseComplete,
     resetInitialization
   };

@@ -19,6 +19,8 @@ import BlogPostPage from '@/pages/website/BlogPostPage';
 import AccountDeletion from '@/pages/AccountDeletion';
 import DataDeletion from '@/pages/DataDeletion';
 import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
+import VoiceOnboarding from '@/pages/VoiceOnboarding';
+import VoiceOnboardingRoute from '@/components/routing/VoiceOnboardingRoute';
 import SessionRouter from '@/components/routing/SessionRouter';
 import { AppSessionProvider } from '@/components/session/AppSessionProvider';
 import { useAuth } from '@/contexts/AuthContext';
@@ -186,6 +188,13 @@ const AppRoutes = () => {
         <Route path="/app/auth" element={
           <SessionRouter>
             <Auth />
+          </SessionRouter>
+        } />
+        <Route path="/app/voice-onboarding" element={
+          <SessionRouter>
+            <VoiceOnboardingRoute>
+              <VoiceOnboarding />
+            </VoiceOnboardingRoute>
           </SessionRouter>
         } />
         <Route path="/app/native-auth-diagnostics" element={<NativeAuthDiagnostics />} />
