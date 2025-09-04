@@ -47,17 +47,20 @@ const AppRoutes = () => {
             .from('profiles')
             .select('profile_onboarding_completed')
             .eq('id', user.id)
-            .single();
+            .maybeSingle();
           
           if (error) {
             console.error('Error checking profile onboarding:', error);
+            // If profile doesn't exist, treat as onboarding not completed
             setProfileOnboardingComplete(false);
             return;
           }
           
-          setProfileOnboardingComplete(data?.profile_onboarding_completed || false);
+          // If no profile exists or profile_onboarding_completed is null/false, treat as not completed
+          setProfileOnboardingComplete(data?.profile_onboarding_completed ?? false);
         } catch (error) {
           console.error('Error in profile onboarding check:', error);
+          // Default to onboarding not completed on error
           setProfileOnboardingComplete(false);
         }
       };
