@@ -114,8 +114,6 @@ const JournalNavigationButton: React.FC = () => {
           height: 'auto',
         }}
         data-testid="journal-arrow-button"
-        data-protected-positioning="true"
-        data-component-type="navigation-button"
         ref={buttonRef}
       >
         <motion.div

@@ -102,8 +102,6 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
                  ${bottomNavOffset ? 'bottom-16' : 'bottom-0'} 
                  left-0 right-0 ${bottomNavOffset ? 'top-0' : 'top-0'} overflow-hidden opacity-70 z-0 ${className}`}
       style={{ pointerEvents: 'none' }} // Ensure the animation doesn't interfere with user interactions
-      data-protected-positioning="true"
-      data-component-type="energy-animation"
     >
       {/* Glowing center with enhanced blur */}
       <div 
