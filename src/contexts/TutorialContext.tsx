@@ -13,7 +13,7 @@ import {
   findAndHighlightElement,
   logPotentialTutorialElements
 } from '@/utils/tutorial/tutorial-elements-finder';
-import { performComprehensiveCleanup, performStaggeredCleanup, performNavigationCleanup } from '@/utils/tutorial/tutorial-cleanup-enhanced';
+import { performComprehensiveCleanup, performStaggeredCleanup, performNavigationCleanup, performStep1ExitCleanup } from '@/utils/tutorial/tutorial-cleanup-enhanced';
 import { navigationManager } from '@/utils/tutorial/navigation-state-manager';
 import { highlightingManager } from '@/utils/tutorial/tutorial-highlighting-manager';
 import { InfographicType } from '@/components/tutorial/TutorialInfographic';
@@ -580,8 +580,15 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       navigationManager.forceReset();
       highlightingManager.reset();
       
-      // Clean up any lingering tutorial classes - pass current step for step-specific logic
-      performStaggeredCleanup(steps[currentStep]?.id);
+      // Use special step 1 cleanup if exiting from step 1, otherwise use standard cleanup
+      const currentStepId = steps[currentStep]?.id;
+      if (currentStepId === 1) {
+        console.log('[TutorialContext] Using special step 1 exit cleanup to preserve energy animation');
+        performStep1ExitCleanup();
+      } else {
+        // Clean up any lingering tutorial classes - pass current step for step-specific logic
+        performStaggeredCleanup(currentStepId);
+      }
       
       console.log('[TutorialContext] Tutorial skipped by user, navigating to home');
       // Navigate to home page after skipping the tutorial

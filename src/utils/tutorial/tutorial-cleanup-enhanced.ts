@@ -353,6 +353,43 @@ export const performNavigationCleanup = (preserveStep?: number) => {
   }
 };
 
+// NEW: Special cleanup for step 1 exit - preserves energy animation and arrow button positioning
+export const performStep1ExitCleanup = () => {
+  console.log('[TutorialCleanup] Performing special step 1 exit cleanup - preserving energy animation');
+  
+  try {
+    // Only remove tutorial modal overlay and tutorial-specific classes
+    const tutorialOverlay = document.querySelector('[data-tutorial-overlay]');
+    if (tutorialOverlay) {
+      tutorialOverlay.remove();
+    }
+    
+    // Remove tutorial classes but preserve ALL positioning and animation styles
+    const tutorialElements = document.querySelectorAll(
+      TUTORIAL_CLASSES.map(cls => `.${cls}`).join(', ')
+    );
+    
+    tutorialElements.forEach(el => {
+      if (el instanceof HTMLElement) {
+        // Remove only tutorial classes, preserve ALL other styles
+        TUTORIAL_CLASSES.forEach(className => {
+          el.classList.remove(className);
+        });
+      }
+    });
+    
+    // Clean body classes but preserve scroll and positioning
+    document.body.classList.remove('tutorial-active');
+    document.body.removeAttribute('data-current-step');
+    
+    // Do NOT reset any positioning styles - preserve energy animation state
+    console.log('[TutorialCleanup] Step 1 exit cleanup complete - energy animation preserved');
+    
+  } catch (error) {
+    console.error('[TutorialCleanup] Error during step 1 exit cleanup:', error);
+  }
+};
+
 // NEW: Selective cleanup that preserves specific step highlighting
 export const performSelectiveCleanup = (preserveSteps: number[] = []) => {
   console.log(`[TutorialCleanup] Performing selective cleanup, preserving steps: ${preserveSteps.join(', ')}`);

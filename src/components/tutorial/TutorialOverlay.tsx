@@ -452,6 +452,7 @@ const TutorialOverlay: React.FC = () => {
       {/* Semi-transparent overlay */}
       <motion.div
         className="tutorial-overlay absolute inset-0"
+        data-tutorial-overlay
         initial={{ opacity: 0 }}
         animate={{ opacity: 0.75 }}
         exit={{ opacity: 0 }}
