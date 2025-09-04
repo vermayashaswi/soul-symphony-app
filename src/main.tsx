@@ -10,6 +10,7 @@ import { BrowserRouter } from 'react-router-dom'
 import { TranslationProvider } from './contexts/TranslationContext'
 import { ContextReadinessProvider } from './contexts/ContextReadinessManager'
 import { ThemeProvider } from './hooks/use-theme'
+import { AppInitializationProvider } from './contexts/AppInitializationContext'
 import { initializeServiceWorker } from './utils/serviceWorker'
 import { backgroundSyncService } from './services/backgroundSyncService'
 import { periodicSyncService } from './services/periodicSyncService'
@@ -286,7 +287,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           <ThemeProvider>
             <TranslationProvider>
               <AuthProvider>
-                <App />
+                <AppInitializationProvider>
+                  <App />
+                </AppInitializationProvider>
               </AuthProvider>
             </TranslationProvider>
           </ThemeProvider>
