@@ -7,8 +7,6 @@ import { subscriptionErrorHandler } from '@/services/subscriptionErrorHandler';
 interface InitializationPhase {
   fonts: boolean;
   auth: boolean;
-  onboarding: boolean;
-  voiceOnboarding: boolean;
   appServices: boolean;
   subscription: boolean;
   contextProviders: boolean;
@@ -34,12 +32,6 @@ interface AppInitializationState {
     isTrialActive: boolean;
     daysRemainingInTrial: number;
   } | null;
-  // Onboarding status
-  onboardingCompleted: boolean;
-  voiceOnboardingCompleted: boolean;
-  // Loading states
-  onboardingLoading: boolean;
-  voiceOnboardingLoading: boolean;
 }
 
 interface AppInitializationContextType extends AppInitializationState {
@@ -53,17 +45,10 @@ export function AppInitializationProvider({ children }: { children: ReactNode })
   const [phases, setPhases] = useState<InitializationPhase>({
     fonts: false,
     auth: false,
-    onboarding: false,
-    voiceOnboarding: false,
     appServices: false,
     subscription: false,
     contextProviders: false
   });
-
-  const [onboardingCompleted, setOnboardingCompleted] = useState(false);
-  const [voiceOnboardingCompleted, setVoiceOnboardingCompleted] = useState(false);
-  const [onboardingLoading, setOnboardingLoading] = useState(true);
-  const [voiceOnboardingLoading, setVoiceOnboardingLoading] = useState(true);
 
   const [subscriptionData, setSubscriptionData] = useState<{
     tier: SubscriptionTier;
@@ -125,74 +110,14 @@ export function AppInitializationProvider({ children }: { children: ReactNode })
     }
   }, [appInit.isInitialized, appInit.error]);
 
-  // Monitor auth state and onboarding status
+  // Monitor auth state
   const { user, isLoading: authLoading, profileCreationInProgress, profileCreationComplete } = useAuth();
-  
   useEffect(() => {
     if (!authLoading) {
       markPhaseComplete('auth');
-      setCurrentPhase('Checking onboarding...');
+      setCurrentPhase('Loading app services...');
     }
   }, [authLoading]);
-
-  // Check onboarding status after auth is complete
-  useEffect(() => {
-    if (phases.auth && user) {
-      checkOnboardingStatus();
-    }
-  }, [phases.auth, user]);
-
-  const checkOnboardingStatus = async () => {
-    if (!user) return;
-
-    console.log('[AppInit] Checking onboarding status for user:', user.id);
-    setOnboardingLoading(true);
-    setVoiceOnboardingLoading(true);
-
-    try {
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('onboarding_completed, voice_onboarding_completed')
-        .eq('id', user.id)
-        .single();
-
-      if (error) {
-        console.error('[AppInit] Error checking onboarding status:', error);
-        // Default to incomplete onboarding
-        setOnboardingCompleted(false);
-        setVoiceOnboardingCompleted(false);
-        console.log('[AppInit] Set onboarding to false due to error');
-      } else {
-        const regularOnboarding = profile?.onboarding_completed || false;
-        const voiceOnboarding = profile?.voice_onboarding_completed || false;
-        
-        setOnboardingCompleted(regularOnboarding);
-        setVoiceOnboardingCompleted(voiceOnboarding);
-        
-        console.log('[AppInit] Onboarding status loaded:', {
-          regularOnboarding,
-          voiceOnboarding,
-          userId: user.id
-        });
-      }
-
-      // Mark phases complete based on actual status
-      markPhaseComplete('onboarding');
-      markPhaseComplete('voiceOnboarding');
-      setOnboardingLoading(false);
-      setVoiceOnboardingLoading(false);
-      setCurrentPhase('Loading app services...');
-    } catch (error) {
-      console.error('[AppInit] Error checking onboarding:', error);
-      setOnboardingCompleted(false);
-      setVoiceOnboardingCompleted(false);
-      markPhaseComplete('onboarding');
-      markPhaseComplete('voiceOnboarding');
-      setOnboardingLoading(false);
-      setVoiceOnboardingLoading(false);
-      setCurrentPhase('Loading app services...');
-    }
-  };
 
   // Load subscription data after app services are ready
   useEffect(() => {
@@ -365,14 +290,14 @@ export function AppInitializationProvider({ children }: { children: ReactNode })
 
   // Mark context providers as ready after a brief delay to ensure all providers are mounted
   useEffect(() => {
-    if (phases.fonts && phases.auth && phases.onboarding && phases.voiceOnboarding && phases.appServices && phases.subscription) {
+    if (phases.fonts && phases.auth && phases.appServices && phases.subscription) {
       const timer = setTimeout(() => {
         markPhaseComplete('contextProviders');
         setCurrentPhase('Ready!');
       }, 100);
       return () => clearTimeout(timer);
     }
-  }, [phases.fonts, phases.auth, phases.onboarding, phases.voiceOnboarding, phases.appServices, phases.subscription]);
+  }, [phases.fonts, phases.auth, phases.appServices, phases.subscription]);
 
   const markPhaseComplete = (phase: keyof InitializationPhase) => {
     setPhases(prev => ({ ...prev, [phase]: true }));
@@ -382,17 +307,11 @@ export function AppInitializationProvider({ children }: { children: ReactNode })
     setPhases({
       fonts: false,
       auth: false,
-      onboarding: false,
-      voiceOnboarding: false,
       appServices: false,
       subscription: false,
       contextProviders: false
     });
     setSubscriptionData(null);
-    setOnboardingCompleted(false);
-    setVoiceOnboardingCompleted(false);
-    setOnboardingLoading(true);
-    setVoiceOnboardingLoading(true);
     setCurrentPhase('Initializing fonts...');
     setError(null);
   };
@@ -412,10 +331,6 @@ export function AppInitializationProvider({ children }: { children: ReactNode })
     currentPhase,
     error,
     subscriptionData,
-    onboardingCompleted,
-    voiceOnboardingCompleted,
-    onboardingLoading,
-    voiceOnboardingLoading,
     markPhaseComplete,
     resetInitialization
   };

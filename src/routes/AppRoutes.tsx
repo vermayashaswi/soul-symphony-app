@@ -19,14 +19,11 @@ import BlogPostPage from '@/pages/website/BlogPostPage';
 import AccountDeletion from '@/pages/AccountDeletion';
 import DataDeletion from '@/pages/DataDeletion';
 import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
-import VoiceOnboarding from '@/pages/VoiceOnboarding';
-import VoiceOnboardingRoute from '@/components/routing/VoiceOnboardingRoute';
 import SessionRouter from '@/components/routing/SessionRouter';
 import { AppSessionProvider } from '@/components/session/AppSessionProvider';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOnboarding } from '@/hooks/use-onboarding';
 import { useSessionValidation } from '@/hooks/useSessionValidation';
-import { useAppInitializationContext } from '@/contexts/AppInitializationContext';
 import { nativeIntegrationService } from '@/services/nativeIntegrationService';
 import NativeAuthDiagnostics from '@/pages/NativeAuthDiagnostics';
 
@@ -34,7 +31,6 @@ const AppRoutes = () => {
   const { user } = useAuth();
   const { onboardingComplete } = useOnboarding();
   const { session: validatedSession, isValid: hasValidSession, isLoading: sessionLoading } = useSessionValidation();
-  const { voiceOnboardingCompleted, voiceOnboardingLoading, onboardingLoading } = useAppInitializationContext();
 
   // Enhanced app root redirect with session validation
   const AppRootRedirect = () => {
@@ -59,13 +55,9 @@ const AppRoutes = () => {
       // ENHANCED: For native apps, prioritize validated session over user context
       console.log('[AppRoutes] Native environment detected, checking session validation');
       
-      // If we have a validated session, check voice onboarding
+      // If we have a validated session, go directly to home
       if (hasValidSession && validatedSession) {
-        console.log('[AppRoutes] Native app with validated session, checking voice onboarding');
-        if (!voiceOnboardingCompleted) {
-          console.log('[AppRoutes] Redirecting to voice onboarding');
-          return <Navigate to="/app/voice-onboarding" replace />;
-        }
+        console.log('[AppRoutes] Native app with validated session, redirecting to home');
         return <Navigate to="/app/home" replace />;
       }
       
@@ -75,12 +67,8 @@ const AppRoutes = () => {
         return <Navigate to="/app/onboarding" replace />;
       }
 
-      // If user exists but session validation is still loading, check voice onboarding
-      console.log('[AppRoutes] Native app user authenticated, checking voice onboarding');
-      if (!voiceOnboardingCompleted) {
-        console.log('[AppRoutes] Redirecting to voice onboarding');
-        return <Navigate to="/app/voice-onboarding" replace />;
-      }
+      // If user exists but session validation is still loading, go to home anyway
+      console.log('[AppRoutes] Native app user authenticated, redirecting to home');
       return <Navigate to="/app/home" replace />;
     }
 
@@ -105,11 +93,7 @@ const AppRoutes = () => {
       return <Navigate to="/app/onboarding" replace />;
     }
 
-    // If user is authenticated, check voice onboarding first
-    if (!voiceOnboardingCompleted) {
-      console.log('[AppRoutes] Redirecting to voice onboarding');
-      return <Navigate to="/app/voice-onboarding" replace />;
-    }
+    // If user is authenticated, go to last in-app path when available
     return <Navigate to={lastAppPath && lastAppPath.startsWith('/app/') ? lastAppPath : '/app/home'} replace />;
   };
 
@@ -125,11 +109,7 @@ const AppRoutes = () => {
       
       // Prioritize validated session for immediate routing
       if (hasValidSession && validatedSession) {
-        console.log('[AppRoutes] Native app with validated session, checking voice onboarding');
-        if (!voiceOnboardingCompleted) {
-          console.log('[AppRoutes] Redirecting to voice onboarding');
-          return <Navigate to="/app/voice-onboarding" replace />;
-        }
+        console.log('[AppRoutes] Native app with validated session, redirecting to home');
         return <Navigate to="/app/home" replace />;
       }
       
@@ -138,12 +118,8 @@ const AppRoutes = () => {
         return <Navigate to="/app/onboarding" replace />;
       }
 
-      // If user exists, check voice onboarding
-      console.log('[AppRoutes] Native app user ready, checking voice onboarding');
-      if (!voiceOnboardingCompleted) {
-        console.log('[AppRoutes] Redirecting to voice onboarding');
-        return <Navigate to="/app/voice-onboarding" replace />;
-      }
+      // If user exists, go to home
+      console.log('[AppRoutes] Native app user ready, redirecting to home');
       return <Navigate to="/app/home" replace />;
     }
 
@@ -151,10 +127,6 @@ const AppRoutes = () => {
     console.log('[AppRoutes] Web environment at root');
     const lastAppPath = (() => { try { return localStorage.getItem('lastAppPath'); } catch { return null; } })();
     if (user || validatedSession) {
-      if (!voiceOnboardingCompleted) {
-        console.log('[AppRoutes] Redirecting to voice onboarding');
-        return <Navigate to="/app/voice-onboarding" replace />;
-      }
       return <Navigate to={lastAppPath && lastAppPath.startsWith('/app/') ? lastAppPath : '/app/home'} replace />;
     }
     return <Index />;
@@ -214,13 +186,6 @@ const AppRoutes = () => {
         <Route path="/app/auth" element={
           <SessionRouter>
             <Auth />
-          </SessionRouter>
-        } />
-        <Route path="/app/voice-onboarding" element={
-          <SessionRouter>
-            <VoiceOnboardingRoute>
-              <VoiceOnboarding />
-            </VoiceOnboardingRoute>
           </SessionRouter>
         } />
         <Route path="/app/native-auth-diagnostics" element={<NativeAuthDiagnostics />} />
