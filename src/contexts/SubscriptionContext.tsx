@@ -30,11 +30,11 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
 
   // Simplified refresh functions that don't actually refetch during initialization
   const refreshSubscription = async (): Promise<void> => {
-    console.log('[SubscriptionContext] Refresh requested - data comes from AppInitializationContext');
+    console.log('[SubscriptionContext] Refresh requested - data comes from AppInitializationContext (hardcoded for new users)');
   };
 
   const refreshSubscriptionStatus = async (): Promise<void> => {
-    console.log('[SubscriptionContext] Refresh status requested - data comes from AppInitializationContext');
+    console.log('[SubscriptionContext] Refresh status requested - data comes from AppInitializationContext (hardcoded for new users)');
   };
 
   // Use data from AppInitializationContext or defaults

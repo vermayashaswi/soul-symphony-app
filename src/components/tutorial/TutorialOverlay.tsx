@@ -107,8 +107,9 @@ const TutorialOverlay: React.FC = () => {
           window.scrollTo(0, scrollPos);
           console.log('[TutorialOverlay] Tutorial inactive, restored page scrolling');
           
-          // Run enhanced staggered cleanup
-          performStaggeredCleanup();
+          // Run enhanced staggered cleanup with current step info
+          const currentStepId = tutorialContext.steps[tutorialContext.currentStep]?.id;
+          performStaggeredCleanup(currentStepId);
           
           // SPECIAL: Reset the arrow button specifically to ensure it's centered
           resetArrowButtonPosition();

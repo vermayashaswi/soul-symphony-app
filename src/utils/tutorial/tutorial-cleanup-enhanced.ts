@@ -23,8 +23,8 @@ export const TUTORIAL_STYLE_PROPERTIES = [
   'outline', 'backdropFilter', 'filter', 'cursor', 'pointerEvents'
 ];
 
-export const performComprehensiveCleanup = () => {
-  console.log('[TutorialCleanup] Starting comprehensive cleanup');
+export const performComprehensiveCleanup = (currentStepId?: number) => {
+  console.log('[TutorialCleanup] Starting comprehensive cleanup', { currentStepId });
   
   try {
     // Phase 1: Remove all tutorial classes from any element
@@ -77,7 +77,7 @@ export const performComprehensiveCleanup = () => {
     rootElement.style.removeProperty('--tutorial-animation');
     
     // Phase 3: Specific cleanup for known problematic elements
-    cleanupSpecificElements();
+    cleanupSpecificElements(currentStepId);
     
     // Phase 4: Reset body classes and attributes
     cleanupBodyElement();
@@ -109,43 +109,61 @@ const cleanupBodyElement = () => {
   }
 };
 
-const cleanupSpecificElements = () => {
-  console.log('[TutorialCleanup] Running specific element cleanup');
+  const cleanupSpecificElements = (currentStepId?: number) => {
+  console.log('[TutorialCleanup] Running specific element cleanup', { currentStepId });
   
   try {
     // Clean up arrow button specifically with defensive checks
+    // IMPORTANT: Skip arrow button position reset if we're coming from step 1 to preserve energy animation
     const arrowButton = document.querySelector('.journal-arrow-button');
     if (arrowButton instanceof HTMLElement) {
-      console.log('[TutorialCleanup] Resetting arrow button');
-      
-      // Reset to default centered position
-      const arrowStyles = {
-        position: 'fixed',
-        top: '50%',
-        left: '50%',
-        transform: 'translate(-50%, -50%)',
-        zIndex: '40',
-        margin: '0',
-        padding: '0'
-      };
-      
-      Object.entries(arrowStyles).forEach(([prop, value]) => {
-        try {
-          arrowButton.style[prop as any] = value;
-        } catch (error) {
-          console.warn(`[TutorialCleanup] Could not set arrow button style ${prop}:`, error);
+      if (currentStepId === 1) {
+        console.log('[TutorialCleanup] Skipping arrow button position reset for step 1 to preserve energy animation');
+        
+        // Only clean tutorial-specific styles, preserve positioning for energy animation
+        const buttonElement = arrowButton.querySelector('button');
+        if (buttonElement instanceof HTMLElement) {
+          const gentleStylesReset = ['boxShadow', 'animation', 'border', 'backgroundColor', 'color', 'textShadow', 'outline'];
+          gentleStylesReset.forEach(style => {
+            try {
+              buttonElement.style[style as any] = '';
+            } catch (error) {
+              // Silently ignore errors for button element cleanup
+            }
+          });
         }
-      });
-      
-      const buttonElement = arrowButton.querySelector('button');
-      if (buttonElement instanceof HTMLElement) {
-        TUTORIAL_STYLE_PROPERTIES.forEach(style => {
+      } else {
+        console.log('[TutorialCleanup] Resetting arrow button position (not step 1)');
+        
+        // Reset to default centered position for other steps
+        const arrowStyles = {
+          position: 'fixed',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          zIndex: '40',
+          margin: '0',
+          padding: '0'
+        };
+        
+        Object.entries(arrowStyles).forEach(([prop, value]) => {
           try {
-            buttonElement.style[style as any] = '';
+            arrowButton.style[prop as any] = value;
           } catch (error) {
-            // Silently ignore errors for button element cleanup
+            console.warn(`[TutorialCleanup] Could not set arrow button style ${prop}:`, error);
           }
         });
+        
+        const buttonElement = arrowButton.querySelector('button');
+        if (buttonElement instanceof HTMLElement) {
+          TUTORIAL_STYLE_PROPERTIES.forEach(style => {
+            try {
+              buttonElement.style[style as any] = '';
+            } catch (error) {
+              // Silently ignore errors for button element cleanup
+            }
+          });
+        }
       }
     }
     
@@ -218,28 +236,75 @@ const cleanupSpecificElements = () => {
   }
 };
 
-export const performStaggeredCleanup = () => {
-  console.log('[TutorialCleanup] Starting staggered cleanup process');
+// NEW: Gentle cleanup for step 1 - preserves energy animation positioning
+const performGentleCleanup = () => {
+  console.log('[TutorialCleanup] Performing gentle cleanup for step 1');
   
-  // Stage 1: Immediate cleanup
-  performComprehensiveCleanup();
+  try {
+    // Only remove tutorial classes without affecting positioning or animations
+    const tutorialElements = document.querySelectorAll(
+      TUTORIAL_CLASSES.map(cls => `.${cls}`).join(', ')
+    );
+    
+    tutorialElements.forEach(el => {
+      if (el instanceof HTMLElement) {
+        // Remove only tutorial classes, preserve all positioning
+        TUTORIAL_CLASSES.forEach(className => {
+          el.classList.remove(className);
+        });
+        
+        // Only reset non-positioning styles to preserve energy animation
+        const gentleStyleReset = ['boxShadow', 'animation', 'border', 'backgroundColor', 'color', 'textShadow', 'outline'];
+        gentleStyleReset.forEach(style => {
+          try {
+            el.style[style as any] = '';
+          } catch (error) {
+            // Silently ignore errors
+          }
+        });
+      }
+    });
+    
+    // Clean body classes but preserve scroll position
+    document.body.classList.remove('tutorial-active');
+    document.body.removeAttribute('data-current-step');
+    
+  } catch (error) {
+    console.error('[TutorialCleanup] Error during gentle cleanup:', error);
+  }
+};
+
+export const performStaggeredCleanup = (currentStepId?: number) => {
+  console.log('[TutorialCleanup] Starting staggered cleanup process', { currentStepId });
+  
+  // Stage 1: Immediate cleanup with step-specific considerations
+  performComprehensiveCleanup(currentStepId);
   
   // Stage 2: Short delay cleanup
   setTimeout(() => {
     console.log('[TutorialCleanup] Stage 2 cleanup');
-    performComprehensiveCleanup();
+    performComprehensiveCleanup(currentStepId);
   }, 50);
   
-  // Stage 3: Medium delay cleanup
-  setTimeout(() => {
-    console.log('[TutorialCleanup] Stage 3 cleanup');
-    performComprehensiveCleanup();
-  }, 150);
+  // Stage 3: Medium delay cleanup - skip if exiting from step 1 to preserve energy animation
+  if (currentStepId !== 1) {
+    setTimeout(() => {
+      console.log('[TutorialCleanup] Stage 3 cleanup');
+      performComprehensiveCleanup(currentStepId);
+    }, 150);
+  } else {
+    console.log('[TutorialCleanup] Skipping stage 3 cleanup for step 1 to preserve energy animation');
+  }
   
-  // Stage 4: Final cleanup
+  // Stage 4: Final cleanup - gentle cleanup for step 1
   setTimeout(() => {
     console.log('[TutorialCleanup] Final cleanup stage');
-    performComprehensiveCleanup();
+    if (currentStepId === 1) {
+      // Gentle cleanup for step 1 - only remove tutorial classes, preserve positioning
+      performGentleCleanup();
+    } else {
+      performComprehensiveCleanup(currentStepId);
+    }
   }, 300);
 };
 

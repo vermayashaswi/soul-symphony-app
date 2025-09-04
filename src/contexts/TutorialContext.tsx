@@ -411,7 +411,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       highlightingManager.reset();
       
       // Comprehensive cleanup
-      performStaggeredCleanup();
+      performStaggeredCleanup(currentStep + 1); // Pass current step for cleanup logic
       
       // Then update database - mark both tutorial AND onboarding as complete
       const { error } = await supabase
@@ -580,8 +580,8 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       navigationManager.forceReset();
       highlightingManager.reset();
       
-      // Clean up any lingering tutorial classes
-      performStaggeredCleanup();
+      // Clean up any lingering tutorial classes - pass current step for step-specific logic
+      performStaggeredCleanup(steps[currentStep]?.id);
       
       console.log('[TutorialContext] Tutorial skipped by user, navigating to home');
       // Navigate to home page after skipping the tutorial
