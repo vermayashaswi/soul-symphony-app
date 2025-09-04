@@ -4,7 +4,6 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
 import { TranslationLoadingOverlay } from '@/components/translation/TranslationLoadingOverlay';
-import { MasterLoadingOverlay } from '@/components/system/MasterLoadingOverlay';
 import { JournalProcessingInitializer } from './app/journal-processing-init';
 import { TutorialProvider } from './contexts/TutorialContext';
 import { MusicPlayerProvider } from '@/contexts/MusicPlayerContext';
@@ -22,22 +21,14 @@ import { mobileErrorHandler } from './services/mobileErrorHandler';
 import { mobileOptimizationService } from './services/mobileOptimizationService';
 import { nativeIntegrationService } from './services/nativeIntegrationService';
 import PullToRefresh from './components/system/PullToRefresh';
-import { useAuth } from '@/contexts/AuthContext';
-import { useTranslation } from '@/contexts/TranslationContext';
-import { useContextReadiness } from '@/contexts/ContextReadinessManager';
 
 import { useAppInitialization } from './hooks/useAppInitialization';
 import { logger } from './utils/logger';
 
 const App: React.FC = () => {
-  const [isAppReady, setIsAppReady] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
   const [initializationError, setInitializationError] = useState<string | null>(null);
   const appInitialization = useAppInitialization();
-  
-  // Track context readiness
-  const { user } = useAuth();
-  const { isTranslating } = useTranslation();
-  const { isReady: contextReady } = useContextReadiness();
 
   useEffect(() => {
     const appLogger = logger.createLogger('App');
@@ -116,9 +107,8 @@ const App: React.FC = () => {
         appLogger.debug('Setting initialization delay', { initDelay, isNativeApp });
         
         setTimeout(() => {
-          appLogger.info('App initialization completed - waiting for all contexts');
-          // Don't mark as ready immediately - wait for context coordination
-          checkAllSystemsReady();
+          appLogger.info('App initialization completed');
+          setIsInitialized(true);
         }, initDelay);
 
       } catch (error) {
@@ -133,35 +123,6 @@ const App: React.FC = () => {
 
     initializeApp();
   }, []);
-
-  // System readiness coordination
-  const checkAllSystemsReady = () => {
-    const appLogger = logger.createLogger('App');
-    
-    // Check if all critical systems are ready
-    const systemsReady = {
-      context: contextReady,
-      auth: user !== undefined, // Auth context has resolved (user or null)
-      translation: !isTranslating,
-    };
-    
-    appLogger.debug('Checking system readiness', systemsReady);
-    
-    const allReady = Object.values(systemsReady).every(Boolean);
-    
-    if (allReady && !isAppReady) {
-      appLogger.info('All systems ready - rendering final UI');
-      // Add stability buffer to prevent flicker
-      setTimeout(() => {
-        setIsAppReady(true);
-      }, 150);
-    }
-  };
-
-  // Monitor context changes for readiness
-  useEffect(() => {
-    checkAllSystemsReady();
-  }, [contextReady, user, isTranslating, isAppReady]);
 
   const handleAppError = (error: Error, errorInfo: any) => {
     const appLogger = logger.createLogger('App');
@@ -214,7 +175,7 @@ const App: React.FC = () => {
             <button 
               onClick={() => {
                 setInitializationError(null);
-                setIsAppReady(false);
+                setIsInitialized(false);
                 window.location.reload();
               }}
               className="px-4 py-2 bg-primary text-primary-foreground rounded-md"
@@ -236,24 +197,21 @@ const App: React.FC = () => {
   return (
     <ErrorBoundary onError={handleAppError}>
       <AuthErrorBoundary>
-          <FeatureFlagsProvider>
-            <SubscriptionProvider>
-              <TutorialProvider>
-                <MusicPlayerProvider>
-                  <JournalProcessingInitializer />
-                  <PullToRefresh>
-                    <AppRoutes />
-                    <TutorialOverlay />
-                    <Toaster />
-                    <SonnerToaster position="top-right" />
-                  </PullToRefresh>
-                  
-                  {/* Master loading overlay - hides all renders until fully ready */}
-                  <MasterLoadingOverlay isVisible={!isAppReady} />
-                </MusicPlayerProvider>
-              </TutorialProvider>
-            </SubscriptionProvider>
-          </FeatureFlagsProvider>
+        <FeatureFlagsProvider>
+          <SubscriptionProvider>
+            <TutorialProvider>
+              <MusicPlayerProvider>
+                <JournalProcessingInitializer />
+              <PullToRefresh>
+                <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
+                <TutorialOverlay />
+                <Toaster />
+                <SonnerToaster position="top-right" />
+              </PullToRefresh>
+              </MusicPlayerProvider>
+            </TutorialProvider>
+          </SubscriptionProvider>
+        </FeatureFlagsProvider>
       </AuthErrorBoundary>
     </ErrorBoundary>
   );

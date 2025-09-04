@@ -279,17 +279,19 @@ class ThemeErrorBoundary extends React.Component<ThemeErrorBoundaryProps, ThemeE
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
-  <ThemeErrorBoundary>
-    <BrowserRouter>
-      <ContextReadinessProvider>
-        <ThemeProvider>
-          <TranslationProvider>
-            <AuthProvider>
-              <App />
-            </AuthProvider>
-          </TranslationProvider>
-        </ThemeProvider>
-      </ContextReadinessProvider>
-    </BrowserRouter>
-  </ThemeErrorBoundary>,
+  <React.StrictMode>
+    <ThemeErrorBoundary>
+      <BrowserRouter>
+        <ContextReadinessProvider>
+          <ThemeProvider>
+            <TranslationProvider>
+              <AuthProvider>
+                <App />
+              </AuthProvider>
+            </TranslationProvider>
+          </ThemeProvider>
+        </ContextReadinessProvider>
+      </BrowserRouter>
+    </ThemeErrorBoundary>
+  </React.StrictMode>,
 )
