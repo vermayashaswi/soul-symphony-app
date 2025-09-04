@@ -37,6 +37,9 @@ interface AppInitializationState {
   // Onboarding status
   onboardingCompleted: boolean;
   voiceOnboardingCompleted: boolean;
+  // Loading states
+  onboardingLoading: boolean;
+  voiceOnboardingLoading: boolean;
 }
 
 interface AppInitializationContextType extends AppInitializationState {
@@ -59,6 +62,8 @@ export function AppInitializationProvider({ children }: { children: ReactNode })
 
   const [onboardingCompleted, setOnboardingCompleted] = useState(false);
   const [voiceOnboardingCompleted, setVoiceOnboardingCompleted] = useState(false);
+  const [onboardingLoading, setOnboardingLoading] = useState(true);
+  const [voiceOnboardingLoading, setVoiceOnboardingLoading] = useState(true);
 
   const [subscriptionData, setSubscriptionData] = useState<{
     tier: SubscriptionTier;
@@ -140,6 +145,10 @@ export function AppInitializationProvider({ children }: { children: ReactNode })
   const checkOnboardingStatus = async () => {
     if (!user) return;
 
+    console.log('[AppInit] Checking onboarding status for user:', user.id);
+    setOnboardingLoading(true);
+    setVoiceOnboardingLoading(true);
+
     try {
       const { data: profile, error } = await supabase
         .from('profiles')
@@ -148,24 +157,39 @@ export function AppInitializationProvider({ children }: { children: ReactNode })
         .single();
 
       if (error) {
-        console.error('Error checking onboarding status:', error);
+        console.error('[AppInit] Error checking onboarding status:', error);
         // Default to incomplete onboarding
         setOnboardingCompleted(false);
         setVoiceOnboardingCompleted(false);
+        console.log('[AppInit] Set onboarding to false due to error');
       } else {
-        setOnboardingCompleted(profile?.onboarding_completed || false);
-        setVoiceOnboardingCompleted(profile?.voice_onboarding_completed || false);
+        const regularOnboarding = profile?.onboarding_completed || false;
+        const voiceOnboarding = profile?.voice_onboarding_completed || false;
+        
+        setOnboardingCompleted(regularOnboarding);
+        setVoiceOnboardingCompleted(voiceOnboarding);
+        
+        console.log('[AppInit] Onboarding status loaded:', {
+          regularOnboarding,
+          voiceOnboarding,
+          userId: user.id
+        });
       }
 
+      // Mark phases complete based on actual status
       markPhaseComplete('onboarding');
       markPhaseComplete('voiceOnboarding');
+      setOnboardingLoading(false);
+      setVoiceOnboardingLoading(false);
       setCurrentPhase('Loading app services...');
     } catch (error) {
-      console.error('Error checking onboarding:', error);
+      console.error('[AppInit] Error checking onboarding:', error);
       setOnboardingCompleted(false);
       setVoiceOnboardingCompleted(false);
       markPhaseComplete('onboarding');
       markPhaseComplete('voiceOnboarding');
+      setOnboardingLoading(false);
+      setVoiceOnboardingLoading(false);
       setCurrentPhase('Loading app services...');
     }
   };
@@ -367,6 +391,8 @@ export function AppInitializationProvider({ children }: { children: ReactNode })
     setSubscriptionData(null);
     setOnboardingCompleted(false);
     setVoiceOnboardingCompleted(false);
+    setOnboardingLoading(true);
+    setVoiceOnboardingLoading(true);
     setCurrentPhase('Initializing fonts...');
     setError(null);
   };
@@ -388,6 +414,8 @@ export function AppInitializationProvider({ children }: { children: ReactNode })
     subscriptionData,
     onboardingCompleted,
     voiceOnboardingCompleted,
+    onboardingLoading,
+    voiceOnboardingLoading,
     markPhaseComplete,
     resetInitialization
   };
