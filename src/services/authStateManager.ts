@@ -319,14 +319,14 @@ class AuthStateManager {
       return storedRedirect;
     }
 
-    // Use verified onboarding status if provided, otherwise check localStorage
-    const isOnboardingComplete = onboardingComplete !== undefined 
+    // Use verified profile onboarding status if provided, otherwise check localStorage
+    const isProfileOnboardingComplete = onboardingComplete !== undefined 
       ? onboardingComplete 
-      : localStorage.getItem('onboardingComplete') === 'true';
+      : localStorage.getItem('profileOnboardingComplete') === 'true';
       
-    if (!isOnboardingComplete) {
-      this.log('Redirecting to onboarding - not completed');
-      return '/app/onboarding';
+    if (!isProfileOnboardingComplete) {
+      this.log('Redirecting to profile onboarding - not completed');
+      return '/app/profile-onboarding';
     }
 
     this.log('Using default redirect to home');
@@ -362,8 +362,8 @@ class AuthStateManager {
       return isComplete;
       
     } catch (error) {
-      this.error('Failed to verify onboarding status:', error);
-      return localStorage.getItem('onboardingComplete') === 'true';
+      this.error('Failed to verify profile onboarding status:', error);
+      return localStorage.getItem('profileOnboardingComplete') === 'true';
     }
   }
 
