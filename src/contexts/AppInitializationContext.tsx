@@ -146,9 +146,9 @@ export function AppInitializationProvider({ children }: { children: ReactNode })
         return;
       }
 
-      // Check if this is a new user - hardcode trial status without backend calls
-      if (profileCreationInProgress || (profileCreationComplete && !subscriptionData)) {
-        console.log('[AppInit] New user detected - setting hardcoded trial values (no backend calls)');
+      // Check if this is a genuinely new user during profile creation
+      if (profileCreationInProgress) {
+        console.log('[AppInit] Profile creation in progress - setting hardcoded trial values');
         
         const trialEnd = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
         const newUserData = {
@@ -165,59 +165,66 @@ export function AppInitializationProvider({ children }: { children: ReactNode })
         setSubscriptionData(newUserData);
         markPhaseComplete('subscription');
         setCurrentPhase('Finalizing setup...');
-        
-        console.log('[AppInit] New user subscription hardcoded to trial - skipping backend sync');
         return;
       }
 
-      // Additional check: For users with onboarding_completed = false or specific new user, hardcode trial
-      if (user && !isAppReady) {
-        try {
-          const { data: profileCheck } = await supabase
-            .from('profiles')
-            .select('onboarding_completed, tutorial_completed, subscription_status, created_at')
-            .eq('id', user.id)
-            .single();
+      // For all other users (including returning users), check profile and fetch actual data
+      setCurrentPhase('Checking user profile...');
+      
+      try {
+        const { data: profileCheck } = await supabase
+          .from('profiles')
+          .select('onboarding_completed, tutorial_completed, subscription_status, subscription_tier, trial_ends_at, is_premium, created_at')
+          .eq('id', user.id)
+          .maybeSingle();
 
-          // Check if this is the specific new user or any user with incomplete onboarding
-          const isSpecificNewUser = user.id === '3300254e-73db-4af5-af22-eea8fb0fe5db';
-          const isNewUser = profileCheck && !profileCheck.onboarding_completed;
-          const isVeryRecentUser = profileCheck?.created_at && 
-            new Date().getTime() - new Date(profileCheck.created_at).getTime() < 24 * 60 * 60 * 1000; // Within 24 hours
+        // Only hardcode for completely new users with no profile or very recent profile with no subscription data
+        const isCompletelyNewUser = !profileCheck || 
+          (profileCheck.created_at && 
+           new Date().getTime() - new Date(profileCheck.created_at).getTime() < 60 * 60 * 1000 && // Within 1 hour
+           !profileCheck.subscription_status);
 
-          if (isSpecificNewUser || isNewUser || isVeryRecentUser) {
-            console.log('[AppInit] New user detected - hardcoding trial subscription', {
-              userId: user.id,
-              isSpecificNewUser,
-              isNewUser,
-              isVeryRecentUser,
-              onboardingComplete: profileCheck?.onboarding_completed
-            });
-            
-            const trialEnd = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
-            const hardcodedData = {
-              tier: 'premium' as SubscriptionTier,
-              status: 'trial' as SubscriptionStatus,
-              trialEndDate: trialEnd,
-              isTrialEligible: true,
-              isPremium: true,
-              hasActiveSubscription: true,
-              isTrialActive: true,
-              daysRemainingInTrial: 14
-            };
-            
-            setSubscriptionData(hardcodedData);
-            markPhaseComplete('subscription');
-            setCurrentPhase('Finalizing setup...');
-            return;
-          }
-        } catch (error) {
-          console.error('[AppInit] Error checking onboarding status:', error);
+        if (isCompletelyNewUser) {
+          console.log('[AppInit] Completely new user detected - hardcoding trial subscription', {
+            userId: user.id,
+            hasProfile: !!profileCheck,
+            createdAt: profileCheck?.created_at
+          });
+          
+          const trialEnd = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+          const hardcodedData = {
+            tier: 'premium' as SubscriptionTier,
+            status: 'trial' as SubscriptionStatus,
+            trialEndDate: trialEnd,
+            isTrialEligible: true,
+            isPremium: true,
+            hasActiveSubscription: true,
+            isTrialActive: true,
+            daysRemainingInTrial: 14
+          };
+          
+          setSubscriptionData(hardcodedData);
+          markPhaseComplete('subscription');
+          setCurrentPhase('Finalizing setup...');
+          return;
         }
-      }
 
-      // Existing user - fetch from database
-      await fetchActualSubscriptionData();
+        // Returning user or user with existing subscription data - always fetch from backend
+        console.log('[AppInit] Returning user detected - fetching actual subscription data from backend', {
+          userId: user.id,
+          existingStatus: profileCheck?.subscription_status,
+          existingTier: profileCheck?.subscription_tier,
+          onboardingComplete: profileCheck?.onboarding_completed
+        });
+        
+        setCurrentPhase('Fetching subscription data...');
+        await fetchActualSubscriptionData();
+        
+      } catch (error) {
+        console.error('[AppInit] Error checking profile, fetching actual subscription data:', error);
+        setCurrentPhase('Fetching subscription data...');
+        await fetchActualSubscriptionData();
+      }
       
     } catch (error) {
       console.error('[AppInit] Error loading subscription:', error);
