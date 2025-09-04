@@ -116,8 +116,8 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
       <div 
         className="absolute z-10"
         style={{
-          left: isTutorialMode ? '50%' : animationCenter.x,
-          top: isTutorialMode ? '50%' : animationCenter.y,
+          left: `${animationCenter.x}px`,
+          top: `${animationCenter.y}px`,
           transform: 'translate(-50%, -50%)'
         }}
       >
@@ -134,8 +134,8 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
           key={index}
           className="absolute rounded-full"
           style={{
-            left: isTutorialMode ? '50%' : animationCenter.x,
-            top: isTutorialMode ? '50%' : animationCenter.y,
+            left: `${animationCenter.x}px`,
+            top: `${animationCenter.y}px`,
             background: `radial-gradient(circle, ${colors.main} 0%, ${colors.secondary} 50%, ${colors.tertiary} 100%)`
           }}
           initial={{ 
@@ -182,8 +182,8 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
           key={`small-${index}`}
           className="absolute rounded-full"
           style={{
-            left: isTutorialMode ? '50%' : animationCenter.x,
-            top: isTutorialMode ? '50%' : animationCenter.y,
+            left: `${animationCenter.x}px`,
+            top: `${animationCenter.y}px`,
             background: `radial-gradient(circle, rgba(255,255,255,0.8) 0%, ${colors.light} 50%, ${colors.tertiary} 100%)`
           }}
           initial={{ 
@@ -219,8 +219,8 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
             key={`particle-${index}`}
             className="absolute rounded-full bg-white/80"
             style={{
-              left: isTutorialMode ? '50%' : animationCenter.x,
-              top: isTutorialMode ? '50%' : animationCenter.y
+              left: `${animationCenter.x}px`,
+              top: `${animationCenter.y}px`
             }}
             initial={{ 
               width: 3, 
