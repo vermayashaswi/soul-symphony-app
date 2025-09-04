@@ -78,22 +78,14 @@ function isTutorialActive(): boolean {
  */
 export function useAnimationCenter(bottomNavOffset: boolean = true, verticalOffset: number = 1.0): CircleCenter {
   const [center, setCenter] = React.useState<CircleCenter>(() => {
-    if (isTutorialActive()) {
-      // In tutorial mode, use percentage-based center (50%, 50% relative to container)
-      return { x: 50, y: 50 };
-    }
+    // Always use actual pixel coordinates, regardless of tutorial mode
     return getAnimationCenter(window.innerWidth, window.innerHeight, bottomNavOffset, verticalOffset);
   });
 
   React.useEffect(() => {
     const updateCenter = () => {
-      if (isTutorialActive()) {
-        // In tutorial mode, use percentage-based center
-        setCenter({ x: 50, y: 50 });
-      } else {
-        // Normal mode, use viewport coordinates
-        setCenter(getAnimationCenter(window.innerWidth, window.innerHeight, bottomNavOffset, verticalOffset));
-      }
+      // Always calculate actual pixel coordinates for consistent positioning
+      setCenter(getAnimationCenter(window.innerWidth, window.innerHeight, bottomNavOffset, verticalOffset));
     };
 
     // Update center on resize
