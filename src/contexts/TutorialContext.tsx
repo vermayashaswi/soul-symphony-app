@@ -13,7 +13,7 @@ import {
   findAndHighlightElement,
   logPotentialTutorialElements
 } from '@/utils/tutorial/tutorial-elements-finder';
-import { performComprehensiveCleanup, performStaggeredCleanup, performNavigationCleanup, performStep1ExitCleanup } from '@/utils/tutorial/tutorial-cleanup-enhanced';
+import { performComprehensiveCleanup, performStaggeredCleanup, performNavigationCleanup, performStep1ExitCleanup, performPreTutorialCleanup } from '@/utils/tutorial/tutorial-cleanup-enhanced';
 import { navigationManager } from '@/utils/tutorial/navigation-state-manager';
 import { highlightingManager } from '@/utils/tutorial/tutorial-highlighting-manager';
 import { InfographicType } from '@/components/tutorial/TutorialInfographic';
@@ -217,12 +217,16 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     return unsubscribe;
   }, []);
   
-  // Function to manually start the tutorial with proper navigation
+  // Function to manually start the tutorial with proper navigation and cleanup
   const startTutorial = () => {
-    console.log('[TutorialContext] Starting tutorial manually');
+    console.log('[TutorialContext] Starting tutorial manually with comprehensive cleanup');
     
-    // Reset highlighting manager
+    // FIRST: Perform comprehensive pre-tutorial cleanup to fix restart disorientation
+    performPreTutorialCleanup();
+    
+    // Reset managers
     highlightingManager.reset();
+    navigationManager.forceReset();
     
     // Set the tutorial as pending start until we're on the right route
     setPendingTutorialStart(true);
@@ -621,6 +625,9 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       
       console.log('[TutorialContext] Tutorial reset in database, updating state');
       
+      // FIRST: Perform comprehensive cleanup to prevent disorientation
+      performPreTutorialCleanup();
+      
       // Reset all tutorial state
       setCurrentStep(0);
       setTutorialChecked(false);
@@ -639,9 +646,9 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       setTimeout(() => {
         navigate('/app/home', { replace: true });
         
-        // After navigation, start the tutorial
+        // After navigation, start the tutorial with additional cleanup
         setTimeout(() => {
-          console.log('[TutorialContext] Starting tutorial after reset');
+          console.log('[TutorialContext] Starting tutorial after reset with fresh cleanup');
           startTutorial();
         }, 200);
       }, 100);
