@@ -1,5 +1,6 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 import Index from '@/pages/Index';
 import Home from '@/pages/Home';
 import Journal from '@/pages/Journal';
@@ -26,17 +27,54 @@ import { useOnboarding } from '@/hooks/use-onboarding';
 import { useSessionValidation } from '@/hooks/useSessionValidation';
 import { nativeIntegrationService } from '@/services/nativeIntegrationService';
 import NativeAuthDiagnostics from '@/pages/NativeAuthDiagnostics';
+import ProfileOnboarding from '@/pages/ProfileOnboarding';
 
 const AppRoutes = () => {
   const { user } = useAuth();
   const { onboardingComplete } = useOnboarding();
   const { session: validatedSession, isValid: hasValidSession, isLoading: sessionLoading } = useSessionValidation();
+  
+  // Profile onboarding check hook
+  const useProfileOnboarding = () => {
+    const [profileOnboardingComplete, setProfileOnboardingComplete] = React.useState<boolean | null>(null);
+    
+    React.useEffect(() => {
+      const checkProfileOnboarding = async () => {
+        if (!user) return;
+        
+        try {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('profile_onboarding_completed')
+            .eq('id', user.id)
+            .single();
+          
+          if (error) {
+            console.error('Error checking profile onboarding:', error);
+            setProfileOnboardingComplete(false);
+            return;
+          }
+          
+          setProfileOnboardingComplete(data?.profile_onboarding_completed || false);
+        } catch (error) {
+          console.error('Error in profile onboarding check:', error);
+          setProfileOnboardingComplete(false);
+        }
+      };
+      
+      checkProfileOnboarding();
+    }, [user]);
+    
+    return profileOnboardingComplete;
+  };
+  
+  const profileOnboardingComplete = useProfileOnboarding();
 
   // Enhanced app root redirect with session validation
   const AppRootRedirect = () => {
     const isNative = nativeIntegrationService.isRunningNatively();
 
-    console.log('[AppRoutes] AppRootRedirect - isNative:', isNative, 'user:', !!user, 'validatedSession:', !!validatedSession, 'hasValidSession:', hasValidSession);
+    console.log('[AppRoutes] AppRootRedirect - isNative:', isNative, 'user:', !!user, 'validatedSession:', !!validatedSession, 'hasValidSession:', hasValidSession, 'profileOnboarding:', profileOnboardingComplete);
 
     // CRITICAL: For native apps, handle OAuth callback parameters properly
     if (isNative) {
@@ -55,9 +93,12 @@ const AppRoutes = () => {
       // ENHANCED: For native apps, prioritize validated session over user context
       console.log('[AppRoutes] Native environment detected, checking session validation');
       
-      // If we have a validated session, go directly to home
+      // If we have a validated session, check profile onboarding
       if (hasValidSession && validatedSession) {
-        console.log('[AppRoutes] Native app with validated session, redirecting to home');
+        console.log('[AppRoutes] Native app with validated session, checking profile onboarding');
+        if (profileOnboardingComplete === false) {
+          return <Navigate to="/app/profile-onboarding" replace />;
+        }
         return <Navigate to="/app/home" replace />;
       }
       
@@ -67,8 +108,11 @@ const AppRoutes = () => {
         return <Navigate to="/app/onboarding" replace />;
       }
 
-      // If user exists but session validation is still loading, go to home anyway
-      console.log('[AppRoutes] Native app user authenticated, redirecting to home');
+      // If user exists but session validation is still loading, check profile onboarding  
+      console.log('[AppRoutes] Native app user authenticated, checking profile onboarding');
+      if (profileOnboardingComplete === false) {
+        return <Navigate to="/app/profile-onboarding" replace />;
+      }
       return <Navigate to="/app/home" replace />;
     }
 
@@ -93,7 +137,10 @@ const AppRoutes = () => {
       return <Navigate to="/app/onboarding" replace />;
     }
 
-    // If user is authenticated, go to last in-app path when available
+    // If user is authenticated, check profile onboarding first
+    if (profileOnboardingComplete === false) {
+      return <Navigate to="/app/profile-onboarding" replace />;
+    }
     return <Navigate to={lastAppPath && lastAppPath.startsWith('/app/') ? lastAppPath : '/app/home'} replace />;
   };
 
@@ -109,7 +156,10 @@ const AppRoutes = () => {
       
       // Prioritize validated session for immediate routing
       if (hasValidSession && validatedSession) {
-        console.log('[AppRoutes] Native app with validated session, redirecting to home');
+        console.log('[AppRoutes] Native app with validated session, checking profile onboarding');
+        if (profileOnboardingComplete === false) {
+          return <Navigate to="/app/profile-onboarding" replace />;
+        }
         return <Navigate to="/app/home" replace />;
       }
       
@@ -118,8 +168,11 @@ const AppRoutes = () => {
         return <Navigate to="/app/onboarding" replace />;
       }
 
-      // If user exists, go to home
-      console.log('[AppRoutes] Native app user ready, redirecting to home');
+      // If user exists, check profile onboarding
+      console.log('[AppRoutes] Native app user ready, checking profile onboarding');
+      if (profileOnboardingComplete === false) {
+        return <Navigate to="/app/profile-onboarding" replace />;
+      }
       return <Navigate to="/app/home" replace />;
     }
 
@@ -127,6 +180,9 @@ const AppRoutes = () => {
     console.log('[AppRoutes] Web environment at root');
     const lastAppPath = (() => { try { return localStorage.getItem('lastAppPath'); } catch { return null; } })();
     if (user || validatedSession) {
+      if (profileOnboardingComplete === false) {
+        return <Navigate to="/app/profile-onboarding" replace />;
+      }
       return <Navigate to={lastAppPath && lastAppPath.startsWith('/app/') ? lastAppPath : '/app/home'} replace />;
     }
     return <Index />;
@@ -189,6 +245,11 @@ const AppRoutes = () => {
           </SessionRouter>
         } />
         <Route path="/app/native-auth-diagnostics" element={<NativeAuthDiagnostics />} />
+        <Route path="/app/profile-onboarding" element={
+          <SessionRouter>
+            <ProfileOnboarding />
+          </SessionRouter>
+        } />
 
         {/* Root app route with smart redirect */}
         <Route path="/app" element={<AppRootRedirect />} />
