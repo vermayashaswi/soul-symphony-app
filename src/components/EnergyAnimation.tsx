@@ -95,6 +95,9 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
   // Use consistent positioning with arrow button (1.07 offset) - aligned with JournalNavigationButton
   const animationCenter = useAnimationCenter(bottomNavOffset, 1.07);
   
+  // Debug logging to verify coordinate alignment
+  console.log('[EnergyAnimation] Animation center coordinates:', animationCenter);
+  
   return (
     <div 
       ref={containerRef}

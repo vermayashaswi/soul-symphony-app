@@ -38,10 +38,11 @@ export function getAnimationCenter(
   // Add additional offset for Capacitor native apps to account for status bar/navigation differences
   const capacitorOffset = isCapacitorNative() ? 15 : 0;
   
-  return {
-    x: containerWidth / 2,
-    y: (effectiveHeight / 2 - capacitorOffset) * verticalOffset
-  };
+  // Round to whole pixels to ensure perfect alignment between components
+  const x = Math.round(containerWidth / 2);
+  const y = Math.round((effectiveHeight / 2 - capacitorOffset) * verticalOffset);
+  
+  return { x, y };
 }
 
 /**
@@ -54,6 +55,9 @@ export function getAnimationCenterStyles(
   verticalOffset: number = 1.0
 ): React.CSSProperties {
   const center = getAnimationCenter(containerWidth, containerHeight, bottomNavOffset, verticalOffset);
+  
+  // Debug logging to ensure coordinates match between components
+  console.log('[getAnimationCenterStyles] Center coordinates:', center);
   
   return {
     position: 'fixed' as const,
