@@ -53,11 +53,7 @@ const ButtonStateManager: React.FC<ButtonStateManagerProps> = ({
         glowElement.style.opacity = "0.95";
       }
 
-      // Ensure container is properly positioned for tutorial
-      containerEl.style.position = 'fixed';
-      containerEl.style.top = '50%';
-      containerEl.style.left = '50%';
-      containerEl.style.transform = 'translate(-50%, -50%)';
+      // Ensure container has proper z-index for tutorial (positioning handled by parent)
       containerEl.style.zIndex = '10000';
     } else {
       // Remove tutorial styling and reset to normal state
@@ -79,14 +75,8 @@ const ButtonStateManager: React.FC<ButtonStateManagerProps> = ({
         glowElement.style.opacity = "";
       }
 
-      // Reset container to default centered positioning
-      containerEl.style.position = 'fixed';
-      containerEl.style.top = '50%';
-      containerEl.style.left = '50%';
-      containerEl.style.transform = 'translate(-50%, -50%)';
+      // Reset container z-index (positioning handled by parent)
       containerEl.style.zIndex = '40';
-      containerEl.style.margin = '0';
-      containerEl.style.padding = '0';
     }
 
     // Cleanup function for when component unmounts or state changes
