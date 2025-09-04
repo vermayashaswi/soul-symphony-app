@@ -274,53 +274,38 @@ const performGentleCleanup = () => {
   }
 };
 
-// NEW: Enhanced staggered cleanup with better step transition handling
 export const performStaggeredCleanup = (currentStepId?: number) => {
-  console.log(`[TutorialCleanup] Starting enhanced staggered cleanup for step ${currentStepId}`);
+  console.log('[TutorialCleanup] Starting staggered cleanup process', { currentStepId });
   
-  try {
-    // Phase 1: Immediate cleanup of critical elements
+  // Stage 1: Immediate cleanup with step-specific considerations
+  performComprehensiveCleanup(currentStepId);
+  
+  // Stage 2: Short delay cleanup
+  setTimeout(() => {
+    console.log('[TutorialCleanup] Stage 2 cleanup');
+    performComprehensiveCleanup(currentStepId);
+  }, 50);
+  
+  // Stage 3: Medium delay cleanup - skip if exiting from step 1 to preserve energy animation
+  if (currentStepId !== 1) {
     setTimeout(() => {
+      console.log('[TutorialCleanup] Stage 3 cleanup');
       performComprehensiveCleanup(currentStepId);
-    }, 50);
-    
-    // Phase 2: Body and global cleanup
-    setTimeout(() => {
-      cleanupBodyElement();
     }, 150);
-    
-    // Phase 3: Specific elements cleanup with improved positioning reset
-    setTimeout(() => {
-      cleanupSpecificElements(currentStepId);
-      
-      // Enhanced step-specific cleanup logic
-      if (currentStepId === 1) {
-        console.log('[TutorialCleanup] Step 1 detected, performing gentle cleanup to preserve energy animation');
-        setTimeout(() => {
-          performGentleCleanup();
-        }, 100);
-      } else if (currentStepId === 2) {
-        console.log('[TutorialCleanup] Step 2 detected, ensuring proper positioning reset');
-        // Reset any conflicting positioning for step 2
-        const elements = document.querySelectorAll('[style*="transform"], [style*="position"]');
-        elements.forEach(el => {
-          if (el instanceof HTMLElement && el.classList.contains('tutorial-highlighted')) {
-            // Remove only tutorial-related positioning, preserve energy animation
-            el.style.removeProperty('z-index');
-            el.style.removeProperty('position');
-            if (el.style.transform && !el.style.transform.includes('translate')) {
-              el.style.removeProperty('transform');
-            }
-          }
-        });
-      }
-    }, 250);
-    
-    console.log('[TutorialCleanup] Enhanced staggered cleanup sequence initiated');
-    
-  } catch (error) {
-    console.error('[TutorialCleanup] Error during enhanced staggered cleanup:', error);
+  } else {
+    console.log('[TutorialCleanup] Skipping stage 3 cleanup for step 1 to preserve energy animation');
   }
+  
+  // Stage 4: Final cleanup - gentle cleanup for step 1
+  setTimeout(() => {
+    console.log('[TutorialCleanup] Final cleanup stage');
+    if (currentStepId === 1) {
+      // Gentle cleanup for step 1 - only remove tutorial classes, preserve positioning
+      performGentleCleanup();
+    } else {
+      performComprehensiveCleanup(currentStepId);
+    }
+  }, 300);
 };
 
 // ENHANCED: Selective cleanup function for navigation transitions that preserves highlighting
@@ -365,47 +350,6 @@ export const performNavigationCleanup = (preserveStep?: number) => {
     
   } catch (error) {
     console.error('[TutorialCleanup] Error during navigation cleanup:', error);
-  }
-};
-
-// NEW: Pre-tutorial cleanup for fresh start (fixes restart disorientation)
-export const performPreTutorialCleanup = () => {
-  console.log('[TutorialCleanup] Performing pre-tutorial cleanup for fresh start');
-  
-  try {
-    // Remove any existing tutorial overlays
-    const existingOverlays = document.querySelectorAll('[data-tutorial-overlay]');
-    existingOverlays.forEach(overlay => overlay.remove());
-    
-    // Clean up all tutorial classes from all elements
-    const allTutorialElements = document.querySelectorAll('*');
-    allTutorialElements.forEach(el => {
-      if (el instanceof HTMLElement) {
-        TUTORIAL_CLASSES.forEach(className => {
-          el.classList.remove(className);
-        });
-        
-        // Reset tutorial-specific inline styles that might interfere
-        TUTORIAL_STYLE_PROPERTIES.forEach(property => {
-          if (el.style.getPropertyValue(property)) {
-            el.style.removeProperty(property);
-          }
-        });
-      }
-    });
-    
-    // Clean body element thoroughly
-    document.body.classList.remove('tutorial-active');
-    document.body.removeAttribute('data-current-step');
-    
-    // Reset scroll behavior
-    document.body.style.removeProperty('overflow');
-    document.body.style.removeProperty('position');
-    
-    console.log('[TutorialCleanup] Pre-tutorial cleanup complete');
-    
-  } catch (error) {
-    console.error('[TutorialCleanup] Error during pre-tutorial cleanup:', error);
   }
 };
 
