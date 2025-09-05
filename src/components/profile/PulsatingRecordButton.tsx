@@ -80,8 +80,8 @@ export const PulsatingRecordButton: React.FC<PulsatingRecordButtonProps> = ({
         </motion.div>
       )}
       
-      {/* Recording time */}
-      {isRecording && recordingTime && (
+      {/* Recording time - only show if recordingTime is provided */}
+      {isRecording && recordingTime && recordingTime.trim() !== '' && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}

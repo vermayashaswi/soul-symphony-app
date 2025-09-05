@@ -781,7 +781,7 @@ function SettingsContent() {
                         title="Update your profile information"
                       >
                         <img 
-                          src="/soulo-mascot.png" 
+                          src="/lovable-uploads/soulo-icon.png?v=3" 
                           alt="Profile Setup" 
                           className="h-4 w-4"
                         />

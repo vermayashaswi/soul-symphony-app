@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
 import { useVoiceRecorder } from '@/hooks/use-voice-recorder';
+import { useTypewriter } from '@/hooks/use-typewriter';
 import { PulsatingRecordButton } from './PulsatingRecordButton';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -22,7 +23,6 @@ export const ProfileOnboardingOverlay: React.FC<ProfileOnboardingOverlayProps> =
   onSkip,
   showThankYou: initialShowThankYou = false
 }) => {
-  const [currentLineIndex, setCurrentLineIndex] = useState(0);
   const [showMicButton, setShowMicButton] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showThankYou, setShowThankYou] = useState(initialShowThankYou);
@@ -39,6 +39,29 @@ export const ProfileOnboardingOverlay: React.FC<ProfileOnboardingOverlayProps> =
     "Tell me about your interests, hobbies, and a little bit about what you like and dislike.",
     "The more you tell me, the more I know 'YOU' and the more 'you' helps 'you'!"
   ];
+
+  const fullScript = scriptLines.join(' ');
+
+  const { displayText, isComplete, startTyping } = useTypewriter(fullScript, {
+    speed: 50,
+    onComplete: () => {
+      const timer = setTimeout(() => {
+        setShowMicButton(true);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  });
+
+  // Start typewriter animation
+  useEffect(() => {
+    if (showThankYou) return;
+    
+    const timer = setTimeout(() => {
+      startTyping();
+    }, 1000);
+    
+    return () => clearTimeout(timer);
+  }, [showThankYou, startTyping]);
 
   const {
     status,
@@ -59,22 +82,6 @@ export const ProfileOnboardingOverlay: React.FC<ProfileOnboardingOverlayProps> =
     },
     maxDuration: 300
   });
-
-  // Script animation effect
-  useEffect(() => {
-    if (currentLineIndex < scriptLines.length) {
-      const timer = setTimeout(() => {
-        setCurrentLineIndex(currentLineIndex + 1);
-      }, 2500);
-      return () => clearTimeout(timer);
-    } else {
-      // All lines shown, show mic button after a delay
-      const timer = setTimeout(() => {
-        setShowMicButton(true);
-      }, 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [currentLineIndex, scriptLines.length]);
 
   async function handleRecordingComplete(audioBlob: Blob) {
     if (!user?.id) {
@@ -101,8 +108,12 @@ export const ProfileOnboardingOverlay: React.FC<ProfileOnboardingOverlayProps> =
 
           console.log('[ProfileOnboardingOverlay] Calling process-profile-audio function');
           
+          // Fix: Use correct parameter names matching the edge function
           const { data, error } = await supabase.functions.invoke('process-profile-audio', {
-            body: { audio: base64Audio }
+            body: { 
+              audio_data: base64Audio,  // Changed from 'audio' to 'audio_data'
+              user_id: user.id 
+            }
           });
 
           if (error) {
@@ -175,11 +186,12 @@ export const ProfileOnboardingOverlay: React.FC<ProfileOnboardingOverlayProps> =
     if (!user?.id) return;
     
     try {
-      // Update first visit flag when user skips
+      // Update first visit flag and onboarding completed when user skips
       const { error } = await supabase
         .from('profiles')
         .update({ 
           first_smart_chat_visit: false,
+          profile_onboarding_completed: true,
           updated_at: new Date().toISOString()
         })
         .eq('id', user.id);
@@ -241,8 +253,8 @@ export const ProfileOnboardingOverlay: React.FC<ProfileOnboardingOverlayProps> =
             transition={{ delay: 0.2, duration: 0.6 }}
           >
             <img 
-              src="/soulo-mascot.png" 
-              alt="SOULo Mascot" 
+              src="/lovable-uploads/soulo-icon.png?v=3" 
+              alt="Soulo Icon" 
               className="w-24 h-24 mx-auto mb-6"
             />
             
@@ -308,7 +320,7 @@ export const ProfileOnboardingOverlay: React.FC<ProfileOnboardingOverlayProps> =
       </div>
 
       <div className="relative z-10 text-center max-w-md mx-auto px-6">
-        {/* SOULo mascot */}
+        {/* Soulo icon */}
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
@@ -316,36 +328,22 @@ export const ProfileOnboardingOverlay: React.FC<ProfileOnboardingOverlayProps> =
           className="mb-8"
         >
           <img 
-            src="/soulo-mascot.png" 
-            alt="SOULo Mascot" 
+            src="/lovable-uploads/soulo-icon.png?v=3" 
+            alt="Soulo Icon" 
             className="w-24 h-24 mx-auto"
           />
         </motion.div>
 
-        {/* Script lines animation */}
+        {/* Typewriter text */}
         <div className="mb-8 min-h-[120px] flex items-center justify-center">
-          <AnimatePresence mode="wait">
-            {scriptLines.slice(0, currentLineIndex + 1).map((line, index) => (
-              <motion.p
-                key={index}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.5 }}
-                className={`text-white text-lg font-medium leading-relaxed ${
-                  index === currentLineIndex ? 'opacity-100' : 'opacity-50'
-                }`}
-                style={{
-                  position: index === currentLineIndex ? 'static' : 'absolute',
-                  top: index === currentLineIndex ? 'auto' : '50%',
-                  left: index === currentLineIndex ? 'auto' : '50%',
-                  transform: index === currentLineIndex ? 'none' : 'translate(-50%, -50%)',
-                }}
-              >
-                {line}
-              </motion.p>
-            ))}
-          </AnimatePresence>
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="text-white text-lg font-medium leading-relaxed"
+          >
+            {displayText}
+            {!isComplete && <span className="animate-pulse">|</span>}
+          </motion.p>
         </div>
 
         {/* Microphone button */}
@@ -361,21 +359,11 @@ export const ProfileOnboardingOverlay: React.FC<ProfileOnboardingOverlayProps> =
               <PulsatingRecordButton
                 isRecording={status === 'recording'}
                 isLoading={isProcessing}
-                recordingTime={recordingTime}
+                recordingTime="" // Remove time display as requested
                 audioLevel={audioLevel}
                 onToggleRecording={handleVoiceRecording}
                 disabled={isProcessing}
               />
-              
-              {status === 'recording' && (
-                <motion.p
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="text-white/80 text-sm mt-4"
-                >
-                  Listening... {recordingTime}
-                </motion.p>
-              )}
               
               {isProcessing && (
                 <motion.p
