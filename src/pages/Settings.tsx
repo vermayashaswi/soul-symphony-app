@@ -38,6 +38,7 @@ import { DeleteAllEntriesSection } from '@/components/settings/DeleteAllEntriesS
 import { EnhancedAvatarImage } from '@/components/ui/EnhancedAvatarImage';
 import { avatarSyncService } from '@/services/avatarSyncService';
 import { NotificationPreferencesSection } from '@/components/settings/NotificationPreferencesSection';
+import { ProfileOnboardingOverlay } from '@/components/profile/ProfileOnboardingOverlay';
 
 
 interface SettingItemProps {
@@ -126,6 +127,7 @@ function SettingsContent() {
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [nameError, setNameError] = useState<string | null>(null);
   const [avatarRefreshing, setAvatarRefreshing] = useState(false);
+  const [showProfileOverlay, setShowProfileOverlay] = useState(false);
   
   
   const MAX_NAME_LENGTH = 25;
@@ -771,6 +773,19 @@ function SettingsContent() {
                       >
                         <Pencil className="h-3 w-3" />
                       </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-6 w-6"
+                        onClick={() => setShowProfileOverlay(true)}
+                        title="Update your profile information"
+                      >
+                        <img 
+                          src="/soulo-mascot.png" 
+                          alt="Profile Setup" 
+                          className="h-4 w-4"
+                        />
+                      </Button>
                     </div>
                   )}
                   <p className="text-muted-foreground">{user?.email}</p>
@@ -1396,6 +1411,15 @@ function SettingsContent() {
           onSave={handleCustomTimeSave}
           initialReminders={notificationReminders}
         />
+        
+        {/* Profile Onboarding Overlay */}
+        {showProfileOverlay && (
+          <ProfileOnboardingOverlay
+            onClose={() => setShowProfileOverlay(false)}
+            onComplete={() => setShowProfileOverlay(false)}
+            onSkip={() => setShowProfileOverlay(false)}
+          />
+        )}
       </div>
     </SettingsLoadingWrapper>
   );

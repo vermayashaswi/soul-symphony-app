@@ -11,7 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 // Animated script that appears sentence by sentence
 const scriptLines = [
   "Hey, Welcome to SouLo!",
-  "Let's get to know you a little better.",
+  "No endless forms. Just use your voice and tell me about you",
   "All this will help me provide you contextual guidance and give you the best insights possible.",
   "I want to know your age, where you live, your gender, what you do for a living.",
   "Tell me about your interests, hobbies, and a little bit about what you like and dislike.",

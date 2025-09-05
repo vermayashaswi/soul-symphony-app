@@ -11,6 +11,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { v4 as uuidv4 } from 'uuid';
 import { PremiumFeatureGuard } from '@/components/subscription/PremiumFeatureGuard';
 import { setupGlobalMessageDeletionListener } from '@/hooks/use-message-deletion';
+import { ProfileOnboardingOverlay } from '@/components/profile/ProfileOnboardingOverlay';
 
 const SmartChat = () => {
   const { user } = useAuth();
@@ -18,6 +19,8 @@ const SmartChat = () => {
   const { toast } = useToast();
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
   const [isProcessingActive, setIsProcessingActive] = useState(false);
+  const [showProfileOverlay, setShowProfileOverlay] = useState(false);
+  const [isCheckingProfile, setIsCheckingProfile] = useState(true);
   const isMobile = useIsMobile();
 
   // Redirect to login if not authenticated
@@ -27,10 +30,51 @@ const SmartChat = () => {
     }
   }, [user, navigate]);
 
+  // Check if user needs profile onboarding overlay
+  useEffect(() => {
+    const checkProfileOnboarding = async () => {
+      if (!user?.id) {
+        setIsCheckingProfile(false);
+        return;
+      }
+
+      try {
+        console.log('[SmartChat] Checking first_smart_chat_visit for user:', user.id);
+        
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('first_smart_chat_visit, profile_onboarding_completed')
+          .eq('id', user.id)
+          .single();
+
+        if (error) {
+          console.error('[SmartChat] Error checking profile:', error);
+          setIsCheckingProfile(false);
+          return;
+        }
+
+        console.log('[SmartChat] Profile data:', profile);
+
+        // Show overlay if this is first smart chat visit
+        // Don't show if they already completed the old onboarding flow
+        if (profile?.first_smart_chat_visit && !profile?.profile_onboarding_completed) {
+          setShowProfileOverlay(true);
+        }
+        
+        setIsCheckingProfile(false);
+      } catch (error) {
+        console.error('[SmartChat] Exception checking profile:', error);
+        setIsCheckingProfile(false);
+      }
+    };
+
+    checkProfileOnboarding();
+  }, [user?.id]);
+
   // Load the last active thread on component mount
   useEffect(() => {
     const loadLastThread = async () => {
-      if (!user?.id) return;
+      if (!user?.id || isCheckingProfile) return;
       
       const storedThreadId = localStorage.getItem("lastActiveChatThreadId");
       if (storedThreadId) {
@@ -63,7 +107,7 @@ const SmartChat = () => {
     };
     
     loadLastThread();
-  }, [user?.id]);
+  }, [user?.id, isCheckingProfile]);
 
   // Setup global message deletion listener
   useEffect(() => {
@@ -192,6 +236,15 @@ const SmartChat = () => {
             userId={user?.id}
             isProcessingActive={isProcessingActive}
             onProcessingStateChange={setIsProcessingActive}
+          />
+        )}
+        
+        {/* Profile Onboarding Overlay */}
+        {showProfileOverlay && (
+          <ProfileOnboardingOverlay
+            onClose={() => setShowProfileOverlay(false)}
+            onComplete={() => setShowProfileOverlay(false)}
+            onSkip={() => setShowProfileOverlay(false)}
           />
         )}
       </div>

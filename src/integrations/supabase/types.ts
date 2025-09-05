@@ -270,6 +270,7 @@ export type Database = {
           display_name: string | null
           email: string | null
           entry_count: number | null
+          first_smart_chat_visit: boolean | null
           full_name: string | null
           gender: string | null
           hobbies: string[] | null
@@ -303,6 +304,7 @@ export type Database = {
           display_name?: string | null
           email?: string | null
           entry_count?: number | null
+          first_smart_chat_visit?: boolean | null
           full_name?: string | null
           gender?: string | null
           hobbies?: string[] | null
@@ -336,6 +338,7 @@ export type Database = {
           display_name?: string | null
           email?: string | null
           entry_count?: number | null
+          first_smart_chat_visit?: boolean | null
           full_name?: string | null
           gender?: string | null
           hobbies?: string[] | null
