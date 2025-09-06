@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useRef, useCallback } from 'react';
 
 interface UseTypewriterOptions {
   speed?: number; // milliseconds per character
@@ -14,15 +14,25 @@ export const useTypewriter = (
   const [displayText, setDisplayText] = useState('');
   const [isComplete, setIsComplete] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+  const timeoutsRef = useRef<NodeJS.Timeout[]>([]);
+  const hasStartedRef = useRef(false);
+
+  const cleanup = useCallback(() => {
+    timeoutsRef.current.forEach(timeout => clearTimeout(timeout));
+    timeoutsRef.current = [];
+  }, []);
 
   const startTyping = useCallback(() => {
-    if (!text) return;
+    if (!text || hasStartedRef.current) return;
+    
+    hasStartedRef.current = true;
+    cleanup();
     
     setDisplayText('');
     setIsComplete(false);
     setIsTyping(true);
 
-    const timeout = setTimeout(() => {
+    const initialTimeout = setTimeout(() => {
       let currentIndex = 0;
       
       const typeNextChar = () => {
@@ -31,7 +41,8 @@ export const useTypewriter = (
           currentIndex++;
           
           if (currentIndex <= text.length) {
-            setTimeout(typeNextChar, speed);
+            const charTimeout = setTimeout(typeNextChar, speed);
+            timeoutsRef.current.push(charTimeout);
           } else {
             setIsComplete(true);
             setIsTyping(false);
@@ -43,14 +54,16 @@ export const useTypewriter = (
       typeNextChar();
     }, startDelay);
 
-    return () => clearTimeout(timeout);
-  }, [text, speed, startDelay, onComplete]);
+    timeoutsRef.current.push(initialTimeout);
+  }, [text, speed, startDelay, onComplete, cleanup]);
 
   const reset = useCallback(() => {
+    cleanup();
+    hasStartedRef.current = false;
     setDisplayText('');
     setIsComplete(false);
     setIsTyping(false);
-  }, []);
+  }, [cleanup]);
 
   return {
     displayText,

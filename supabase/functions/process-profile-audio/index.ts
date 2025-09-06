@@ -57,7 +57,7 @@ serve(async (req) => {
     
     transcriptionFormData.append('file', audioBlob, 'audio.webm');
     transcriptionFormData.append('model', 'whisper-1');
-    transcriptionFormData.append('language', 'auto'); // Auto-detect language
+    // Language auto-detection is default when no language parameter is provided
 
     const transcriptionResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
       method: 'POST',

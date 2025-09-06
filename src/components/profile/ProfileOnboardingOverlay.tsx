@@ -25,6 +25,7 @@ export const ProfileOnboardingOverlay: React.FC<ProfileOnboardingOverlayProps> =
 }) => {
   const [showMicButton, setShowMicButton] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isSkipping, setIsSkipping] = useState(false);
   const [showThankYou, setShowThankYou] = useState(initialShowThankYou);
   const [audioLevel, setAudioLevel] = useState(0);
   const { toast } = useToast();
@@ -183,9 +184,12 @@ export const ProfileOnboardingOverlay: React.FC<ProfileOnboardingOverlayProps> =
   };
 
   const handleSkip = async () => {
-    if (!user?.id) return;
+    if (!user?.id || isSkipping) return;
     
     try {
+      setIsSkipping(true);
+      console.log('[ProfileOnboardingOverlay] Skipping onboarding for user:', user.id);
+      
       // Update first visit flag and onboarding completed when user skips
       const { error } = await supabase
         .from('profiles')
@@ -197,15 +201,33 @@ export const ProfileOnboardingOverlay: React.FC<ProfileOnboardingOverlayProps> =
         .eq('id', user.id);
 
       if (error) {
-        console.error('Error updating first visit flag:', error);
+        console.error('[ProfileOnboardingOverlay] Error updating profile during skip:', error);
+        toast({
+          title: "Skip Error",
+          description: "Failed to skip onboarding. Please try again.",
+          variant: "destructive"
+        });
+        return;
       }
+
+      console.log('[ProfileOnboardingOverlay] Successfully skipped onboarding');
+      toast({
+        title: "Onboarding Skipped",
+        description: "You can complete your profile later in settings.",
+        variant: "default"
+      });
 
       onSkip?.();
       onClose();
     } catch (error) {
-      console.error('Error in handleSkip:', error);
-      onSkip?.();
-      onClose();
+      console.error('[ProfileOnboardingOverlay] Error in handleSkip:', error);
+      toast({
+        title: "Error",
+        description: "An error occurred while skipping. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSkipping(false);
     }
   };
 
@@ -290,10 +312,11 @@ export const ProfileOnboardingOverlay: React.FC<ProfileOnboardingOverlayProps> =
         onClick={handleSkip}
         variant="ghost"
         size="sm"
-        className="absolute top-4 right-4 text-white/70 hover:text-white hover:bg-white/10"
+        disabled={isSkipping}
+        className="absolute top-4 right-4 text-white/70 hover:text-white hover:bg-white/10 disabled:opacity-50"
       >
         <X className="h-4 w-4 mr-2" />
-        Skip
+        {isSkipping ? 'Skipping...' : 'Skip'}
       </Button>
 
       {/* Animated background particles */}
