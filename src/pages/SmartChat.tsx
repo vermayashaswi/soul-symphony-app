@@ -242,6 +242,7 @@ const SmartChat = () => {
         {/* Profile Onboarding Overlay */}
         {showProfileOverlay && (
           <ProfileOnboardingOverlay
+            source="smartchat"
             onClose={() => setShowProfileOverlay(false)}
             onComplete={() => setShowProfileOverlay(false)}
             onSkip={() => setShowProfileOverlay(false)}

@@ -15,13 +15,15 @@ interface ProfileOnboardingOverlayProps {
   onComplete?: () => void;
   onSkip?: () => void;
   showThankYou?: boolean;
+  source?: 'smartchat' | 'settings';
 }
 
 export const ProfileOnboardingOverlay: React.FC<ProfileOnboardingOverlayProps> = ({
   onClose,
   onComplete,
   onSkip,
-  showThankYou: initialShowThankYou = false
+  showThankYou: initialShowThankYou = false,
+  source = 'smartchat'
 }) => {
   const [showMicButton, setShowMicButton] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -35,10 +37,10 @@ export const ProfileOnboardingOverlay: React.FC<ProfileOnboardingOverlayProps> =
   const scriptSections = [
     { text: "Hey, Welcome to SouLo!\n\n", speed: 80, pauseAfter: 800 },
     { text: "No endless forms. Just use your voice and tell me about you.\n\n", speed: 60, pauseAfter: 1000 },
-    { text: "All this will help me provide you contextual guidance...\n\n", speed: 50, pauseAfter: 800 },
+    { text: "All this will help me provide you contextual guidance.\n\n", speed: 50, pauseAfter: 800 },
     { text: "I want to know your age, where you live, your gender, what you do for a living.\n\n", speed: 45, pauseAfter: 600 },
     { text: "Tell me about your interests, hobbies, and a little bit about what you like and dislike.\n\n", speed: 45, pauseAfter: 800 },
-    { text: "The more you tell me, the more I know 'YOU' and the more 'you' helps 'you'!", speed: 40, pauseAfter: 500 }
+    { text: "The more you tell me, the more I know YOU and the more you helps you!", speed: 40, pauseAfter: 500 }
   ];
 
   const { displayText, isComplete, startTyping } = useTypewriter(scriptSections, {
@@ -214,8 +216,16 @@ export const ProfileOnboardingOverlay: React.FC<ProfileOnboardingOverlayProps> =
         variant: "default"
       });
 
-      onSkip?.();
-      onClose();
+      // Navigate based on source context
+      if (source === 'smartchat') {
+        // Just close overlay, user stays on chat
+        onSkip?.();
+        onClose();
+      } else {
+        // Close overlay, user stays on settings
+        onSkip?.();
+        onClose();
+      }
     } catch (error) {
       console.error('[ProfileOnboardingOverlay] Error in handleSkip:', error);
       toast({
@@ -355,11 +365,11 @@ export const ProfileOnboardingOverlay: React.FC<ProfileOnboardingOverlayProps> =
         </motion.div>
 
         {/* Typewriter text */}
-        <div className="mb-8 min-h-[120px] flex items-center justify-center">
+        <div className="mb-6 min-h-[100px] flex items-center justify-center">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="text-white text-lg font-medium leading-relaxed text-center whitespace-pre-line max-w-lg"
+            className="text-white text-sm font-medium leading-relaxed text-center whitespace-pre-line max-w-md"
           >
             {displayText}
             {!isComplete && <span className="animate-pulse ml-1">|</span>}

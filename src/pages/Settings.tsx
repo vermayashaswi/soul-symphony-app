@@ -1415,6 +1415,7 @@ function SettingsContent() {
         {/* Profile Onboarding Overlay */}
         {showProfileOverlay && (
           <ProfileOnboardingOverlay
+            source="settings"
             onClose={() => setShowProfileOverlay(false)}
             onComplete={() => setShowProfileOverlay(false)}
             onSkip={() => setShowProfileOverlay(false)}
