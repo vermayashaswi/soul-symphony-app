@@ -285,6 +285,7 @@ export type Database = {
           place: string | null
           profession: string | null
           profile_onboarding_completed: boolean | null
+          profilesummaryenglish: string | null
           reminder_settings: Json | null
           revenuecat_entitlements: Json | null
           subscription_status: string | null
@@ -319,6 +320,7 @@ export type Database = {
           place?: string | null
           profession?: string | null
           profile_onboarding_completed?: boolean | null
+          profilesummaryenglish?: string | null
           reminder_settings?: Json | null
           revenuecat_entitlements?: Json | null
           subscription_status?: string | null
@@ -353,6 +355,7 @@ export type Database = {
           place?: string | null
           profession?: string | null
           profile_onboarding_completed?: boolean | null
+          profilesummaryenglish?: string | null
           reminder_settings?: Json | null
           revenuecat_entitlements?: Json | null
           subscription_status?: string | null

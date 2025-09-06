@@ -32,19 +32,16 @@ export const ProfileOnboardingOverlay: React.FC<ProfileOnboardingOverlayProps> =
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const scriptLines = [
-    "Hey, Welcome to SouLo!",
-    "No endless forms. Just use your voice and tell me about you",
-    "All this will help me provide you contextual guidance...",
-    "I want to know your age, where you live, your gender, what you do for a living.",
-    "Tell me about your interests, hobbies, and a little bit about what you like and dislike.",
-    "The more you tell me, the more I know 'YOU' and the more 'you' helps 'you'!"
+  const scriptSections = [
+    { text: "Hey, Welcome to SouLo!\n\n", speed: 80, pauseAfter: 800 },
+    { text: "No endless forms. Just use your voice and tell me about you.\n\n", speed: 60, pauseAfter: 1000 },
+    { text: "All this will help me provide you contextual guidance...\n\n", speed: 50, pauseAfter: 800 },
+    { text: "I want to know your age, where you live, your gender, what you do for a living.\n\n", speed: 45, pauseAfter: 600 },
+    { text: "Tell me about your interests, hobbies, and a little bit about what you like and dislike.\n\n", speed: 45, pauseAfter: 800 },
+    { text: "The more you tell me, the more I know 'YOU' and the more 'you' helps 'you'!", speed: 40, pauseAfter: 500 }
   ];
 
-  const fullScript = scriptLines.join(' ');
-
-  const { displayText, isComplete, startTyping } = useTypewriter(fullScript, {
-    speed: 50,
+  const { displayText, isComplete, startTyping } = useTypewriter(scriptSections, {
     onComplete: () => {
       const timer = setTimeout(() => {
         setShowMicButton(true);
@@ -359,14 +356,14 @@ export const ProfileOnboardingOverlay: React.FC<ProfileOnboardingOverlayProps> =
 
         {/* Typewriter text */}
         <div className="mb-8 min-h-[120px] flex items-center justify-center">
-          <motion.p
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="text-white text-lg font-medium leading-relaxed"
+            className="text-white text-lg font-medium leading-relaxed text-center whitespace-pre-line max-w-lg"
           >
             {displayText}
-            {!isComplete && <span className="animate-pulse">|</span>}
-          </motion.p>
+            {!isComplete && <span className="animate-pulse ml-1">|</span>}
+          </motion.div>
         </div>
 
         {/* Microphone button */}

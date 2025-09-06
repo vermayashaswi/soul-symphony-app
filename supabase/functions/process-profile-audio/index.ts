@@ -85,6 +85,8 @@ serve(async (req) => {
 You are a helpful assistant that extracts personal information from transcribed user recordings. 
 The user has provided details about themselves for profile creation.
 
+First, if the transcribed text is not in English, translate it to English for better processing.
+
 Please analyze the following transcribed text and extract meaningful data. Return ONLY a valid JSON object with these fields:
 
 {
@@ -96,7 +98,8 @@ Please analyze the following transcribed text and extract meaningful data. Retur
   "hobbies": string[] | null,
   "likes": string[] | null,
   "dislikes": string[] | null,
-  "others": string | null
+  "others": string | null,
+  "profilesummaryenglish": string | null
 }
 
 Guidelines:
@@ -105,6 +108,7 @@ Guidelines:
 - Use arrays for multiple items (interests, hobbies, likes, dislikes)
 - Use null for missing information
 - For "others", include any additional personality traits, background, or context that doesn't fit other categories
+- For "profilesummaryenglish", provide a concise 2-3 sentence summary in English of the user's profile based on the transcribed information
 - Keep extracted text concise but meaningful
 - If gender is mentioned in non-standard terms, use the exact term provided by the user
 
@@ -155,6 +159,7 @@ Return only the JSON object:`;
         likes: extractedProfile.likes,
         dislikes: extractedProfile.dislikes,
         others: extractedProfile.others,
+        profilesummaryenglish: extractedProfile.profilesummaryenglish,
         updated_at: new Date().toISOString()
       })
       .eq('id', user_id);
